@@ -1,0 +1,10 @@
+{
+  "description": "Enables seamless text communication by allowing users to send and receive messages instantly for clear and efficient conversations.",
+  "robots": {
+    "index": false
+  },
+  "accessibility": {
+    "addBypassLinks": false,
+    "ignoreReducedMotion": false
+  }
+}

@@ -1,5 +1,10 @@
 target/
+node_modules/
 .idea/
 .vscode/
 *.iml
 *.log
+.env
+.env.*
+!.env.example
+application-local.properties

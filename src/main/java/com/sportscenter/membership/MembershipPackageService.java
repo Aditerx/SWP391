@@ -31,15 +31,21 @@ public class MembershipPackageService {
     @Transactional
     public MembershipPackageResponse update(Integer id, MembershipPackageRequest request) {
         MembershipPackage membershipPackage = getEntity(id);
+        String previousStatus = membershipPackage.getStatus();
         apply(membershipPackage, request);
-        return MembershipPackageResponse.from(repository.save(membershipPackage));
+        MembershipPackage saved = repository.save(membershipPackage);
+        auditStatusChange(previousStatus, saved, "UPDATE_PACKAGE");
+        return MembershipPackageResponse.from(saved);
     }
 
     @Transactional
     public MembershipPackageResponse updateStatus(Integer id, String status) {
         MembershipPackage membershipPackage = getEntity(id);
+        String previousStatus = membershipPackage.getStatus();
         membershipPackage.setStatus(status);
-        return MembershipPackageResponse.from(repository.save(membershipPackage));
+        MembershipPackage saved = repository.save(membershipPackage);
+        auditStatusChange(previousStatus, saved, "CHANGE_PACKAGE_STATUS");
+        return MembershipPackageResponse.from(saved);
     }
 
     private MembershipPackage getEntity(Integer id) {
@@ -53,5 +59,12 @@ public class MembershipPackageService {
         membershipPackage.setPrice(request.price());
         membershipPackage.setBenefits(request.benefits());
         membershipPackage.setStatus(request.status() == null ? "ACTIVE" : request.status());
+    }
+
+    private void auditStatusChange(String previousStatus, MembershipPackage saved, String action) {
+        if (previousStatus != null && !previousStatus.equalsIgnoreCase(saved.getStatus())) {
+            auditService.log(null, action, "MEMBERSHIP_PACKAGE", saved.getId(),
+                    previousStatus + " -> " + saved.getStatus());
+        }
     }
 }

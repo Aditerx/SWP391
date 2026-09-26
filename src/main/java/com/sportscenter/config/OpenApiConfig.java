@@ -13,11 +13,13 @@ public class OpenApiConfig {
 
     @Bean
     OpenAPI sportsCenterOpenApi() {
-        String scheme = "basicAuth";
+        String scheme = "sessionCookie";
         return new OpenAPI()
                 .info(new Info().title("Sports Center Management API").version("MVP"))
                 .addSecurityItem(new SecurityRequirement().addList(scheme))
                 .components(new Components().addSecuritySchemes(scheme,
-                        new SecurityScheme().type(SecurityScheme.Type.HTTP).scheme("basic")));
+                        new SecurityScheme().type(SecurityScheme.Type.APIKEY)
+                                .in(SecurityScheme.In.COOKIE)
+                                .name("JSESSIONID")));
     }
 }

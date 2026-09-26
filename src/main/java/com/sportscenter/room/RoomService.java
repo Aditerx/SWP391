@@ -1,6 +1,7 @@
 package com.sportscenter.room;
 
 import com.sportscenter.audit.AuditService;
+import com.sportscenter.common.exception.BusinessException;
 import com.sportscenter.common.exception.ResourceNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -31,15 +32,26 @@ public class RoomService {
     @Transactional
     public RoomResponse update(Integer id, RoomRequest request) {
         Room room = getEntity(id);
+        String previousStatus = room.getStatus();
+        validateRoomCanBecomeUnavailable(room, request.status());
         apply(room, request);
-        return RoomResponse.from(repository.save(room));
+        Room saved = repository.save(room);
+        auditStatusChange(previousStatus, saved, "UPDATE_ROOM");
+        return RoomResponse.from(saved);
     }
 
     @Transactional
     public RoomResponse updateStatus(Integer id, String status) {
         Room room = getEntity(id);
+        String previousStatus = room.getStatus();
+        validateRoomCanBecomeUnavailable(room, status);
         room.setStatus(status);
-        return RoomResponse.from(repository.save(room));
+        Room saved = repository.save(room);
+        if (!previousStatus.equalsIgnoreCase(saved.getStatus())) {
+            auditService.log(null, "CHANGE_ROOM_STATUS", "ROOM", saved.getId(),
+                    previousStatus + " -> " + saved.getStatus());
+        }
+        return RoomResponse.from(saved);
     }
 
     private Room getEntity(Integer id) {
@@ -52,5 +64,32 @@ public class RoomService {
         room.setLocation(request.location());
         room.setCapacity(request.capacity());
         room.setStatus(request.status() == null ? "ACTIVE" : request.status());
+    }
+
+    private void validateRoomCanBecomeUnavailable(Room room, String requestedStatus) {
+        if (requestedStatus == null || "Available".equalsIgnoreCase(requestedStatus)
+                || requestedStatus.equalsIgnoreCase(room.getStatus())) {
+            return;
+        }
+
+        List<RoomScheduleConflict> conflicts = repository.findFutureScheduledSessions(room.getId());
+        if (!conflicts.isEmpty()) {
+            String affected = conflicts.stream()
+                    .limit(5)
+                    .map(item -> "#" + item.getSessionId() + " " + item.getClassName() + " ("
+                            + item.getSessionDate() + " " + item.getStartTime() + ")")
+                    .reduce((left, right) -> left + ", " + right)
+                    .orElse("");
+            String suffix = conflicts.size() > 5 ? ", ..." : "";
+            throw new BusinessException("Room still has future scheduled sessions: " + affected + suffix
+                    + ". Reassign or cancel them before changing the room status.");
+        }
+    }
+
+    private void auditStatusChange(String previousStatus, Room saved, String action) {
+        if (previousStatus != null && !previousStatus.equalsIgnoreCase(saved.getStatus())) {
+            auditService.log(null, action, "ROOM", saved.getId(),
+                    previousStatus + " -> " + saved.getStatus());
+        }
     }
 }
