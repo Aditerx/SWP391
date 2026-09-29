@@ -81,4 +81,7 @@ public interface SessionRepository extends JpaRepository<Session, Integer> {
                                        @Param("startDate") LocalDate startDate,
                                        @Param("endDate") LocalDate endDate,
                                        @Param("status") String status);
+    List<Session> findBySessionDateBetween(LocalDate startDate, LocalDate endDate);
+
+    long countBySessionDate(LocalDate sessionDate);
 }

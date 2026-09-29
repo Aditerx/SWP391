@@ -12,8 +12,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
 import java.time.LocalDate;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -26,7 +26,6 @@ public class SportsClassService {
 
     @Transactional(readOnly = true)
     public List<SportsClassResponse> findAll() {
-        return repository.findAll().stream().map(SportsClassResponse::from).toList();
         return repository.findAll().stream().map(c -> {
             int count = (int) classEnrollmentRepository.countBySportsClassIdAndStatus(c.getId(), "Registered");
             return SportsClassResponse.from(c, count);
@@ -35,7 +34,6 @@ public class SportsClassService {
 
     @Transactional(readOnly = true)
     public SportsClassResponse findById(Integer id) {
-        return SportsClassResponse.from(getEntity(id));
         SportsClass entity = getEntity(id);
         int count = (int) classEnrollmentRepository.countBySportsClassIdAndStatus(entity.getId(), "Registered");
         return SportsClassResponse.from(entity, count);
@@ -49,7 +47,6 @@ public class SportsClassService {
         apply(sportsClass, request);
         SportsClass saved = repository.save(sportsClass);
         auditService.log(null, "CREATE_CLASS", "CLASS", saved.getId(), saved.getName());
-        return SportsClassResponse.from(saved);
         return SportsClassResponse.from(saved, 0);
     }
 
@@ -58,7 +55,6 @@ public class SportsClassService {
         validateDateRange(request);
         SportsClass sportsClass = getEntity(id);
         apply(sportsClass, request);
-        return SportsClassResponse.from(repository.save(sportsClass));
         SportsClass saved = repository.save(sportsClass);
         int count = (int) classEnrollmentRepository.countBySportsClassIdAndStatus(saved.getId(), "Registered");
         return SportsClassResponse.from(saved, count);
@@ -71,7 +67,6 @@ public class SportsClassService {
         sportsClass.setCoach(coach);
         SportsClass saved = repository.save(sportsClass);
         auditService.log(null, "ASSIGN_COACH", "CLASS", saved.getId(), "coachId=" + coachId);
-        return SportsClassResponse.from(saved);
         int count = (int) classEnrollmentRepository.countBySportsClassIdAndStatus(saved.getId(), "Registered");
         return SportsClassResponse.from(saved, count);
     }

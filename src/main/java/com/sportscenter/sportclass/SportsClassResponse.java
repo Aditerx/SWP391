@@ -10,11 +10,9 @@ public record SportsClassResponse(
         Integer maxCapacity,
         LocalDate startDate,
         LocalDate endDate,
-        String status) {
         String status,
         Integer enrolledCount) {
 
-    static SportsClassResponse from(SportsClass sportsClass) {
     public static SportsClassResponse from(SportsClass sportsClass) {
         return from(sportsClass, null);
     }
@@ -28,7 +26,6 @@ public record SportsClassResponse(
                 sportsClass.getMaxCapacity(),
                 sportsClass.getStartDate(),
                 sportsClass.getEndDate(),
-                sportsClass.getStatus());
                 sportsClass.getStatus(),
                 enrolledCount);
     }

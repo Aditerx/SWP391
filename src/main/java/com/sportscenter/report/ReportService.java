@@ -46,7 +46,7 @@ public class ReportService {
                 .filter(s -> "Active".equalsIgnoreCase(s.getStatus()) && (s.getEndDate() == null || !s.getEndDate().isBefore(LocalDate.now())))
                 .count();
 
-        long todaySessions = sessionRepository.findByDateBetween(LocalDate.now(), LocalDate.now()).size();
+        long todaySessions = sessionRepository.findBySessionDateBetween(LocalDate.now(), LocalDate.now()).size();
 
         return new DashboardResponse(
                 userRepository.count(),
