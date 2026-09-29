@@ -32,8 +32,8 @@ RUN mvn package -DskipTests -q
 FROM eclipse-temurin:17-jre-alpine
 WORKDIR /app
 
-# Limit heap for Render Free (512 MB RAM)
-ENV JAVA_OPTS="-Xmx400m -Xms200m"
+# Limit heap for Render Free (512 MB RAM) & force IPv4 to avoid Network unreachable errors
+ENV JAVA_OPTS="-Xmx400m -Xms200m -Djava.net.preferIPv4Stack=true"
 
 COPY --from=be-build /app/target/*.jar app.jar
 
