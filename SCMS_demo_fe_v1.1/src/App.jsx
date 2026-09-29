@@ -9,6 +9,10 @@ import { Toast } from './components/common/Toast';
 import { HomeLandingView } from './components/views/HomeLandingView';
 import { LoginView } from './components/views/LoginView';
 
+// Admin Views
+import { AdminUserManagement } from './components/views/AdminUserManagement';
+import { AdminRBACView } from './components/views/AdminRBACView';
+
 // Manager Views
 import { ManagerDashboard } from './components/views/ManagerDashboard';
 import { StaffManagement } from './components/views/StaffManagement';
@@ -20,6 +24,7 @@ import { PaymentManagement } from './components/views/PaymentManagement';
 import { ReportsView } from './components/views/ReportsView';
 import { AuditLogView } from './components/views/AuditLogView';
 import { ResourceManagement } from './components/views/ResourceManagement';
+
 
 // Coach Views
 import { CoachDashboard } from './components/views/CoachDashboard';
@@ -95,6 +100,12 @@ function SCMSApp() {
   // Render current view
   const renderView = () => {
     switch (currentTab) {
+      // Admin
+      case 'admin_users':
+        return <AdminUserManagement />;
+      case 'admin_rbac':
+        return <AdminRBACView />;
+
       // Manager
       case 'dashboard':
         return <ManagerDashboard />;
@@ -162,12 +173,14 @@ function SCMSApp() {
         return <PersonalProfileView />;
 
       default:
-        return <ManagerDashboard />;
+        return role === 'admin' ? <AdminUserManagement /> : <ManagerDashboard />;
     }
   };
 
   const getPageTitle = () => {
     switch (currentTab) {
+      case 'admin_users': return t('userManagement');
+      case 'admin_rbac': return t('rbacManagement');
       case 'dashboard':
       case 'coach_dashboard':
       case 'reception_dashboard':
@@ -195,6 +208,7 @@ function SCMSApp() {
       default: return t('dashboard');
     }
   };
+
 
   return (
     <div className="min-h-screen bg-[#F7F5F0] text-[#2D2721] flex flex-row font-sans antialiased">

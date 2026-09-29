@@ -13,6 +13,10 @@ public interface UserRepository extends JpaRepository<User, Integer> {
             "where lower(u.email) = lower(:email)")
     Optional<User> findForAuthentication(@Param("email") String email);
 
+    Optional<User> findByEmail(String email);
+
+    Optional<User> findByEmailIgnoreCase(String email);
+
     @Query(value = "SELECT COUNT(*) FROM users u JOIN roles r ON r.role_id = u.role_id " +
             "WHERE UPPER(r.role_name) = 'MEMBER'", nativeQuery = true)
     long countMembers();

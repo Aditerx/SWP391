@@ -6,9 +6,9 @@ import { AlertTriangle, ShieldAlert, Check, X } from 'lucide-react';
 
 
 export function AttendanceCorrectionModal({
-  classId, memberId, memberName, currentStatus, isOpen, onClose
+  classId, memberId, memberName, currentStatus, attendanceId, isOpen, onClose
 }) {
-  const { recordAttendance, t, language } = useSCMS();
+  const { recordAttendance, correctAttendance, t, language } = useSCMS();
   const [selectedStatus, setSelectedStatus] = useState(currentStatus);
   const [reason, setReason] = useState('');
   const [error, setError] = useState('');
@@ -22,7 +22,11 @@ export function AttendanceCorrectionModal({
       return;
     }
 
-    recordAttendance(classId, memberId, selectedStatus, reason);
+    if (attendanceId) {
+      correctAttendance(attendanceId, selectedStatus, reason);
+    } else {
+      recordAttendance(classId, memberId, selectedStatus, reason);
+    }
     onClose();
   };
 

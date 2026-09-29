@@ -27,17 +27,20 @@ public class SubjectController {
     }
 
     @PostMapping
+    @PreAuthorize("hasAuthority('MANAGE_CLASSES')")
     public ResponseEntity<SubjectResponse> create(@Valid @RequestBody SubjectRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(service.create(request));
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasAuthority('MANAGE_CLASSES')")
     public ResponseEntity<SubjectResponse> update(@PathVariable Integer id,
                                                    @Valid @RequestBody SubjectRequest request) {
         return ResponseEntity.ok(service.update(id, request));
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasAuthority('MANAGE_CLASSES')")
     public ResponseEntity<Void> delete(@PathVariable Integer id) {
         service.delete(id);
         return ResponseEntity.noContent().build();

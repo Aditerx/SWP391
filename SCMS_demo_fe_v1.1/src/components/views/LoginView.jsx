@@ -717,25 +717,84 @@ export function LoginView({ onLoginSuccess, onBackToHome, initialMode = 'login',
               </button>
             </div>
 
-            {/* Quick Demo Fill Helper */}
-            <div className="mt-6 p-3.5 rounded-md border border-stone-200 bg-stone-50/70 flex items-center justify-between gap-3 text-xs">
-              <div>
+            {/* Quick Demo Fill Helper with all Roles */}
+            <div className="mt-6 p-3.5 rounded-lg border border-stone-200 bg-stone-50/90 space-y-2 text-xs">
+              <div className="flex items-center justify-between pb-1 border-b border-stone-200">
                 <p className="text-[11px] font-bold text-stone-800">
-                  {isVi ? 'Tài khoản trình diễn' : 'Demo account'}
+                  {isVi ? 'Tài khoản trình diễn theo vai trò (Demo accounts)' : 'Quick Demo Accounts'}
                 </p>
-                <p className="mt-0.5 text-[11px] text-stone-500 font-mono">
-                  {DEMO_EMAIL} · {DEMO_PASSWORD}
-                </p>
+                <span className="text-[10px] text-stone-400 font-mono">Pass: 12345678</span>
               </div>
-              <button
-                type="button"
-                onClick={fillDemoAccount}
-                className="px-2.5 py-1.5 border border-stone-300 rounded text-[11px] font-bold text-stone-700 bg-white hover:bg-stone-50 whitespace-nowrap cursor-pointer transition-colors shadow-2xs"
-              >
-                {isVi ? 'Điền lại' : 'Fill'}
-              </button>
+
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 pt-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setLoginEmail('admin@scms.com');
+                    setLoginPassword('12345678');
+                    setIsLoginCaptchaChecked(true);
+                    setLoginError('');
+                  }}
+                  className="px-2 py-1.5 border border-purple-200 bg-purple-50/60 hover:bg-purple-100/80 rounded text-[11px] font-bold text-purple-900 text-left transition-colors cursor-pointer"
+                >
+                  👑 Admin
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setLoginEmail('manager@scms.com');
+                    setLoginPassword('12345678');
+                    setIsLoginCaptchaChecked(true);
+                    setLoginError('');
+                  }}
+                  className="px-2 py-1.5 border border-blue-200 bg-blue-50/60 hover:bg-blue-100/80 rounded text-[11px] font-bold text-blue-900 text-left transition-colors cursor-pointer"
+                >
+                  🏢 Manager
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setLoginEmail('mai.do@fitzone.vn');
+                    setLoginPassword('12345678');
+                    setIsLoginCaptchaChecked(true);
+                    setLoginError('');
+                  }}
+                  className="px-2 py-1.5 border border-amber-200 bg-amber-50/60 hover:bg-amber-100/80 rounded text-[11px] font-bold text-amber-900 text-left transition-colors cursor-pointer"
+                >
+                  🛎️ Lễ tân
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setLoginEmail('huong.tran@fitzone.vn');
+                    setLoginPassword('12345678');
+                    setIsLoginCaptchaChecked(true);
+                    setLoginError('');
+                  }}
+                  className="px-2 py-1.5 border border-emerald-200 bg-emerald-50/60 hover:bg-emerald-100/80 rounded text-[11px] font-bold text-emerald-900 text-left transition-colors cursor-pointer"
+                >
+                  💪 Coach
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setLoginEmail('oanh.hoang@fitzone.vn');
+                    setLoginPassword('12345678');
+                    setIsLoginCaptchaChecked(true);
+                    setLoginError('');
+                  }}
+                  className="px-2 py-1.5 border border-stone-200 bg-white hover:bg-stone-100 rounded text-[11px] font-bold text-stone-800 text-left transition-colors cursor-pointer col-span-2 sm:col-span-1"
+                >
+                  🏃 Member
+                </button>
+              </div>
             </div>
           </div>
+
         ) : (
           /* ============================================================ */
           /* MODE: REGISTER FORM                                          */

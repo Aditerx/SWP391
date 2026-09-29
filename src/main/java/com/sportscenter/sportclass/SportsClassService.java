@@ -3,6 +3,7 @@ package com.sportscenter.sportclass;
 import com.sportscenter.audit.AuditService;
 import com.sportscenter.common.exception.BusinessException;
 import com.sportscenter.common.exception.ResourceNotFoundException;
+import com.sportscenter.enrollment.ClassEnrollmentRepository;
 import com.sportscenter.subject.Subject;
 import com.sportscenter.subject.SubjectRepository;
 import com.sportscenter.user.User;
@@ -20,16 +21,24 @@ public class SportsClassService {
     private final SportsClassRepository repository;
     private final SubjectRepository subjectRepository;
     private final UserRepository userRepository;
+    private final ClassEnrollmentRepository classEnrollmentRepository;
     private final AuditService auditService;
 
     @Transactional(readOnly = true)
     public List<SportsClassResponse> findAll() {
         return repository.findAll().stream().map(SportsClassResponse::from).toList();
+        return repository.findAll().stream().map(c -> {
+            int count = (int) classEnrollmentRepository.countBySportsClassIdAndStatus(c.getId(), "Registered");
+            return SportsClassResponse.from(c, count);
+        }).toList();
     }
 
     @Transactional(readOnly = true)
     public SportsClassResponse findById(Integer id) {
         return SportsClassResponse.from(getEntity(id));
+        SportsClass entity = getEntity(id);
+        int count = (int) classEnrollmentRepository.countBySportsClassIdAndStatus(entity.getId(), "Registered");
+        return SportsClassResponse.from(entity, count);
     }
 
     @Transactional
@@ -41,6 +50,7 @@ public class SportsClassService {
         SportsClass saved = repository.save(sportsClass);
         auditService.log(null, "CREATE_CLASS", "CLASS", saved.getId(), saved.getName());
         return SportsClassResponse.from(saved);
+        return SportsClassResponse.from(saved, 0);
     }
 
     @Transactional
@@ -49,6 +59,9 @@ public class SportsClassService {
         SportsClass sportsClass = getEntity(id);
         apply(sportsClass, request);
         return SportsClassResponse.from(repository.save(sportsClass));
+        SportsClass saved = repository.save(sportsClass);
+        int count = (int) classEnrollmentRepository.countBySportsClassIdAndStatus(saved.getId(), "Registered");
+        return SportsClassResponse.from(saved, count);
     }
 
     @Transactional
@@ -59,6 +72,8 @@ public class SportsClassService {
         SportsClass saved = repository.save(sportsClass);
         auditService.log(null, "ASSIGN_COACH", "CLASS", saved.getId(), "coachId=" + coachId);
         return SportsClassResponse.from(saved);
+        int count = (int) classEnrollmentRepository.countBySportsClassIdAndStatus(saved.getId(), "Registered");
+        return SportsClassResponse.from(saved, count);
     }
 
     private void apply(SportsClass sportsClass, SportsClassRequest request) {
@@ -70,7 +85,15 @@ public class SportsClassService {
         sportsClass.setMaxCapacity(request.maxCapacity());
         sportsClass.setStartDate(request.startDate());
         sportsClass.setEndDate(request.endDate());
-        sportsClass.setStatus(request.status() == null ? "ACTIVE" : request.status());
+        sportsClass.setStatus(request.status() == null ? "Open" : normalizeClassStatus(request.status()));
+    }
+
+    private String normalizeClassStatus(String status) {
+        if ("Open".equalsIgnoreCase(status)) return "Open";
+        if ("Ongoing".equalsIgnoreCase(status)) return "Ongoing";
+        if ("Closed".equalsIgnoreCase(status)) return "Closed";
+        if ("Cancelled".equalsIgnoreCase(status)) return "Cancelled";
+        throw new BusinessException("Invalid class status: " + status + ". Must be Open, Ongoing, Closed, or Cancelled");
     }
 
     private SportsClass getEntity(Integer id) {

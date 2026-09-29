@@ -11,6 +11,10 @@ export const translations = {
     dashboard: 'Tổng quan',
     staff: 'Nhân viên',
     members: 'Thành viên',
+    users: 'Người dùng',
+    userManagement: 'Quản lý người dùng',
+    rbacManagement: 'Phân quyền vai trò (RBAC)',
+    subscriptions: 'Gói tập & Gia hạn',
     packages: 'Gói thành viên',
     memberships: 'Hội viên',
     classes: 'Lớp học',
@@ -32,11 +36,28 @@ export const translations = {
     login: 'Đăng nhập',
     
     // Role names
+    roleAdmin: 'Quản trị viên',
     roleManager: 'Quản lý trung tâm',
     roleCoach: 'Huấn luyện viên',
     roleReceptionist: 'Lễ tân',
     roleMember: 'Thành viên',
     switchRole: 'Chuyển vai trò thử nghiệm',
+
+    // RBAC & Subscriptions Actions
+    savePermissions: 'Lưu phân quyền',
+    permissionsUpdated: 'Đã cập nhật phân quyền vai trò thành công!',
+    renewSubscription: 'Gia hạn gói tập',
+    registerSubscription: 'Đăng ký gói tập',
+    subscriptionHistory: 'Lịch sử gói tập',
+    currentSubscription: 'Gói tập hiện tại',
+    startDate: 'Ngày bắt đầu',
+    endDate: 'Ngày kết thúc',
+    durationDays: 'Thời hạn (ngày)',
+    paymentMethod: 'Hình thức thanh toán',
+    registeredBy: 'Tiếp nhận bởi',
+    lockUser: 'Khóa tài khoản',
+    unlockUser: 'Mở khóa tài khoản',
+
 
     // Language switcher
     language: 'Ngôn ngữ',
@@ -60,8 +81,11 @@ export const translations = {
     // Statuses - Class
     draft: 'Bản nháp',
     published: 'Đã xuất bản',
+    open: 'Mở đăng ký',
+    ongoing: 'Đang diễn ra',
     full: 'Hết chỗ',
     completed: 'Hoàn thành',
+    closed: 'Đã đóng',
 
     // Statuses - Attendance
     present: 'Có mặt',
@@ -151,6 +175,10 @@ export const translations = {
     dashboard: 'Dashboard',
     staff: 'Staff',
     members: 'Members',
+    users: 'Users',
+    userManagement: 'User Management',
+    rbacManagement: 'Role Permissions (RBAC)',
+    subscriptions: 'Subscriptions & Renewals',
     packages: 'Membership Packages',
     memberships: 'Memberships',
     classes: 'Classes',
@@ -172,11 +200,28 @@ export const translations = {
     login: 'Log In',
 
     // Role names
+    roleAdmin: 'Administrator',
     roleManager: 'Center Manager',
     roleCoach: 'Coach',
     roleReceptionist: 'Receptionist',
     roleMember: 'Member',
     switchRole: 'Switch Simulation Role',
+
+    // RBAC & Subscriptions Actions
+    savePermissions: 'Save Permissions',
+    permissionsUpdated: 'Role permissions updated successfully!',
+    renewSubscription: 'Renew Subscription',
+    registerSubscription: 'Register Subscription',
+    subscriptionHistory: 'Subscription History',
+    currentSubscription: 'Current Subscription',
+    startDate: 'Start Date',
+    endDate: 'End Date',
+    durationDays: 'Duration (Days)',
+    paymentMethod: 'Payment Method',
+    registeredBy: 'Registered By',
+    lockUser: 'Lock Account',
+    unlockUser: 'Unlock Account',
+
 
     // Language switcher
     language: 'Language',
@@ -200,8 +245,11 @@ export const translations = {
     // Statuses - Class
     draft: 'Draft',
     published: 'Published',
+    open: 'Open',
+    ongoing: 'Ongoing',
     full: 'Full',
     completed: 'Completed',
+    closed: 'Closed',
 
     // Statuses - Attendance
     present: 'Present',

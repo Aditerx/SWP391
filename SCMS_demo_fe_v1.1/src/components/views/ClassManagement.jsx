@@ -3,7 +3,8 @@ import { useSCMS } from '../../context/SCMSContext';
 import { formatDate } from '../../locales/translations';
 import { StatusBadge } from '../common/Badge';
 import { NewClassModal } from '../modals/NewClassModal';
-import { Calendar, CalendarPlus, Users, Clock, MapPin, Search, Edit3, UserRoundCheck, X } from 'lucide-react';
+import { ClassScheduleModal } from '../modals/ClassScheduleModal';
+import { Calendar, CalendarPlus, Users, Clock, MapPin, Search, Edit3, UserRoundCheck, CalendarDays, X } from 'lucide-react';
 
 function EditClassModal({ item, subjects, staff, language, onClose, onSave }) {
   const coaches = staff.filter(person => person.role === 'coach' && person.status === 'active');
@@ -36,10 +37,15 @@ function EditClassModal({ item, subjects, staff, language, onClose, onSave }) {
             <label className="block text-xs font-bold">{language === 'vi' ? 'Bắt đầu' : 'Start'}<input type="date" value={form.startDate || ''} onChange={e => setForm({ ...form, startDate: e.target.value, date: e.target.value })} className="mt-1 block w-full border rounded px-3 py-2 font-normal" /></label>
             <label className="block text-xs font-bold">{language === 'vi' ? 'Kết thúc' : 'End'}<input type="date" value={form.endDate || ''} onChange={e => setForm({ ...form, endDate: e.target.value })} className="mt-1 block w-full border rounded px-3 py-2 font-normal" /></label>
           </div>
-          <label className="block text-xs font-bold">{language === 'vi' ? 'Trạng thái' : 'Status'}<select value={form.status || 'published'} onChange={e => {
-            const apiStatuses = { published: 'Open', completed: 'Closed', cancelled: 'Cancelled' };
-            setForm({ ...form, status: e.target.value, apiStatus: apiStatuses[e.target.value] });
-          }} className="mt-1 block w-full border rounded px-3 py-2 font-normal"><option value="published">Open / Ongoing</option><option value="completed">Closed</option><option value="cancelled">Cancelled</option></select></label>
+          <label className="block text-xs font-bold">{language === 'vi' ? 'Trạng thái' : 'Status'}<select value={form.status || 'open'} onChange={e => {
+            const apiStatuses = { open: 'Open', ongoing: 'Ongoing', closed: 'Closed', cancelled: 'Cancelled' };
+            setForm({ ...form, status: e.target.value, apiStatus: apiStatuses[e.target.value] || 'Open' });
+          }} className="mt-1 block w-full border rounded px-3 py-2 font-normal">
+            <option value="open">{language === 'vi' ? 'Mở đăng ký (Open)' : 'Open'}</option>
+            <option value="ongoing">{language === 'vi' ? 'Đang diễn ra (Ongoing)' : 'Ongoing'}</option>
+            <option value="closed">{language === 'vi' ? 'Đã kết thúc (Closed)' : 'Closed'}</option>
+            <option value="cancelled">{language === 'vi' ? 'Đã hủy (Cancelled)' : 'Cancelled'}</option>
+          </select></label>
         </div>
         <div className="p-4 border-t flex justify-end gap-2"><button type="button" onClick={onClose} className="px-3 py-2 bg-slate-100 rounded text-xs font-bold">{language === 'vi' ? 'Hủy' : 'Cancel'}</button><button disabled={saving} className="px-3 py-2 bg-slate-900 text-white rounded text-xs font-bold disabled:opacity-50">{saving ? '...' : (language === 'vi' ? 'Lưu' : 'Save')}</button></div>
       </form>
@@ -48,11 +54,12 @@ function EditClassModal({ item, subjects, staff, language, onClose, onSave }) {
 }
 
 export function ClassManagement() {
-  const { classes, subjects, staff, updateClass, assignCoach, showToast, t, language } = useSCMS();
+  const { classes, subjects, staff, sessions, updateClass, assignCoach, showToast, t, language } = useSCMS();
   const [viewMode, setViewMode] = useState('list');
   const [isNewClassOpen, setIsNewClassOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [editingClass, setEditingClass] = useState(null);
+  const [schedulingClass, setSchedulingClass] = useState(null);
   const [assigningId, setAssigningId] = useState(null);
 
   const saveClass = async (data) => {
@@ -102,7 +109,7 @@ export function ClassManagement() {
           </div>
           <div>
             <h2 className="text-sm font-bold text-slate-900 tracking-tight">{t('classes')}</h2>
-            <p className="text-xs text-slate-500">{language === 'vi' ? 'Quản lý lớp nhóm, phân công huấn luyện viên và sức chứa phòng tập' : 'Manage group classes, coach assignments and room capacity'}</p>
+            <p className="text-xs text-slate-500">{language === 'vi' ? 'Quản lý lớp nhóm, phân công huấn luyện viên, xếp lịch buổi học và sức chứa phòng tập' : 'Manage group classes, coach assignments, session schedules and room capacity'}</p>
           </div>
         </div>
 
@@ -152,51 +159,79 @@ export function ClassManagement() {
       {/* Content */}
       {viewMode === 'list' ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {filteredClasses.map(cls => (
-            <div key={cls.id} className="bg-white border border-slate-200 hover:border-slate-300 rounded-lg p-5 shadow-xs transition-all space-y-4">
-              <div className="flex items-start justify-between">
+          {filteredClasses.map(cls => {
+            const classSessionCount = sessions.filter(s => String(s.classId) === String(cls.id)).length;
+            return (
+              <div key={cls.id} className="bg-white border border-slate-200 hover:border-slate-300 rounded-lg p-5 shadow-xs transition-all space-y-4 flex flex-col justify-between">
                 <div>
-                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-100 text-slate-700 font-bold border border-slate-200 uppercase">
-                    {cls.category}
-                  </span>
-                  <h3 className="text-sm font-bold text-slate-900 mt-1.5">{language === 'vi' ? cls.nameVi : cls.name}</h3>
-                </div>
-                <StatusBadge type="class" status={cls.status} />
-              </div>
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-100 text-slate-700 font-bold border border-slate-200 uppercase">
+                        {cls.category}
+                      </span>
+                      <h3 className="text-sm font-bold text-slate-900 mt-1.5">{language === 'vi' ? cls.nameVi : cls.name}</h3>
+                    </div>
+                    <StatusBadge type="class" status={cls.status} />
+                  </div>
 
-              <div className="space-y-2 text-xs text-slate-700 bg-slate-50 p-3 rounded border border-slate-200">
-                <div className="flex items-center gap-2">
-                  <Clock className="w-3.5 h-3.5 text-slate-500" />
-                  <span className="tabular-nums">{formatDate(cls.date, language)} &bull; {cls.startTime} ({cls.durationMinutes} {language === 'vi' ? 'phút' : 'min'})</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <MapPin className="w-3.5 h-3.5 text-slate-500" />
-                  <span>{language === 'vi' ? (cls.roomVi || cls.room) : cls.room}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Users className="w-3.5 h-3.5 text-slate-500" />
-                  <span>{language === 'vi' ? 'Sức chứa' : 'Capacity'}: <strong className={`tabular-nums ${cls.enrolledCount >= cls.capacity ? 'text-rose-700' : 'text-slate-900'}`}>{cls.enrolledCount}/{cls.capacity}</strong> {language === 'vi' ? 'học viên' : 'members'}</span>
-                </div>
-              </div>
+                  <div className="mt-3 space-y-2 text-xs text-slate-700 bg-slate-50 p-3 rounded border border-slate-200">
+                    <div className="flex items-center gap-2">
+                      <Clock className="w-3.5 h-3.5 text-slate-500" />
+                      <span className="tabular-nums">
+                        {cls.startDate ? `${formatDate(cls.startDate, language)} - ${cls.endDate ? formatDate(cls.endDate, language) : ''}` : 'Chưa xếp ngày'}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <CalendarDays className="w-3.5 h-3.5 text-slate-500" />
+                      <span>{language === 'vi' ? 'Số buổi học:' : 'Sessions:'} <strong className="text-blue-700 font-mono">{classSessionCount}</strong> {language === 'vi' ? 'buổi' : 'sessions'}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Users className="w-3.5 h-3.5 text-slate-500" />
+                      <span>{language === 'vi' ? 'Sức chứa' : 'Capacity'}: <strong className={`tabular-nums ${cls.enrolledCount >= cls.capacity ? 'text-rose-700' : 'text-slate-900'}`}>{cls.enrolledCount}/{cls.capacity}</strong> {language === 'vi' ? 'học viên' : 'members'}</span>
+                    </div>
+                  </div>
 
-              <div className="flex items-center justify-between text-xs pt-1 border-t border-slate-100">
-                <div className="text-slate-600">{language === 'vi' ? 'Huấn luyện viên' : 'Coach'}: <strong className="text-slate-900">{cls.coachName}</strong></div>
-                <span className="text-[10px] text-blue-800 font-bold bg-blue-50 border border-blue-200 px-2 py-0.5 rounded">
-                  Tier {cls.minTierRequired}+
-                </span>
+                  <div className="flex items-center justify-between text-xs pt-3 mt-3 border-t border-slate-100">
+                    <div className="text-slate-600">{language === 'vi' ? 'Huấn luyện viên' : 'Coach'}: <strong className="text-slate-900">{cls.coachName || 'Chưa phân công'}</strong></div>
+                  </div>
+                </div>
+
+                <div className="space-y-2 pt-2 border-t border-slate-100">
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setSchedulingClass(cls)}
+                      className="flex-1 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-800 border border-blue-200 rounded text-xs font-bold flex items-center justify-center gap-1.5 transition-all"
+                    >
+                      <Calendar className="w-3.5 h-3.5" />
+                      <span>{language === 'vi' ? 'Lịch buổi học' : 'Schedule'}</span>
+                    </button>
+                    <button
+                      onClick={() => setEditingClass(cls)}
+                      className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 rounded text-xs font-bold flex items-center gap-1 transition-all"
+                    >
+                      <Edit3 className="w-3.5 h-3.5" />
+                      <span>{language === 'vi' ? 'Sửa' : 'Edit'}</span>
+                    </button>
+                  </div>
+
+                  <label className="block relative">
+                    <UserRoundCheck className="w-3.5 h-3.5 absolute left-2 top-2 text-slate-500" />
+                    <select
+                      disabled={assigningId === cls.id}
+                      value=""
+                      onChange={e => changeCoach(cls.id, e.target.value)}
+                      className="w-full pl-7 pr-2 py-1.5 border border-slate-300 rounded text-xs bg-white disabled:opacity-50 font-medium"
+                    >
+                      <option value="">{language === 'vi' ? 'Phân công coach…' : 'Assign coach…'}</option>
+                      {staff.filter(person => person.role === 'coach' && person.status === 'active').map(coach => (
+                        <option key={coach.id} value={coach.id}>{coach.name}</option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
               </div>
-              <div className="flex gap-2 pt-2 border-t border-slate-100">
-                <button onClick={() => setEditingClass(cls)} className="px-2.5 py-1.5 bg-slate-100 rounded text-xs font-bold flex items-center gap-1"><Edit3 className="w-3.5 h-3.5" />{language === 'vi' ? 'Sửa' : 'Edit'}</button>
-                <label className="flex-1 relative">
-                  <UserRoundCheck className="w-3.5 h-3.5 absolute left-2 top-2 text-slate-500" />
-                  <select disabled={assigningId === cls.id} value="" onChange={e => changeCoach(cls.id, e.target.value)} className="w-full pl-7 pr-2 py-1.5 border border-slate-300 rounded text-xs bg-white disabled:opacity-50">
-                    <option value="">{language === 'vi' ? 'Phân công coach…' : 'Assign coach…'}</option>
-                    {staff.filter(person => person.role === 'coach' && person.status === 'active').map(coach => <option key={coach.id} value={coach.id}>{coach.name}</option>)}
-                  </select>
-                </label>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       ) : (
         /* Calendar Matrix Grid View */
@@ -213,14 +248,14 @@ export function ClassManagement() {
                 return <div key={`empty-${i}`} aria-hidden="true" className="min-h-[80px] rounded bg-slate-50/40 border border-dashed border-slate-100" />;
               }
               const dateStr = `2026-09-${String(day).padStart(2,'0')}`;
-              const dayClasses = classes.filter(c => c.date === dateStr);
+              const daySessions = sessions.filter(s => (s.sessionDate || s.date) === dateStr);
 
               return (
-                <div key={dateStr} className={`p-2 bg-slate-50 border border-slate-200 rounded min-h-[80px] text-left ${day === 22 ? 'ring-2 ring-blue-600 bg-blue-50/30' : ''}`}>
+                <div key={dateStr} className={`p-2 bg-slate-50 border border-slate-200 rounded min-h-[80px] text-left ${day === 24 ? 'ring-2 ring-blue-600 bg-blue-50/30' : ''}`}>
                   <div className="text-[10px] font-mono font-bold text-slate-500 mb-1 tabular-nums">{day}</div>
-                  {dayClasses.map(c => (
-                    <div key={c.id} title={`${c.startTime} — ${language === 'vi' ? c.nameVi : c.name}`} className="p-1 bg-white border border-slate-300 rounded text-[10px] text-slate-900 font-semibold line-clamp-2 mb-1 shadow-2xs">
-                      <span className="text-blue-700 tabular-nums">{c.startTime}</span> {language === 'vi' ? c.nameVi : c.name}
+                  {daySessions.map(s => (
+                    <div key={s.id} title={`${s.startTime} — ${s.className} (${s.roomName})`} className="p-1 bg-white border border-slate-300 rounded text-[10px] text-slate-900 font-semibold line-clamp-2 mb-1 shadow-2xs">
+                      <span className="text-blue-700 tabular-nums">{s.startTime}</span> {s.className}
                     </div>
                   ))}
                 </div>
@@ -231,7 +266,23 @@ export function ClassManagement() {
       )}
 
       <NewClassModal isOpen={isNewClassOpen} onClose={() => setIsNewClassOpen(false)} />
-      {editingClass && <EditClassModal item={editingClass} subjects={subjects} staff={staff} language={language} onClose={() => setEditingClass(null)} onSave={saveClass} />}
+      {editingClass && (
+        <EditClassModal
+          item={editingClass}
+          subjects={subjects}
+          staff={staff}
+          language={language}
+          onClose={() => setEditingClass(null)}
+          onSave={saveClass}
+        />
+      )}
+      {schedulingClass && (
+        <ClassScheduleModal
+          sportsClass={schedulingClass}
+          isOpen={Boolean(schedulingClass)}
+          onClose={() => setSchedulingClass(null)}
+        />
+      )}
     </div>
   );
 }

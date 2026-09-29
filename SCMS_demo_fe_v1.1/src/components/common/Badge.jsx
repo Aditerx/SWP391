@@ -47,8 +47,12 @@ export function StatusBadge({ type, status }) {
     }
   } else if (type === 'class') {
     switch (status) {
+      case 'open':
       case 'published':
         colorClasses = 'bg-blue-50 text-blue-800 border-blue-200';
+        break;
+      case 'ongoing':
+        colorClasses = 'bg-emerald-50 text-emerald-800 border-emerald-200';
         break;
       case 'full':
         colorClasses = 'bg-[#FEE2E2] text-[#991B1B] border-[#FECACA]';
@@ -56,8 +60,12 @@ export function StatusBadge({ type, status }) {
       case 'draft':
         colorClasses = 'bg-[#F1F5F9] text-[#475569] border-[#CBD5E1]';
         break;
+      case 'closed':
       case 'completed':
         colorClasses = 'bg-indigo-50 text-indigo-800 border-indigo-200';
+        break;
+      case 'cancelled':
+        colorClasses = 'bg-slate-100 text-slate-600 border-slate-300';
         break;
     }
   } else if (type === 'attendance') {

@@ -15,6 +15,14 @@ export function Sidebar({ currentTab, onSelectTab }) {
 
   const getNavItems = () => {
     switch (role) {
+      case 'admin':
+        return [
+          { id: 'admin_users', labelKey: 'userManagement', icon: Users },
+          { id: 'admin_rbac', labelKey: 'rbacManagement', icon: Shield },
+          { id: 'auditLogs', labelKey: 'auditLogs', icon: History },
+          { id: 'reports', labelKey: 'reports', icon: BarChart3 }
+        ];
+
       case 'manager':
         return [
           { id: 'dashboard', labelKey: 'dashboard', icon: LayoutDashboard },
@@ -27,6 +35,7 @@ export function Sidebar({ currentTab, onSelectTab }) {
           { id: 'reports', labelKey: 'reports', icon: BarChart3 },
           { id: 'auditLogs', labelKey: 'auditLogs', icon: History }
         ];
+
 
       case 'coach':
         return [

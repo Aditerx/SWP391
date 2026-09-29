@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: scms-app
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    # Render will call this path to verify the service is healthy after each deploy.
+    healthCheckPath: /actuator/health
+    # Auto-deploy triggers after CI checks pass (configured in the GitHub repo settings).
+    autoDeploy: true
+    envVars:
+      # Set these values in the Render dashboard — never commit real credentials.
+      - key: DB_URL
+        sync: false
+      - key: DB_USERNAME
+        sync: false
+      - key: DB_PASSWORD
+        sync: false

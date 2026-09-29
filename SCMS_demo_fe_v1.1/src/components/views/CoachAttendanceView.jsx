@@ -89,7 +89,7 @@ export function CoachAttendanceView() {
 
                   {/* Edit with reason modal */}
                   <button
-                    onClick={() => setSelectedMemberModal({ memberId: m.id, memberName: m.name, status: currentStatus })}
+                    onClick={() => setSelectedMemberModal({ memberId: m.id, memberName: m.name, status: currentStatus, attendanceId: att?.id || att?.attendanceId })}
                     className="p-1.5 bg-white hover:bg-slate-100 text-slate-700 rounded border border-slate-300 text-xs shadow-2xs"
                     title="Chỉnh sửa &amp; nhập lý do"
                   >
@@ -108,6 +108,7 @@ export function CoachAttendanceView() {
           memberId={selectedMemberModal.memberId}
           memberName={selectedMemberModal.memberName}
           currentStatus={selectedMemberModal.status}
+          attendanceId={selectedMemberModal.attendanceId}
           isOpen={!!selectedMemberModal}
           onClose={() => setSelectedMemberModal(null)}
         />

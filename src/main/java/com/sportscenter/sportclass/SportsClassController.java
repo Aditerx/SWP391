@@ -27,17 +27,20 @@ public class SportsClassController {
     }
 
     @PostMapping
+    @PreAuthorize("hasAuthority('MANAGE_CLASSES')")
     public ResponseEntity<SportsClassResponse> create(@Valid @RequestBody SportsClassRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(service.create(request));
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasAuthority('MANAGE_CLASSES')")
     public ResponseEntity<SportsClassResponse> update(@PathVariable Integer id,
                                                        @Valid @RequestBody SportsClassRequest request) {
         return ResponseEntity.ok(service.update(id, request));
     }
 
     @PatchMapping("/{id}/coach")
+    @PreAuthorize("hasAuthority('MANAGE_CLASSES')")
     public ResponseEntity<SportsClassResponse> assignCoach(@PathVariable Integer id,
                                                             @Valid @RequestBody AssignCoachRequest request) {
         return ResponseEntity.ok(service.assignCoach(id, request.coachId()));

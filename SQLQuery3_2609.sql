@@ -483,10 +483,11 @@ GO
 -- =====================================================================
 
 INSERT INTO roles (role_name, description) VALUES
-(N'CenterManager', N'Quan ly trung tam - toan quyen he thong'),
+(N'CenterManager', N'Quan ly trung tam - van hanh lop hoc, goi tap, bao cao'),
 (N'Coach', N'Huan luyen vien'),
 (N'Member', N'Thanh vien / hoc vien'),
-(N'Receptionist', N'Nhan vien le tan');
+(N'Receptionist', N'Nhan vien le tan'),
+(N'Admin', N'Quan tri vien he thong - quan tri nguoi dung va phan quyen RBAC');
 
 INSERT INTO permissions (permission_name, description) VALUES
 (N'MANAGE_USERS', N'Quan ly nguoi dung'),
@@ -497,7 +498,10 @@ INSERT INTO permissions (permission_name, description) VALUES
 (N'RECORD_RESULT', N'Ghi nhan ket qua buoi tap'),
 (N'PROCESS_PAYMENT', N'Ghi nhan thanh toan, xuat hoa don'),
 (N'HANDLE_SUPPORT', N'Xu ly yeu cau ho tro'),
-(N'VIEW_AUDIT_LOG', N'Xem lich su thao tac he thong');
+(N'VIEW_AUDIT_LOG', N'Xem lich su thao tac he thong'),
+(N'MANAGE_RBAC', N'Phan quyen va quan tri vai tro he thong'),
+(N'REGISTER_MEMBER', N'Dang ky thanh vien moi tai quay'),
+(N'MANAGE_SUBSCRIPTIONS', N'Dang ky va gia han goi tap');
 GO
 
 -- =====================================================================
@@ -505,9 +509,10 @@ GO
 -- =====================================================================
 
 INSERT INTO role_permissions (role_id, permission_id) VALUES
-    (1,1),(1,2),(1,3),(1,4),(1,5),(1,6),(1,7),(1,8),(1,9), -- CenterManager: toan quyen
+(1,1),(1,2),(1,3),(1,4),(1,7),(1,8),(1,9),        -- CenterManager: van hanh, bao cao, lop, goi, user
 (2,5),(2,6),                                        -- Coach: quan ly ke hoach tap, ghi ket qua
-(4,7),(4,8);                                        -- Receptionist: thanh toan, ho tro
+(4,6),(4,7),(4,8),(4,11),(4,12),                    -- Receptionist: dang ky hoi vien, dang ky/gia han goi, thanh toan, ho tro
+(5,1),(5,4),(5,9),(5,10);                           -- Admin: quan tri user, xem bao cao, xem audit log, quan ly RBAC
 GO
 
 -- =====================================================================
@@ -531,7 +536,8 @@ INSERT INTO users (role_id, full_name, email, phone, password_hash, address, gen
 (3, N'Ngô Thị Quyên',    N'quyen.ngo@fitzone.vn',    N'0901234509', @pwd, N'67 Lý Thường Kiệt, Quận 10, TP.HCM',   N'Female', '1999-12-01'),
 (3, N'Đặng Văn Sơn',     N'son.dang@fitzone.vn',     N'0901234510', @pwd, N'90 Ba Tháng Hai, Quận 10, TP.HCM',     N'Male',   '1988-08-08'),
 (3, N'Lý Thị Thu',       N'thu.ly@fitzone.vn',       N'0901234511', @pwd, N'11 Hoàng Văn Thụ, Tân Bình, TP.HCM',   N'Female', '2000-05-14'),
-(3, N'Trịnh Văn Vinh',   N'vinh.trinh@fitzone.vn',   N'0901234512', @pwd, N'22 Cộng Hòa, Tân Bình, TP.HCM',        N'Male',   '1991-10-09');
+(3, N'Trịnh Văn Vinh',   N'vinh.trinh@fitzone.vn',   N'0901234512', @pwd, N'22 Cộng Hòa, Tân Bình, TP.HCM',        N'Male',   '1991-10-09'),
+(5, N'Hệ Thống Admin',   N'admin@scms.com',          N'0901234500', @pwd, N'Trụ sở SCMS, Quận 1, TP.HCM',         N'Male',   '1980-01-01');
 GO
 
 INSERT INTO center_managers (user_id) VALUES (1);

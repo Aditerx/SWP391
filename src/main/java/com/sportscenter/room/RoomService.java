@@ -63,7 +63,15 @@ public class RoomService {
         room.setName(request.name());
         room.setLocation(request.location());
         room.setCapacity(request.capacity());
-        room.setStatus(request.status() == null ? "ACTIVE" : request.status());
+        String status = request.status() == null ? "Available" : normalizeRoomStatus(request.status());
+        room.setStatus(status);
+    }
+
+    private String normalizeRoomStatus(String status) {
+        if ("Available".equalsIgnoreCase(status)) return "Available";
+        if ("Maintenance".equalsIgnoreCase(status)) return "Maintenance";
+        if ("Closed".equalsIgnoreCase(status)) return "Closed";
+        throw new BusinessException("Invalid room status: " + status + ". Must be Available, Maintenance, or Closed");
     }
 
     private void validateRoomCanBecomeUnavailable(Room room, String requestedStatus) {

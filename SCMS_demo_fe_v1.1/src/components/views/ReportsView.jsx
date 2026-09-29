@@ -15,31 +15,37 @@ import {
 } from 'recharts';
 
 export function ReportsView() {
-  const { payments, members, t, language } = useSCMS();
+  const { payments, members, revenueReport, memberReport, t, language } = useSCMS();
 
-  const totalRev = payments.filter(p => p.status === 'successful').reduce((a, b) => a + b.amount, 0);
+  const totalRev = revenueReport?.totalRevenue != null
+    ? revenueReport.totalRevenue
+    : payments.filter(p => p.status === 'successful').reduce((a, b) => a + b.amount, 0);
 
   // Monthly Revenue Trend Data
-  const monthlyRevenueData = [
-    { month: language === 'vi' ? 'Thg 3' : 'Mar', revenue: 4500000 },
-    { month: language === 'vi' ? 'Thg 4' : 'Apr', revenue: 6800000 },
-    { month: language === 'vi' ? 'Thg 5' : 'May', revenue: 8200000 },
-    { month: language === 'vi' ? 'Thg 6' : 'Jun', revenue: 10500000 },
-    { month: language === 'vi' ? 'Thg 7' : 'Jul', revenue: 11800000 },
-    { month: language === 'vi' ? 'Thg 8' : 'Aug', revenue: 13200000 },
-    { month: language === 'vi' ? 'Thg 9' : 'Sep', revenue: totalRev > 0 ? totalRev : 14700000 },
-  ];
+  const monthlyRevenueData = (revenueReport?.timeline && revenueReport.timeline.length > 0)
+    ? revenueReport.timeline.map(item => ({ month: item.period, revenue: Number(item.revenue) || 0 }))
+    : [
+        { month: language === 'vi' ? 'Thg 3' : 'Mar', revenue: 4500000 },
+        { month: language === 'vi' ? 'Thg 4' : 'Apr', revenue: 6800000 },
+        { month: language === 'vi' ? 'Thg 5' : 'May', revenue: 8200000 },
+        { month: language === 'vi' ? 'Thg 6' : 'Jun', revenue: 10500000 },
+        { month: language === 'vi' ? 'Thg 7' : 'Jul', revenue: 11800000 },
+        { month: language === 'vi' ? 'Thg 8' : 'Aug', revenue: 13200000 },
+        { month: language === 'vi' ? 'Thg 9' : 'Sep', revenue: totalRev > 0 ? totalRev : 14700000 },
+      ];
 
   // New Member Growth Data
-  const memberGrowthData = [
-    { month: language === 'vi' ? 'Thg 3' : 'Mar', count: 2 },
-    { month: language === 'vi' ? 'Thg 4' : 'Apr', count: 3 },
-    { month: language === 'vi' ? 'Thg 5' : 'May', count: 4 },
-    { month: language === 'vi' ? 'Thg 6' : 'Jun', count: 3 },
-    { month: language === 'vi' ? 'Thg 7' : 'Jul', count: 5 },
-    { month: language === 'vi' ? 'Thg 8' : 'Aug', count: 6 },
-    { month: language === 'vi' ? 'Thg 9' : 'Sep', count: members.length },
-  ];
+  const memberGrowthData = (memberReport?.growth && memberReport.growth.length > 0)
+    ? memberReport.growth.map(item => ({ month: item.period, count: Number(item.newMembersCount) || 0 }))
+    : [
+        { month: language === 'vi' ? 'Thg 3' : 'Mar', count: 2 },
+        { month: language === 'vi' ? 'Thg 4' : 'Apr', count: 3 },
+        { month: language === 'vi' ? 'Thg 5' : 'May', count: 4 },
+        { month: language === 'vi' ? 'Thg 6' : 'Jun', count: 3 },
+        { month: language === 'vi' ? 'Thg 7' : 'Jul', count: 5 },
+        { month: language === 'vi' ? 'Thg 8' : 'Aug', count: 6 },
+        { month: language === 'vi' ? 'Thg 9' : 'Sep', count: members.length },
+      ];
 
   return (
     <div className="space-y-6">
