@@ -83,7 +83,7 @@ public class UserService {
         user.setGender(request.gender());
         user.setDateOfBirth(request.dateOfBirth());
         user.setRole(role);
-        String rawPassword = (request.password() != null && !request.password().isBlank()) ? request.password() : "12345678";
+        String rawPassword = (request.password() != null && !request.password().isBlank()) ? request.password() : "Scms@2026";
         user.setPasswordHash(passwordEncoder.encode(rawPassword));
         user.setStatus(request.status() != null ? normalizeUserStatus(request.status()) : "Active");
 

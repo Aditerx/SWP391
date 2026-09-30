@@ -26,7 +26,7 @@ import {
 } from 'lucide-react';
 
 const DEMO_EMAIL = 'manager@scms.com';
-const DEMO_PASSWORD = '12345678';
+const DEMO_PASSWORD = 'Scms@2026';
 
 export function LoginView({ onLoginSuccess, onBackToHome, initialMode = 'login', initialPackageId }) {
   const { language, setLanguage, packages, members, addMember, login, apiEnabled } = useSCMS();
@@ -124,7 +124,7 @@ export function LoginView({ onLoginSuccess, onBackToHome, initialMode = 'login',
       m => m.email.toLowerCase() === trimmedEmail
     );
 
-    if (isManager || loginPassword === '12345678') {
+    if (isManager || loginPassword === 'Scms@2026') {
       setIsLoginLoading(true);
       setTimeout(() => {
         setIsLoginLoading(false);
@@ -144,8 +144,8 @@ export function LoginView({ onLoginSuccess, onBackToHome, initialMode = 'login',
 
     setLoginError(
       isVi
-        ? 'Thông tin đăng nhập không chính xác. Mật khẩu demo: 12345678'
-        : 'Incorrect sign-in details. Demo password: 12345678'
+        ? 'Thông tin đăng nhập không chính xác. Mật khẩu demo: Scms@2026'
+        : 'Incorrect sign-in details. Demo password: Scms@2026'
     );
   };
 
@@ -723,7 +723,7 @@ export function LoginView({ onLoginSuccess, onBackToHome, initialMode = 'login',
                 <p className="text-[11px] font-bold text-stone-800">
                   {isVi ? 'Tài khoản trình diễn theo vai trò (Demo accounts)' : 'Quick Demo Accounts'}
                 </p>
-                <span className="text-[10px] text-stone-400 font-mono">Pass: 12345678</span>
+                <span className="text-[10px] text-stone-400 font-mono">Pass: Scms@2026</span>
               </div>
 
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 pt-1">
@@ -731,7 +731,7 @@ export function LoginView({ onLoginSuccess, onBackToHome, initialMode = 'login',
                   type="button"
                   onClick={() => {
                     setLoginEmail('admin@scms.com');
-                    setLoginPassword('12345678');
+                    setLoginPassword('Scms@2026');
                     setIsLoginCaptchaChecked(true);
                     setLoginError('');
                   }}
@@ -744,7 +744,7 @@ export function LoginView({ onLoginSuccess, onBackToHome, initialMode = 'login',
                   type="button"
                   onClick={() => {
                     setLoginEmail('manager@scms.com');
-                    setLoginPassword('12345678');
+                    setLoginPassword('Scms@2026');
                     setIsLoginCaptchaChecked(true);
                     setLoginError('');
                   }}
@@ -757,7 +757,7 @@ export function LoginView({ onLoginSuccess, onBackToHome, initialMode = 'login',
                   type="button"
                   onClick={() => {
                     setLoginEmail('mai.do@fitzone.vn');
-                    setLoginPassword('12345678');
+                    setLoginPassword('Scms@2026');
                     setIsLoginCaptchaChecked(true);
                     setLoginError('');
                   }}
@@ -770,7 +770,7 @@ export function LoginView({ onLoginSuccess, onBackToHome, initialMode = 'login',
                   type="button"
                   onClick={() => {
                     setLoginEmail('huong.tran@fitzone.vn');
-                    setLoginPassword('12345678');
+                    setLoginPassword('Scms@2026');
                     setIsLoginCaptchaChecked(true);
                     setLoginError('');
                   }}
@@ -783,7 +783,7 @@ export function LoginView({ onLoginSuccess, onBackToHome, initialMode = 'login',
                   type="button"
                   onClick={() => {
                     setLoginEmail('oanh.hoang@fitzone.vn');
-                    setLoginPassword('12345678');
+                    setLoginPassword('Scms@2026');
                     setIsLoginCaptchaChecked(true);
                     setLoginError('');
                   }}

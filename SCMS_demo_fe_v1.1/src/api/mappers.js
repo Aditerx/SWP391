@@ -271,7 +271,7 @@ export const toStaffRequest = (item) => ({
   phone: item.phone,
   role: item.role === 'coach' ? 'Coach' : item.role === 'receptionist' ? 'Receptionist' : item.role === 'admin' ? 'Admin' : 'CenterManager',
   specialization: item.specialty || item.specialization,
-  password: item.password || '12345678',
+  password: item.password || 'Scms@2026',
   status: item.status === 'suspended' ? 'Locked' : 'Active',
 });
 
@@ -279,7 +279,7 @@ export const toMemberRequest = (item) => ({
   name: item.name,
   email: item.email,
   phone: item.phone,
-  password: item.password || '12345678',
+  password: item.password || 'Scms@2026',
   packageId: idNumber(item.packageId || item.currentPackageId),
   goal: item.goal,
   healthNote: item.healthNote,

@@ -19,7 +19,7 @@ Mở http://localhost:5173. Dừng bằng Ctrl+C.
 Tài khoản trình diễn:
 
 - Email: `manager@scms.com`
-- Mật khẩu: `12345678`
+- Mật khẩu: `Scms@2026`
 
 ```powershell
 pnpm build:local

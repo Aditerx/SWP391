@@ -103,7 +103,7 @@ export function AdminUserManagement() {
         phone: formData.phone.trim(),
         roleId: Number(formData.roleId),
         roleName: roles.find(r => r.id === Number(formData.roleId))?.name,
-        password: formData.password || '12345678',
+        password: formData.password || 'Scms@2026',
         status: formData.status
       });
       setIsCreateOpen(false);
@@ -457,7 +457,7 @@ export function AdminUserManagement() {
                 <label className="text-xs font-bold text-slate-700 block mb-1">
                   {editingUser
                     ? (language === 'vi' ? 'Mật khẩu mới (Bỏ trống nếu giữ nguyên)' : 'New Password (leave empty to keep current)')
-                    : (language === 'vi' ? 'Mật khẩu khởi tạo (Mặc định: 12345678)' : 'Initial Password (default: 12345678)')}
+                    : (language === 'vi' ? 'Mật khẩu khởi tạo (Mặc định: Scms@2026)' : 'Initial Password (default: Scms@2026)')}
                 </label>
                 <input
                   type="password"

@@ -16,4 +16,11 @@ class LegacyPasswordEncoderTest {
         assertTrue(encoder.matches("12345678", sqlServerHash));
         assertFalse(encoder.matches("wrong-password", sqlServerHash));
     }
+
+    @Test
+    void matchesScms2026Password() {
+        String hash = encoder.encode("Scms@2026");
+        assertTrue(encoder.matches("Scms@2026", hash));
+        assertFalse(encoder.matches("wrong-password", hash));
+    }
 }
