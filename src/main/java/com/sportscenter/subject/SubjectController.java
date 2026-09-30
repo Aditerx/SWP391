@@ -12,7 +12,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/subjects")
 @RequiredArgsConstructor
-@PreAuthorize("hasAuthority('MANAGE_CLASSES')")
+@PreAuthorize("hasAuthority('MANAGE_SUBJECTS')")
 public class SubjectController {
     private final SubjectService service;
 

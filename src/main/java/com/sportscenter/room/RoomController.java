@@ -12,7 +12,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/rooms")
 @RequiredArgsConstructor
-@PreAuthorize("hasAuthority('MANAGE_CLASSES')")
+@PreAuthorize("hasAuthority('MANAGE_ROOMS')")
 public class RoomController {
     private final RoomService service;
 
