@@ -14,6 +14,14 @@ public interface AttendanceRepository extends JpaRepository<Attendance, Integer>
 
     @Query("SELECT a FROM Attendance a " +
            "LEFT JOIN FETCH a.session s " +
+           "LEFT JOIN FETCH s.sportsClass sc " +
+           "LEFT JOIN FETCH a.member m " +
+           "LEFT JOIN FETCH a.recordedBy r " +
+           "ORDER BY a.attendanceId DESC")
+    List<Attendance> findAllWithDetails();
+
+    @Query("SELECT a FROM Attendance a " +
+           "LEFT JOIN FETCH a.session s " +
            "LEFT JOIN FETCH a.member m " +
            "LEFT JOIN FETCH a.recordedBy r " +
            "WHERE (:sessionId IS NULL OR (a.session IS NOT NULL AND a.session.id = :sessionId)) " +

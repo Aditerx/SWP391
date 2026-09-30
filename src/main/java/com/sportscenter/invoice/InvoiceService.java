@@ -33,8 +33,15 @@ public class InvoiceService {
             LocalDateTime startDate,
             LocalDateTime endDate
     ) {
-        return invoiceRepository.searchInvoices(memberId, packageId, receptionistId, status, method, startDate, endDate)
-                .stream()
+        List<Invoice> list = invoiceRepository.findAllWithDetails();
+        return list.stream()
+                .filter(i -> memberId == null || (i.getMember() != null && memberId.equals(i.getMember().getId())))
+                .filter(i -> packageId == null || (i.getMembershipPackage() != null && packageId.equals(i.getMembershipPackage().getId())))
+                .filter(i -> receptionistId == null || (i.getReceptionist() != null && receptionistId.equals(i.getReceptionist().getId())))
+                .filter(i -> status == null || status.isBlank() || (i.getPaymentStatus() != null && i.getPaymentStatus().equalsIgnoreCase(status)))
+                .filter(i -> method == null || method.isBlank() || (i.getPaymentMethod() != null && i.getPaymentMethod().equalsIgnoreCase(method)))
+                .filter(i -> startDate == null || (i.getPaymentDate() != null && !i.getPaymentDate().isBefore(startDate)))
+                .filter(i -> endDate == null || (i.getPaymentDate() != null && !i.getPaymentDate().isAfter(endDate)))
                 .map(InvoiceResponse::from)
                 .toList();
     }

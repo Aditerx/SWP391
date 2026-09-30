@@ -12,7 +12,6 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/subjects")
 @RequiredArgsConstructor
-@PreAuthorize("hasAuthority('MANAGE_CLASSES')")
 public class SubjectController {
     private final SubjectService service;
 

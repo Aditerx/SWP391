@@ -95,4 +95,27 @@ class AttendanceServiceTest {
         assertEquals("Present", response.state());
         verify(auditService).log(isNull(), eq("ATTENDANCE_CORRECTION"), eq("attendances"), eq(60), contains("Reason: Học viên đến muộn"));
     }
+
+    @Test
+    @DisplayName("Search attendances with null-safe filter")
+    void searchAttendances_Success() {
+        Attendance att1 = new Attendance();
+        att1.setAttendanceId(1);
+        att1.setMember(sampleMember);
+        att1.setState("Present");
+
+        Attendance att2 = new Attendance();
+        att2.setAttendanceId(2);
+        att2.setMember(sampleMember);
+        att2.setState("Absent");
+
+        when(attendanceRepository.findAllWithDetails()).thenReturn(java.util.List.of(att1, att2));
+
+        var all = attendanceService.searchAttendances(null, null, null, null, null, null);
+        assertEquals(2, all.size());
+
+        var filtered = attendanceService.searchAttendances(null, null, null, "Present", null, null);
+        assertEquals(1, filtered.size());
+        assertEquals("Present", filtered.get(0).state());
+    }
 }

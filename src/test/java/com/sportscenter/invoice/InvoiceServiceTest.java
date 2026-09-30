@@ -122,4 +122,32 @@ class InvoiceServiceTest {
         InvoicePaymentRequest payReq = new InvoicePaymentRequest("Cash", null, null, null);
         assertThrows(BusinessException.class, () -> invoiceService.payInvoice(201, payReq));
     }
+
+    @Test
+    @DisplayName("Find all invoices with null-safe stream filtering")
+    void findAll_Success() {
+        Invoice invoice1 = new Invoice();
+        invoice1.setInvoiceId(1);
+        invoice1.setMember(sampleMember);
+        invoice1.setMembershipPackage(samplePackage);
+        invoice1.setPaymentStatus("Paid");
+        invoice1.setAmount(BigDecimal.valueOf(1350000));
+        invoice1.setPaymentMethod("BankTransfer");
+
+        Invoice invoice2 = new Invoice();
+        invoice2.setInvoiceId(2);
+        invoice2.setMember(sampleMember);
+        invoice2.setPaymentStatus("Pending");
+        invoice2.setAmount(BigDecimal.valueOf(500000));
+        invoice2.setPaymentMethod("Cash");
+
+        when(invoiceRepository.findAllWithDetails()).thenReturn(java.util.List.of(invoice1, invoice2));
+
+        var all = invoiceService.findAll(null, null, null, null, null, null, null);
+        assertEquals(2, all.size());
+
+        var filtered = invoiceService.findAll(null, null, null, "Paid", null, null, null);
+        assertEquals(1, filtered.size());
+        assertEquals(1, filtered.get(0).invoiceId());
+    }
 }

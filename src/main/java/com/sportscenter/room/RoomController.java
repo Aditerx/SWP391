@@ -12,7 +12,6 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/rooms")
 @RequiredArgsConstructor
-@PreAuthorize("hasAuthority('MANAGE_CLASSES')")
 public class RoomController {
     private final RoomService service;
 

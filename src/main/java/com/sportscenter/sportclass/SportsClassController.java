@@ -12,7 +12,6 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/classes")
 @RequiredArgsConstructor
-@PreAuthorize("hasAuthority('MANAGE_CLASSES')")
 public class SportsClassController {
     private final SportsClassService service;
 

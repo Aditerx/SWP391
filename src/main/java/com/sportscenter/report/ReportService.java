@@ -36,10 +36,16 @@ public class ReportService {
 
     @Transactional(readOnly = true)
     public DashboardResponse dashboard() {
-        BigDecimal totalRevenue = invoiceRepository.sumRevenueBetween(null, null);
-        if (totalRevenue == null) totalRevenue = BigDecimal.ZERO;
+        List<Invoice> allInvoices = invoiceRepository.findAllWithDetails();
+        BigDecimal totalRevenue = allInvoices.stream()
+                .filter(i -> "Paid".equalsIgnoreCase(i.getPaymentStatus()))
+                .map(Invoice::getAmount)
+                .filter(Objects::nonNull)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        long totalPaidInvoices = invoiceRepository.countPaidBetween(null, null);
+        long totalPaidInvoices = allInvoices.stream()
+                .filter(i -> "Paid".equalsIgnoreCase(i.getPaymentStatus()))
+                .count();
 
         List<MemberPackage> allSubs = memberPackageRepository.findAll();
         long activeSubscriptions = allSubs.stream()
@@ -65,7 +71,12 @@ public class ReportService {
         LocalDateTime start = startDate != null ? startDate.atStartOfDay() : null;
         LocalDateTime end = endDate != null ? endDate.atTime(23, 59, 59) : null;
 
-        List<Invoice> invoices = invoiceRepository.searchInvoices(null, null, null, "Paid", null, start, end);
+        List<Invoice> allInvoices = invoiceRepository.findAllWithDetails();
+        List<Invoice> invoices = allInvoices.stream()
+                .filter(i -> "Paid".equalsIgnoreCase(i.getPaymentStatus()))
+                .filter(i -> start == null || (i.getPaymentDate() != null && !i.getPaymentDate().isBefore(start)))
+                .filter(i -> end == null || (i.getPaymentDate() != null && !i.getPaymentDate().isAfter(end)))
+                .toList();
 
         BigDecimal totalRevenue = invoices.stream()
                 .map(Invoice::getAmount)

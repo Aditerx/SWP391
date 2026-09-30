@@ -32,7 +32,14 @@ public class AttendanceService {
             LocalDateTime startDate,
             LocalDateTime endDate
     ) {
-        return attendanceRepository.searchAttendances(sessionId, memberId, recordedBy, state, startDate, endDate).stream()
+        List<Attendance> all = attendanceRepository.findAllWithDetails();
+        return all.stream()
+                .filter(a -> sessionId == null || (a.getSession() != null && sessionId.equals(a.getSession().getId())))
+                .filter(a -> memberId == null || (a.getMember() != null && memberId.equals(a.getMember().getId())))
+                .filter(a -> recordedBy == null || (a.getRecordedBy() != null && recordedBy.equals(a.getRecordedBy().getId())))
+                .filter(a -> state == null || state.isBlank() || (a.getState() != null && a.getState().equalsIgnoreCase(state)))
+                .filter(a -> startDate == null || (a.getCheckInTime() != null && !a.getCheckInTime().isBefore(startDate)))
+                .filter(a -> endDate == null || (a.getCheckInTime() != null && !a.getCheckInTime().isAfter(endDate)))
                 .map(AttendanceResponse::from)
                 .toList();
     }

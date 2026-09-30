@@ -12,7 +12,6 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/packages")
 @RequiredArgsConstructor
-@PreAuthorize("hasAuthority('MANAGE_PACKAGES')")
 public class MembershipPackageController {
     private final MembershipPackageService service;
 
@@ -22,12 +21,14 @@ public class MembershipPackageController {
     }
 
     @PostMapping
+    @PreAuthorize("hasAuthority('MANAGE_PACKAGES')")
     public ResponseEntity<MembershipPackageResponse> create(
             @Valid @RequestBody MembershipPackageRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(service.create(request));
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasAuthority('MANAGE_PACKAGES')")
     public ResponseEntity<MembershipPackageResponse> update(
             @PathVariable Integer id,
             @Valid @RequestBody MembershipPackageRequest request) {
@@ -35,6 +36,7 @@ public class MembershipPackageController {
     }
 
     @PatchMapping("/{id}/status")
+    @PreAuthorize("hasAuthority('MANAGE_PACKAGES')")
     public ResponseEntity<MembershipPackageResponse> updateStatus(
             @PathVariable Integer id,
             @Valid @RequestBody PackageStatusRequest request) {
