@@ -321,13 +321,14 @@ frontend sẽ gửi `Open`; người dùng cũng không thể chủ động chuy
 Thiết kế quyền riêng hoặc chế độ `correction/audit` để cho phép sửa dữ liệu lịch sử có kiểm soát.
 Nội dung này độc lập với các mapper/constraint ở trên và chưa nằm trong phạm vi triển khai hiện tại.
 
-## Phạm vi các đợt tiếp theo
+## Phạm vi các đợt triển khai
 
-- **Đợt 2 (ĐÃ HOÀN TẤT):** Tách role Admin khỏi Center Manager, Quản lý Users, Phân quyền RBAC, Luồng Lễ tân đăng ký học viên tại quầy và đăng ký / gia hạn gói tập (`/api/members/{memberId}/subscriptions`).
-- Đợt 3: session, lịch thật, booking/enrollment và kiểm tra trùng coach/phòng.
-- Đợt 4: invoice/payment/report theo khoảng thời gian.
-- Đợt 5: training plan, result, attendance, evaluation.
-- Đợt 6: AI service riêng; không đặt API key trong frontend.
+- **Đợt 1 (ĐÃ HOÀN TẤT):** Nền tảng xác thực Session, CRUD Bộ môn, Phòng tập, Gói thành viên, Lớp học ban đầu và Báo cáo tổng quan.
+- **Đợt 2 (ĐÃ HOÀN TẤT):** Tách role Admin khỏi Center Manager, Quản lý Users toàn diện, Phân quyền RBAC động, Luồng Lễ tân đăng ký học viên tại quầy và đăng ký / gia hạn gói tập (`/api/members/{memberId}/subscriptions`).
+- **Đợt 3 (ĐÃ HOÀN TẤT):** Module Lịch học thực tế (`/api/sessions`), Xếp lịch tự động định kỳ, Thuật toán kiểm tra trùng phòng/HLV theo thời gian thực và Module Đăng ký lớp học (`/api/enrollments`, `/api/classes/{id}/enroll`) với 5 Guards.
+- **Đợt 4 (ĐÃ HOÀN TẤT):** Module Hóa đơn, Thanh toán tại quầy (`/api/invoices`), tự động sinh hóa đơn khi mua gói tập và Báo cáo thống kê tài chính nâng cao (`/api/reports/dashboard`, `/api/reports/revenue`, `/api/reports/members`).
+- **Đợt 5 (ĐÃ HOÀN TẤT):** Module Kế hoạch tập luyện (`/api/training-plans`), Ghi nhận kết quả buổi học (`/api/training-results`), Điểm danh & Check-in/out (`/api/attendances`) kèm Audit Attendance Correction, và Đánh giá định kỳ (`/api/evaluations`).
+- **Đợt 6 (Quy hoạch tương lai):** AI Workout Recommendation & AI Assistant Chatbot (sử dụng LLM service độc lập, không lưu API key tại frontend).
 
 ---
 
@@ -566,7 +567,7 @@ Khi một học viên đăng ký vào lớp (trực tuyến hoặc qua quầy L�
 
 ## 4. Kết quả Kiểm thử Toàn diện (Verification Summary)
 - **Backend Unit & Integration Tests:**
-  - `mvnw.cmd test`: **18/18 tests passed** (100% SUCCESS, 0 failures, 0 errors).
-  - Bao gồm: `LegacyPasswordEncoderTest`, `EnrollmentServiceTest`, `SessionServiceTest`, `InvoiceServiceTest`, `AttendanceServiceTest`, `TrainingResultServiceTest`.
+  - `mvnw.cmd test`: **23/23 tests passed** (100% SUCCESS, 0 failures, 0 errors).
+  - Bao gồm: `LegacyPasswordEncoderTest` (2), `EnrollmentServiceTest` (5), `InvoiceServiceTest` (4), `ReportServiceTest` (2), `SessionServiceTest` (5), `AttendanceServiceTest` (3), `TrainingResultServiceTest` (2).
 - **Frontend Production Build:**
   - `npm run build`: **Vite build SUCCESS** (0 errors, 0 linting issues, bundle output sẵn sàng tại `dist/`).
