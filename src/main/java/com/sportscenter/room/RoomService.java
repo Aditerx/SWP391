@@ -24,7 +24,7 @@ public class RoomService {
         Room room = new Room();
         apply(room, request);
         Room saved = repository.save(room);
-        auditService.log(null, "CREATE_ROOM", "ROOM", saved.getId(), saved.getName());
+        auditService.log("CREATE", "Room", saved.getId(), "Created room " + saved.getName());
         return RoomResponse.from(saved);
     }
 
@@ -32,14 +32,18 @@ public class RoomService {
     public RoomResponse update(Integer id, RoomRequest request) {
         Room room = getEntity(id);
         apply(room, request);
-        return RoomResponse.from(repository.save(room));
+        Room saved = repository.save(room);
+        auditService.log("UPDATE", "Room", saved.getId(), "Updated room " + saved.getName());
+        return RoomResponse.from(saved);
     }
 
     @Transactional
     public RoomResponse updateStatus(Integer id, String status) {
         Room room = getEntity(id);
         room.setStatus(status);
-        return RoomResponse.from(repository.save(room));
+        Room saved = repository.save(room);
+        auditService.log("UPDATE", "Room", saved.getId(), "Updated room status to " + status);
+        return RoomResponse.from(saved);
     }
 
     private Room getEntity(Integer id) {

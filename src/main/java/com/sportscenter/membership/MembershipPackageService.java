@@ -24,7 +24,7 @@ public class MembershipPackageService {
         MembershipPackage membershipPackage = new MembershipPackage();
         apply(membershipPackage, request);
         MembershipPackage saved = repository.save(membershipPackage);
-        auditService.log(null, "CREATE_PACKAGE", "MEMBERSHIP_PACKAGE", saved.getId(), saved.getName());
+        auditService.log("CREATE", "MembershipPackage", saved.getId(), "Created package " + saved.getName());
         return MembershipPackageResponse.from(saved);
     }
 
@@ -32,14 +32,18 @@ public class MembershipPackageService {
     public MembershipPackageResponse update(Integer id, MembershipPackageRequest request) {
         MembershipPackage membershipPackage = getEntity(id);
         apply(membershipPackage, request);
-        return MembershipPackageResponse.from(repository.save(membershipPackage));
+        MembershipPackage saved = repository.save(membershipPackage);
+        auditService.log("UPDATE", "MembershipPackage", saved.getId(), "Updated package " + saved.getName());
+        return MembershipPackageResponse.from(saved);
     }
 
     @Transactional
     public MembershipPackageResponse updateStatus(Integer id, String status) {
         MembershipPackage membershipPackage = getEntity(id);
         membershipPackage.setStatus(status);
-        return MembershipPackageResponse.from(repository.save(membershipPackage));
+        MembershipPackage saved = repository.save(membershipPackage);
+        auditService.log("UPDATE", "MembershipPackage", saved.getId(), "Updated package status to " + status);
+        return MembershipPackageResponse.from(saved);
     }
 
     private MembershipPackage getEntity(Integer id) {

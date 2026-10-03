@@ -11,4 +11,7 @@ public interface UserRepository extends JpaRepository<User, Integer> {
     long countMembers();
 
     Optional<User> findByEmail(String email);
+
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"role", "role.permissions"})
+    Optional<User> findWithRoleAndPermissionsByEmail(String email);
 }

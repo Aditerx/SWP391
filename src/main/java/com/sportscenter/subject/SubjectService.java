@@ -29,7 +29,7 @@ public class SubjectService {
         Subject subject = new Subject();
         apply(subject, request);
         Subject saved = repository.save(subject);
-        auditService.log(null, "CREATE_SUBJECT", "SUBJECT", saved.getId(), saved.getName());
+        auditService.log("CREATE", "Subject", saved.getId(), "Created subject " + saved.getName());
         return SubjectResponse.from(saved);
     }
 
@@ -37,12 +37,16 @@ public class SubjectService {
     public SubjectResponse update(Integer id, SubjectRequest request) {
         Subject subject = getEntity(id);
         apply(subject, request);
-        return SubjectResponse.from(repository.save(subject));
+        Subject saved = repository.save(subject);
+        auditService.log("UPDATE", "Subject", saved.getId(), "Updated subject " + saved.getName());
+        return SubjectResponse.from(saved);
     }
 
     @Transactional
     public void delete(Integer id) {
-        repository.delete(getEntity(id));
+        Subject subject = getEntity(id);
+        repository.delete(subject);
+        auditService.log("DELETE", "Subject", id, "Deleted subject " + subject.getName());
     }
 
     private Subject getEntity(Integer id) {

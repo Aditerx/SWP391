@@ -35,7 +35,7 @@ public class SportsClassService {
         SportsClass sportsClass = new SportsClass();
         apply(sportsClass, request);
         SportsClass saved = repository.save(sportsClass);
-        auditService.log(null, "CREATE_CLASS", "CLASS", saved.getId(), saved.getName());
+        auditService.log("CREATE", "Class", saved.getId(), "Created class " + saved.getName());
         return SportsClassResponse.from(saved);
     }
 
@@ -43,7 +43,9 @@ public class SportsClassService {
     public SportsClassResponse update(Integer id, SportsClassRequest request) {
         SportsClass sportsClass = getEntity(id);
         apply(sportsClass, request);
-        return SportsClassResponse.from(repository.save(sportsClass));
+        SportsClass saved = repository.save(sportsClass);
+        auditService.log("UPDATE", "Class", saved.getId(), "Updated class " + saved.getName());
+        return SportsClassResponse.from(saved);
     }
 
     @Transactional
@@ -53,7 +55,7 @@ public class SportsClassService {
                 .orElseThrow(() -> new ResourceNotFoundException("Coach user not found: " + coachId));
         sportsClass.setCoach(coach);
         SportsClass saved = repository.save(sportsClass);
-        auditService.log(null, "ASSIGN_COACH", "CLASS", saved.getId(), "coachId=" + coachId);
+        auditService.log("UPDATE", "Class", saved.getId(), "Assigned coach " + coachId);
         return SportsClassResponse.from(saved);
     }
 
