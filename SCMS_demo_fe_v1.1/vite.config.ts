@@ -40,7 +40,7 @@ react(),
     server: {
       host: process.env.FIGMA_DEV_SERVER_HOST || '0.0.0.0',
       port: parseInt(process.env.PORT || '5173'),
-      strictPort: true,
+      strictPort: false,
       proxy: {
         '/api': {
           target: process.env.VITE_API_PROXY_TARGET || 'http://localhost:8080',
