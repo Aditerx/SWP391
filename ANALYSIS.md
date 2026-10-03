@@ -3,9 +3,9 @@
 
 ---
 
-> **Tài liệu tham chiếu:** [PROJECT_CONTEXT.md](file:///d:/Projects/SWP391/PROJECT_CONTEXT.md) | [README_BE_CHANGES_2609.md](file:///d:/Projects/SWP391/README_BE_CHANGES_2609.md) | [API_TEST_REPORT.md](file:///d:/Projects/SWP391/API_TEST_REPORT.md)  
+> **Tài liệu tham chiếu:** [PROJECT_CONTEXT.md](file:///d:/Projects/SWP391/PROJECT_CONTEXT.md) | [README_BE_CHANGES_2609.md](file:///d:/Projects/SWP391/README_BE_CHANGES_2609.md) | [DEMO_SCRIPT.md](file:///d:/Projects/SWP391/DEMO_SCRIPT.md) | [API_TEST_REPORT.md](file:///d:/Projects/SWP391/API_TEST_REPORT.md)  
 > **Môi trường & Công nghệ:** Java 17, Spring Boot 3.3.3, Spring Security 6, Spring Data JPA, Hibernate 6, PostgreSQL (Supabase) / SQL Server, Maven.  
-> **Kiểm thử tự động:** 22/22 Unit & Integration Tests đạt 100% SUCCESS (`.\mvnw.cmd test`).
+> **Kiểm thử tự động:** 23/23 Unit & Integration Tests đạt 100% SUCCESS (`.\mvnw.cmd test`).
 
 ---
 
@@ -399,7 +399,7 @@ Dựa trên [PROJECT_CONTEXT.md](file:///d:/Projects/SWP391/PROJECT_CONTEXT.md),
 1. **Kiến trúc phân quyền RBAC chuẩn chỉnh:** Tách biệt rõ ràng 5 vai trò hệ thống, hỗ trợ ma trận quyền hạn động có thể thay đổi ngay trên giao diện mà không cần restart backend.
 2. **Thuật toán xếp lịch & phát hiện xung đột chuẩn xác:** Ngăn ngừa 100% tình trạng trùng phòng hoặc trùng HLV theo thời gian thực trước khi lưu dữ liệu.
 3. **Bảo vệ toàn vẹn dữ liệu 2 lớp (Defense-in-depth):** Kết hợp chặt chẽ giữa Application Service Guards và Database Triggers (PostgreSQL PL/pgSQL).
-4. **Chất lượng kiểm thử cao:** 22/22 unit và integration tests pass 100%, coverage đầy đủ từ xác thực, xếp lịch, đăng ký gói đến tính toán báo cáo doanh thu.
+4. **Chất lượng kiểm thử cao:** 23/23 unit và integration tests pass 100%, coverage đầy đủ từ xác thực, xếp lịch, đăng ký gói đến tính toán báo cáo doanh thu.
 
 ### 7.2 Bảng Kịch Bản Demo Nhanh Theo Timeline Thuyết Trình
 
