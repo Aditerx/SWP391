@@ -6,6 +6,9 @@ import com.sportscenter.membership.MembershipPackage;
 import com.sportscenter.membership.MembershipPackageRepository;
 import com.sportscenter.user.User;
 import com.sportscenter.user.UserRepository;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -16,6 +19,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
 import java.util.Optional;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -46,6 +50,7 @@ class InvoiceServiceTest {
     void setUp() {
         sampleMember = new User();
         sampleMember.setId(7);
+        sampleMember.setEmail("member-a@example.com");
         sampleMember.setFullName("Hoàng Thị Oanh");
 
         samplePackage = new MembershipPackage();
@@ -143,11 +148,44 @@ class InvoiceServiceTest {
 
         when(invoiceRepository.findAllWithDetails()).thenReturn(java.util.List.of(invoice1, invoice2));
 
-        var all = invoiceService.findAll(null, null, null, null, null, null, null);
+        var all = invoiceService.findAll(null, null, null, null, null, null, null, null);
         assertEquals(2, all.size());
 
-        var filtered = invoiceService.findAll(null, null, null, "Paid", null, null, null);
+        var filtered = invoiceService.findAll(null, null, null, "Paid", null, null, null, null);
         assertEquals(1, filtered.size());
         assertEquals(1, filtered.get(0).invoiceId());
+    }
+
+    @Test
+    @DisplayName("Member invoice list is scoped to the authenticated user's ID")
+    void findAll_MemberOnlySeesOwnInvoices() {
+        Invoice ownInvoice = new Invoice();
+        ownInvoice.setInvoiceId(1);
+        ownInvoice.setMember(sampleMember);
+        ownInvoice.setPaymentStatus("Paid");
+        ownInvoice.setAmount(BigDecimal.valueOf(100));
+
+        var authentication = new UsernamePasswordAuthenticationToken(
+                "member-a@example.com", "n/a", List.of(new SimpleGrantedAuthority("ROLE_MEMBER")));
+        when(userRepository.findByEmailIgnoreCase("member-a@example.com")).thenReturn(Optional.of(sampleMember));
+        when(invoiceRepository.findByMemberId(7)).thenReturn(List.of(ownInvoice));
+
+        var invoices = invoiceService.findAll(null, null, null, null, null, null, null, authentication);
+
+        assertEquals(1, invoices.size());
+        assertEquals(1, invoices.get(0).invoiceId());
+        verify(invoiceRepository).findByMemberId(7);
+    }
+
+    @Test
+    @DisplayName("Member cannot request another member's invoices")
+    void findAll_MemberCannotOverrideScopeWithQueryParameter() {
+        var authentication = new UsernamePasswordAuthenticationToken(
+                "member-a@example.com", "n/a", List.of(new SimpleGrantedAuthority("ROLE_MEMBER")));
+        when(userRepository.findByEmailIgnoreCase("member-a@example.com")).thenReturn(Optional.of(sampleMember));
+
+        assertThrows(AccessDeniedException.class,
+                () -> invoiceService.findAll(8, null, null, null, null, null, null, authentication));
+        verifyNoInteractions(invoiceRepository);
     }
 }

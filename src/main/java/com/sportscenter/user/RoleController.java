@@ -27,7 +27,7 @@ public class RoleController {
     }
 
     @PutMapping("/roles/{id}/permissions")
-    @PreAuthorize("hasAuthority('MANAGE_RBAC') or hasAuthority('MANAGE_USERS') or hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('MANAGE_PERMISSIONS')")
     public RoleResponse updateRolePermissions(@PathVariable Integer id, @Valid @RequestBody RolePermissionUpdateRequest request) {
         return roleService.updateRolePermissions(id, request.permissionIds());
     }

@@ -2,6 +2,8 @@ package com.sportscenter.membership;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
@@ -15,22 +17,27 @@ public class MemberPackageController {
     private final MemberPackageService memberPackageService;
 
     @GetMapping({"/member-packages", "/subscriptions"})
+    @PreAuthorize("hasAnyAuthority('MANAGE_USERS', 'MANAGE_SUBSCRIPTIONS')")
     public List<MemberPackageResponse> getAllSubscriptions() {
         return memberPackageService.findAll();
     }
 
     @GetMapping({"/members/{memberId}/packages", "/members/{memberId}/subscriptions"})
-    public List<MemberPackageResponse> getSubscriptionsByMember(@PathVariable Integer memberId) {
-        return memberPackageService.findByMemberId(memberId);
+    @PreAuthorize("hasAnyAuthority('MANAGE_USERS', 'MANAGE_SUBSCRIPTIONS') or hasRole('MEMBER')")
+    public List<MemberPackageResponse> getSubscriptionsByMember(@PathVariable Integer memberId,
+                                                                Authentication authentication) {
+        return memberPackageService.findByMemberId(memberId, authentication);
     }
 
     @PostMapping({"/members/{memberId}/packages", "/members/{memberId}/subscriptions"})
     @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("hasAuthority('MANAGE_SUBSCRIPTIONS')")
     public MemberPackageResponse subscribe(@PathVariable Integer memberId, @Valid @RequestBody MemberPackageRequest request) {
         return memberPackageService.subscribe(memberId, request);
     }
 
     @PatchMapping({"/member-packages/{id}/status", "/subscriptions/{id}/status"})
+    @PreAuthorize("hasAuthority('MANAGE_SUBSCRIPTIONS')")
     public MemberPackageResponse updateStatus(@PathVariable Integer id, @RequestBody Map<String, String> body) {
         String status = body != null ? body.get("status") : null;
         return memberPackageService.updateStatus(id, status);

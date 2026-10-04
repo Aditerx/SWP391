@@ -35,6 +35,7 @@ public class SessionController {
     }
 
     @PostMapping("/check-conflict")
+    @PreAuthorize("hasAuthority('MANAGE_CLASSES')")
     public ResponseEntity<ConflictCheckResponse> checkConflict(@Valid @RequestBody ConflictCheckRequest request) {
         return ResponseEntity.ok(sessionService.checkConflict(request));
     }
@@ -59,6 +60,7 @@ public class SessionController {
     }
 
     @PatchMapping("/{id}/status")
+    @PreAuthorize("hasAuthority('MANAGE_CLASSES')")
     public ResponseEntity<SessionResponse> updateStatus(@PathVariable Integer id,
                                                         @Valid @RequestBody SessionStatusRequest request) {
         return ResponseEntity.ok(sessionService.updateStatus(id, request.status()));

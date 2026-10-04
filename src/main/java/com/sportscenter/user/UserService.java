@@ -6,6 +6,9 @@ import com.sportscenter.common.exception.ResourceNotFoundException;
 import com.sportscenter.user.dto.UserRequest;
 import com.sportscenter.user.dto.UserResponse;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -74,6 +77,7 @@ public class UserService {
             role = roleRepository.findByNameIgnoreCase("Member")
                     .orElseThrow(() -> new BusinessException("Default Member role not found"));
         }
+        assertCanManageAdminRole(null, role);
 
         User user = new User();
         user.setFullName(request.fullName().trim());
@@ -102,6 +106,7 @@ public class UserService {
     public UserResponse updateUser(Integer id, UserRequest request) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + id));
+        assertCanManageAdminRole(user, null);
 
         if (request.fullName() != null && !request.fullName().isBlank()) {
             user.setFullName(request.fullName().trim());
@@ -128,12 +133,14 @@ public class UserService {
         if (request.roleId() != null && (user.getRole() == null || !request.roleId().equals(user.getRole().getId()))) {
             Role newRole = roleRepository.findById(request.roleId())
                     .orElseThrow(() -> new ResourceNotFoundException("Role not found with id: " + request.roleId()));
+            assertCanManageAdminRole(user, newRole);
             user.setRole(newRole);
             syncSubtypeRecord(user, newRole.getName());
         } else if (request.roleName() != null && !request.roleName().isBlank() &&
                 (user.getRole() == null || !request.roleName().equalsIgnoreCase(user.getRole().getName()))) {
             Role newRole = roleRepository.findByNameIgnoreCase(request.roleName().trim())
                     .orElseThrow(() -> new BusinessException("Role not found with name: " + request.roleName()));
+            assertCanManageAdminRole(user, newRole);
             user.setRole(newRole);
             syncSubtypeRecord(user, newRole.getName());
         }
@@ -149,6 +156,7 @@ public class UserService {
     public UserResponse updateUserStatus(Integer id, String status) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + id));
+        assertCanManageAdminRole(user, null);
 
         String previousStatus = user.getStatus();
         String newStatus = normalizeUserStatus(status);
@@ -168,6 +176,7 @@ public class UserService {
 
         Role newRole = roleRepository.findById(roleId)
                 .orElseThrow(() -> new ResourceNotFoundException("Role not found with id: " + roleId));
+        assertCanManageAdminRole(user, newRole);
 
         String previousRole = user.getRole() != null ? user.getRole().getName() : "None";
         user.setRole(newRole);
@@ -178,6 +187,22 @@ public class UserService {
                 previousRole + " -> " + newRole.getName());
 
         return UserResponse.from(savedUser);
+    }
+
+    private void assertCanManageAdminRole(User currentUser, Role requestedRole) {
+        boolean touchesAdminRole = (currentUser != null && currentUser.getRole() != null
+                && "Admin".equalsIgnoreCase(currentUser.getRole().getName()))
+                || (requestedRole != null && "Admin".equalsIgnoreCase(requestedRole.getName()));
+        if (!touchesAdminRole) {
+            return;
+        }
+
+        var authentication = SecurityContextHolder.getContext().getAuthentication();
+        boolean canManagePermissions = authentication != null && authentication.getAuthorities().contains(
+                new SimpleGrantedAuthority("MANAGE_PERMISSIONS"));
+        if (!canManagePermissions) {
+            throw new AccessDeniedException("Only administrators with MANAGE_PERMISSIONS may manage Admin accounts");
+        }
     }
 
     private void syncSubtypeRecord(User user, String roleName) {

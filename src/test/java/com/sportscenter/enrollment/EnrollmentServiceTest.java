@@ -8,6 +8,7 @@ import com.sportscenter.sportclass.SportsClass;
 import com.sportscenter.sportclass.SportsClassRepository;
 import com.sportscenter.user.User;
 import com.sportscenter.user.UserRepository;
+import com.sportscenter.user.Role;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -15,6 +16,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.access.AccessDeniedException;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -24,6 +26,7 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -48,6 +51,7 @@ class EnrollmentServiceTest {
     private EnrollmentService enrollmentService;
 
     private User sampleMember;
+    private User sampleAdmin;
     private SportsClass sampleClass;
     private MemberPackage sampleActivePackage;
 
@@ -58,6 +62,17 @@ class EnrollmentServiceTest {
         sampleMember.setFullName("Hoàng Thị Oanh");
         sampleMember.setEmail("oanh.hoang@fitzone.vn");
         sampleMember.setStatus("Active");
+        Role memberRole = new Role();
+        memberRole.setName("Member");
+        sampleMember.setRole(memberRole);
+
+        sampleAdmin = new User();
+        sampleAdmin.setId(1);
+        sampleAdmin.setEmail("admin@scms.com");
+        Role adminRole = new Role();
+        adminRole.setName("Admin");
+        sampleAdmin.setRole(adminRole);
+        lenient().when(userRepository.findByEmailIgnoreCase("admin@scms.com")).thenReturn(Optional.of(sampleAdmin));
 
         sampleClass = new SportsClass();
         sampleClass.setId(1);
@@ -167,5 +182,19 @@ class EnrollmentServiceTest {
         assertNotNull(response);
         assertEquals("Cancelled", existing.getStatus());
         verify(enrollmentRepository).save(existing);
+    }
+
+    @Test
+    @DisplayName("Member cannot enroll another member")
+    void enroll_MemberCannotTargetAnotherMember() {
+        Role memberRole = new Role();
+        memberRole.setName("Member");
+        sampleMember.setRole(memberRole);
+        when(userRepository.findByEmailIgnoreCase(sampleMember.getEmail())).thenReturn(Optional.of(sampleMember));
+
+        assertThrows(AccessDeniedException.class,
+                () -> enrollmentService.enroll(1, 9, sampleMember.getEmail()));
+        verifyNoInteractions(memberPackageRepository);
+        verifyNoInteractions(enrollmentRepository);
     }
 }

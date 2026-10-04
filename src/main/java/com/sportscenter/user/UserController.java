@@ -18,7 +18,7 @@ public class UserController {
     private final UserService userService;
 
     @GetMapping
-    @PreAuthorize("hasAuthority('MANAGE_USERS') or hasAuthority('MANAGE_RBAC') or hasRole('ADMIN') or hasRole('CENTERMANAGER')")
+    @PreAuthorize("hasAuthority('MANAGE_USERS') or hasAuthority('MANAGE_RBAC')")
     public List<UserResponse> getAllUsers(
             @RequestParam(required = false) String role,
             @RequestParam(required = false) String search
@@ -27,33 +27,33 @@ public class UserController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAuthority('MANAGE_USERS') or hasRole('ADMIN') or hasRole('CENTERMANAGER')")
+    @PreAuthorize("hasAuthority('MANAGE_USERS') or hasAuthority('MANAGE_RBAC')")
     public UserResponse getUserById(@PathVariable Integer id) {
         return userService.findById(id);
     }
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasAuthority('MANAGE_USERS') or hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('MANAGE_USERS')")
     public UserResponse createUser(@Valid @RequestBody UserRequest request) {
         return userService.createUser(request);
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAuthority('MANAGE_USERS') or hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('MANAGE_USERS')")
     public UserResponse updateUser(@PathVariable Integer id, @Valid @RequestBody UserRequest request) {
         return userService.updateUser(id, request);
     }
 
     @PatchMapping("/{id}/status")
-    @PreAuthorize("hasAuthority('MANAGE_USERS') or hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('MANAGE_USERS')")
     public UserResponse updateUserStatus(@PathVariable Integer id, @RequestBody Map<String, String> body) {
         String status = body != null ? body.get("status") : null;
         return userService.updateUserStatus(id, status);
     }
 
     @PatchMapping("/{id}/role")
-    @PreAuthorize("hasAuthority('MANAGE_USERS') or hasAuthority('MANAGE_RBAC') or hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('MANAGE_USERS') or hasAuthority('MANAGE_RBAC')")
     public UserResponse updateUserRole(@PathVariable Integer id, @RequestBody Map<String, Integer> body) {
         Integer roleId = body != null ? body.get("roleId") : null;
         return userService.updateUserRole(id, roleId);

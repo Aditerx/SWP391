@@ -8,6 +8,8 @@ import com.sportscenter.sportclass.SportsClassRepository;
 import com.sportscenter.user.User;
 import com.sportscenter.user.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,17 +25,55 @@ public class TrainingPlanService {
     private final AuditService auditService;
 
     @Transactional(readOnly = true)
-    public List<TrainingPlanResponse> searchPlans(Integer coachId, Integer classId, Integer memberId) {
+    public List<TrainingPlanResponse> searchPlans(Integer coachId, Integer classId, Integer memberId,
+                                                  Authentication authentication) {
+        User currentUser = null;
+        boolean memberRole = hasRole(authentication, "ROLE_MEMBER");
+        boolean coachRole = hasRole(authentication, "ROLE_COACH");
+        if (memberRole || coachRole) {
+            currentUser = userRepository.findByEmailIgnoreCase(authentication.getName())
+                    .orElseThrow(() -> new AccessDeniedException("Authenticated user account was not found"));
+        }
+        if (memberRole) {
+            if (memberId != null && !memberId.equals(currentUser.getId())) {
+                throw new AccessDeniedException("Members may only view their own training plans");
+            }
+            memberId = currentUser.getId();
+        } else if (coachRole) {
+            if (coachId != null && !coachId.equals(currentUser.getId())) {
+                throw new AccessDeniedException("Coaches may only view their own training plans");
+            }
+            coachId = currentUser.getId();
+        }
         return trainingPlanRepository.searchPlans(coachId, classId, memberId).stream()
                 .map(TrainingPlanResponse::from)
                 .toList();
     }
 
     @Transactional(readOnly = true)
-    public TrainingPlanResponse findById(Integer id) {
+    public TrainingPlanResponse findById(Integer id, Authentication authentication) {
         TrainingPlan plan = trainingPlanRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Training plan not found: " + id));
+        if (hasRole(authentication, "ROLE_MEMBER") && (plan.getMember() == null
+                || !plan.getMember().getId().equals(currentUserId(authentication)))) {
+            throw new AccessDeniedException("Members may only view their own training plans");
+        }
+        if (hasRole(authentication, "ROLE_COACH") && (plan.getCoach() == null
+                || !plan.getCoach().getId().equals(currentUserId(authentication)))) {
+            throw new AccessDeniedException("Coaches may only view their own training plans");
+        }
         return TrainingPlanResponse.from(plan);
+    }
+
+    private boolean hasRole(Authentication authentication, String role) {
+        return authentication != null && authentication.getAuthorities().stream()
+                .anyMatch(authority -> role.equals(authority.getAuthority()));
+    }
+
+    private Integer currentUserId(Authentication authentication) {
+        return userRepository.findByEmailIgnoreCase(authentication.getName())
+                .map(User::getId)
+                .orElseThrow(() -> new AccessDeniedException("Authenticated user account was not found"));
     }
 
     @Transactional

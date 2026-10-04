@@ -5,6 +5,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
@@ -19,17 +20,19 @@ public class AttendanceController {
     private final AttendanceService attendanceService;
 
     @GetMapping
+    @PreAuthorize("hasAnyAuthority('RECORD_RESULT', 'REGISTER_MEMBER', 'MANAGE_CLASSES', 'MANAGE_USERS') or hasRole('MEMBER')")
     public ResponseEntity<List<AttendanceResponse>> searchAttendances(
             @RequestParam(required = false) Integer sessionId,
             @RequestParam(required = false) Integer memberId,
             @RequestParam(required = false) Integer recordedBy,
             @RequestParam(required = false) String state,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+            Authentication authentication
     ) {
         LocalDateTime start = startDate != null ? startDate.atStartOfDay() : null;
         LocalDateTime end = endDate != null ? endDate.atTime(LocalTime.MAX) : null;
-        return ResponseEntity.ok(attendanceService.searchAttendances(sessionId, memberId, recordedBy, state, start, end));
+        return ResponseEntity.ok(attendanceService.searchAttendances(sessionId, memberId, recordedBy, state, start, end, authentication));
     }
 
     @PostMapping("/check-in")

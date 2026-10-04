@@ -5,6 +5,8 @@ import com.sportscenter.common.exception.ResourceNotFoundException;
 import com.sportscenter.user.dto.PermissionResponse;
 import com.sportscenter.user.dto.RoleResponse;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -17,6 +19,7 @@ import java.util.Set;
 public class RoleService {
     private final RoleRepository roleRepository;
     private final PermissionRepository permissionRepository;
+    private final UserRepository userRepository;
     private final AuditService auditService;
 
     @Transactional(readOnly = true)
@@ -51,7 +54,14 @@ public class RoleService {
 
         Role saved = roleRepository.save(role);
         String permNames = newPermissions.stream().map(Permission::getName).reduce((a, b) -> a + ", " + b).orElse("None");
-        auditService.log(null, "UPDATE_ROLE_PERMISSIONS", "ROLE", saved.getId(),
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated()) {
+            throw new IllegalStateException("Authenticated actor is required for permission changes");
+        }
+        Integer actorId = userRepository.findByEmailIgnoreCase(authentication.getName())
+                .map(User::getId)
+                .orElseThrow(() -> new IllegalStateException("Authenticated actor account was not found"));
+        auditService.log(actorId, "UPDATE_ROLE_PERMISSIONS", "ROLE", saved.getId(),
                 "Updated permissions for role " + saved.getName() + " to: [" + permNames + "]");
 
         return RoleResponse.from(saved);

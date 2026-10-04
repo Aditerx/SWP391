@@ -538,15 +538,39 @@ INSERT INTO permissions (permission_name, description) VALUES
 ('VIEW_AUDIT_LOG',       'Xem lich su thao tac he thong'),
 ('MANAGE_RBAC',          'Phan quyen va quan tri vai tro he thong'),
 ('REGISTER_MEMBER',      'Dang ky thanh vien moi tai quay'),
-('MANAGE_SUBSCRIPTIONS', 'Dang ky va gia han goi tap')
+('MANAGE_SUBSCRIPTIONS', 'Dang ky va gia han goi tap'),
+('MANAGE_PERMISSIONS',   'Chi quan tri vien duoc cau hinh ma tran phan quyen'),
+('MANAGE_INVOICES',      'Quan ly va xem hoa don cua cac thanh vien')
 ON CONFLICT (permission_name) DO NOTHING;
 
--- Role → Permission assignments
-INSERT INTO role_permissions (role_id, permission_id) VALUES
-    (1,1),(1,2),(1,3),(1,4),(1,7),(1,8),(1,9),
-    (2,5),(2,6),
-    (4,6),(4,7),(4,8),(4,11),(4,12),
-    (5,1),(5,4),(5,9),(5,10)
+-- Role → Permission assignments by names, not sequence-specific IDs.
+INSERT INTO role_permissions (role_id, permission_id)
+SELECT r.role_id, p.permission_id
+FROM (VALUES
+    ('CenterManager', 'MANAGE_USERS'),
+    ('CenterManager', 'MANAGE_CLASSES'),
+    ('CenterManager', 'MANAGE_PACKAGES'),
+    ('CenterManager', 'VIEW_REPORTS'),
+    ('CenterManager', 'PROCESS_PAYMENT'),
+    ('CenterManager', 'HANDLE_SUPPORT'),
+    ('CenterManager', 'VIEW_AUDIT_LOG'),
+    ('CenterManager', 'MANAGE_INVOICES'),
+    ('Coach', 'MANAGE_TRAINING_PLAN'),
+    ('Coach', 'RECORD_RESULT'),
+    ('Receptionist', 'RECORD_RESULT'),
+    ('Receptionist', 'PROCESS_PAYMENT'),
+    ('Receptionist', 'HANDLE_SUPPORT'),
+    ('Receptionist', 'REGISTER_MEMBER'),
+    ('Receptionist', 'MANAGE_SUBSCRIPTIONS'),
+    ('Receptionist', 'MANAGE_INVOICES'),
+    ('Admin', 'MANAGE_USERS'),
+    ('Admin', 'VIEW_REPORTS'),
+    ('Admin', 'VIEW_AUDIT_LOG'),
+    ('Admin', 'MANAGE_RBAC'),
+    ('Admin', 'MANAGE_PERMISSIONS')
+) AS defaults(role_name, permission_name)
+JOIN roles r ON UPPER(r.role_name) = UPPER(defaults.role_name)
+JOIN permissions p ON p.permission_name = defaults.permission_name
 ON CONFLICT DO NOTHING;
 
 -- Users (password: 12345678, stored as BCrypt hash)

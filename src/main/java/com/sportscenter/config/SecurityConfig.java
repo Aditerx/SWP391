@@ -11,7 +11,6 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -23,9 +22,8 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
-import java.util.HashSet;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
 
 @Configuration
 @EnableMethodSecurity
@@ -38,6 +36,7 @@ public class SecurityConfig {
 
     @Bean
     UserDetailsService userDetailsService(UserRepository repository) {
+        // Session authentication keeps this permission snapshot until the user logs in again.
         return email -> {
             User user = repository.findForAuthentication(email)
                     .orElseThrow(() -> new UsernameNotFoundException("User not found"));
@@ -45,7 +44,7 @@ public class SecurityConfig {
                 throw new UsernameNotFoundException("User is not active");
             }
 
-            Set<GrantedAuthority> authorities = new HashSet<>();
+            List<GrantedAuthority> authorities = new ArrayList<>();
             if (user.getRole() != null) {
                 String roleName = user.getRole().getName();
                 authorities.add(new SimpleGrantedAuthority("ROLE_" + roleName.toUpperCase()));
@@ -54,33 +53,6 @@ public class SecurityConfig {
                         .map(permission -> new SimpleGrantedAuthority(permission.getName()))
                         .forEach(authorities::add);
 
-                if ("Admin".equalsIgnoreCase(roleName)) {
-                    authorities.add(new SimpleGrantedAuthority("MANAGE_USERS"));
-                    authorities.add(new SimpleGrantedAuthority("MANAGE_RBAC"));
-                    authorities.add(new SimpleGrantedAuthority("VIEW_AUDIT_LOG"));
-                    authorities.add(new SimpleGrantedAuthority("VIEW_REPORTS"));
-                    authorities.add(new SimpleGrantedAuthority("MANAGE_CLASSES"));
-                    authorities.add(new SimpleGrantedAuthority("MANAGE_PACKAGES"));
-                    authorities.add(new SimpleGrantedAuthority("REGISTER_MEMBER"));
-                    authorities.add(new SimpleGrantedAuthority("MANAGE_SUBSCRIPTIONS"));
-                } else if ("CenterManager".equalsIgnoreCase(roleName)) {
-                    authorities.add(new SimpleGrantedAuthority("MANAGE_USERS"));
-                    authorities.add(new SimpleGrantedAuthority("MANAGE_CLASSES"));
-                    authorities.add(new SimpleGrantedAuthority("MANAGE_PACKAGES"));
-                    authorities.add(new SimpleGrantedAuthority("VIEW_REPORTS"));
-                    authorities.add(new SimpleGrantedAuthority("VIEW_AUDIT_LOG"));
-                    authorities.add(new SimpleGrantedAuthority("PROCESS_PAYMENT"));
-                    authorities.add(new SimpleGrantedAuthority("HANDLE_SUPPORT"));
-                } else if ("Receptionist".equalsIgnoreCase(roleName)) {
-                    authorities.add(new SimpleGrantedAuthority("REGISTER_MEMBER"));
-                    authorities.add(new SimpleGrantedAuthority("MANAGE_SUBSCRIPTIONS"));
-                    authorities.add(new SimpleGrantedAuthority("PROCESS_PAYMENT"));
-                    authorities.add(new SimpleGrantedAuthority("HANDLE_SUPPORT"));
-                    authorities.add(new SimpleGrantedAuthority("RECORD_RESULT"));
-                } else if ("Coach".equalsIgnoreCase(roleName)) {
-                    authorities.add(new SimpleGrantedAuthority("MANAGE_TRAINING_PLAN"));
-                    authorities.add(new SimpleGrantedAuthority("RECORD_RESULT"));
-                }
             }
 
 
