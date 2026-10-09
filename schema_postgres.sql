@@ -20,6 +20,8 @@
 --
 -- Password for all demo accounts: 12345678
 -- BCrypt hash used below: $2a$10$4GZCdOj0TOi2rNMWm17FVeEVBIXhEGmJCEeYM2VDqEqeYJAqT9sFi
+-- Password for all demo accounts: Scms@2026
+-- BCrypt hash used below: $2a$10$QBctKpWoGbyJxKd43TNSPemf2xsDeVUugnAhEEfkZH6pLU8ncMqMi
 
 -- =====================================================================
 -- 1. ROLES – PERMISSIONS
@@ -551,6 +553,8 @@ ON CONFLICT DO NOTHING;
 
 -- Users (password: 12345678, stored as BCrypt hash)
 -- BCrypt hash: $2a$10$4GZCdOj0TOi2rNMWm17FVeEVBIXhEGmJCEeYM2VDqEqeYJAqT9sFi
+-- Users (password: Scms@2026, stored as BCrypt hash)
+-- BCrypt hash: $2a$10$QBctKpWoGbyJxKd43TNSPemf2xsDeVUugnAhEEfkZH6pLU8ncMqMi
 INSERT INTO users (role_id, full_name, email, phone, password_hash, address, gender, date_of_birth) VALUES
 (1, 'Nguyen Van An',    'manager@scms.com',        '0901234501', '$2a$10$4GZCdOj0TOi2rNMWm17FVeEVBIXhEGmJCEeYM2VDqEqeYJAqT9sFi', '12 Nguyen Hue, Q1, TP.HCM',          'Male',   '1985-03-12'),
 (2, 'Tran Thi Huong',   'huong.tran@fitzone.vn',   '0901234502', '$2a$10$4GZCdOj0TOi2rNMWm17FVeEVBIXhEGmJCEeYM2VDqEqeYJAqT9sFi', '45 Le Loi, Q1, TP.HCM',              'Female', '1992-07-20'),
@@ -565,6 +569,20 @@ INSERT INTO users (role_id, full_name, email, phone, password_hash, address, gen
 (3, 'Ly Thi Thu',       'thu.ly@fitzone.vn',       '0901234511', '$2a$10$4GZCdOj0TOi2rNMWm17FVeEVBIXhEGmJCEeYM2VDqEqeYJAqT9sFi', '11 Hoang Van Thu, Tan Binh, TP.HCM', 'Female', '2000-05-14'),
 (3, 'Trinh Van Vinh',   'vinh.trinh@fitzone.vn',   '0901234512', '$2a$10$4GZCdOj0TOi2rNMWm17FVeEVBIXhEGmJCEeYM2VDqEqeYJAqT9sFi', '22 Cong Hoa, Tan Binh, TP.HCM',      'Male',   '1991-10-09')
 ON CONFLICT (email) DO NOTHING;
+(1, 'Nguyen Van An',    'manager@scms.com',        '0901234501', '$2a$10$QBctKpWoGbyJxKd43TNSPemf2xsDeVUugnAhEEfkZH6pLU8ncMqMi', '12 Nguyen Hue, Q1, TP.HCM',          'Male',   '1985-03-12'),
+(2, 'Tran Thi Huong',   'huong.tran@fitzone.vn',   '0901234502', '$2a$10$QBctKpWoGbyJxKd43TNSPemf2xsDeVUugnAhEEfkZH6pLU8ncMqMi', '45 Le Loi, Q1, TP.HCM',              'Female', '1992-07-20'),
+(2, 'Le Minh Khoa',     'khoa.le@fitzone.vn',      '0901234503', '$2a$10$QBctKpWoGbyJxKd43TNSPemf2xsDeVUugnAhEEfkZH6pLU8ncMqMi', '78 CMT8, Q3, TP.HCM',                'Male',   '1990-01-15'),
+(2, 'Pham Thi Lan',     'lan.pham@fitzone.vn',     '0901234504', '$2a$10$QBctKpWoGbyJxKd43TNSPemf2xsDeVUugnAhEEfkZH6pLU8ncMqMi', '23 NTM Khai, Q1, TP.HCM',            'Female', '1994-11-05'),
+(4, 'Do Thi Mai',       'mai.do@fitzone.vn',       '0901234505', '$2a$10$QBctKpWoGbyJxKd43TNSPemf2xsDeVUugnAhEEfkZH6pLU8ncMqMi', '56 Dien Bien Phu, Binh Thanh',       'Female', '1998-04-22'),
+(4, 'Vu Van Nam',       'nam.vu@fitzone.vn',       '0901234506', '$2a$10$QBctKpWoGbyJxKd43TNSPemf2xsDeVUugnAhEEfkZH6pLU8ncMqMi', '89 Phan Xich Long, Phu Nhuan',       'Male',   '1997-09-30'),
+(3, 'Hoang Thi Oanh',   'oanh.hoang@fitzone.vn',   '0901234507', '$2a$10$QBctKpWoGbyJxKd43TNSPemf2xsDeVUugnAhEEfkZH6pLU8ncMqMi', '12 Tran Hung Dao, Q5, TP.HCM',       'Female', '1996-06-18'),
+(3, 'Bui Van Phuc',     'phuc.bui@fitzone.vn',     '0901234508', '$2a$10$QBctKpWoGbyJxKd43TNSPemf2xsDeVUugnAhEEfkZH6pLU8ncMqMi', '34 Nguyen Trai, Q5, TP.HCM',         'Male',   '1993-02-27'),
+(3, 'Ngo Thi Quyen',    'quyen.ngo@fitzone.vn',    '0901234509', '$2a$10$QBctKpWoGbyJxKd43TNSPemf2xsDeVUugnAhEEfkZH6pLU8ncMqMi', '67 Ly Thuong Kiet, Q10, TP.HCM',     'Female', '1999-12-01'),
+(3, 'Dang Van Son',     'son.dang@fitzone.vn',     '0901234510', '$2a$10$QBctKpWoGbyJxKd43TNSPemf2xsDeVUugnAhEEfkZH6pLU8ncMqMi', '90 Ba Thang Hai, Q10, TP.HCM',       'Male',   '1988-08-08'),
+(3, 'Ly Thi Thu',       'thu.ly@fitzone.vn',       '0901234511', '$2a$10$QBctKpWoGbyJxKd43TNSPemf2xsDeVUugnAhEEfkZH6pLU8ncMqMi', '11 Hoang Van Thu, Tan Binh, TP.HCM', 'Female', '2000-05-14'),
+(3, 'Trinh Van Vinh',   'vinh.trinh@fitzone.vn',   '0901234512', '$2a$10$QBctKpWoGbyJxKd43TNSPemf2xsDeVUugnAhEEfkZH6pLU8ncMqMi', '22 Cong Hoa, Tan Binh, TP.HCM',      'Male',   '1991-10-09'),
+(5, 'Admin System',     'admin@scms.com',          '0901234500', '$2a$10$QBctKpWoGbyJxKd43TNSPemf2xsDeVUugnAhEEfkZH6pLU8ncMqMi', 'Headquarters, Q1, TP.HCM',          'Other',  '1980-01-01')
+ON CONFLICT (email) DO UPDATE SET password_hash = EXCLUDED.password_hash;
 
 INSERT INTO center_managers (user_id) VALUES (1) ON CONFLICT DO NOTHING;
 INSERT INTO receptionists   (user_id) VALUES (5),(6) ON CONFLICT DO NOTHING;
