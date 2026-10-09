@@ -13,7 +13,9 @@ public record StaffResponse(
         String specialization,
         String specializationVi,
         String status,
-        Integer activeClassesCount
+        Integer activeClassesCount,
+        Boolean emailSent,
+        String warning
 ) {
     public static StaffResponse fromUser(User user, Coach coach, Integer classCount) {
         String roleName = user.getRole() != null ? user.getRole().getName() : "Staff";
@@ -35,7 +37,14 @@ public record StaffResponse(
                 spec,
                 spec,
                 user.getStatus() != null ? user.getStatus().toLowerCase() : "active",
-                classCount != null ? classCount : 0
+                classCount != null ? classCount : 0,
+                null,
+                null
         );
+    }
+
+    public StaffResponse withEmailDelivery(boolean sent, String warning) {
+        return new StaffResponse(id, code, name, email, phone, role, specialization,
+                specializationVi, status, activeClassesCount, sent, warning);
     }
 }

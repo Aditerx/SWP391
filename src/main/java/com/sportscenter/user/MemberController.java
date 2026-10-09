@@ -36,6 +36,13 @@ public class MemberController {
         return memberService.createMember(request);
     }
 
+    @PostMapping("/register")
+    @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("hasAuthority('REGISTER_MEMBER')")
+    public MemberResponse registerMember(@Valid @RequestBody MemberRequest request) {
+        return memberService.createMember(request);
+    }
+
     @PutMapping("/{id}")
     @PreAuthorize("hasAuthority('MANAGE_USERS')")
     public MemberResponse updateMember(@PathVariable Integer id, @Valid @RequestBody MemberRequest request) {

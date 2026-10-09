@@ -16,6 +16,7 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class UserController {
     private final UserService userService;
+    private final AvatarService avatarService;
 
     @GetMapping
     @PreAuthorize("hasAuthority('MANAGE_USERS') or hasAuthority('MANAGE_RBAC')")
@@ -37,6 +38,25 @@ public class UserController {
     @PreAuthorize("hasAuthority('MANAGE_USERS')")
     public UserResponse createUser(@Valid @RequestBody UserRequest request) {
         return userService.createUser(request);
+    }
+
+    @PostMapping("/{id}/reissue-password")
+    @PreAuthorize("hasAnyAuthority('MANAGE_USERS', 'REGISTER_MEMBER', 'MANAGE_PERMISSIONS')")
+    public UserResponse reissuePassword(@PathVariable Integer id) {
+        return userService.reissuePassword(id);
+    }
+
+    @PostMapping(value = "/me/avatar", consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)
+    public AvatarResponse uploadMyAvatar(@RequestParam("file") org.springframework.web.multipart.MultipartFile file,
+                                         org.springframework.security.core.Authentication authentication) {
+        return avatarService.upload(authentication.getName(), file);
+    }
+
+    @DeleteMapping("/me/avatar")
+    public org.springframework.http.ResponseEntity<Void> deleteMyAvatar(
+            org.springframework.security.core.Authentication authentication) {
+        avatarService.delete(authentication.getName());
+        return org.springframework.http.ResponseEntity.noContent().build();
     }
 
     @PutMapping("/{id}")

@@ -18,6 +18,10 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.security.web.context.SecurityContextRepository;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.core.session.SessionRegistry;
+import org.springframework.security.core.session.SessionRegistryImpl;
+import org.springframework.security.web.session.HttpSessionEventPublisher;
+import org.springframework.security.web.access.intercept.AuthorizationFilter;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -65,6 +69,21 @@ public class SecurityConfig {
     }
 
     @Bean
+    SessionRegistry sessionRegistry() {
+        return new SessionRegistryImpl();
+    }
+
+    @Bean
+    FirstLoginPasswordFilter firstLoginPasswordFilter(UserRepository userRepository) {
+        return new FirstLoginPasswordFilter(userRepository);
+    }
+
+    @Bean
+    HttpSessionEventPublisher httpSessionEventPublisher() {
+        return new HttpSessionEventPublisher();
+    }
+
+    @Bean
     SecurityContextRepository securityContextRepository() {
         return new HttpSessionSecurityContextRepository();
     }
@@ -92,14 +111,18 @@ public class SecurityConfig {
     @Bean
     SecurityFilterChain securityFilterChain(HttpSecurity http,
                                              SecurityContextRepository securityContextRepository,
-                                             CorsConfigurationSource corsConfigurationSource) throws Exception {
+                                             CorsConfigurationSource corsConfigurationSource,
+                                             FirstLoginPasswordFilter firstLoginPasswordFilter) throws Exception {
         return http
                 .cors(cors -> cors.configurationSource(corsConfigurationSource))
                 .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/actuator/health", "/actuator/info").permitAll()
                         .requestMatchers("/api/health").permitAll()
-                        .requestMatchers("/api/auth/login", "/api/auth/logout").permitAll()
+                        .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/auth/login", "/api/auth/logout",
+                                "/api/auth/forgot-password", "/api/auth/reset-password", "/api/auth/register",
+                                "/api/auth/verify-registration", "/api/auth/resend-otp").permitAll()
+                        .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/public/**").permitAll()
                         .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                         .requestMatchers("/", "/index.html", "/assets/**", "/*.ico", "/*.png", "/*.svg", "/*.js", "/*.css", "/*.json").permitAll()
                         .requestMatchers("/api/**").authenticated()
@@ -110,6 +133,7 @@ public class SecurityConfig {
                         (request, response, exception) -> response.sendError(HttpServletResponse.SC_UNAUTHORIZED)))
                 .securityContext(context -> context.securityContextRepository(securityContextRepository))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED))
+                .addFilterBefore(firstLoginPasswordFilter, AuthorizationFilter.class)
                 .build();
     }
 }

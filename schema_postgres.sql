@@ -53,6 +53,17 @@ CREATE TABLE IF NOT EXISTS role_permissions (
 -- 2. USERS + role subtypes
 -- =====================================================================
 
+CREATE TABLE IF NOT EXISTS centers (
+    center_id SERIAL PRIMARY KEY,
+    center_name VARCHAR(150) NOT NULL
+);
+
+INSERT INTO centers (center_id, center_name)
+VALUES (1, 'Sports Center 1')
+ON CONFLICT (center_id) DO NOTHING;
+SELECT setval(pg_get_serial_sequence('centers', 'center_id'),
+              GREATEST((SELECT COALESCE(MAX(center_id), 1) FROM centers), 1));
+
 CREATE TABLE IF NOT EXISTS users (
     user_id       SERIAL PRIMARY KEY,
     role_id       INT NOT NULL,
@@ -64,13 +75,58 @@ CREATE TABLE IF NOT EXISTS users (
     gender        VARCHAR(10)  CHECK (gender IN ('Male', 'Female', 'Other')),
     date_of_birth DATE,
     status        VARCHAR(20)  NOT NULL DEFAULT 'Active'
-        CHECK (status IN ('Active', 'Inactive', 'Locked')),
+        CHECK (status IN ('Active', 'Inactive', 'Locked', 'Pending')),
+    failed_login_attempts INT NOT NULL DEFAULT 0,
+    locked_until  TIMESTAMP NULL,
+    center_id     INT NULL DEFAULT 1,
+    is_first_login BOOLEAN NOT NULL DEFAULT FALSE,
+    avatar_url VARCHAR(500) NULL,
+    avatar_public_id VARCHAR(255) NULL,
     created_at    TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_user_role
-        FOREIGN KEY (role_id) REFERENCES roles(role_id)
+        FOREIGN KEY (role_id) REFERENCES roles(role_id),
+    CONSTRAINT fk_user_center
+        FOREIGN KEY (center_id) REFERENCES centers(center_id)
 );
 
 CREATE INDEX IF NOT EXISTS idx_users_role ON users(role_id);
+
+CREATE TABLE IF NOT EXISTS email_otps (
+    otp_id SERIAL PRIMARY KEY,
+    email VARCHAR(100) NOT NULL,
+    user_id INT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+    purpose VARCHAR(30) NOT NULL CHECK (purpose IN ('REGISTER', 'RESET_PASSWORD')),
+    otp_hash VARCHAR(255) NOT NULL,
+    expires_at TIMESTAMP NOT NULL,
+    attempts INT NOT NULL DEFAULT 0,
+    used BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_email_otps_quota ON email_otps(email, purpose, created_at);
+
+UPDATE users u
+SET center_id = 1
+WHERE u.center_id IS NULL
+  AND NOT EXISTS (
+      SELECT 1 FROM roles r WHERE r.role_id = u.role_id AND r.role_name = 'Admin'
+  );
+
+CREATE OR REPLACE FUNCTION enforce_user_center_assignment()
+RETURNS TRIGGER AS $$
+DECLARE role_name_value VARCHAR(50);
+BEGIN
+    SELECT role_name INTO role_name_value FROM roles WHERE role_id = NEW.role_id;
+    IF role_name_value IS DISTINCT FROM 'Admin' AND NEW.center_id IS NULL THEN
+        RAISE EXCEPTION 'center_id is required for non-admin users';
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_users_require_center ON users;
+CREATE TRIGGER trg_users_require_center
+    BEFORE INSERT OR UPDATE OF role_id, center_id ON users
+    FOR EACH ROW EXECUTE FUNCTION enforce_user_center_assignment();
 
 CREATE TABLE IF NOT EXISTS center_managers (
     user_id INT PRIMARY KEY,
@@ -116,7 +172,23 @@ CREATE TABLE IF NOT EXISTS members (
 CREATE TABLE IF NOT EXISTS subjects (
     subject_id   SERIAL PRIMARY KEY,
     subject_name VARCHAR(100) NOT NULL,
-    description  VARCHAR(255)
+    description  VARCHAR(255),
+    status       VARCHAR(20) NOT NULL DEFAULT 'Active' CHECK (status IN ('Active', 'Inactive')),
+    slug         VARCHAR(120) NULL UNIQUE
+);
+
+CREATE TABLE IF NOT EXISTS specializations (
+    specialization_id SERIAL PRIMARY KEY,
+    name VARCHAR(120) NOT NULL UNIQUE,
+    subject_id INT NULL REFERENCES subjects(subject_id),
+    description TEXT,
+    status VARCHAR(20) NOT NULL DEFAULT 'Active' CHECK (status IN ('Active', 'Inactive'))
+);
+
+CREATE TABLE IF NOT EXISTS coach_specializations (
+    coach_id INT NOT NULL REFERENCES coaches(user_id) ON DELETE CASCADE,
+    specialization_id INT NOT NULL REFERENCES specializations(specialization_id) ON DELETE CASCADE,
+    PRIMARY KEY (coach_id, specialization_id)
 );
 
 CREATE TABLE IF NOT EXISTS rooms (
@@ -126,6 +198,7 @@ CREATE TABLE IF NOT EXISTS rooms (
     capacity  INT,
     status    VARCHAR(20)  NOT NULL DEFAULT 'Available'
         CHECK (status IN ('Available', 'Maintenance', 'Closed')),
+    center_id INT NOT NULL DEFAULT 1 REFERENCES centers(center_id),
     CONSTRAINT chk_room_capacity CHECK (capacity IS NULL OR capacity > 0)
 );
 
@@ -139,6 +212,7 @@ CREATE TABLE IF NOT EXISTS classes (
     end_date     DATE,
     status       VARCHAR(20) NOT NULL DEFAULT 'Open'
         CHECK (status IN ('Open', 'Ongoing', 'Closed', 'Cancelled')),
+    center_id    INT NOT NULL DEFAULT 1 REFERENCES centers(center_id),
     CONSTRAINT chk_class_capacity CHECK (max_capacity IS NULL OR max_capacity > 0),
     CONSTRAINT chk_class_dates    CHECK (end_date IS NULL OR start_date IS NULL OR end_date >= start_date),
     CONSTRAINT fk_class_subject   FOREIGN KEY (subject_id) REFERENCES subjects(subject_id),
@@ -268,7 +342,8 @@ CREATE TABLE IF NOT EXISTS membership_packages (
     duration_days INT             NOT NULL,
     benefits      TEXT,
     status        VARCHAR(20)     NOT NULL DEFAULT 'Active'
-        CHECK (status IN ('Active', 'Inactive'))
+        CHECK (status IN ('Active', 'Inactive')),
+    center_id     INT             NOT NULL DEFAULT 1 REFERENCES centers(center_id)
 );
 
 CREATE TABLE IF NOT EXISTS member_packages (
@@ -540,7 +615,9 @@ INSERT INTO permissions (permission_name, description) VALUES
 ('REGISTER_MEMBER',      'Dang ky thanh vien moi tai quay'),
 ('MANAGE_SUBSCRIPTIONS', 'Dang ky va gia han goi tap'),
 ('MANAGE_PERMISSIONS',   'Chi quan tri vien duoc cau hinh ma tran phan quyen'),
-('MANAGE_INVOICES',      'Quan ly va xem hoa don cua cac thanh vien')
+('MANAGE_INVOICES',      'Quan ly va xem hoa don cua cac thanh vien'),
+('LOCK_SUBJECTS',        'Khoa hoac mo mon hoc'),
+('MANAGE_SPECIALIZATIONS', 'Quan ly chuyen mon huan luyen vien')
 ON CONFLICT (permission_name) DO NOTHING;
 
 -- Role → Permission assignments by names, not sequence-specific IDs.
@@ -567,7 +644,9 @@ FROM (VALUES
     ('Admin', 'VIEW_REPORTS'),
     ('Admin', 'VIEW_AUDIT_LOG'),
     ('Admin', 'MANAGE_RBAC'),
-    ('Admin', 'MANAGE_PERMISSIONS')
+    ('Admin', 'MANAGE_PERMISSIONS'),
+    ('Admin', 'LOCK_SUBJECTS'),
+    ('Admin', 'MANAGE_SPECIALIZATIONS')
 ) AS defaults(role_name, permission_name)
 JOIN roles r ON UPPER(r.role_name) = UPPER(defaults.role_name)
 JOIN permissions p ON p.permission_name = defaults.permission_name
@@ -597,6 +676,21 @@ INSERT INTO coaches (user_id, specialization, certification, bio) VALUES
 (2, 'Yoga, Pilates',        'RYT-200',       'Hon 6 nam kinh nghiem giang day Yoga cho moi trinh do.'),
 (3, 'Gym, Tang co giam mo', 'NASM-CPT',      'Chuyen huan luyen the hinh, dong hanh cung nhieu hoc vien.'),
 (4, 'Boxing, Kickboxing',   'Boxing cap 2',  'Cuu van dong vien boxing phong trao.')
+ON CONFLICT DO NOTHING;
+
+INSERT INTO specializations(name, status)
+SELECT DISTINCT trim(value), 'Active'
+FROM coaches c
+CROSS JOIN LATERAL regexp_split_to_table(c.specialization, '[,;]') AS value
+WHERE c.specialization IS NOT NULL AND trim(value) <> ''
+ON CONFLICT (name) DO NOTHING;
+
+INSERT INTO coach_specializations(coach_id, specialization_id)
+SELECT c.user_id, s.specialization_id
+FROM coaches c
+CROSS JOIN LATERAL regexp_split_to_table(c.specialization, '[,;]') AS value
+JOIN specializations s ON lower(s.name) = lower(trim(value))
+WHERE c.specialization IS NOT NULL AND trim(value) <> ''
 ON CONFLICT DO NOTHING;
 
 INSERT INTO members (user_id, goal, health_note, join_date, registered_by) VALUES

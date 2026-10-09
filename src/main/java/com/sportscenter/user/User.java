@@ -45,6 +45,24 @@ public class User {
     @Column(name = "status")
     private String status;
 
+    @Column(name = "failed_login_attempts", nullable = false)
+    private Integer failedLoginAttempts = 0;
+
+    @Column(name = "locked_until")
+    private LocalDateTime lockedUntil;
+
+    @Column(name = "center_id")
+    private Integer centerId;
+
+    @Column(name = "is_first_login", nullable = false)
+    private boolean firstLogin;
+
+    @Column(name = "avatar_url")
+    private String avatarUrl;
+
+    @Column(name = "avatar_public_id")
+    private String avatarPublicId;
+
     @Column(name = "created_at", insertable = false, updatable = false)
     private LocalDateTime createdAt;
 
