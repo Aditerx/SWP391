@@ -1,5 +1,6 @@
 package com.sportscenter.common.exception;
 
+import com.sportscenter.feedback.ClassFeedbackConflictException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -39,6 +40,11 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(DataIntegrityViolationException.class)
     ResponseEntity<Map<String, Object>> integrity(DataIntegrityViolationException ex) {
         return error(HttpStatus.CONFLICT, "Operation violates a database constraint");
+    }
+
+    @ExceptionHandler(ClassFeedbackConflictException.class)
+    ResponseEntity<Map<String, Object>> classFeedbackConflict(ClassFeedbackConflictException ex) {
+        return error(HttpStatus.CONFLICT, ex.getMessage());
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
