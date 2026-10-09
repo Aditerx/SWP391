@@ -22,4 +22,10 @@ public class Subject {
     @Column(name = "description")
     private String description;
 
+    @Column(name = "status", nullable = false)
+    private String status = "Active";
+
+    @Column(name = "slug", unique = true)
+    private String slug;
+
 }

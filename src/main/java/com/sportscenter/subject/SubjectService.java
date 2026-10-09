@@ -7,6 +7,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.text.Normalizer;
 
 @Service
 @RequiredArgsConstructor
@@ -53,5 +54,16 @@ public class SubjectService {
     private void apply(Subject subject, SubjectRequest request) {
         subject.setName(request.name());
         subject.setDescription(request.description());
+        subject.setStatus(request.status() == null ? "Active" : request.status());
+        subject.setSlug(request.slug() == null || request.slug().isBlank()
+                ? slugify(request.name()) : slugify(request.slug()));
+    }
+
+    private String slugify(String value) {
+        return Normalizer.normalize(value, Normalizer.Form.NFD)
+                .replaceAll("\\p{M}", "")
+                .toLowerCase()
+                .replaceAll("[^a-z0-9]+", "-")
+                .replaceAll("^-|-$", "");
     }
 }

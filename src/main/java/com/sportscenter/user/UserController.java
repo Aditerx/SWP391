@@ -16,9 +16,10 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class UserController {
     private final UserService userService;
+    private final AvatarService avatarService;
 
     @GetMapping
-    @PreAuthorize("hasAuthority('MANAGE_USERS') or hasAuthority('MANAGE_RBAC') or hasRole('ADMIN') or hasRole('CENTERMANAGER')")
+    @PreAuthorize("hasAuthority('MANAGE_USERS') or hasAuthority('MANAGE_RBAC')")
     public List<UserResponse> getAllUsers(
             @RequestParam(required = false) String role,
             @RequestParam(required = false) String search
@@ -27,33 +28,52 @@ public class UserController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAuthority('MANAGE_USERS') or hasRole('ADMIN') or hasRole('CENTERMANAGER')")
+    @PreAuthorize("hasAuthority('MANAGE_USERS') or hasAuthority('MANAGE_RBAC')")
     public UserResponse getUserById(@PathVariable Integer id) {
         return userService.findById(id);
     }
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasAuthority('MANAGE_USERS') or hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('MANAGE_USERS')")
     public UserResponse createUser(@Valid @RequestBody UserRequest request) {
         return userService.createUser(request);
     }
 
+    @PostMapping("/{id}/reissue-password")
+    @PreAuthorize("hasAnyAuthority('MANAGE_USERS', 'REGISTER_MEMBER', 'MANAGE_PERMISSIONS')")
+    public UserResponse reissuePassword(@PathVariable Integer id) {
+        return userService.reissuePassword(id);
+    }
+
+    @PostMapping(value = "/me/avatar", consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)
+    public AvatarResponse uploadMyAvatar(@RequestParam("file") org.springframework.web.multipart.MultipartFile file,
+                                         org.springframework.security.core.Authentication authentication) {
+        return avatarService.upload(authentication.getName(), file);
+    }
+
+    @DeleteMapping("/me/avatar")
+    public org.springframework.http.ResponseEntity<Void> deleteMyAvatar(
+            org.springframework.security.core.Authentication authentication) {
+        avatarService.delete(authentication.getName());
+        return org.springframework.http.ResponseEntity.noContent().build();
+    }
+
     @PutMapping("/{id}")
-    @PreAuthorize("hasAuthority('MANAGE_USERS') or hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('MANAGE_USERS')")
     public UserResponse updateUser(@PathVariable Integer id, @Valid @RequestBody UserRequest request) {
         return userService.updateUser(id, request);
     }
 
     @PatchMapping("/{id}/status")
-    @PreAuthorize("hasAuthority('MANAGE_USERS') or hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('MANAGE_USERS')")
     public UserResponse updateUserStatus(@PathVariable Integer id, @RequestBody Map<String, String> body) {
         String status = body != null ? body.get("status") : null;
         return userService.updateUserStatus(id, status);
     }
 
     @PatchMapping("/{id}/role")
-    @PreAuthorize("hasAuthority('MANAGE_USERS') or hasAuthority('MANAGE_RBAC') or hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('MANAGE_USERS') or hasAuthority('MANAGE_RBAC')")
     public UserResponse updateUserRole(@PathVariable Integer id, @RequestBody Map<String, Integer> body) {
         Integer roleId = body != null ? body.get("roleId") : null;
         return userService.updateUserRole(id, roleId);

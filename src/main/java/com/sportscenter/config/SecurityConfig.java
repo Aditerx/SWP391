@@ -11,7 +11,6 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -19,13 +18,16 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.security.web.context.SecurityContextRepository;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.core.session.SessionRegistry;
+import org.springframework.security.core.session.SessionRegistryImpl;
+import org.springframework.security.web.session.HttpSessionEventPublisher;
+import org.springframework.security.web.access.intercept.AuthorizationFilter;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
-import java.util.HashSet;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
 
 @Configuration
 @EnableMethodSecurity
@@ -38,6 +40,7 @@ public class SecurityConfig {
 
     @Bean
     UserDetailsService userDetailsService(UserRepository repository) {
+        // Session authentication keeps this permission snapshot until the user logs in again.
         return email -> {
             User user = repository.findForAuthentication(email)
                     .orElseThrow(() -> new UsernameNotFoundException("User not found"));
@@ -45,7 +48,7 @@ public class SecurityConfig {
                 throw new UsernameNotFoundException("User is not active");
             }
 
-            Set<GrantedAuthority> authorities = new HashSet<>();
+            List<GrantedAuthority> authorities = new ArrayList<>();
             if (user.getRole() != null) {
                 String roleName = user.getRole().getName();
                 authorities.add(new SimpleGrantedAuthority("ROLE_" + roleName.toUpperCase()));
@@ -54,33 +57,6 @@ public class SecurityConfig {
                         .map(permission -> new SimpleGrantedAuthority(permission.getName()))
                         .forEach(authorities::add);
 
-                if ("Admin".equalsIgnoreCase(roleName)) {
-                    authorities.add(new SimpleGrantedAuthority("MANAGE_USERS"));
-                    authorities.add(new SimpleGrantedAuthority("MANAGE_RBAC"));
-                    authorities.add(new SimpleGrantedAuthority("VIEW_AUDIT_LOG"));
-                    authorities.add(new SimpleGrantedAuthority("VIEW_REPORTS"));
-                    authorities.add(new SimpleGrantedAuthority("MANAGE_CLASSES"));
-                    authorities.add(new SimpleGrantedAuthority("MANAGE_PACKAGES"));
-                    authorities.add(new SimpleGrantedAuthority("REGISTER_MEMBER"));
-                    authorities.add(new SimpleGrantedAuthority("MANAGE_SUBSCRIPTIONS"));
-                } else if ("CenterManager".equalsIgnoreCase(roleName)) {
-                    authorities.add(new SimpleGrantedAuthority("MANAGE_USERS"));
-                    authorities.add(new SimpleGrantedAuthority("MANAGE_CLASSES"));
-                    authorities.add(new SimpleGrantedAuthority("MANAGE_PACKAGES"));
-                    authorities.add(new SimpleGrantedAuthority("VIEW_REPORTS"));
-                    authorities.add(new SimpleGrantedAuthority("VIEW_AUDIT_LOG"));
-                    authorities.add(new SimpleGrantedAuthority("PROCESS_PAYMENT"));
-                    authorities.add(new SimpleGrantedAuthority("HANDLE_SUPPORT"));
-                } else if ("Receptionist".equalsIgnoreCase(roleName)) {
-                    authorities.add(new SimpleGrantedAuthority("REGISTER_MEMBER"));
-                    authorities.add(new SimpleGrantedAuthority("MANAGE_SUBSCRIPTIONS"));
-                    authorities.add(new SimpleGrantedAuthority("PROCESS_PAYMENT"));
-                    authorities.add(new SimpleGrantedAuthority("HANDLE_SUPPORT"));
-                    authorities.add(new SimpleGrantedAuthority("RECORD_RESULT"));
-                } else if ("Coach".equalsIgnoreCase(roleName)) {
-                    authorities.add(new SimpleGrantedAuthority("MANAGE_TRAINING_PLAN"));
-                    authorities.add(new SimpleGrantedAuthority("RECORD_RESULT"));
-                }
             }
 
 
@@ -90,6 +66,21 @@ public class SecurityConfig {
                     .authorities(authorities)
                     .build();
         };
+    }
+
+    @Bean
+    SessionRegistry sessionRegistry() {
+        return new SessionRegistryImpl();
+    }
+
+    @Bean
+    FirstLoginPasswordFilter firstLoginPasswordFilter(UserRepository userRepository) {
+        return new FirstLoginPasswordFilter(userRepository);
+    }
+
+    @Bean
+    HttpSessionEventPublisher httpSessionEventPublisher() {
+        return new HttpSessionEventPublisher();
     }
 
     @Bean
@@ -120,14 +111,19 @@ public class SecurityConfig {
     @Bean
     SecurityFilterChain securityFilterChain(HttpSecurity http,
                                              SecurityContextRepository securityContextRepository,
-                                             CorsConfigurationSource corsConfigurationSource) throws Exception {
+                                             CorsConfigurationSource corsConfigurationSource,
+                                             FirstLoginPasswordFilter firstLoginPasswordFilter) throws Exception {
         return http
                 .cors(cors -> cors.configurationSource(corsConfigurationSource))
                 .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/actuator/health", "/actuator/info").permitAll()
                         .requestMatchers("/api/health").permitAll()
-                        .requestMatchers("/api/auth/login", "/api/auth/logout").permitAll()
+                        .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/payments/vnpay/ipn", "/api/payments/vnpay/return").permitAll()
+                        .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/auth/login", "/api/auth/logout",
+                                "/api/auth/forgot-password", "/api/auth/reset-password", "/api/auth/register",
+                                "/api/auth/verify-registration", "/api/auth/resend-otp").permitAll()
+                        .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/public/**").permitAll()
                         .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                         .requestMatchers("/", "/index.html", "/assets/**", "/*.ico", "/*.png", "/*.svg", "/*.js", "/*.css", "/*.json").permitAll()
                         .requestMatchers("/api/**").authenticated()
@@ -138,6 +134,7 @@ public class SecurityConfig {
                         (request, response, exception) -> response.sendError(HttpServletResponse.SC_UNAUTHORIZED)))
                 .securityContext(context -> context.securityContextRepository(securityContextRepository))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED))
+                .addFilterBefore(firstLoginPasswordFilter, AuthorizationFilter.class)
                 .build();
     }
 }

@@ -4,5 +4,7 @@ import jakarta.validation.constraints.NotBlank;
 
 public record SubjectRequest(
         @NotBlank String name,
-        String description) {
+        String description,
+        String status,
+        String slug) {
 }

@@ -7,5 +7,6 @@ public record LoginResponse(
         String email,
         String fullName,
         String role,
-        Set<String> authorities) {
+        Set<String> authorities,
+        boolean isFirstLogin) {
 }

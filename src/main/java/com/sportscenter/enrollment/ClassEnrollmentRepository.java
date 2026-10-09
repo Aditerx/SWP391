@@ -42,7 +42,11 @@ public interface ClassEnrollmentRepository extends JpaRepository<ClassEnrollment
 
     Optional<ClassEnrollment> findByMemberIdAndSportsClassId(Integer memberId, Integer classId);
 
+    boolean existsByMemberIdAndSportsClassIdAndStatusIn(Integer memberId, Integer classId, List<String> statuses);
+
     long countBySportsClassIdAndStatus(Integer classId, String status);
+
+    long countBySportsClassIdAndStatusIn(Integer classId, List<String> statuses);
 
     boolean existsByMemberIdAndSportsClassIdAndStatus(Integer memberId, Integer classId, String status);
 }

@@ -1,6 +1,8 @@
 package com.sportscenter.enrollment;
 
 import com.sportscenter.audit.AuditService;
+import com.sportscenter.invoice.InvoiceService;
+import com.sportscenter.invoice.InvoiceOrderResponse;
 import com.sportscenter.common.exception.BusinessException;
 import com.sportscenter.membership.MemberPackage;
 import com.sportscenter.membership.MemberPackageRepository;
@@ -8,6 +10,7 @@ import com.sportscenter.sportclass.SportsClass;
 import com.sportscenter.sportclass.SportsClassRepository;
 import com.sportscenter.user.User;
 import com.sportscenter.user.UserRepository;
+import com.sportscenter.user.Role;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -15,15 +18,18 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.access.AccessDeniedException;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.math.BigDecimal;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -44,10 +50,14 @@ class EnrollmentServiceTest {
     @Mock
     private AuditService auditService;
 
+    @Mock
+    private InvoiceService invoiceService;
+
     @InjectMocks
     private EnrollmentService enrollmentService;
 
     private User sampleMember;
+    private User sampleAdmin;
     private SportsClass sampleClass;
     private MemberPackage sampleActivePackage;
 
@@ -58,6 +68,17 @@ class EnrollmentServiceTest {
         sampleMember.setFullName("Hoàng Thị Oanh");
         sampleMember.setEmail("oanh.hoang@fitzone.vn");
         sampleMember.setStatus("Active");
+        Role memberRole = new Role();
+        memberRole.setName("Member");
+        sampleMember.setRole(memberRole);
+
+        sampleAdmin = new User();
+        sampleAdmin.setId(1);
+        sampleAdmin.setEmail("admin@scms.com");
+        Role adminRole = new Role();
+        adminRole.setName("Admin");
+        sampleAdmin.setRole(adminRole);
+        lenient().when(userRepository.findByEmailIgnoreCase("admin@scms.com")).thenReturn(Optional.of(sampleAdmin));
 
         sampleClass = new SportsClass();
         sampleClass.setId(1);
@@ -78,8 +99,8 @@ class EnrollmentServiceTest {
     void enroll_Success() {
         when(userRepository.findById(8)).thenReturn(Optional.of(sampleMember));
         when(memberPackageRepository.findByMemberId(8)).thenReturn(List.of(sampleActivePackage));
-        when(classRepository.findById(1)).thenReturn(Optional.of(sampleClass));
-        when(enrollmentRepository.countBySportsClassIdAndStatus(1, "Registered")).thenReturn(10L);
+        when(classRepository.findByIdForUpdate(1)).thenReturn(Optional.of(sampleClass));
+        when(enrollmentRepository.countBySportsClassIdAndStatusIn(1, List.of("Registered", "Pending"))).thenReturn(10L);
         when(enrollmentRepository.findByMemberIdAndSportsClassId(8, 1)).thenReturn(Optional.empty());
 
         ClassEnrollment saved = new ClassEnrollment();
@@ -119,8 +140,8 @@ class EnrollmentServiceTest {
         sampleClass.setMaxCapacity(15);
         when(userRepository.findById(8)).thenReturn(Optional.of(sampleMember));
         when(memberPackageRepository.findByMemberId(8)).thenReturn(List.of(sampleActivePackage));
-        when(classRepository.findById(1)).thenReturn(Optional.of(sampleClass));
-        when(enrollmentRepository.countBySportsClassIdAndStatus(1, "Registered")).thenReturn(15L);
+        when(classRepository.findByIdForUpdate(1)).thenReturn(Optional.of(sampleClass));
+        when(enrollmentRepository.countBySportsClassIdAndStatusIn(1, List.of("Registered", "Pending"))).thenReturn(15L);
 
         BusinessException ex = assertThrows(BusinessException.class, () ->
                 enrollmentService.enroll(1, 8, "admin@scms.com"));
@@ -133,8 +154,8 @@ class EnrollmentServiceTest {
     void enroll_AlreadyRegistered_ThrowsException() {
         when(userRepository.findById(8)).thenReturn(Optional.of(sampleMember));
         when(memberPackageRepository.findByMemberId(8)).thenReturn(List.of(sampleActivePackage));
-        when(classRepository.findById(1)).thenReturn(Optional.of(sampleClass));
-        when(enrollmentRepository.countBySportsClassIdAndStatus(1, "Registered")).thenReturn(5L);
+        when(classRepository.findByIdForUpdate(1)).thenReturn(Optional.of(sampleClass));
+        when(enrollmentRepository.countBySportsClassIdAndStatusIn(1, List.of("Registered", "Pending"))).thenReturn(5L);
 
         ClassEnrollment existing = new ClassEnrollment();
         existing.setId(50);
@@ -167,5 +188,43 @@ class EnrollmentServiceTest {
         assertNotNull(response);
         assertEquals("Cancelled", existing.getStatus());
         verify(enrollmentRepository).save(existing);
+    }
+
+    @Test
+    @DisplayName("Member cannot enroll another member")
+    void enroll_MemberCannotTargetAnotherMember() {
+        Role memberRole = new Role();
+        memberRole.setName("Member");
+        sampleMember.setRole(memberRole);
+        when(userRepository.findByEmailIgnoreCase(sampleMember.getEmail())).thenReturn(Optional.of(sampleMember));
+
+        assertThrows(AccessDeniedException.class,
+                () -> enrollmentService.enroll(1, 9, sampleMember.getEmail()));
+        verifyNoInteractions(memberPackageRepository);
+        verifyNoInteractions(enrollmentRepository);
+    }
+
+    @Test
+    @DisplayName("Paid class tuition holds capacity with a Pending enrollment and invoice")
+    void enroll_PaidClassCreatesPendingInvoiceAndReservation() {
+        sampleClass.setTuitionFee(new BigDecimal("125.00"));
+        when(userRepository.findById(8)).thenReturn(Optional.of(sampleMember));
+        when(memberPackageRepository.findByMemberId(8)).thenReturn(List.of(sampleActivePackage));
+        when(classRepository.findByIdForUpdate(1)).thenReturn(Optional.of(sampleClass));
+        when(enrollmentRepository.countBySportsClassIdAndStatusIn(1, List.of("Registered", "Pending"))).thenReturn(2L);
+        when(enrollmentRepository.findByMemberIdAndSportsClassId(8, 1)).thenReturn(Optional.empty());
+        when(enrollmentRepository.save(any(ClassEnrollment.class))).thenAnswer(invocation -> {
+            ClassEnrollment e = invocation.getArgument(0); e.setId(77); return e;
+        });
+        when(invoiceService.createClassOrder(sampleMember, sampleClass, "VNPay", "203.0.113.5"))
+                .thenReturn(new InvoiceOrderResponse(88, "INV-2026-000088", new BigDecimal("125.00"), "VNPay", "Pending",
+                        LocalDateTime.now().plusMinutes(15), "https://vnpay.test/pay"));
+
+        EnrollmentResponse response = enrollmentService.enroll(1, 8, "admin@scms.com", "VNPay", "203.0.113.5");
+
+        assertEquals("Pending", response.status());
+        assertEquals(88, response.invoiceId());
+        assertEquals("Pending", response.paymentStatus());
+        assertEquals("https://vnpay.test/pay", response.paymentUrl());
     }
 }

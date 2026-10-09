@@ -20,7 +20,9 @@ public record UserResponse(
         Integer roleId,
         String roleName,
         LocalDateTime createdAt,
-        Set<String> permissions
+        Set<String> permissions,
+        Boolean emailSent,
+        String warning
 ) {
     public static UserResponse from(User user) {
         String roleName = user.getRole() != null ? user.getRole().getName() : null;
@@ -53,7 +55,14 @@ public record UserResponse(
                 roleId,
                 roleName,
                 user.getCreatedAt(),
-                perms
+                perms,
+                null,
+                null
         );
+    }
+
+    public UserResponse withEmailDelivery(boolean sent, String warning) {
+        return new UserResponse(id, code, fullName, email, phone, address, gender, dateOfBirth,
+                status, roleId, roleName, createdAt, permissions, sent, warning);
     }
 }

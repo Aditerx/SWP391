@@ -1,9 +1,12 @@
 package com.sportscenter.common.exception;
 
+import com.sportscenter.feedback.ClassFeedbackConflictException;
+import com.sportscenter.invoice.InvoiceConflictException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.AuthenticationException;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -30,9 +33,24 @@ public class GlobalExceptionHandler {
         return error(HttpStatus.UNAUTHORIZED, "Invalid email or password");
     }
 
+    @ExceptionHandler(AccessDeniedException.class)
+    ResponseEntity<Map<String, Object>> forbidden(AccessDeniedException ex) {
+        return error(HttpStatus.FORBIDDEN, ex.getMessage());
+    }
+
     @ExceptionHandler(DataIntegrityViolationException.class)
     ResponseEntity<Map<String, Object>> integrity(DataIntegrityViolationException ex) {
         return error(HttpStatus.CONFLICT, "Operation violates a database constraint");
+    }
+
+    @ExceptionHandler(ClassFeedbackConflictException.class)
+    ResponseEntity<Map<String, Object>> classFeedbackConflict(ClassFeedbackConflictException ex) {
+        return error(HttpStatus.CONFLICT, ex.getMessage());
+    }
+
+    @ExceptionHandler(InvoiceConflictException.class)
+    ResponseEntity<Map<String, Object>> invoiceConflict(InvoiceConflictException ex) {
+        return error(HttpStatus.CONFLICT, ex.getMessage());
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

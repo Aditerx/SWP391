@@ -1,6 +1,9 @@
 package com.sportscenter.user;
 
 import com.sportscenter.audit.AuditService;
+import com.sportscenter.center.CenterContext;
+import com.sportscenter.auth.EmailService;
+import com.sportscenter.auth.TemporaryPasswordGenerator;
 import com.sportscenter.common.exception.BusinessException;
 import com.sportscenter.common.exception.ResourceNotFoundException;
 import com.sportscenter.membership.MemberPackage;
@@ -30,6 +33,9 @@ public class MemberService {
     private final MembershipPackageRepository membershipPackageRepository;
     private final AuditService auditService;
     private final PasswordEncoder passwordEncoder;
+    private final CenterContext centerContext;
+    private final EmailService emailService;
+    private final TemporaryPasswordGenerator temporaryPasswordGenerator;
 
     @Transactional(readOnly = true)
     public List<MemberResponse> findAllMembers() {
@@ -96,8 +102,10 @@ public class MemberService {
         user.setGender(request.gender());
         user.setDateOfBirth(request.dateOfBirth());
         user.setRole(memberRole);
-        String rawPassword = (request.password() != null && !request.password().isBlank()) ? request.password() : "Scms@2026";
-        user.setPasswordHash(passwordEncoder.encode(rawPassword));
+        user.setCenterId(centerContext.centerForNewAccount(request.centerId(), false));
+        String temporaryPassword = temporaryPasswordGenerator.generate();
+        user.setPasswordHash(temporaryPasswordGenerator.hash(temporaryPassword));
+        user.setFirstLogin(true);
         user.setStatus(request.status() != null ? normalizeUserStatus(request.status()) : "Active");
 
         User savedUser = userRepository.save(user);
@@ -135,7 +143,9 @@ public class MemberService {
         auditService.log(null, "CREATE_MEMBER", "USER", savedUser.getId(), savedUser.getFullName());
         BigDecimal totalSpent = createdPackage != null && createdPackage.getMembershipPackage() != null
                 ? createdPackage.getMembershipPackage().getPrice() : BigDecimal.ZERO;
-        return MemberResponse.from(savedUser, savedMember, createdPackage, totalSpent);
+        boolean emailSent = emailService.sendWelcomeEmail(savedUser.getEmail(), savedUser.getFullName(), temporaryPassword);
+        return MemberResponse.from(savedUser, savedMember, createdPackage, totalSpent).withEmailDelivery(emailSent,
+                emailSent ? null : "Tạo tài khoản thành công nhưng gửi email thất bại. Dùng chức năng cấp lại mật khẩu để gửi lại.");
     }
 
     @Transactional

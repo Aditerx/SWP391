@@ -18,9 +18,9 @@ class LegacyPasswordEncoderTest {
     }
 
     @Test
-    void matchesScms2026Password() {
-        String hash = encoder.encode("Scms@2026");
-        assertTrue(encoder.matches("Scms@2026", hash));
+    void matchesNewBcryptPassword() {
+        String hash = encoder.encode("SamplePass2046");
+        assertTrue(encoder.matches("SamplePass2046", hash));
         assertFalse(encoder.matches("wrong-password", hash));
     }
 }

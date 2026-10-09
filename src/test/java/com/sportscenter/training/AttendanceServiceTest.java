@@ -111,10 +111,10 @@ class AttendanceServiceTest {
 
         when(attendanceRepository.findAllWithDetails()).thenReturn(java.util.List.of(att1, att2));
 
-        var all = attendanceService.searchAttendances(null, null, null, null, null, null);
+        var all = attendanceService.searchAttendances(null, null, null, null, null, null, null);
         assertEquals(2, all.size());
 
-        var filtered = attendanceService.searchAttendances(null, null, null, "Present", null, null);
+        var filtered = attendanceService.searchAttendances(null, null, null, "Present", null, null, null);
         assertEquals(1, filtered.size());
         assertEquals("Present", filtered.get(0).state());
     }

@@ -27,4 +27,7 @@ public class Room {
 
     @Column(name = "status")
     private String status;
+
+    @Column(name = "center_id", nullable = false)
+    private Integer centerId = 1;
 }
