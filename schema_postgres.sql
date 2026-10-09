@@ -208,6 +208,7 @@ CREATE TABLE IF NOT EXISTS classes (
     subject_id   INT NOT NULL,
     coach_id     INT NULL,
     max_capacity INT,
+    tuition_fee  NUMERIC(12,2) NOT NULL DEFAULT 0 CHECK (tuition_fee >= 0),
     start_date   DATE,
     end_date     DATE,
     status       VARCHAR(20) NOT NULL DEFAULT 'Open'
@@ -380,7 +381,7 @@ CREATE TABLE IF NOT EXISTS member_packages (
     start_date      DATE NOT NULL,
     end_date        DATE NOT NULL,
     status          VARCHAR(20) NOT NULL DEFAULT 'Active'
-        CHECK (status IN ('Active', 'Expired', 'Cancelled')),
+        CHECK (status IN ('Pending', 'Active', 'Expired', 'Cancelled')),
     CONSTRAINT fk_mp_member  FOREIGN KEY (member_id)  REFERENCES members(user_id),
     CONSTRAINT fk_mp_package FOREIGN KEY (package_id) REFERENCES membership_packages(package_id)
 );
@@ -394,7 +395,7 @@ CREATE TABLE IF NOT EXISTS class_enrollments (
     class_id      INT NOT NULL,
     enrolled_at   TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     status        VARCHAR(20) NOT NULL DEFAULT 'Registered'
-        CHECK (status IN ('Registered', 'Cancelled', 'Completed')),
+        CHECK (status IN ('Pending', 'Registered', 'Cancelled', 'Completed')),
     CONSTRAINT fk_enroll_member FOREIGN KEY (member_id) REFERENCES members(user_id),
     CONSTRAINT fk_enroll_class  FOREIGN KEY (class_id)  REFERENCES classes(class_id),
     CONSTRAINT uq_enrollment UNIQUE (member_id, class_id)
@@ -404,25 +405,38 @@ CREATE TABLE IF NOT EXISTS class_enrollments (
 -- 7. INVOICES
 -- =====================================================================
 
+CREATE SEQUENCE IF NOT EXISTS invoice_code_seq START WITH 1;
+
 CREATE TABLE IF NOT EXISTS invoices (
     invoice_id              SERIAL PRIMARY KEY,
     member_id               INT NOT NULL,
     package_id              INT NULL,
+    class_id                INT NULL,
+    subscription_id         INT NULL,
     receptionist_id         INT NULL,
     amount                  DECIMAL(12,2) NOT NULL,
+    invoice_code            VARCHAR(30) NOT NULL DEFAULT ('INV-' || to_char(CURRENT_DATE, 'YYYY') || '-' || lpad(nextval('invoice_code_seq')::text, 6, '0')),
     payment_method          VARCHAR(20)
-        CHECK (payment_method IN ('Cash', 'BankTransfer', 'CreditCard', 'EWallet')),
+        CHECK (payment_method IN ('Cash', 'BankTransfer', 'CreditCard', 'EWallet', 'VNPay')),
     payment_status          VARCHAR(20) NOT NULL DEFAULT 'Pending'
-        CHECK (payment_status IN ('Pending', 'Paid', 'Failed', 'Refunded')),
+        CHECK (payment_status IN ('Pending', 'Paid', 'Failed', 'Refunded', 'Expired', 'Cancelled')),
     payment_date            TIMESTAMP,
+    created_at              TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    expires_at              TIMESTAMP,
     gateway_transaction_ref VARCHAR(100),
     CONSTRAINT fk_invoice_member       FOREIGN KEY (member_id)       REFERENCES members(user_id),
     CONSTRAINT fk_invoice_package      FOREIGN KEY (package_id)      REFERENCES membership_packages(package_id),
-    CONSTRAINT fk_invoice_receptionist FOREIGN KEY (receptionist_id) REFERENCES receptionists(user_id)
+    CONSTRAINT fk_invoice_class        FOREIGN KEY (class_id)        REFERENCES classes(class_id),
+    CONSTRAINT fk_invoice_subscription FOREIGN KEY (subscription_id) REFERENCES member_packages(subscription_id),
+    CONSTRAINT fk_invoice_receptionist FOREIGN KEY (receptionist_id) REFERENCES receptionists(user_id),
+    CONSTRAINT chk_invoice_target CHECK ((package_id IS NOT NULL AND class_id IS NULL) OR (package_id IS NULL AND class_id IS NOT NULL))
 );
 
 CREATE INDEX IF NOT EXISTS idx_invoice_member       ON invoices(member_id);
 CREATE INDEX IF NOT EXISTS idx_invoice_receptionist ON invoices(receptionist_id);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_invoices_invoice_code ON invoices(invoice_code);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_invoice_gateway_transaction_ref ON invoices(gateway_transaction_ref) WHERE gateway_transaction_ref IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_invoice_member_package_pending ON invoices(member_id, package_id) WHERE payment_status = 'Pending' AND package_id IS NOT NULL;
 
 -- =====================================================================
 -- 8. SUPPORT REQUESTS

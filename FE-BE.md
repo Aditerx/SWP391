@@ -610,3 +610,18 @@ Luồng chăm sóc khách hàng và giữ tương tác (Retention).
 * **Hỗ trợ (Ticket):** **Hội viên** báo lỗi \-\> Đính kèm hình ảnh \-\> **FE** upload ảnh thẳng lên **Cloudinary/S3** \-\> Nhận URL \-\> Gửi nội dung \+ URL ảnh lên **BE** lưu Database \-\> Lễ tân xem URL ảnh và xử lý.  
 * **Thông báo (Notification):** **Hệ thống** sinh triggers tự động \-\> Gửi Push Notification \-\> **Hội viên** nhận thông báo \-\> **\[Tùy chọn mới\]: Hội viên** vào trang Cài đặt (Settings) trên FE \-\> Tắt nhận thông báo quảng cáo/spam, chỉ giữ lại thông báo lịch tập/trạng thái thẻ.
 
+
+### Contract thanh toán hiện đang triển khai (ghi đè endpoint/status cũ ở phần mô tả phía trên)
+
+- `POST /api/members/me/subscriptions` (Member): body `{ "packageId": 2, "paymentMethod": "Cash" }` hoặc `VNPay`. Giá lấy từ DB. Trả `201` với `{ "subscriptionId": 12, "invoiceId": 81, "invoiceCode": "INV-2026-000041", "amount": 500000, "paymentMethod": "Cash", "status": "Pending", "expiresAt": "...", "paymentUrl": null }`. Gói ở trạng thái Pending; chỉ xác nhận thanh toán mới kích hoạt.
+- Lễ tân tạo đơn bằng `POST /api/members/{memberId}/subscriptions` theo body trên. Không truyền amount. Một đơn mới cho cùng member/gói sẽ hủy đơn Pending cũ.
+- `GET /api/members/me/invoices` và `GET /api/members/me/invoices/{invoiceId}` (Member) chỉ trả hóa đơn của chính hội viên. Sau redirect hoặc thanh toán, FE đọc lại endpoint này để lấy trạng thái đáng tin cậy.
+- `POST /api/invoices/{invoiceId}/confirm-cash` (Receptionist có `MANAGE_INVOICES`) xác nhận Cash; `POST /api/invoices/{invoiceId}/cancel` cho chủ hóa đơn hoặc Receptionist hủy Pending.
+- `POST /api/invoices/{invoiceId}/pay-online` (Member, hóa đơn VNPay) trả `{ "paymentUrl": "https://..." }`; có thể gọi lại để lấy URL mới khi hóa đơn vẫn Pending và chưa hết hạn.
+- `GET /api/invoices` (Receptionist/Manager có `MANAGE_INVOICES`) nhận filter `memberId`, `packageId`, `status`, `method`, `startDate`, `endDate`.
+- VNPay gọi public `GET /api/payments/vnpay/ipn`; trình duyệt quay lại public `GET /api/payments/vnpay/return`. Cả hai kiểm chữ ký ở BE. Return redirect sang `FRONTEND_PAYMENT_RESULT_URL?invoiceCode=...&status=...`; FE không tin status trên URL.
+- Hóa đơn Pending hết hạn sau `PAYMENT_EXPIRE_MINUTES` (mặc định 15) chuyển Expired, gói Pending liên kết chuyển Cancelled. Callback VNPay thành công sau hết hạn vẫn ghi Paid/kích hoạt gói và tạo audit `PAID_AFTER_EXPIRY`.
+- Với lớp có học phí dương, `POST /api/classes/{classId}/enroll` nhận thêm `paymentMethod` (Cash/VNPay), trả enrollment `Pending` cùng `invoiceId`, `invoiceCode`, `paymentStatus`, `paymentUrl`. Enrollment chỉ thành Registered sau invoice Paid. Pending được tính vào sức chứa; khi invoice hết hạn, enrollment Pending bị hủy và nhả chỗ. Lớp học phí 0 vẫn đăng ký trực tiếp.
+- Cập nhật DB PostgreSQL bằng `migration_payment.sql` trước khi chạy ứng dụng; `schema_postgres.sql` đã phản ánh schema mới. Không dùng route `/api/invoices/{id}/pay` hay `/api/invoices/{id}/status` để tự đánh dấu Paid.
+- Chính sách giữ chỗ khi lớp dùng VNPay: invoice có thể chuyển Expired sau 15 phút, nhưng enrollment giữ Pending và tiếp tục tính vào sức chứa đến khi callback VNPay được xác minh. Callback Paid chuyển Registered; callback thất bại chuyển Cancelled và nhả chỗ. Member chủ động hủy enrollment thì invoice liên quan cũng bị hủy.
+- Bộ lọc `GET /api/invoices` gồm `status`, `method`, `keyword`, `memberId`, `packageId`, `receptionistId`, `startDate`, `endDate`.

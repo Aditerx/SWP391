@@ -1,6 +1,7 @@
 package com.sportscenter.membership;
 
 import jakarta.validation.Valid;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
@@ -32,8 +33,20 @@ public class MemberPackageController {
     @PostMapping({"/members/{memberId}/packages", "/members/{memberId}/subscriptions"})
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("hasAuthority('MANAGE_SUBSCRIPTIONS')")
-    public MemberPackageResponse subscribe(@PathVariable Integer memberId, @Valid @RequestBody MemberPackageRequest request) {
-        return memberPackageService.subscribe(memberId, request);
+    public SubscriptionOrderResponse subscribe(@PathVariable Integer memberId, @Valid @RequestBody MemberPackageRequest request, HttpServletRequest httpRequest) {
+        return memberPackageService.subscribe(memberId, request, clientIp(httpRequest));
+    }
+
+    @PostMapping("/members/me/subscriptions")
+    @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("hasRole('MEMBER')")
+    public SubscriptionOrderResponse subscribeMe(@Valid @RequestBody MemberPackageRequest request, Authentication authentication, HttpServletRequest httpRequest) {
+        return memberPackageService.subscribeMe(request, authentication, clientIp(httpRequest));
+    }
+
+    private String clientIp(HttpServletRequest request) {
+        String forwarded = request.getHeader("X-Forwarded-For");
+        return forwarded != null && !forwarded.isBlank() ? forwarded.split(",")[0].trim() : request.getRemoteAddr();
     }
 
     @PatchMapping({"/member-packages/{id}/status", "/subscriptions/{id}/status"})

@@ -27,7 +27,7 @@ public class SportsClassService {
     @Transactional(readOnly = true)
     public List<SportsClassResponse> findAll() {
         return repository.findAll().stream().map(c -> {
-            int count = (int) classEnrollmentRepository.countBySportsClassIdAndStatus(c.getId(), "Registered");
+            int count = (int) classEnrollmentRepository.countBySportsClassIdAndStatusIn(c.getId(), List.of("Registered", "Pending"));
             return SportsClassResponse.from(c, count);
         }).toList();
     }
@@ -35,7 +35,7 @@ public class SportsClassService {
     @Transactional(readOnly = true)
     public SportsClassResponse findById(Integer id) {
         SportsClass entity = getEntity(id);
-        int count = (int) classEnrollmentRepository.countBySportsClassIdAndStatus(entity.getId(), "Registered");
+        int count = (int) classEnrollmentRepository.countBySportsClassIdAndStatusIn(entity.getId(), List.of("Registered", "Pending"));
         return SportsClassResponse.from(entity, count);
     }
 
@@ -56,7 +56,7 @@ public class SportsClassService {
         SportsClass sportsClass = getEntity(id);
         apply(sportsClass, request);
         SportsClass saved = repository.save(sportsClass);
-        int count = (int) classEnrollmentRepository.countBySportsClassIdAndStatus(saved.getId(), "Registered");
+        int count = (int) classEnrollmentRepository.countBySportsClassIdAndStatusIn(saved.getId(), List.of("Registered", "Pending"));
         return SportsClassResponse.from(saved, count);
     }
 
@@ -67,7 +67,7 @@ public class SportsClassService {
         sportsClass.setCoach(coach);
         SportsClass saved = repository.save(sportsClass);
         auditService.log(null, "ASSIGN_COACH", "CLASS", saved.getId(), "coachId=" + coachId);
-        int count = (int) classEnrollmentRepository.countBySportsClassIdAndStatus(saved.getId(), "Registered");
+        int count = (int) classEnrollmentRepository.countBySportsClassIdAndStatusIn(saved.getId(), List.of("Registered", "Pending"));
         return SportsClassResponse.from(saved, count);
     }
 
@@ -78,6 +78,11 @@ public class SportsClassService {
         sportsClass.setSubject(subject);
         sportsClass.setCoach(request.coachId() == null ? null : getCoach(request.coachId()));
         sportsClass.setMaxCapacity(request.maxCapacity());
+        if (request.tuitionFee() != null) {
+            sportsClass.setTuitionFee(request.tuitionFee());
+        } else if (sportsClass.getTuitionFee() == null) {
+            sportsClass.setTuitionFee(java.math.BigDecimal.ZERO);
+        }
         sportsClass.setStartDate(request.startDate());
         sportsClass.setEndDate(request.endDate());
         sportsClass.setStatus(request.status() == null ? "Open" : normalizeClassStatus(request.status()));

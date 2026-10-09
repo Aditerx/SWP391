@@ -36,6 +36,8 @@ public class FirstLoginPasswordFilter extends OncePerRequestFilter {
     private boolean isRestrictedPath(HttpServletRequest request) {
         String path = request.getRequestURI();
         String method = request.getMethod();
+        if ("GET".equals(method) && ("/api/payments/vnpay/ipn".equals(path)
+                || "/api/payments/vnpay/return".equals(path))) return false;
         return !("POST".equals(method) && ("/api/auth/change-password".equals(path)
                 || "/api/auth/logout".equals(path))
                 || "GET".equals(method) && "/api/auth/me".equals(path));

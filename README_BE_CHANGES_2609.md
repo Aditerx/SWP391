@@ -571,3 +571,13 @@ Khi một học viên đăng ký vào lớp (trực tuyến hoặc qua quầy L�
   - Bao gồm: `LegacyPasswordEncoderTest` (2), `EnrollmentServiceTest` (5), `InvoiceServiceTest` (4), `ReportServiceTest` (2), `SessionServiceTest` (5), `AttendanceServiceTest` (3), `TrainingResultServiceTest` (2).
 - **Frontend Production Build:**
   - `npm run build`: **Vite build SUCCESS** (0 errors, 0 linting issues, bundle output sẵn sàng tại `dist/`).
+
+# Cập nhật thanh toán Membership + học phí lớp (2026-10-10)
+
+- Thanh toán hội viên hiện tạo `MemberPackage` Pending cùng invoice Pending; tiền chỉ lấy từ giá package trong DB. Cash cần Receptionist có `MANAGE_INVOICES` xác nhận; VNPay chỉ được xác nhận qua callback IPN/return có chữ ký hợp lệ.
+- Thêm mã hóa đơn, thời gian hết hạn 15 phút có cấu hình, job quét mỗi phút, idempotency callback và các endpoint tự phục vụ cho member. Hóa đơn và gói được cập nhật trong cùng transaction khi Paid.
+- Mở rộng `classes.tuition_fee` và invoices hỗ trợ class_id. Lớp có học phí giữ chỗ bằng enrollment Pending; chỗ Pending được tính vào capacity và được nhả khi hóa đơn hết hạn.
+- Chạy `migration_payment.sql` trên PostgreSQL trước khi khởi động ứng dụng; không tự chạy lên DB. Schema mới được mô tả trong `schema_postgres.sql`.
+- Kiểm tra ngày 2026-10-10: `mvnw.cmd test` — 26 tests passed.
+- Chính sách chỗ lớp VNPay theo yêu cầu: khi invoice hết hạn vẫn giữ enrollment Pending làm chỗ dự trữ cho tới khi callback đã xác minh; callback thành công kích hoạt, callback thất bại nhả chỗ. Chủ động hủy enrollment sẽ hủy invoice liên quan.
+- Kết quả kiểm thử mới nhất sau bổ sung thanh toán: `mvnw.cmd test` — 32 tests passed, 0 failures/errors (thay cho số liệu kiểm thử cũ ở các phần bàn giao trước).

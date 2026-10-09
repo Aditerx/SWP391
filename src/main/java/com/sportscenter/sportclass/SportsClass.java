@@ -8,6 +8,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import java.time.LocalDate;
+import java.math.BigDecimal;
 
 @Entity
 @Table(name = "classes")
@@ -33,6 +34,9 @@ public class SportsClass {
 
     @Column(name = "max_capacity")
     private Integer maxCapacity;
+
+    @Column(name = "tuition_fee", nullable = false, precision = 12, scale = 2)
+    private BigDecimal tuitionFee = BigDecimal.ZERO;
 
     @Column(name = "start_date")
     private LocalDate startDate;

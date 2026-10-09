@@ -18,7 +18,12 @@ public record InvoiceResponse(
         String paymentMethod,
         String paymentStatus,
         LocalDateTime paymentDate,
-        String gatewayTransactionRef
+        String gatewayTransactionRef,
+        String invoiceCode,
+        LocalDateTime createdAt,
+        LocalDateTime expiresAt,
+        Integer classId,
+        String className
 ) {
     public static InvoiceResponse from(Invoice invoice) {
         if (invoice == null) return null;
@@ -50,7 +55,12 @@ public record InvoiceResponse(
                 invoice.getPaymentMethod(),
                 invoice.getPaymentStatus(),
                 invoice.getPaymentDate(),
-                invoice.getGatewayTransactionRef()
+                invoice.getGatewayTransactionRef(),
+                invoice.getInvoiceCode(),
+                invoice.getCreatedAt(),
+                invoice.getExpiresAt(),
+                invoice.getSportsClass() != null ? invoice.getSportsClass().getId() : null,
+                invoice.getSportsClass() != null ? invoice.getSportsClass().getName() : null
         );
     }
 }
