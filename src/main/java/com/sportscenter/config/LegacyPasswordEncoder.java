@@ -17,7 +17,7 @@ public class LegacyPasswordEncoder implements PasswordEncoder {
 
     @Override
     public String encode(CharSequence rawPassword) {
-        return sha256(rawPassword.toString());
+        return bcrypt.encode(rawPassword);
     }
 
     @Override

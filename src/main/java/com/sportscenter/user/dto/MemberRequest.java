@@ -14,5 +14,6 @@ public record MemberRequest(
         String address,
         String gender,
         LocalDate dateOfBirth,
-        String status
+        String status,
+        Integer centerId
 ) {}

@@ -17,24 +17,30 @@ public class EnrollmentController {
     private final EnrollmentService enrollmentService;
 
     @GetMapping("/enrollments")
+    @PreAuthorize("hasAnyAuthority('MANAGE_USERS', 'MANAGE_CLASSES', 'REGISTER_MEMBER') or hasRole('MEMBER')")
     public ResponseEntity<List<EnrollmentResponse>> findAll(
             @RequestParam(required = false) Integer classId,
             @RequestParam(required = false) Integer memberId,
-            @RequestParam(required = false) String status) {
-        return ResponseEntity.ok(enrollmentService.findAll(classId, memberId, status));
+            @RequestParam(required = false) String status,
+            Authentication authentication) {
+        return ResponseEntity.ok(enrollmentService.findAll(classId, memberId, status, authentication.getName()));
     }
 
     @GetMapping("/classes/{classId}/enrollments")
+    @PreAuthorize("hasAnyAuthority('MANAGE_USERS', 'MANAGE_CLASSES', 'REGISTER_MEMBER')")
     public ResponseEntity<List<EnrollmentResponse>> findByClassId(@PathVariable Integer classId) {
         return ResponseEntity.ok(enrollmentService.findByClassId(classId));
     }
 
     @GetMapping({"/members/{memberId}/enrollments", "/members/{memberId}/classes"})
-    public ResponseEntity<List<EnrollmentResponse>> findByMemberId(@PathVariable Integer memberId) {
-        return ResponseEntity.ok(enrollmentService.findByMemberId(memberId));
+    @PreAuthorize("hasAnyAuthority('MANAGE_USERS', 'MANAGE_CLASSES', 'REGISTER_MEMBER') or hasRole('MEMBER')")
+    public ResponseEntity<List<EnrollmentResponse>> findByMemberId(@PathVariable Integer memberId,
+                                                                   Authentication authentication) {
+        return ResponseEntity.ok(enrollmentService.findByMemberId(memberId, authentication.getName()));
     }
 
     @PostMapping("/classes/{classId}/enroll")
+    @PreAuthorize("hasAnyAuthority('REGISTER_MEMBER', 'MANAGE_CLASSES') or hasRole('MEMBER')")
     public ResponseEntity<EnrollmentResponse> enrollInClass(
             @PathVariable Integer classId,
             @RequestBody(required = false) EnrollmentRequest request,
@@ -46,6 +52,7 @@ public class EnrollmentController {
     }
 
     @PostMapping("/enrollments")
+    @PreAuthorize("hasAnyAuthority('REGISTER_MEMBER', 'MANAGE_CLASSES') or hasRole('MEMBER')")
     public ResponseEntity<EnrollmentResponse> createEnrollment(
             @Valid @RequestBody EnrollmentRequest request,
             Authentication authentication) {
@@ -58,6 +65,7 @@ public class EnrollmentController {
     }
 
     @PostMapping("/classes/{classId}/cancel-enrollment")
+    @PreAuthorize("hasAnyAuthority('REGISTER_MEMBER', 'MANAGE_CLASSES') or hasRole('MEMBER')")
     public ResponseEntity<EnrollmentResponse> cancelEnrollment(
             @PathVariable Integer classId,
             @RequestBody(required = false) EnrollmentRequest request,
@@ -68,6 +76,7 @@ public class EnrollmentController {
     }
 
     @PatchMapping("/enrollments/{id}/cancel")
+    @PreAuthorize("hasAnyAuthority('REGISTER_MEMBER', 'MANAGE_CLASSES') or hasRole('MEMBER')")
     public ResponseEntity<EnrollmentResponse> cancelById(
             @PathVariable Integer id,
             Authentication authentication) {
@@ -76,6 +85,7 @@ public class EnrollmentController {
     }
 
     @DeleteMapping("/enrollments/{id}")
+    @PreAuthorize("hasAnyAuthority('REGISTER_MEMBER', 'MANAGE_CLASSES') or hasRole('MEMBER')")
     public ResponseEntity<EnrollmentResponse> deleteEnrollment(
             @PathVariable Integer id,
             Authentication authentication) {

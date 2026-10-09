@@ -4,6 +4,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -15,12 +16,14 @@ public class TrainingResultController {
     private final TrainingResultService trainingResultService;
 
     @GetMapping
+    @PreAuthorize("hasAnyAuthority('MANAGE_CLASSES', 'MANAGE_USERS') or hasRole('COACH')")
     public ResponseEntity<List<TrainingResultResponse>> searchResults(
             @RequestParam(required = false) Integer sessionId,
             @RequestParam(required = false) Integer memberId,
-            @RequestParam(required = false) Integer coachId
+            @RequestParam(required = false) Integer coachId,
+            Authentication authentication
     ) {
-        return ResponseEntity.ok(trainingResultService.searchResults(sessionId, memberId, coachId));
+        return ResponseEntity.ok(trainingResultService.searchResults(sessionId, memberId, coachId, authentication));
     }
 
     @PostMapping

@@ -5,6 +5,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -16,17 +17,20 @@ public class TrainingPlanController {
     private final TrainingPlanService trainingPlanService;
 
     @GetMapping
+    @PreAuthorize("hasAnyAuthority('MANAGE_TRAINING_PLAN', 'MANAGE_CLASSES', 'MANAGE_USERS') or hasRole('MEMBER')")
     public ResponseEntity<List<TrainingPlanResponse>> searchPlans(
             @RequestParam(required = false) Integer coachId,
             @RequestParam(required = false) Integer classId,
-            @RequestParam(required = false) Integer memberId
+            @RequestParam(required = false) Integer memberId,
+            Authentication authentication
     ) {
-        return ResponseEntity.ok(trainingPlanService.searchPlans(coachId, classId, memberId));
+        return ResponseEntity.ok(trainingPlanService.searchPlans(coachId, classId, memberId, authentication));
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<TrainingPlanResponse> findById(@PathVariable Integer id) {
-        return ResponseEntity.ok(trainingPlanService.findById(id));
+    @PreAuthorize("hasAnyAuthority('MANAGE_TRAINING_PLAN', 'MANAGE_CLASSES', 'MANAGE_USERS') or hasRole('MEMBER')")
+    public ResponseEntity<TrainingPlanResponse> findById(@PathVariable Integer id, Authentication authentication) {
+        return ResponseEntity.ok(trainingPlanService.findById(id, authentication));
     }
 
     @PostMapping

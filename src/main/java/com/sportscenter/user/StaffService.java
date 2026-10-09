@@ -1,6 +1,10 @@
 package com.sportscenter.user;
 
 import com.sportscenter.audit.AuditService;
+import com.sportscenter.center.CenterContext;
+import com.sportscenter.auth.EmailService;
+import com.sportscenter.auth.TemporaryPasswordGenerator;
+import com.sportscenter.specialization.CoachSpecializationAssignmentService;
 import com.sportscenter.common.exception.BusinessException;
 import com.sportscenter.common.exception.ResourceNotFoundException;
 import com.sportscenter.sportclass.SportsClassRepository;
@@ -25,6 +29,10 @@ public class StaffService {
     private final SportsClassRepository sportsClassRepository;
     private final AuditService auditService;
     private final PasswordEncoder passwordEncoder;
+    private final CenterContext centerContext;
+    private final EmailService emailService;
+    private final TemporaryPasswordGenerator temporaryPasswordGenerator;
+    private final CoachSpecializationAssignmentService coachSpecializationAssignmentService;
 
     @Transactional(readOnly = true)
     public List<StaffResponse> findAllStaff() {
@@ -66,8 +74,10 @@ public class StaffService {
         user.setEmail(request.email());
         user.setPhone(request.phone());
         user.setRole(role);
-        String rawPassword = (request.password() != null && !request.password().isBlank()) ? request.password() : "Scms@2026";
-        user.setPasswordHash(passwordEncoder.encode(rawPassword));
+        user.setCenterId(centerContext.centerForNewAccount(request.centerId(), false));
+        String temporaryPassword = temporaryPasswordGenerator.generate();
+        user.setPasswordHash(temporaryPasswordGenerator.hash(temporaryPassword));
+        user.setFirstLogin(true);
         user.setStatus(request.status() != null ? normalizeUserStatus(request.status()) : "Active");
 
         User savedUser = userRepository.save(user);
@@ -78,6 +88,7 @@ public class StaffService {
             coach.setUser(savedUser);
             coach.setSpecialization(request.specialization());
             savedCoach = coachRepository.save(coach);
+            coachSpecializationAssignmentService.assign(savedCoach, request.specializationIds());
         } else if ("Receptionist".equalsIgnoreCase(roleName)) {
             Receptionist receptionist = new Receptionist();
             receptionist.setUser(savedUser);
@@ -85,7 +96,9 @@ public class StaffService {
         }
 
         auditService.log(null, "CREATE_STAFF", "USER", savedUser.getId(), savedUser.getFullName() + " (" + roleName + ")");
-        return StaffResponse.fromUser(savedUser, savedCoach, 0);
+        boolean emailSent = emailService.sendWelcomeEmail(savedUser.getEmail(), savedUser.getFullName(), temporaryPassword);
+        return StaffResponse.fromUser(savedUser, savedCoach, 0).withEmailDelivery(emailSent,
+                emailSent ? null : "Tạo tài khoản thành công nhưng gửi email thất bại. Dùng chức năng cấp lại mật khẩu để gửi lại.");
     }
 
     @Transactional
@@ -103,6 +116,9 @@ public class StaffService {
             if (coach != null && request.specialization() != null) {
                 coach.setSpecialization(request.specialization());
                 coach = coachRepository.save(coach);
+            }
+            if (coach != null && request.specializationIds() != null) {
+                coachSpecializationAssignmentService.assign(coach, request.specializationIds());
             }
         }
 

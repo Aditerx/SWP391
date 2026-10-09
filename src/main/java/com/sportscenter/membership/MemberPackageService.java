@@ -7,6 +7,8 @@ import com.sportscenter.user.User;
 import com.sportscenter.user.UserRepository;
 import com.sportscenter.invoice.InvoiceService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -31,7 +33,18 @@ public class MemberPackageService {
     }
 
     @Transactional(readOnly = true)
-    public List<MemberPackageResponse> findByMemberId(Integer memberId) {
+    public List<MemberPackageResponse> findByMemberId(Integer memberId, Authentication authentication) {
+        User actor = userRepository.findByEmailIgnoreCase(authentication.getName())
+                .orElseThrow(() -> new AccessDeniedException("Authenticated user account was not found"));
+        boolean memberRole = authentication.getAuthorities().stream()
+                .anyMatch(authority -> "ROLE_MEMBER".equals(authority.getAuthority()))
+                || (actor.getRole() != null && "Member".equalsIgnoreCase(actor.getRole().getName()));
+        if (memberRole) {
+            if (!actor.getId().equals(memberId)) {
+                throw new AccessDeniedException("Members may only view their own subscriptions");
+            }
+            memberId = actor.getId();
+        }
         return memberPackageRepository.findByMemberId(memberId).stream()
                 .map(MemberPackageResponse::from)
                 .toList();

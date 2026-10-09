@@ -8,6 +8,8 @@ import com.sportscenter.membership.MembershipPackageRepository;
 import com.sportscenter.user.User;
 import com.sportscenter.user.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -31,11 +33,15 @@ public class InvoiceService {
             String status,
             String method,
             LocalDateTime startDate,
-            LocalDateTime endDate
+            LocalDateTime endDate,
+            Authentication authentication
     ) {
-        List<Invoice> list = invoiceRepository.findAllWithDetails();
+        Integer scopedMemberId = resolveMemberScope(authentication, memberId);
+        List<Invoice> list = scopedMemberId == null
+                ? invoiceRepository.findAllWithDetails()
+                : invoiceRepository.findByMemberId(scopedMemberId);
         return list.stream()
-                .filter(i -> memberId == null || (i.getMember() != null && memberId.equals(i.getMember().getId())))
+                .filter(i -> scopedMemberId == null || (i.getMember() != null && scopedMemberId.equals(i.getMember().getId())))
                 .filter(i -> packageId == null || (i.getMembershipPackage() != null && packageId.equals(i.getMembershipPackage().getId())))
                 .filter(i -> receptionistId == null || (i.getReceptionist() != null && receptionistId.equals(i.getReceptionist().getId())))
                 .filter(i -> status == null || status.isBlank() || (i.getPaymentStatus() != null && i.getPaymentStatus().equalsIgnoreCase(status)))
@@ -47,10 +53,28 @@ public class InvoiceService {
     }
 
     @Transactional(readOnly = true)
-    public InvoiceResponse findById(Integer id) {
+    public InvoiceResponse findById(Integer id, Authentication authentication) {
         Invoice invoice = invoiceRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Invoice not found: " + id));
+        Integer scopedMemberId = resolveMemberScope(authentication, null);
+        if (scopedMemberId != null && (invoice.getMember() == null || !scopedMemberId.equals(invoice.getMember().getId()))) {
+            throw new AccessDeniedException("Members may only view their own invoices");
+        }
         return InvoiceResponse.from(invoice);
+    }
+
+    private Integer resolveMemberScope(Authentication authentication, Integer requestedMemberId) {
+        if (authentication == null || !authentication.getAuthorities().stream()
+                .anyMatch(authority -> "ROLE_MEMBER".equals(authority.getAuthority()))) {
+            return requestedMemberId;
+        }
+
+        User currentUser = userRepository.findByEmailIgnoreCase(authentication.getName())
+                .orElseThrow(() -> new AccessDeniedException("Authenticated member account was not found"));
+        if (requestedMemberId != null && !requestedMemberId.equals(currentUser.getId())) {
+            throw new AccessDeniedException("Members may only view their own invoices");
+        }
+        return currentUser.getId();
     }
 
     @Transactional

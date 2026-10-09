@@ -8,6 +8,8 @@ import com.sportscenter.session.SessionRepository;
 import com.sportscenter.user.User;
 import com.sportscenter.user.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -30,12 +32,25 @@ public class AttendanceService {
             Integer recordedBy,
             String state,
             LocalDateTime startDate,
-            LocalDateTime endDate
+            LocalDateTime endDate,
+            Authentication authentication
     ) {
+        Integer resolvedMemberId = memberId;
+        boolean memberRole = authentication != null && authentication.getAuthorities().stream()
+                .anyMatch(authority -> "ROLE_MEMBER".equals(authority.getAuthority()));
+        if (memberRole) {
+            User currentUser = userRepository.findByEmailIgnoreCase(authentication.getName())
+                    .orElseThrow(() -> new AccessDeniedException("Authenticated member account was not found"));
+            if (resolvedMemberId != null && !resolvedMemberId.equals(currentUser.getId())) {
+                throw new AccessDeniedException("Members may only view their own attendance records");
+            }
+            resolvedMemberId = currentUser.getId();
+        }
+        final Integer effectiveMemberId = resolvedMemberId;
         List<Attendance> all = attendanceRepository.findAllWithDetails();
         return all.stream()
                 .filter(a -> sessionId == null || (a.getSession() != null && sessionId.equals(a.getSession().getId())))
-                .filter(a -> memberId == null || (a.getMember() != null && memberId.equals(a.getMember().getId())))
+                .filter(a -> effectiveMemberId == null || (a.getMember() != null && effectiveMemberId.equals(a.getMember().getId())))
                 .filter(a -> recordedBy == null || (a.getRecordedBy() != null && recordedBy.equals(a.getRecordedBy().getId())))
                 .filter(a -> state == null || state.isBlank() || (a.getState() != null && a.getState().equalsIgnoreCase(state)))
                 .filter(a -> startDate == null || (a.getCheckInTime() != null && !a.getCheckInTime().isBefore(startDate)))

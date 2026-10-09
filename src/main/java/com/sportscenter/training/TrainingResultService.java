@@ -8,6 +8,8 @@ import com.sportscenter.session.SessionRepository;
 import com.sportscenter.user.User;
 import com.sportscenter.user.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,7 +27,17 @@ public class TrainingResultService {
     private final AuditService auditService;
 
     @Transactional(readOnly = true)
-    public List<TrainingResultResponse> searchResults(Integer sessionId, Integer memberId, Integer coachId) {
+    public List<TrainingResultResponse> searchResults(Integer sessionId, Integer memberId, Integer coachId,
+                                                      Authentication authentication) {
+        if (authentication != null && authentication.getAuthorities().stream()
+                .anyMatch(authority -> "ROLE_COACH".equals(authority.getAuthority()))) {
+            User coach = userRepository.findByEmailIgnoreCase(authentication.getName())
+                    .orElseThrow(() -> new AccessDeniedException("Authenticated coach account was not found"));
+            if (coachId != null && !coachId.equals(coach.getId())) {
+                throw new AccessDeniedException("Coaches may only view their own training results");
+            }
+            coachId = coach.getId();
+        }
         return trainingResultRepository.searchResults(sessionId, memberId, coachId).stream()
                 .map(TrainingResultResponse::from)
                 .toList();

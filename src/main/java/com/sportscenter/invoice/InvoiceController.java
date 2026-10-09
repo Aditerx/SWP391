@@ -6,6 +6,7 @@ import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
@@ -20,6 +21,7 @@ public class InvoiceController {
     private final InvoiceService invoiceService;
 
     @GetMapping
+    @PreAuthorize("hasAuthority('MANAGE_INVOICES') or hasRole('MEMBER')")
     public ResponseEntity<List<InvoiceResponse>> findAll(
             @RequestParam(required = false) Integer memberId,
             @RequestParam(required = false) Integer packageId,
@@ -27,26 +29,28 @@ public class InvoiceController {
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String method,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+            Authentication authentication
     ) {
         LocalDateTime start = startDate != null ? startDate.atStartOfDay() : null;
         LocalDateTime end = endDate != null ? endDate.atTime(LocalTime.MAX) : null;
-        return ResponseEntity.ok(invoiceService.findAll(memberId, packageId, receptionistId, status, method, start, end));
+        return ResponseEntity.ok(invoiceService.findAll(memberId, packageId, receptionistId, status, method, start, end, authentication));
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<InvoiceResponse> findById(@PathVariable Integer id) {
-        return ResponseEntity.ok(invoiceService.findById(id));
+    @PreAuthorize("hasAuthority('MANAGE_INVOICES') or hasRole('MEMBER')")
+    public ResponseEntity<InvoiceResponse> findById(@PathVariable Integer id, Authentication authentication) {
+        return ResponseEntity.ok(invoiceService.findById(id, authentication));
     }
 
     @PostMapping
-    @PreAuthorize("hasAnyAuthority('PROCESS_PAYMENT', 'MANAGE_SUBSCRIPTIONS', 'MANAGE_PACKAGES')")
+    @PreAuthorize("hasAuthority('MANAGE_INVOICES')")
     public ResponseEntity<InvoiceResponse> createInvoice(@Valid @RequestBody InvoiceRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(invoiceService.createInvoice(request));
     }
 
     @PostMapping("/{id}/pay")
-    @PreAuthorize("hasAnyAuthority('PROCESS_PAYMENT', 'MANAGE_SUBSCRIPTIONS')")
+    @PreAuthorize("hasAuthority('MANAGE_INVOICES')")
     public ResponseEntity<InvoiceResponse> payInvoice(
             @PathVariable Integer id,
             @Valid @RequestBody InvoicePaymentRequest request
@@ -55,7 +59,7 @@ public class InvoiceController {
     }
 
     @PatchMapping("/{id}/status")
-    @PreAuthorize("hasAnyAuthority('PROCESS_PAYMENT', 'MANAGE_SUBSCRIPTIONS')")
+    @PreAuthorize("hasAuthority('MANAGE_INVOICES')")
     public ResponseEntity<InvoiceResponse> updateStatus(
             @PathVariable Integer id,
             @Valid @RequestBody InvoiceStatusRequest request
