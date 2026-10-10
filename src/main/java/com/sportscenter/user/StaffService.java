@@ -37,6 +37,7 @@ public class StaffService {
     @Transactional(readOnly = true)
     public List<StaffResponse> findAllStaff() {
         List<User> users = userRepository.findAll();
+        var allClasses = sportsClassRepository.findAll();
         Map<Integer, Coach> coachMap = coachRepository.findAllWithUser().stream()
                 .collect(Collectors.toMap(Coach::getUserId, c -> c));
 
@@ -48,7 +49,7 @@ public class StaffService {
                 .map(u -> {
                     Coach coach = coachMap.get(u.getId());
                     int activeClassesCount = "Coach".equalsIgnoreCase(u.getRole().getName())
-                            ? (int) sportsClassRepository.findAll().stream()
+                            ? (int) allClasses.stream()
                                     .filter(c -> c.getCoach() != null && u.getId().equals(c.getCoach().getId()))
                                     .count()
                             : 0;

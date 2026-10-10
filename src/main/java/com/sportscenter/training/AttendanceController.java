@@ -49,7 +49,7 @@ public class AttendanceController {
 
     @PostMapping("/correct")
     @PreAuthorize("hasAnyAuthority('RECORD_RESULT', 'MANAGE_CLASSES', 'MANAGE_USERS')")
-    public ResponseEntity<AttendanceResponse> correctAttendance(@Valid @RequestBody AttendanceCorrectionRequest request) {
-        return ResponseEntity.ok(attendanceService.correctAttendance(request));
+    public ResponseEntity<AttendanceResponse> correctAttendance(@Valid @RequestBody AttendanceCorrectionRequest request, Authentication authentication) {
+        return ResponseEntity.ok(attendanceService.correctAttendance(request, authentication));
     }
 }

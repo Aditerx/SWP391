@@ -26,8 +26,10 @@ public class SportsClassService {
 
     @Transactional(readOnly = true)
     public List<SportsClassResponse> findAll() {
+        var counts = classEnrollmentRepository.countGroupedByClass(List.of("Registered", "Pending")).stream()
+                .collect(java.util.stream.Collectors.toMap(r -> (Integer) r[0], r -> ((Number) r[1]).intValue()));
         return repository.findAll().stream().map(c -> {
-            int count = (int) classEnrollmentRepository.countBySportsClassIdAndStatusIn(c.getId(), List.of("Registered", "Pending"));
+            int count = counts.getOrDefault(c.getId(), 0);
             return SportsClassResponse.from(c, count);
         }).toList();
     }

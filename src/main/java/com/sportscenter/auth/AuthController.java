@@ -37,6 +37,7 @@ public class AuthController {
     private final AuthenticationManager authenticationManager;
     private final SecurityContextRepository securityContextRepository;
     private final UserRepository userRepository;
+    private final com.sportscenter.user.MemberRepository memberRepository;
     private final LoginAttemptService loginAttemptService;
     private final UserService userService;
     private final UserDetailsService userDetailsService;
@@ -156,6 +157,7 @@ public class AuthController {
                 new LinkedHashSet<>(authentication.getAuthorities().stream()
                         .map(authority -> authority.getAuthority())
                         .toList()),
-                user.isFirstLogin());
+                user.isFirstLogin(),
+                memberRepository.existsById(user.getId()) ? user.getId() : null);
     }
 }

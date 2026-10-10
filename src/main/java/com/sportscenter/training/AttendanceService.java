@@ -101,8 +101,26 @@ public class AttendanceService {
 
     @Transactional
     public AttendanceResponse correctAttendance(AttendanceCorrectionRequest request) {
+        return correctAttendance(request, null);
+    }
+
+    @Transactional
+    public AttendanceResponse correctAttendance(AttendanceCorrectionRequest request, Authentication authentication) {
         Attendance att = attendanceRepository.findById(request.attendanceId())
                 .orElseThrow(() -> new ResourceNotFoundException("Attendance record not found: " + request.attendanceId()));
+
+        if (request.reason() == null || request.reason().isBlank()) {
+            throw new BusinessException("A reason is required for attendance correction");
+        }
+        if (authentication != null && authentication.getAuthorities().stream()
+                .anyMatch(a -> "ROLE_COACH".equals(a.getAuthority()))) {
+            User actor = userRepository.findByEmailIgnoreCase(authentication.getName()).orElseThrow();
+            if (att.getSession() == null || att.getSession().getSportsClass() == null
+                    || att.getSession().getSportsClass().getCoach() == null
+                    || !actor.getId().equals(att.getSession().getSportsClass().getCoach().getId())) {
+                throw new AccessDeniedException("Coaches may only correct attendance for their own classes");
+            }
+        }
 
         String oldState = att.getState();
         String newState = normalizeState(request.newState());

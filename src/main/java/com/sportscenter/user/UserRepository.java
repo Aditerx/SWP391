@@ -10,6 +10,9 @@ import jakarta.persistence.LockModeType;
 import java.util.Optional;
 
 public interface UserRepository extends JpaRepository<User, Integer> {
+    @Override
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = "role")
+    java.util.List<User> findAll();
     @Query("select distinct u from User u " +
             "left join fetch u.role r " +
             "left join fetch r.permissions " +

@@ -39,8 +39,10 @@ public class SessionService {
         } else {
             list = sessionRepository.findFiltered(classId, coachId, roomId, startDate, endDate, status);
         }
+        var counts = classEnrollmentRepository.countGroupedByClass(List.of("Registered")).stream()
+                .collect(java.util.stream.Collectors.toMap(r -> (Integer) r[0], r -> ((Number) r[1]).intValue()));
         return list.stream().map(s -> {
-            int count = (int) classEnrollmentRepository.countBySportsClassIdAndStatus(s.getSportsClass().getId(), "Registered");
+            int count = counts.getOrDefault(s.getSportsClass().getId(), 0);
             return SessionResponse.from(s, count);
         }).toList();
     }

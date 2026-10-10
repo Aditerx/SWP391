@@ -48,5 +48,8 @@ public interface ClassEnrollmentRepository extends JpaRepository<ClassEnrollment
 
     long countBySportsClassIdAndStatusIn(Integer classId, List<String> statuses);
 
+    @Query("SELECT e.sportsClass.id, COUNT(e) FROM ClassEnrollment e WHERE e.status IN :statuses GROUP BY e.sportsClass.id")
+    List<Object[]> countGroupedByClass(@Param("statuses") List<String> statuses);
+
     boolean existsByMemberIdAndSportsClassIdAndStatus(Integer memberId, Integer classId, String status);
 }

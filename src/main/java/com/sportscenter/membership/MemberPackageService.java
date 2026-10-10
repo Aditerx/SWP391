@@ -103,9 +103,11 @@ public class MemberPackageService {
 
         String normalizedStatus = normalizeStatus(status);
         String previousStatus = mp.getStatus();
-        if ("Pending".equalsIgnoreCase(previousStatus) && "Active".equals(normalizedStatus)) {
-            throw new BusinessException("A Pending subscription can only be activated after its invoice is Paid");
+        if (!"Active".equalsIgnoreCase(previousStatus) && "Active".equals(normalizedStatus)) {
+            invoiceService.requirePaidSubscription(subscriptionId);
         }
+        if ("Cancelled".equals(normalizedStatus) || "Expired".equals(normalizedStatus))
+            invoiceService.cancelPendingSubscriptionPayment(subscriptionId);
         mp.setStatus(normalizedStatus);
         MemberPackage saved = memberPackageRepository.save(mp);
 
@@ -117,6 +119,7 @@ public class MemberPackageService {
     private String normalizeStatus(String status) {
         if ("Expired".equalsIgnoreCase(status)) return "Expired";
         if ("Cancelled".equalsIgnoreCase(status)) return "Cancelled";
-        return "Active";
+        if ("Active".equalsIgnoreCase(status)) return "Active";
+        throw new BusinessException("Subscription status must be Active, Expired or Cancelled");
     }
 }

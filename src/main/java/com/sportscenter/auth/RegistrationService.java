@@ -35,6 +35,8 @@ public class RegistrationService {
     private final EmailService emailService;
     private final AuditService auditService;
     private final PasswordResetService passwordResetService;
+    @org.springframework.beans.factory.annotation.Value("${registration.demo-otp:}")
+    private String demoOtp = "";
 
     @Transactional
     public OtpMessageResponse register(RegisterRequest request) {
@@ -128,7 +130,8 @@ public class RegistrationService {
             previous.setUsed(true);
             otpRepository.save(previous);
         });
-        String rawOtp = String.format("%06d", RANDOM.nextInt(1_000_000));
+        String rawOtp = demoOtp != null && !demoOtp.isBlank()
+                ? demoOtp : String.format("%06d", RANDOM.nextInt(1_000_000));
         EmailOtp otp = new EmailOtp();
         otp.setEmail(email);
         otp.setUser(user);
@@ -138,7 +141,7 @@ public class RegistrationService {
         otp.setAttempts(0);
         otp.setUsed(false);
         otpRepository.save(otp);
-        emailService.sendOtpEmail(email, rawOtp, PURPOSE);
+        if (demoOtp == null || demoOtp.isBlank()) emailService.sendOtpEmail(email, rawOtp, PURPOSE);
     }
 
     private String normalize(String email) {

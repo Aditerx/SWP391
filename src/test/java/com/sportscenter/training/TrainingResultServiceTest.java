@@ -37,6 +37,8 @@ class TrainingResultServiceTest {
 
     @Mock
     private AuditService auditService;
+    @Mock
+    private com.sportscenter.enrollment.ClassEnrollmentRepository enrollmentRepository;
 
     @InjectMocks
     private TrainingResultService trainingResultService;
@@ -57,6 +59,11 @@ class TrainingResultServiceTest {
 
         sampleSession = new Session();
         sampleSession.setId(1);
+        var sportsClass = new com.sportscenter.sportclass.SportsClass();
+        sportsClass.setId(3);
+        sportsClass.setCoach(sampleCoach);
+        sampleSession.setSportsClass(sportsClass);
+        lenient().when(enrollmentRepository.existsByMemberIdAndSportsClassIdAndStatusIn(7, 3, List.of("Registered", "Completed"))).thenReturn(true);
     }
 
     @Test
@@ -112,5 +119,45 @@ class TrainingResultServiceTest {
         assertEquals(1, responses.size());
         assertEquals("Present", responses.get(0).attendanceStatus());
         verify(trainingResultRepository, atLeastOnce()).save(any(TrainingResult.class));
+    }
+
+    @Test void rejectsPendingOrUnenrolledMember() {
+        when(sessionRepository.findById(1)).thenReturn(Optional.of(sampleSession));
+        when(enrollmentRepository.existsByMemberIdAndSportsClassIdAndStatusIn(7, 3, List.of("Registered", "Completed"))).thenReturn(false);
+        assertThrows(com.sportscenter.common.exception.BusinessException.class,
+                () -> trainingResultService.recordResult(new TrainingResultRequest(1, 7, 2, "", "Present")));
+        verifyNoInteractions(trainingResultRepository, attendanceRepository);
+    }
+
+    @Test void rejectsCoachNotAssignedToClass() {
+        when(sessionRepository.findById(1)).thenReturn(Optional.of(sampleSession));
+        assertThrows(com.sportscenter.common.exception.BusinessException.class,
+                () -> trainingResultService.recordResult(new TrainingResultRequest(1, 7, 99, "", "Present")));
+        verifyNoInteractions(trainingResultRepository, attendanceRepository);
+    }
+
+    @Test void rejectsSpoofedCoachIdentity() {
+        when(sessionRepository.findById(1)).thenReturn(Optional.of(sampleSession));
+        var other = new User(); other.setId(99);
+        when(userRepository.findByEmailIgnoreCase("other@example.test")).thenReturn(Optional.of(other));
+        var auth = new org.springframework.security.authentication.UsernamePasswordAuthenticationToken("other@example.test", "",
+                List.of(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_COACH")));
+        assertThrows(org.springframework.security.access.AccessDeniedException.class,
+                () -> trainingResultService.recordResult(new TrainingResultRequest(1, 7, 2, "", "Present"), auth));
+        verifyNoInteractions(trainingResultRepository, attendanceRepository);
+    }
+
+    @Test void pastAttendanceCorrectionRequiresReasonEvenViaTrainingResults() {
+        sampleSession.setSessionDate(java.time.LocalDate.now(java.time.ZoneId.of("Asia/Ho_Chi_Minh")).minusDays(1));
+        when(sessionRepository.findById(1)).thenReturn(Optional.of(sampleSession));
+        when(userRepository.findById(7)).thenReturn(Optional.of(sampleMember));
+        when(userRepository.findById(2)).thenReturn(Optional.of(sampleCoach));
+        when(trainingResultRepository.findBySessionIdAndMemberId(1, 7)).thenReturn(Optional.empty());
+        Attendance prior = new Attendance(); prior.setState("Absent");
+        when(attendanceRepository.findBySessionIdAndMemberId(1, 7)).thenReturn(Optional.of(prior));
+        assertThrows(com.sportscenter.common.exception.BusinessException.class,
+                () -> trainingResultService.recordResult(new TrainingResultRequest(1, 7, 2, "", "Present")));
+        verify(trainingResultRepository, never()).save(any());
+        verify(attendanceRepository, never()).save(any());
     }
 }

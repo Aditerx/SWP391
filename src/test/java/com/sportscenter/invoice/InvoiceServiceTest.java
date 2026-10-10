@@ -64,9 +64,8 @@ class InvoiceServiceTest {
         User member = new User(); member.setId(7); member.setEmail("member@example.com");
         var auth = new UsernamePasswordAuthenticationToken("member@example.com", "n/a", List.of(new SimpleGrantedAuthority("ROLE_MEMBER")));
         when(userRepository.findByEmailIgnoreCase("member@example.com")).thenReturn(Optional.of(member));
-        when(invoiceRepository.findByMemberId(7)).thenReturn(List.of());
         assertTrue(invoiceService.findAll(null, null, null, null, null, null, null, null, auth).isEmpty());
-        verify(invoiceRepository).findByMemberId(7);
+        verify(invoiceRepository).searchInvoices(7, null, null, null, null, null, null, null);
     }
 
     @Test

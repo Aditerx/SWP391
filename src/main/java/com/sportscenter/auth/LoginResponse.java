@@ -8,5 +8,6 @@ public record LoginResponse(
         String fullName,
         String role,
         Set<String> authorities,
-        boolean isFirstLogin) {
+        boolean isFirstLogin,
+        Integer memberId) {
 }

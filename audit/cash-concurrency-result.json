@@ -1,0 +1,9 @@
+{
+  "passed": true,
+  "checks": [
+    "Two concurrent Cash confirmations produce one Paid result and one 409",
+    "Two members racing for the last paid seat produce only one Pending enrollment",
+    "The reserved last seat becomes Registered after Cash confirmation",
+    "Pending cancellation synchronizes subscription/invoice; foreign invoice read returns 404"
+  ]
+}

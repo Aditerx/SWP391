@@ -16,6 +16,14 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class MemberController {
     private final MemberService memberService;
+    private final UserRepository userRepository;
+
+    @GetMapping("/me")
+    @PreAuthorize("hasRole('MEMBER')")
+    public MemberResponse getCurrentMember(org.springframework.security.core.Authentication authentication) {
+        User user = userRepository.findByEmailIgnoreCase(authentication.getName()).orElseThrow();
+        return memberService.findById(user.getId());
+    }
 
     @GetMapping
     @PreAuthorize("hasAnyAuthority('MANAGE_USERS', 'REGISTER_MEMBER')")

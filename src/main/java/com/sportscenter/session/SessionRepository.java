@@ -18,8 +18,8 @@ public interface SessionRepository extends JpaRepository<Session, Integer> {
            "WHERE (:classId IS NULL OR c.id = :classId) " +
            "  AND (:coachId IS NULL OR c.coach.id = :coachId) " +
            "  AND (:roomId IS NULL OR r.id = :roomId) " +
-           "  AND (:startDate IS NULL OR s.sessionDate >= :startDate) " +
-           "  AND (:endDate IS NULL OR s.sessionDate <= :endDate) " +
+           "  AND (CAST(:startDate AS date) IS NULL OR s.sessionDate >= :startDate) " +
+           "  AND (CAST(:endDate AS date) IS NULL OR s.sessionDate <= :endDate) " +
            "  AND (:status IS NULL OR s.status = :status) " +
            "ORDER BY s.sessionDate ASC, s.startTime ASC")
     List<Session> findFiltered(@Param("classId") Integer classId,
@@ -73,8 +73,8 @@ public interface SessionRepository extends JpaRepository<Session, Integer> {
            "LEFT JOIN FETCH c.coach " +
            "JOIN FETCH s.room r " +
            "WHERE c.id IN (SELECT e.sportsClass.id FROM ClassEnrollment e WHERE e.member.id = :memberId AND e.status = 'Registered') " +
-           "  AND (:startDate IS NULL OR s.sessionDate >= :startDate) " +
-           "  AND (:endDate IS NULL OR s.sessionDate <= :endDate) " +
+           "  AND (CAST(:startDate AS date) IS NULL OR s.sessionDate >= :startDate) " +
+           "  AND (CAST(:endDate AS date) IS NULL OR s.sessionDate <= :endDate) " +
            "  AND (:status IS NULL OR s.status = :status) " +
            "ORDER BY s.sessionDate ASC, s.startTime ASC")
     List<Session> findByEnrolledMember(@Param("memberId") Integer memberId,

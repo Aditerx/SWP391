@@ -79,8 +79,9 @@ public class EnrollmentService {
         // Validate that member has an active membership package
         List<MemberPackage> activePackages = memberPackageRepository.findByMemberId(memberId).stream()
                 .filter(p -> "Active".equalsIgnoreCase(p.getStatus())
-                        && p.getEndDate() != null
-                        && !p.getEndDate().isBefore(LocalDate.now()))
+                        && p.getStartDate() != null && p.getEndDate() != null
+                        && !p.getStartDate().isAfter(LocalDate.now(java.time.ZoneId.of("Asia/Ho_Chi_Minh")))
+                        && !p.getEndDate().isBefore(LocalDate.now(java.time.ZoneId.of("Asia/Ho_Chi_Minh"))))
                 .toList();
 
         if (activePackages.isEmpty()) {

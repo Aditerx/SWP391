@@ -45,9 +45,8 @@ public class InvoiceService {
             String status, String method, String keyword, LocalDateTime startDate, LocalDateTime endDate,
             Authentication authentication) {
         Integer scopedMemberId = resolveMemberScope(authentication, memberId);
-        List<Invoice> list = scopedMemberId != null
-                ? invoiceRepository.findByMemberId(scopedMemberId)
-                : invoiceRepository.searchInvoices(null, packageId, receptionistId, blankToNull(status), blankToNull(method), blankToNull(keyword), startDate, endDate);
+        List<Invoice> list = invoiceRepository.searchInvoices(scopedMemberId, packageId, receptionistId,
+                blankToNull(status), blankToNull(method), blankToNull(keyword), startDate, endDate);
         return list.stream().map(InvoiceResponse::from).toList();
     }
 
@@ -287,6 +286,23 @@ public class InvoiceService {
 
     private Invoice lockInvoice(Integer id) {
         return invoiceRepository.findByIdForUpdate(id).orElseThrow(() -> new ResourceNotFoundException("Invoice not found: " + id));
+    }
+    @Transactional(readOnly = true)
+    public void requirePaidSubscription(Integer subscriptionId) {
+        if (!invoiceRepository.existsBySubscriptionSubscriptionIdAndPaymentStatus(subscriptionId, "Paid")) {
+            throw new BusinessException("A subscription can only be activated after its invoice is Paid");
+        }
+    }
+
+    @Transactional
+    public void cancelPendingSubscriptionPayment(Integer subscriptionId) {
+        for (Invoice candidate : invoiceRepository.findBySubscriptionSubscriptionId(subscriptionId)) {
+            Invoice invoice = lockInvoice(candidate.getInvoiceId());
+            if ("Pending".equals(invoice.getPaymentStatus())) {
+                invoice.setPaymentStatus("Cancelled");
+                cancelLinked(invoice);
+            }
+        }
     }
     private boolean expired(Invoice invoice) { return invoice.getExpiresAt() != null && !invoice.getExpiresAt().isAfter(LocalDateTime.now(BUSINESS_ZONE)); }
     private User currentUser(Authentication authentication) {
