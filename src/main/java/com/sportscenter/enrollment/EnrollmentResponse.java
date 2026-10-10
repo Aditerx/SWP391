@@ -14,7 +14,11 @@ public record EnrollmentResponse(
         String subjectName,
         String coachName,
         LocalDateTime enrolledAt,
-        String status
+        String status,
+        Integer invoiceId,
+        String invoiceCode,
+        String paymentStatus,
+        String paymentUrl
 ) {
     public static EnrollmentResponse from(ClassEnrollment enrollment) {
         if (enrollment == null) return null;
@@ -32,7 +36,15 @@ public record EnrollmentResponse(
                 sportsClass != null && sportsClass.getSubject() != null ? sportsClass.getSubject().getName() : null,
                 sportsClass != null && sportsClass.getCoach() != null ? sportsClass.getCoach().getFullName() : null,
                 enrollment.getEnrolledAt(),
-                enrollment.getStatus()
+                enrollment.getStatus(), null, null, null, null
         );
+    }
+
+    public static EnrollmentResponse from(ClassEnrollment enrollment, com.sportscenter.invoice.InvoiceOrderResponse order) {
+        if (enrollment == null) return null;
+        EnrollmentResponse base = from(enrollment);
+        return new EnrollmentResponse(base.id(), base.memberId(), base.memberName(), base.memberCode(), base.memberEmail(),
+                base.memberPhone(), base.classId(), base.className(), base.subjectName(), base.coachName(), base.enrolledAt(),
+                base.status(), order.invoiceId(), order.invoiceCode(), order.status(), order.paymentUrl());
     }
 }

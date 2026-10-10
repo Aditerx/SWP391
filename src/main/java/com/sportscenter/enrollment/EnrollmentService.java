@@ -5,6 +5,8 @@ import com.sportscenter.common.exception.BusinessException;
 import com.sportscenter.common.exception.ResourceNotFoundException;
 import com.sportscenter.membership.MemberPackage;
 import com.sportscenter.membership.MemberPackageRepository;
+import com.sportscenter.invoice.InvoiceOrderResponse;
+import com.sportscenter.invoice.InvoiceService;
 import com.sportscenter.sportclass.SportsClass;
 import com.sportscenter.sportclass.SportsClassRepository;
 import com.sportscenter.user.User;
@@ -28,6 +30,7 @@ public class EnrollmentService {
     private final UserRepository userRepository;
     private final MemberPackageRepository memberPackageRepository;
     private final AuditService auditService;
+    private final InvoiceService invoiceService;
 
     @Transactional(readOnly = true)
     public List<EnrollmentResponse> findAll(Integer classId, Integer memberId, String status, String actorEmail) {
@@ -54,6 +57,16 @@ public class EnrollmentService {
 
     @Transactional
     public EnrollmentResponse enroll(Integer classId, Integer targetMemberId, String actorEmail) {
+        return enroll(classId, targetMemberId, actorEmail, "Cash");
+    }
+
+    @Transactional
+    public EnrollmentResponse enroll(Integer classId, Integer targetMemberId, String actorEmail, String paymentMethod) {
+        return enroll(classId, targetMemberId, actorEmail, paymentMethod, "127.0.0.1");
+    }
+
+    @Transactional
+    public EnrollmentResponse enroll(Integer classId, Integer targetMemberId, String actorEmail, String paymentMethod, String clientIp) {
         User actor = requireActor(actorEmail);
         final Integer memberId = resolveMemberScope(actor, targetMemberId);
         User member = userRepository.findById(memberId)
@@ -75,7 +88,7 @@ public class EnrollmentService {
         }
 
         // Validate class
-        SportsClass sportsClass = classRepository.findById(classId)
+        SportsClass sportsClass = classRepository.findByIdForUpdate(classId)
                 .orElseThrow(() -> new ResourceNotFoundException("Class not found: " + classId));
 
         if ("Closed".equalsIgnoreCase(sportsClass.getStatus()) || "Cancelled".equalsIgnoreCase(sportsClass.getStatus())) {
@@ -83,7 +96,7 @@ public class EnrollmentService {
         }
 
         // Validate capacity
-        long currentEnrolled = enrollmentRepository.countBySportsClassIdAndStatus(classId, "Registered");
+        long currentEnrolled = enrollmentRepository.countBySportsClassIdAndStatusIn(classId, List.of("Registered", "Pending"));
         if (sportsClass.getMaxCapacity() != null && currentEnrolled >= sportsClass.getMaxCapacity()) {
             throw new BusinessException("Class is full. Capacity is " + sportsClass.getMaxCapacity() + " and already has " + currentEnrolled + " enrolled members.");
         }
@@ -91,10 +104,9 @@ public class EnrollmentService {
         // Check existing enrollment
         ClassEnrollment enrollment = enrollmentRepository.findByMemberIdAndSportsClassId(memberId, classId).orElse(null);
         if (enrollment != null) {
-            if ("Registered".equalsIgnoreCase(enrollment.getStatus())) {
+            if ("Registered".equalsIgnoreCase(enrollment.getStatus()) || "Pending".equalsIgnoreCase(enrollment.getStatus())) {
                 throw new BusinessException("Member is already enrolled in this class");
             }
-            // Reactivate cancelled enrollment
             enrollment.setStatus("Registered");
             enrollment.setEnrolledAt(LocalDateTime.now());
         } else {
@@ -105,11 +117,18 @@ public class EnrollmentService {
             enrollment.setStatus("Registered");
         }
 
+        InvoiceOrderResponse order = null;
+        if (sportsClass.getTuitionFee() != null && sportsClass.getTuitionFee().compareTo(java.math.BigDecimal.ZERO) > 0) {
+            enrollment.setStatus("Pending");
+        }
         ClassEnrollment saved = enrollmentRepository.save(enrollment);
+        if (sportsClass.getTuitionFee() != null && sportsClass.getTuitionFee().compareTo(java.math.BigDecimal.ZERO) > 0) {
+            order = invoiceService.createClassOrder(member, sportsClass, paymentMethod == null ? "Cash" : paymentMethod, clientIp);
+        }
         auditService.log(actor.getId(), "ENROLL_CLASS", "CLASS_ENROLLMENT", saved.getId(),
                 "Member " + member.getFullName() + " (ID: " + memberId + ") enrolled in class '" + sportsClass.getName() + "' (ID: " + classId + ")");
 
-        return EnrollmentResponse.from(saved);
+        return order != null ? EnrollmentResponse.from(saved, order) : EnrollmentResponse.from(saved);
     }
 
     @Transactional
@@ -121,6 +140,10 @@ public class EnrollmentService {
 
         if ("Cancelled".equalsIgnoreCase(enrollment.getStatus())) {
             throw new BusinessException("Enrollment is already cancelled");
+        }
+
+        if ("Pending".equalsIgnoreCase(enrollment.getStatus())) {
+            invoiceService.cancelPendingClassPayment(memberId, classId);
         }
 
         enrollment.setStatus("Cancelled");
@@ -138,6 +161,10 @@ public class EnrollmentService {
         ClassEnrollment enrollment = enrollmentRepository.findById(enrollmentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Enrollment not found: " + enrollmentId));
         resolveMemberScope(actor, enrollment.getMember() != null ? enrollment.getMember().getId() : null);
+
+        if ("Pending".equalsIgnoreCase(enrollment.getStatus()) && enrollment.getMember() != null && enrollment.getSportsClass() != null) {
+            invoiceService.cancelPendingClassPayment(enrollment.getMember().getId(), enrollment.getSportsClass().getId());
+        }
 
         enrollment.setStatus("Cancelled");
         ClassEnrollment saved = enrollmentRepository.save(enrollment);

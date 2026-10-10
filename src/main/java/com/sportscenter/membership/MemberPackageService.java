@@ -6,6 +6,7 @@ import com.sportscenter.common.exception.ResourceNotFoundException;
 import com.sportscenter.user.User;
 import com.sportscenter.user.UserRepository;
 import com.sportscenter.invoice.InvoiceService;
+import com.sportscenter.invoice.InvoiceOrderResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
@@ -13,6 +14,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.Comparator;
 import java.util.List;
 
@@ -51,72 +53,47 @@ public class MemberPackageService {
     }
 
     @Transactional
-    public MemberPackageResponse subscribe(Integer memberId, MemberPackageRequest request) {
+    public SubscriptionOrderResponse subscribe(Integer memberId, MemberPackageRequest request) {
+        return subscribe(memberId, request, "127.0.0.1");
+    }
+
+    @Transactional
+    public SubscriptionOrderResponse subscribe(Integer memberId, MemberPackageRequest request, String clientIp) {
         User memberUser = userRepository.findById(memberId)
                 .orElseThrow(() -> new ResourceNotFoundException("Member user not found: " + memberId));
 
         MembershipPackage pkg = membershipPackageRepository.findById(request.packageId())
                 .orElseThrow(() -> new ResourceNotFoundException("Membership package not found: " + request.packageId()));
 
-        if ("Inactive".equalsIgnoreCase(pkg.getStatus())) {
-            throw new BusinessException("Cannot subscribe to an Inactive membership package");
-        }
-
-        int days = request.durationDays() != null && request.durationDays() > 0
-                ? request.durationDays()
-                : (pkg.getDurationDays() != null ? pkg.getDurationDays() : 30);
-
-        LocalDate startDate = request.startDate();
-        boolean isRenewal = Boolean.TRUE.equals(request.isRenewal());
-
-        // Find existing active subscriptions for renewal calculation
-        List<MemberPackage> existingSubs = memberPackageRepository.findByMemberId(memberId);
-        MemberPackage latestActiveSub = existingSubs.stream()
-                .filter(s -> "Active".equalsIgnoreCase(s.getStatus()) && s.getEndDate() != null)
-                .max(Comparator.comparing(MemberPackage::getEndDate))
-                .orElse(null);
-
-        if (startDate == null) {
-            if (isRenewal && latestActiveSub != null && !latestActiveSub.getEndDate().isBefore(LocalDate.now())) {
-                startDate = latestActiveSub.getEndDate().plusDays(1);
-            } else {
-                startDate = LocalDate.now();
-            }
-        }
-
-        LocalDate endDate = startDate.plusDays(days);
+        if (!"Active".equalsIgnoreCase(pkg.getStatus())) throw new BusinessException("Cannot subscribe to an Inactive membership package");
+        String method = request.paymentMethod() == null || request.paymentMethod().isBlank() ? "Cash" : request.paymentMethod();
+        LocalDate startDate = LocalDate.now(ZoneId.of("Asia/Ho_Chi_Minh"));
+        int days = pkg.getDurationDays() != null ? pkg.getDurationDays() : 30;
 
         MemberPackage mp = new MemberPackage();
         mp.setMember(memberUser);
         mp.setMembershipPackage(pkg);
         mp.setStartDate(startDate);
-        mp.setEndDate(endDate);
-        mp.setStatus("Active");
-
+        mp.setEndDate(startDate.plusDays(days));
+        mp.setStatus("Pending");
         MemberPackage saved = memberPackageRepository.save(mp);
+        InvoiceOrderResponse order = invoiceService.createPackageOrder(memberUser, pkg, method, saved, clientIp);
+        auditService.log(null, "SUBSCRIBE_PACKAGE", "MEMBER_PACKAGE", saved.getSubscriptionId(),
+                "Created pending subscription and invoice " + order.invoiceCode());
+        return new SubscriptionOrderResponse(saved.getSubscriptionId(), order.invoiceId(), order.invoiceCode(),
+                order.amount(), order.paymentMethod(), order.status(), order.expiresAt(), order.paymentUrl());
+    }
 
-        // Auto-generate Invoice for this subscription
-        try {
-            invoiceService.createInvoiceForSubscription(
-                    memberUser,
-                    pkg,
-                    null,
-                    pkg.getPrice(),
-                    request.paymentMethod() != null ? request.paymentMethod() : "Cash"
-            );
-        } catch (Exception ignored) {
-            // Non-blocking invoice generation fallback
-        }
+    @Transactional
+    public SubscriptionOrderResponse subscribeMe(MemberPackageRequest request, Authentication authentication) {
+        return subscribeMe(request, authentication, "127.0.0.1");
+    }
 
-        String action = isRenewal ? "RENEW_SUBSCRIPTION" : "SUBSCRIBE_PACKAGE";
-        String detail = (isRenewal ? "Renewed " : "Subscribed to ") + pkg.getName() + " for Member #" + memberId +
-                " (Valid: " + startDate + " to " + endDate + ")";
-        if (request.paymentMethod() != null) {
-            detail += " [Payment: " + request.paymentMethod() + "]";
-        }
-
-        auditService.log(null, action, "MEMBER_PACKAGE", saved.getSubscriptionId(), detail);
-        return MemberPackageResponse.from(saved);
+    @Transactional
+    public SubscriptionOrderResponse subscribeMe(MemberPackageRequest request, Authentication authentication, String clientIp) {
+        User actor = userRepository.findByEmailIgnoreCase(authentication.getName())
+                .orElseThrow(() -> new AccessDeniedException("Authenticated member account was not found"));
+        return subscribe(actor.getId(), request, clientIp);
     }
 
     @Transactional
@@ -126,6 +103,9 @@ public class MemberPackageService {
 
         String normalizedStatus = normalizeStatus(status);
         String previousStatus = mp.getStatus();
+        if ("Pending".equalsIgnoreCase(previousStatus) && "Active".equals(normalizedStatus)) {
+            throw new BusinessException("A Pending subscription can only be activated after its invoice is Paid");
+        }
         mp.setStatus(normalizedStatus);
         MemberPackage saved = memberPackageRepository.save(mp);
 

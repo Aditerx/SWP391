@@ -1,6 +1,7 @@
 package com.sportscenter.sportclass;
 
 import java.time.LocalDate;
+import java.math.BigDecimal;
 
 public record SportsClassResponse(
         Integer id,
@@ -8,6 +9,7 @@ public record SportsClassResponse(
         Integer subjectId,
         Integer coachId,
         Integer maxCapacity,
+        BigDecimal tuitionFee,
         LocalDate startDate,
         LocalDate endDate,
         String status,
@@ -24,6 +26,7 @@ public record SportsClassResponse(
                 sportsClass.getSubject() == null ? null : sportsClass.getSubject().getId(),
                 sportsClass.getCoach() == null ? null : sportsClass.getCoach().getId(),
                 sportsClass.getMaxCapacity(),
+                sportsClass.getTuitionFee(),
                 sportsClass.getStartDate(),
                 sportsClass.getEndDate(),
                 sportsClass.getStatus(),

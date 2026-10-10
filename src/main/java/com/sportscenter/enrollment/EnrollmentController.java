@@ -1,6 +1,7 @@
 package com.sportscenter.enrollment;
 
 import jakarta.validation.Valid;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -44,10 +45,12 @@ public class EnrollmentController {
     public ResponseEntity<EnrollmentResponse> enrollInClass(
             @PathVariable Integer classId,
             @RequestBody(required = false) EnrollmentRequest request,
-            Authentication authentication) {
+            Authentication authentication,
+            HttpServletRequest httpRequest) {
         String userEmail = authentication != null ? authentication.getName() : null;
         Integer memberId = request != null ? request.memberId() : null;
-        EnrollmentResponse response = enrollmentService.enroll(classId, memberId, userEmail);
+        EnrollmentResponse response = enrollmentService.enroll(classId, memberId, userEmail,
+                request != null ? request.paymentMethod() : "Cash", clientIp(httpRequest));
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
@@ -55,12 +58,14 @@ public class EnrollmentController {
     @PreAuthorize("hasAnyAuthority('REGISTER_MEMBER', 'MANAGE_CLASSES') or hasRole('MEMBER')")
     public ResponseEntity<EnrollmentResponse> createEnrollment(
             @Valid @RequestBody EnrollmentRequest request,
-            Authentication authentication) {
+            Authentication authentication,
+            HttpServletRequest httpRequest) {
         String userEmail = authentication != null ? authentication.getName() : null;
         if (request.classId() == null) {
             throw new IllegalArgumentException("classId is required");
         }
-        EnrollmentResponse response = enrollmentService.enroll(request.classId(), request.memberId(), userEmail);
+        EnrollmentResponse response = enrollmentService.enroll(request.classId(), request.memberId(), userEmail,
+                request.paymentMethod(), clientIp(httpRequest));
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
@@ -91,5 +96,10 @@ public class EnrollmentController {
             Authentication authentication) {
         String userEmail = authentication != null ? authentication.getName() : null;
         return ResponseEntity.ok(enrollmentService.cancelById(id, userEmail));
+    }
+
+    private String clientIp(HttpServletRequest request) {
+        String forwarded = request.getHeader("X-Forwarded-For");
+        return forwarded != null && !forwarded.isBlank() ? forwarded.split(",")[0].trim() : request.getRemoteAddr();
     }
 }

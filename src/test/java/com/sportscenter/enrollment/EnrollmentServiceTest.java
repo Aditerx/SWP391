@@ -1,6 +1,8 @@
 package com.sportscenter.enrollment;
 
 import com.sportscenter.audit.AuditService;
+import com.sportscenter.invoice.InvoiceService;
+import com.sportscenter.invoice.InvoiceOrderResponse;
 import com.sportscenter.common.exception.BusinessException;
 import com.sportscenter.membership.MemberPackage;
 import com.sportscenter.membership.MemberPackageRepository;
@@ -20,6 +22,7 @@ import org.springframework.security.access.AccessDeniedException;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.math.BigDecimal;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
@@ -46,6 +49,9 @@ class EnrollmentServiceTest {
 
     @Mock
     private AuditService auditService;
+
+    @Mock
+    private InvoiceService invoiceService;
 
     @InjectMocks
     private EnrollmentService enrollmentService;
@@ -93,8 +99,8 @@ class EnrollmentServiceTest {
     void enroll_Success() {
         when(userRepository.findById(8)).thenReturn(Optional.of(sampleMember));
         when(memberPackageRepository.findByMemberId(8)).thenReturn(List.of(sampleActivePackage));
-        when(classRepository.findById(1)).thenReturn(Optional.of(sampleClass));
-        when(enrollmentRepository.countBySportsClassIdAndStatus(1, "Registered")).thenReturn(10L);
+        when(classRepository.findByIdForUpdate(1)).thenReturn(Optional.of(sampleClass));
+        when(enrollmentRepository.countBySportsClassIdAndStatusIn(1, List.of("Registered", "Pending"))).thenReturn(10L);
         when(enrollmentRepository.findByMemberIdAndSportsClassId(8, 1)).thenReturn(Optional.empty());
 
         ClassEnrollment saved = new ClassEnrollment();
@@ -134,8 +140,8 @@ class EnrollmentServiceTest {
         sampleClass.setMaxCapacity(15);
         when(userRepository.findById(8)).thenReturn(Optional.of(sampleMember));
         when(memberPackageRepository.findByMemberId(8)).thenReturn(List.of(sampleActivePackage));
-        when(classRepository.findById(1)).thenReturn(Optional.of(sampleClass));
-        when(enrollmentRepository.countBySportsClassIdAndStatus(1, "Registered")).thenReturn(15L);
+        when(classRepository.findByIdForUpdate(1)).thenReturn(Optional.of(sampleClass));
+        when(enrollmentRepository.countBySportsClassIdAndStatusIn(1, List.of("Registered", "Pending"))).thenReturn(15L);
 
         BusinessException ex = assertThrows(BusinessException.class, () ->
                 enrollmentService.enroll(1, 8, "admin@scms.com"));
@@ -148,8 +154,8 @@ class EnrollmentServiceTest {
     void enroll_AlreadyRegistered_ThrowsException() {
         when(userRepository.findById(8)).thenReturn(Optional.of(sampleMember));
         when(memberPackageRepository.findByMemberId(8)).thenReturn(List.of(sampleActivePackage));
-        when(classRepository.findById(1)).thenReturn(Optional.of(sampleClass));
-        when(enrollmentRepository.countBySportsClassIdAndStatus(1, "Registered")).thenReturn(5L);
+        when(classRepository.findByIdForUpdate(1)).thenReturn(Optional.of(sampleClass));
+        when(enrollmentRepository.countBySportsClassIdAndStatusIn(1, List.of("Registered", "Pending"))).thenReturn(5L);
 
         ClassEnrollment existing = new ClassEnrollment();
         existing.setId(50);
@@ -196,5 +202,29 @@ class EnrollmentServiceTest {
                 () -> enrollmentService.enroll(1, 9, sampleMember.getEmail()));
         verifyNoInteractions(memberPackageRepository);
         verifyNoInteractions(enrollmentRepository);
+    }
+
+    @Test
+    @DisplayName("Paid class tuition holds capacity with a Pending enrollment and invoice")
+    void enroll_PaidClassCreatesPendingInvoiceAndReservation() {
+        sampleClass.setTuitionFee(new BigDecimal("125.00"));
+        when(userRepository.findById(8)).thenReturn(Optional.of(sampleMember));
+        when(memberPackageRepository.findByMemberId(8)).thenReturn(List.of(sampleActivePackage));
+        when(classRepository.findByIdForUpdate(1)).thenReturn(Optional.of(sampleClass));
+        when(enrollmentRepository.countBySportsClassIdAndStatusIn(1, List.of("Registered", "Pending"))).thenReturn(2L);
+        when(enrollmentRepository.findByMemberIdAndSportsClassId(8, 1)).thenReturn(Optional.empty());
+        when(enrollmentRepository.save(any(ClassEnrollment.class))).thenAnswer(invocation -> {
+            ClassEnrollment e = invocation.getArgument(0); e.setId(77); return e;
+        });
+        when(invoiceService.createClassOrder(sampleMember, sampleClass, "VNPay", "203.0.113.5"))
+                .thenReturn(new InvoiceOrderResponse(88, "INV-2026-000088", new BigDecimal("125.00"), "VNPay", "Pending",
+                        LocalDateTime.now().plusMinutes(15), "https://vnpay.test/pay"));
+
+        EnrollmentResponse response = enrollmentService.enroll(1, 8, "admin@scms.com", "VNPay", "203.0.113.5");
+
+        assertEquals("Pending", response.status());
+        assertEquals(88, response.invoiceId());
+        assertEquals("Pending", response.paymentStatus());
+        assertEquals("https://vnpay.test/pay", response.paymentUrl());
     }
 }
