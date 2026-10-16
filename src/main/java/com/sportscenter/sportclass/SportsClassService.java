@@ -4,6 +4,7 @@ import com.sportscenter.audit.AuditService;
 import com.sportscenter.common.exception.BusinessException;
 import com.sportscenter.common.exception.ResourceNotFoundException;
 import com.sportscenter.enrollment.ClassEnrollmentRepository;
+import com.sportscenter.enrollment.EnrollmentService;
 import com.sportscenter.subject.Subject;
 import com.sportscenter.subject.SubjectRepository;
 import com.sportscenter.user.User;
@@ -23,6 +24,7 @@ public class SportsClassService {
     private final UserRepository userRepository;
     private final ClassEnrollmentRepository classEnrollmentRepository;
     private final AuditService auditService;
+    private final EnrollmentService enrollmentService;
 
     @Transactional(readOnly = true)
     public List<SportsClassResponse> findAll() {
@@ -51,11 +53,17 @@ public class SportsClassService {
     }
 
     @Transactional
-    public SportsClassResponse update(Integer id, SportsClassRequest request) {
+    public SportsClassResponse update(Integer id, SportsClassRequest request, String actorEmail) {
         validateDateRange(request);
-        SportsClass sportsClass = getEntity(id);
+        SportsClass sportsClass = repository.findByIdForUpdate(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Class not found: " + id));
+        Integer previousCapacity = sportsClass.getMaxCapacity();
         apply(sportsClass, request);
         SportsClass saved = repository.save(sportsClass);
+        if (saved.getMaxCapacity() != null && (previousCapacity == null || saved.getMaxCapacity() > previousCapacity)) {
+            Integer actorId = userRepository.findByEmailIgnoreCase(actorEmail).map(User::getId).orElse(null);
+            enrollmentService.promoteWaitlist(saved.getId(), actorId);
+        }
         int count = (int) classEnrollmentRepository.countBySportsClassIdAndStatusIn(saved.getId(), List.of("Registered", "Pending"));
         return SportsClassResponse.from(saved, count);
     }

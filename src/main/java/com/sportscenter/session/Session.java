@@ -40,4 +40,6 @@ public class Session {
 
     @Column(name = "status", nullable = false)
     private String status = "Scheduled";
+    @Column(name = "attendance_finalized", nullable = false)
+    private boolean attendanceFinalized;
 }

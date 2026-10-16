@@ -14,7 +14,7 @@ import java.time.LocalTime;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/attendances")
+@RequestMapping({"/api/attendances", "/api/attendance"})
 @RequiredArgsConstructor
 public class AttendanceController {
     private final AttendanceService attendanceService;
@@ -37,19 +37,26 @@ public class AttendanceController {
 
     @PostMapping("/check-in")
     @PreAuthorize("hasAnyAuthority('RECORD_RESULT', 'REGISTER_MEMBER', 'MANAGE_USERS')")
-    public ResponseEntity<AttendanceResponse> checkIn(@Valid @RequestBody CheckInRequest request) {
-        return ResponseEntity.ok(attendanceService.checkIn(request.memberId(), request.recordedBy()));
+    public ResponseEntity<AttendanceResponse> checkIn(@Valid @RequestBody CheckInRequest request, Authentication authentication) {
+        return ResponseEntity.ok(attendanceService.checkIn(request.memberId(), authentication.getName()));
     }
 
     @PostMapping("/check-out")
     @PreAuthorize("hasAnyAuthority('RECORD_RESULT', 'REGISTER_MEMBER', 'MANAGE_USERS')")
-    public ResponseEntity<AttendanceResponse> checkOut(@RequestParam Integer memberId) {
-        return ResponseEntity.ok(attendanceService.checkOut(memberId));
+    public ResponseEntity<AttendanceResponse> checkOut(@RequestParam Integer memberId, Authentication authentication) {
+        return ResponseEntity.ok(attendanceService.checkOut(memberId, authentication.getName()));
+    }
+
+    @PostMapping("/scan")
+    @PreAuthorize("hasAnyAuthority('RECORD_RESULT', 'REGISTER_MEMBER', 'MANAGE_USERS')")
+    public ResponseEntity<AttendanceResponse> scan(@Valid @RequestBody CheckinScanRequest request, Authentication authentication) {
+        return ResponseEntity.ok(attendanceService.scanCheckin(request.memberId(), request.code(), request.sessionId(), authentication.getName()));
     }
 
     @PostMapping("/correct")
     @PreAuthorize("hasAnyAuthority('RECORD_RESULT', 'MANAGE_CLASSES', 'MANAGE_USERS')")
-    public ResponseEntity<AttendanceResponse> correctAttendance(@Valid @RequestBody AttendanceCorrectionRequest request) {
-        return ResponseEntity.ok(attendanceService.correctAttendance(request));
+    public ResponseEntity<AttendanceResponse> correctAttendance(@Valid @RequestBody AttendanceCorrectionRequest request, Authentication authentication) {
+        return ResponseEntity.ok(attendanceService.correctAttendance(request, authentication.getName()));
     }
+
 }

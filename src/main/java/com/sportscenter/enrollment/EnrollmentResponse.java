@@ -18,7 +18,8 @@ public record EnrollmentResponse(
         Integer invoiceId,
         String invoiceCode,
         String paymentStatus,
-        String paymentUrl
+        String paymentUrl,
+        Integer waitlistPosition
 ) {
     public static EnrollmentResponse from(ClassEnrollment enrollment) {
         if (enrollment == null) return null;
@@ -36,7 +37,7 @@ public record EnrollmentResponse(
                 sportsClass != null && sportsClass.getSubject() != null ? sportsClass.getSubject().getName() : null,
                 sportsClass != null && sportsClass.getCoach() != null ? sportsClass.getCoach().getFullName() : null,
                 enrollment.getEnrolledAt(),
-                enrollment.getStatus(), null, null, null, null
+                enrollment.getStatus(), null, null, null, null, null
         );
     }
 
@@ -45,6 +46,13 @@ public record EnrollmentResponse(
         EnrollmentResponse base = from(enrollment);
         return new EnrollmentResponse(base.id(), base.memberId(), base.memberName(), base.memberCode(), base.memberEmail(),
                 base.memberPhone(), base.classId(), base.className(), base.subjectName(), base.coachName(), base.enrolledAt(),
-                base.status(), order.invoiceId(), order.invoiceCode(), order.status(), order.paymentUrl());
+                base.status(), order.invoiceId(), order.invoiceCode(), order.status(), order.paymentUrl(), base.waitlistPosition());
+    }
+
+    public static EnrollmentResponse from(ClassEnrollment enrollment, Integer waitlistPosition) {
+        EnrollmentResponse base = from(enrollment);
+        return new EnrollmentResponse(base.id(), base.memberId(), base.memberName(), base.memberCode(), base.memberEmail(),
+                base.memberPhone(), base.classId(), base.className(), base.subjectName(), base.coachName(), base.enrolledAt(),
+                base.status(), base.invoiceId(), base.invoiceCode(), base.paymentStatus(), base.paymentUrl(), waitlistPosition);
     }
 }

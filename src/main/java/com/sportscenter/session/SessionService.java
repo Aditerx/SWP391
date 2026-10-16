@@ -17,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.time.Clock;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -29,6 +30,7 @@ public class SessionService {
     private final UserRepository userRepository;
     private final ClassEnrollmentRepository classEnrollmentRepository;
     private final AuditService auditService;
+    private final Clock clock;
 
     @Transactional(readOnly = true)
     public List<SessionResponse> findAll(Integer classId, Integer coachId, Integer roomId, Integer memberId,
@@ -93,7 +95,7 @@ public class SessionService {
         if (request.endDate().isBefore(request.startDate())) {
             throw new BusinessException("End date cannot be before start date");
         }
-        if (request.startDate().isBefore(LocalDate.now())) {
+        if (request.startDate().isBefore(LocalDate.now(clock))) {
             throw new BusinessException("Cannot generate sessions starting in the past");
         }
 
@@ -301,7 +303,7 @@ public class SessionService {
     }
 
     private void validateDateNotInPast(LocalDate sessionDate) {
-        if (sessionDate != null && sessionDate.isBefore(LocalDate.now())) {
+        if (sessionDate != null && sessionDate.isBefore(LocalDate.now(clock))) {
             throw new BusinessException("A new session cannot be created in the past");
         }
     }

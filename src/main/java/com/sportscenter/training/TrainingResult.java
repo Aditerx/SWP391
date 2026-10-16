@@ -39,5 +39,5 @@ public class TrainingResult {
     private String attendanceStatus = "Present";
 
     @Column(name = "recorded_at", nullable = false)
-    private LocalDateTime recordedAt = LocalDateTime.now();
+    private LocalDateTime recordedAt;
 }

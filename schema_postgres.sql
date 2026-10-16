@@ -158,12 +158,20 @@ CREATE TABLE IF NOT EXISTS members (
     health_note   TEXT,
     join_date     DATE NOT NULL DEFAULT CURRENT_DATE,
     registered_by INT NULL,
+    checkin_secret VARCHAR(64) NULL,
+    checkin_last_step BIGINT NULL,
+    booking_blocked_until TIMESTAMP NULL,
     CONSTRAINT fk_member_user
         FOREIGN KEY (user_id) REFERENCES users(user_id)
         ON DELETE CASCADE,
     CONSTRAINT fk_member_receptionist
         FOREIGN KEY (registered_by) REFERENCES receptionists(user_id)
 );
+
+-- Flow 4 rotating QR check-in secret and replay protection (run manually by database owner)
+ALTER TABLE members ADD COLUMN IF NOT EXISTS checkin_secret VARCHAR(64) NULL;
+ALTER TABLE members ADD COLUMN IF NOT EXISTS checkin_last_step BIGINT NULL;
+ALTER TABLE members ADD COLUMN IF NOT EXISTS booking_blocked_until TIMESTAMP NULL;
 
 -- =====================================================================
 -- 3. SUBJECTS – ROOMS – CLASSES
@@ -263,12 +271,21 @@ CREATE TABLE IF NOT EXISTS sessions (
     session_date DATE NOT NULL,
     start_time   TIME NOT NULL,
     end_time     TIME NOT NULL,
+    attendance_finalized BOOLEAN NOT NULL DEFAULT FALSE,
     status       VARCHAR(20) NOT NULL DEFAULT 'Scheduled'
         CHECK (status IN ('Scheduled', 'Completed', 'Cancelled')),
     CONSTRAINT chk_session_time  CHECK (end_time > start_time),
     CONSTRAINT fk_session_class  FOREIGN KEY (class_id) REFERENCES classes(class_id) ON DELETE CASCADE,
     CONSTRAINT fk_session_room   FOREIGN KEY (room_id)  REFERENCES rooms(room_id)
 );
+
+ALTER TABLE sessions ADD COLUMN IF NOT EXISTS attendance_finalized BOOLEAN NOT NULL DEFAULT FALSE;
+-- Mark sessions that already ended at migration time as finalized so the new job does not
+-- retroactively penalize historical attendance gaps. The comparison uses Vietnam local time.
+UPDATE sessions
+SET attendance_finalized = TRUE
+WHERE attendance_finalized = FALSE
+  AND session_date + end_time < (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Ho_Chi_Minh');
 
 CREATE INDEX IF NOT EXISTS idx_session_class ON sessions(class_id);
 CREATE INDEX IF NOT EXISTS idx_session_room  ON sessions(room_id);
@@ -280,7 +297,7 @@ CREATE TABLE IF NOT EXISTS training_results (
     coach_id          INT NOT NULL,
     content           TEXT,
     attendance_status VARCHAR(10) NOT NULL DEFAULT 'Present'
-        CHECK (attendance_status IN ('Present', 'Absent', 'Late')),
+        CHECK (attendance_status IN ('Present', 'Absent', 'Late', 'Excused')),
     recorded_at       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_result_session FOREIGN KEY (session_id) REFERENCES sessions(session_id) ON DELETE CASCADE,
     CONSTRAINT fk_result_member  FOREIGN KEY (member_id)  REFERENCES members(user_id),
@@ -298,13 +315,25 @@ CREATE TABLE IF NOT EXISTS attendances (
     member_id      INT NOT NULL,
     recorded_by    INT NULL,
     state          VARCHAR(20) NOT NULL DEFAULT 'Present'
-        CHECK (state IN ('Present', 'Absent', 'Late', 'CheckedIn')),
+        CHECK (state IN ('Present', 'Absent', 'Late', 'CheckedIn', 'Excused')),
+    note           TEXT NULL,
     check_in_time  TIMESTAMP NULL,
     check_out_time TIMESTAMP NULL,
     CONSTRAINT fk_attendance_session  FOREIGN KEY (session_id)  REFERENCES sessions(session_id) ON DELETE CASCADE,
     CONSTRAINT fk_attendance_member   FOREIGN KEY (member_id)   REFERENCES members(user_id),
     CONSTRAINT fk_attendance_recorder FOREIGN KEY (recorded_by) REFERENCES users(user_id)
 );
+
+-- Flow 4 absence state migration (idempotent; run manually by database owner)
+ALTER TABLE attendances ADD COLUMN IF NOT EXISTS note TEXT NULL;
+ALTER TABLE attendances DROP CONSTRAINT IF EXISTS attendances_state_check;
+ALTER TABLE attendances DROP CONSTRAINT IF EXISTS ck_attendances_state;
+ALTER TABLE attendances ADD CONSTRAINT ck_attendances_state
+    CHECK (state IN ('Present', 'Absent', 'Late', 'CheckedIn', 'Excused'));
+ALTER TABLE training_results DROP CONSTRAINT IF EXISTS training_results_attendance_status_check;
+ALTER TABLE training_results DROP CONSTRAINT IF EXISTS ck_training_results_attendance_status;
+ALTER TABLE training_results ADD CONSTRAINT ck_training_results_attendance_status
+    CHECK (attendance_status IN ('Present', 'Absent', 'Late', 'Excused'));
 
 -- Partial unique index: only one attendance record per (session, member) when session_id IS NOT NULL
 CREATE UNIQUE INDEX IF NOT EXISTS ux_attendance_session_member
@@ -395,11 +424,21 @@ CREATE TABLE IF NOT EXISTS class_enrollments (
     class_id      INT NOT NULL,
     enrolled_at   TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     status        VARCHAR(20) NOT NULL DEFAULT 'Registered'
-        CHECK (status IN ('Pending', 'Registered', 'Cancelled', 'Completed')),
+        CHECK (status IN ('Pending', 'Registered', 'Waitlisted', 'Cancelled', 'Completed')),
     CONSTRAINT fk_enroll_member FOREIGN KEY (member_id) REFERENCES members(user_id),
     CONSTRAINT fk_enroll_class  FOREIGN KEY (class_id)  REFERENCES classes(class_id),
     CONSTRAINT uq_enrollment UNIQUE (member_id, class_id)
 );
+
+-- Flow 4 enrollment metadata and waitlist state (idempotent migration)
+ALTER TABLE class_enrollments ADD COLUMN IF NOT EXISTS cancelled_at TIMESTAMP NULL;
+ALTER TABLE class_enrollments ADD COLUMN IF NOT EXISTS cancelled_by INT NULL REFERENCES users(user_id);
+ALTER TABLE class_enrollments ADD COLUMN IF NOT EXISTS cancel_reason TEXT NULL;
+ALTER TABLE class_enrollments ADD COLUMN IF NOT EXISTS promoted_at TIMESTAMP NULL;
+ALTER TABLE class_enrollments DROP CONSTRAINT IF EXISTS class_enrollments_status_check;
+ALTER TABLE class_enrollments DROP CONSTRAINT IF EXISTS ck_class_enrollments_status;
+ALTER TABLE class_enrollments ADD CONSTRAINT ck_class_enrollments_status
+    CHECK (status IN ('Pending', 'Registered', 'Waitlisted', 'Cancelled', 'Completed'));
 
 -- =====================================================================
 -- 7. INVOICES

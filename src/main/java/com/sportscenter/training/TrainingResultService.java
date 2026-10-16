@@ -3,6 +3,7 @@ package com.sportscenter.training;
 import com.sportscenter.audit.AuditService;
 import com.sportscenter.common.exception.BusinessException;
 import com.sportscenter.common.exception.ResourceNotFoundException;
+import com.sportscenter.enrollment.ClassEnrollmentRepository;
 import com.sportscenter.session.Session;
 import com.sportscenter.session.SessionRepository;
 import com.sportscenter.user.User;
@@ -14,6 +15,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.time.Clock;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -25,6 +27,8 @@ public class TrainingResultService {
     private final SessionRepository sessionRepository;
     private final UserRepository userRepository;
     private final AuditService auditService;
+    private final ClassEnrollmentRepository enrollmentRepository;
+    private final Clock clock;
 
     @Transactional(readOnly = true)
     public List<TrainingResultResponse> searchResults(Integer sessionId, Integer memberId, Integer coachId,
@@ -45,14 +49,25 @@ public class TrainingResultService {
 
     @Transactional
     public TrainingResultResponse recordResult(TrainingResultRequest request) {
+        return recordResult(request, null);
+    }
+
+    @Transactional
+    public TrainingResultResponse recordResult(TrainingResultRequest request, Authentication authentication) {
         Session session = sessionRepository.findById(request.sessionId())
                 .orElseThrow(() -> new ResourceNotFoundException("Session not found: " + request.sessionId()));
 
         User member = userRepository.findById(request.memberId())
                 .orElseThrow(() -> new ResourceNotFoundException("Member not found: " + request.memberId()));
 
-        User coach = userRepository.findById(request.coachId())
-                .orElseThrow(() -> new ResourceNotFoundException("Coach not found: " + request.coachId()));
+        User actor = authentication == null ? null : userRepository.findByEmailIgnoreCase(authentication.getName())
+                .orElseThrow(() -> new AccessDeniedException("Authenticated user account was not found"));
+        boolean coachActor = authentication != null && authentication.getAuthorities().stream()
+                .anyMatch(authority -> "ROLE_COACH".equals(authority.getAuthority()));
+        Integer coachId = coachActor ? actor.getId() : request.coachId();
+        User coach = userRepository.findById(coachId)
+                .orElseThrow(() -> new ResourceNotFoundException("Coach not found: " + coachId));
+        if (coachActor) ensureCoachCanRecord(session, member, actor);
 
         String status = normalizeAttendanceStatus(request.attendanceStatus());
 
@@ -64,14 +79,14 @@ public class TrainingResultService {
         result.setCoach(coach);
         result.setContent(request.content());
         result.setAttendanceStatus(status);
-        result.setRecordedAt(LocalDateTime.now());
+        result.setRecordedAt(LocalDateTime.now(clock));
 
         TrainingResult saved = trainingResultRepository.save(result);
 
         // Sync with Attendance record
         syncAttendanceRecord(session, member, coach, status);
 
-        auditService.log(coach.getId(), "RECORD_RESULT", "training_results", saved.getResultId(),
+        auditService.log(actor != null ? actor.getId() : coach.getId(), "RECORD_RESULT", "training_results", saved.getResultId(),
                 "Recorded attendance (" + status + ") and result for member " + member.getFullName() +
                         " in session #" + session.getId());
 
@@ -80,10 +95,19 @@ public class TrainingResultService {
 
     @Transactional
     public List<TrainingResultResponse> recordBulkResults(BulkTrainingResultRequest request) {
+        return recordBulkResults(request, null);
+    }
+
+    @Transactional
+    public List<TrainingResultResponse> recordBulkResults(BulkTrainingResultRequest request, Authentication authentication) {
         Session session = sessionRepository.findById(request.sessionId())
                 .orElseThrow(() -> new ResourceNotFoundException("Session not found: " + request.sessionId()));
 
-        Integer coachId = request.coachId();
+        User actor = authentication == null ? null : userRepository.findByEmailIgnoreCase(authentication.getName())
+                .orElseThrow(() -> new AccessDeniedException("Authenticated user account was not found"));
+        boolean coachActor = authentication != null && authentication.getAuthorities().stream()
+                .anyMatch(authority -> "ROLE_COACH".equals(authority.getAuthority()));
+        Integer coachId = coachActor ? actor.getId() : request.coachId();
         if (coachId == null && session.getSportsClass() != null && session.getSportsClass().getCoach() != null) {
             coachId = session.getSportsClass().getCoach().getId();
         }
@@ -101,6 +125,7 @@ public class TrainingResultService {
 
                 User member = userRepository.findById(item.memberId()).orElse(null);
                 if (member == null) continue;
+                if (coachActor) ensureCoachCanRecord(session, member, actor);
 
                 String status = normalizeAttendanceStatus(item.attendanceStatus());
 
@@ -114,7 +139,7 @@ public class TrainingResultService {
                     tr.setContent(item.content());
                 }
                 tr.setAttendanceStatus(status);
-                tr.setRecordedAt(LocalDateTime.now());
+                tr.setRecordedAt(LocalDateTime.now(clock));
 
                 TrainingResult saved = trainingResultRepository.save(tr);
                 syncAttendanceRecord(session, member, coach, status);
@@ -123,7 +148,7 @@ public class TrainingResultService {
             }
         }
 
-        auditService.log(coach.getId(), "RECORD_RESULT", "sessions", session.getId(),
+        auditService.log(actor != null ? actor.getId() : coach.getId(), "RECORD_RESULT", "sessions", session.getId(),
                 "Bulk attendance recorded for " + responses.size() + " members in session #" + session.getId());
 
         return responses;
@@ -140,16 +165,26 @@ public class TrainingResultService {
 
         if ("Present".equalsIgnoreCase(state) || "Late".equalsIgnoreCase(state)) {
             if (att.getCheckInTime() == null) {
-                att.setCheckInTime(LocalDateTime.now());
+                att.setCheckInTime(LocalDateTime.now(clock));
             }
         }
 
         attendanceRepository.save(att);
     }
 
+    private void ensureCoachCanRecord(Session session, User member, User coach) {
+        if (session.getSportsClass() == null || session.getSportsClass().getCoach() == null
+                || !coach.getId().equals(session.getSportsClass().getCoach().getId())
+                || !enrollmentRepository.existsByMemberIdAndSportsClassIdAndStatus(
+                member.getId(), session.getSportsClass().getId(), "Registered")) {
+            throw new BusinessException("NOT_YOUR_CLASS: coach may only record results for registered members in their own class");
+        }
+    }
+
     private String normalizeAttendanceStatus(String status) {
         if ("Absent".equalsIgnoreCase(status) || "absent".equalsIgnoreCase(status)) return "Absent";
         if ("Late".equalsIgnoreCase(status) || "late".equalsIgnoreCase(status)) return "Late";
+        if ("Excused".equalsIgnoreCase(status) || "excused".equalsIgnoreCase(status)) return "Excused";
         return "Present";
     }
 }

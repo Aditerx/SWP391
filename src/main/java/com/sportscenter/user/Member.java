@@ -6,6 +6,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "members")
@@ -34,4 +35,12 @@ public class Member {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "registered_by")
     private User registeredBy;
+
+    @Column(name = "checkin_secret", length = 64)
+    private String checkinSecret;
+    @Column(name = "checkin_last_step")
+    private Long checkinLastStep;
+
+    @Column(name = "booking_blocked_until")
+    private LocalDateTime bookingBlockedUntil;
 }

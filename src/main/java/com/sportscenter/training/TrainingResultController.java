@@ -28,13 +28,13 @@ public class TrainingResultController {
 
     @PostMapping
     @PreAuthorize("hasAnyAuthority('RECORD_RESULT', 'MANAGE_CLASSES')")
-    public ResponseEntity<TrainingResultResponse> recordResult(@Valid @RequestBody TrainingResultRequest request) {
-        return ResponseEntity.ok(trainingResultService.recordResult(request));
+    public ResponseEntity<TrainingResultResponse> recordResult(@Valid @RequestBody TrainingResultRequest request, Authentication authentication) {
+        return ResponseEntity.ok(trainingResultService.recordResult(request, authentication));
     }
 
     @PostMapping("/bulk")
     @PreAuthorize("hasAnyAuthority('RECORD_RESULT', 'MANAGE_CLASSES')")
-    public ResponseEntity<List<TrainingResultResponse>> recordBulkResults(@Valid @RequestBody BulkTrainingResultRequest request) {
-        return ResponseEntity.ok(trainingResultService.recordBulkResults(request));
+    public ResponseEntity<List<TrainingResultResponse>> recordBulkResults(@Valid @RequestBody BulkTrainingResultRequest request, Authentication authentication) {
+        return ResponseEntity.ok(trainingResultService.recordBulkResults(request, authentication));
     }
 }

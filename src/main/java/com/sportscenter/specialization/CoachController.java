@@ -2,8 +2,11 @@ package com.sportscenter.specialization;
 
 import com.sportscenter.user.CoachRepository;
 import com.sportscenter.center.CenterContext;
+import com.sportscenter.report.AtRiskMemberResponse;
+import com.sportscenter.report.ChurnRiskService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -18,6 +21,13 @@ public class CoachController {
     private final CoachRepository coachRepository;
     private final CoachSpecializationRepository coachSpecializationRepository;
     private final CenterContext centerContext;
+    private final ChurnRiskService churnRiskService;
+
+    @GetMapping("/me/at-risk-members")
+    @PreAuthorize("hasRole('COACH')")
+    public List<AtRiskMemberResponse> atRiskMembers(Authentication authentication) {
+        return churnRiskService.forCoach(authentication);
+    }
 
     @GetMapping
     public List<CoachSummaryResponse> findAll(@RequestParam(required = false) Integer specializationId,

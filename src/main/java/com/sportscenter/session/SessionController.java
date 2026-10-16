@@ -10,12 +10,17 @@ import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
 import java.util.List;
+import com.sportscenter.training.AttendanceService;
+import com.sportscenter.training.AbsenceRequest;
+import com.sportscenter.training.AttendanceResponse;
+import org.springframework.security.core.Authentication;
 
 @RestController
 @RequestMapping("/api/sessions")
 @RequiredArgsConstructor
 public class SessionController {
     private final SessionService sessionService;
+    private final AttendanceService attendanceService;
 
     @GetMapping
     public ResponseEntity<List<SessionResponse>> findAll(
@@ -32,6 +37,13 @@ public class SessionController {
     @GetMapping("/{id}")
     public ResponseEntity<SessionResponse> findById(@PathVariable Integer id) {
         return ResponseEntity.ok(sessionService.findById(id));
+    }
+
+    @PostMapping("/{sessionId}/absence")
+    @PreAuthorize("hasRole('MEMBER')")
+    public ResponseEntity<AttendanceResponse> requestAbsence(@PathVariable Integer sessionId,
+            @Valid @RequestBody AbsenceRequest request, Authentication authentication) {
+        return ResponseEntity.ok(attendanceService.requestAbsence(sessionId, request.reason(), authentication.getName()));
     }
 
     @PostMapping("/check-conflict")
