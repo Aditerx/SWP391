@@ -44,22 +44,16 @@ Khi tạo mới một **Web Service** trên Render Dashboard, cấu hình các b
 
 ## 3. CẤU HÌNH BUILD & START TRÊN RENDER
 
-### Phương án: Dùng Maven Wrapper (Native Java)
-* **Environment:** `Java`
-* **Java Version:** `17`
-* **Build Command:**
-  ```bash
-  chmod +x mvnw && ./mvnw clean package -DskipTests
-  ```
-* **Start Command:**
-  ```bash
-  java -Duser.timezone=Asia/Ho_Chi_Minh -jar target/sports-center-management-0.0.1-SNAPSHOT.jar
-  ```
+### Phương thức triển khai: Docker (Khuyến nghị chuẩn cho Spring Boot trên Render)
+* **Language (Runtime Environment):** Chọn **`Docker`** (Render không hỗ trợ runtime Java độc lập trong menu Language; tất cả Java/Spring Boot đều chạy qua Docker).
+* **Dockerfile Path:** `./Dockerfile` (Render tự động nhận diện file `Dockerfile` ở thư mục gốc).
+* **Docker Context:** `.` (Mặc định).
+* **Build / Start Command:** Để trống (Render tự động vô hiệu hóa 2 ô này khi chọn Docker, vì đã được định nghĩa bên trong `Dockerfile`).
 * **Health Check Path:**
   ```
   /api/health
   ```
-  *(Endpoint này đã được cấu hình `permitAll` trong SecurityConfig, trả về mã HTTP 200 giúp Render giám sát service).*
+  *(Endpoint này được cấu hình `permitAll` trong SecurityConfig, trả về HTTP 200 `{"status":"UP","message":"pong"}` giúp Render giám sát container).*
 
 ---
 

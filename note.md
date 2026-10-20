@@ -62,9 +62,170 @@ Hợp đồng API đã được chuẩn hóa thành **11 mục rõ ràng**, bao 
 
 ---
 
-### III. VIỆC TIẾP THEO CẦN LÀM
-→ PHÂN NÀY CHỈ LÀ THAM KHẢO, CÓ THỂ SÓT VÀI THỨ, VD NHƯ UI HIỆN QR THANH TOÁN
-BE CHƯA LÀM: PHẦN THÔNG BÁO, OTP GMAIL ĐĂNG KÝ (NẾU LAN ANH KO LÀM ĐC THÌ A LÀM SAU)
+### III. Tổng hợp lại toàn bộ API cùng mô tả chức năng
+* **Swagger UI Trực Tuyến:** [https://scms-app-p1gy.onrender.com/swagger-ui/index.html#/]
+* **Base URL:** `https://scms-app-p1gy.onrender.com` (Production Render) hoặc `http://localhost:8080` (Local Dev)
+* **Quy chuẩn trao đổi:** JSON UTF-8, Múi giờ `Asia/Ho_Chi_Minh` (UTC+7), Session Cookie `withCredentials: true`.
+
+#### 1. Nhóm Xác Thực & Hồ Sơ Cá Nhân (Auth & Profile)
+* `POST /api/auth/login`: Đăng nhập hệ thống bằng email và mật khẩu (trả về Cookie `JSESSIONID`).
+* `GET /api/auth/me`: Lấy thông tin chi tiết tài khoản hiện tại (id, email, fullName, role, permissions).
+* `POST /api/auth/logout`: Đăng xuất tài khoản, hủy session trên server.
+* `POST /api/auth/change-password`: Đổi mật khẩu tài khoản đang đăng nhập.
+* `POST /api/auth/register`: Đăng ký tài khoản hội viên mới (trạng thái ban đầu `Pending`, sinh OTP).
+* `POST /api/auth/verify-registration`: Gửi mã OTP 6 số để kích hoạt tài khoản `Pending` sang `Active`.
+* `POST /api/auth/resend-otp`: Gửi lại mã OTP qua email (hạn chế tối đa 3 lần/tiếng).
+* `POST /api/auth/forgot-password`: Yêu cầu gửi mã OTP đặt lại mật khẩu về email.
+* `POST /api/auth/reset-password`: Đặt mật khẩu mới kèm mã OTP xác nhận.
+* `POST /api/users/me/avatar`: Upload và cập nhật ảnh đại diện cá nhân (Multipart qua Cloudinary).
+* `DELETE /api/users/me/avatar`: Xóa ảnh đại diện cá nhân.
+
+#### 2. Nhóm Quản Lý Người Dùng & Nhân Sự (User & Staff Management)
+* `GET /api/users`: Quản lý danh sách người dùng toàn hệ thống (phân trang, tìm kiếm theo email/tên/role).
+* `GET /api/users/{id}`: Xem chi tiết một người dùng theo ID.
+* `POST /api/users`: Quản lý tạo người dùng nội bộ mới (`CenterManager`, `Receptionist`, `Coach`).
+* `PUT /api/users/{id}`: Cập nhật thông tin người dùng.
+* `PATCH /api/users/{id}/status`: Khóa hoặc kích hoạt tài khoản người dùng (`Active`/`Inactive`).
+* `PATCH /api/users/{id}/role`: Phân lại vai trò cho người dùng.
+* `POST /api/users/{id}/reissue-password`: Cấp lại mật khẩu tạm thời ngẫu nhiên cho nhân sự/học viên.
+* `GET /api/staff`: Quản lý danh sách nhân viên trung tâm.
+* `POST /api/staff`: Tạo hồ sơ nhân viên mới kèm hợp đồng, ngày vào làm.
+* `PUT /api/staff/{id}`: Cập nhật hồ sơ nhân viên.
+* `PATCH /api/staff/{id}/status`: Chuyển trạng thái công tác của nhân viên.
+* `GET /api/roles`: Danh sách tất cả vai trò (Roles) trong hệ thống.
+* `GET /api/roles/{id}`: Chi tiết một vai trò kèm danh sách quyền hạn.
+* `PUT /api/roles/{id}/permissions`: Cập nhật ma trận phân quyền động cho vai trò.
+* `GET /api/permissions`: Danh mục toàn bộ quyền năng tĩnh trong hệ thống.
+
+#### 3. Nhóm Quản Lý Hội Viên (Member Management)
+* `GET /api/members`: Danh sách hội viên (hỗ trợ lọc, tìm kiếm theo tên, số điện thoại, email).
+* `GET /api/members/{id}`: Xem hồ sơ chi tiết hội viên, ngày tham gia, thông tin sức khỏe.
+* `POST /api/members`: Lễ tân tạo hồ sơ hội viên trực tiếp tại quầy.
+* `POST /api/members/register`: Đăng ký nhanh hội viên tại quầy.
+* `PUT /api/members/{id}`: Cập nhật thông tin hồ sơ hội viên.
+* `PATCH /api/members/{id}/status`: Bật/khóa trạng thái hội viên.
+* `GET /api/members/at-risk`: Báo cáo danh sách hội viên có nguy cơ bỏ tập (Churn Risk).
+* `PATCH /api/members/{id}/booking-block/lift`: Quản lý chủ động mở khóa quyền đặt lịch trước hạn cho hội viên bị phạt do vắng nhiều.
+
+#### 4. Nhóm Danh Mục Môn Thể Thao & Giá Chuẩn (Subjects Catalog)
+* `GET /api/subjects`: Danh mục 18 môn thể thao kèm giá chuẩn `normalPrice`, `advancedPrice` và cờ `outdoor`.
+* `GET /api/subjects/{id}`: Chi tiết môn thể thao.
+* `POST /api/subjects`: Thêm môn thể thao mới vào hệ thống.
+* `PUT /api/subjects/{id}`: Cập nhật thông tin môn, giá chuẩn hoặc quy định trong nhà/ngoài trời.
+* `DELETE /api/subjects/{id}`: Xóa môn thể thao (chặn xóa nếu đang có lớp học gắn với môn này).
+* `GET /api/public/subjects`: Tra cứu danh mục môn học công khai (không yêu cầu đăng nhập).
+
+#### 5. Nhóm Ca Học Chuẩn & Huấn Luyện Viên (Time Slots & Coaches)
+* `GET /api/sessions/time-slots`: Danh sách 7 ca học chuẩn 90 phút (truyền `isOutdoor=true` để tự loại bỏ Ca 3 và Ca 4 chống sốc nhiệt).
+* `GET /api/coaches`: Danh sách Huấn luyện viên kèm danh mục chuyên môn thể thao (`specializations`).
+* `GET /api/coaches/{coachId}/available-slots`: Lấy danh sách các ca rảnh thực tế của HLV trong khoảng ngày để phục vụ đặt lịch 1:1.
+* `GET /api/coaches/me/at-risk-members`: HLV xem danh sách học viên do mình phụ trách có nguy cơ bỏ tập.
+* `GET /api/specializations`: Danh mục chuyên môn thể thao của Huấn luyện viên.
+* `POST /api/specializations`: Tạo chuyên môn mới.
+* `PUT /api/specializations/{id}`: Sửa chuyên môn.
+* `PATCH /api/specializations/{id}/status`: Đổi trạng thái chuyên môn (`Active`/`Inactive`).
+
+#### 6. Nhóm Lớp Học Nhóm Cố Định (Normal Classes - 12 Buổi Tĩnh)
+* `GET /api/classes`: Danh sách các lớp học nhóm (lọc theo môn, HLV, trạng thái mở đăng ký).
+* `GET /api/classes/{id}`: Chi tiết lớp học, sĩ số hiện tại/tối đa (<= 15), học phí chuẩn đã lưu chết.
+* `POST /api/classes`: Tạo lớp học nhóm mới (tự động áp giá `normalPrice`, giới hạn `maxCapacity <= 15`).
+* `PUT /api/classes/{id}`: Cập nhật thông tin lớp học.
+* `PATCH /api/classes/{id}/coach`: Phân công hoặc đổi Huấn luyện viên phụ trách lớp.
+* `POST /api/sessions/preview-recurring`: Thuật toán Holiday Skipper xem trước 12 buổi học dự kiến và danh sách ngày lễ được tự động bỏ qua trước khi lưu.
+* `POST /api/sessions/generate`: Xác nhận sinh và lưu tĩnh 12 buổi học vào CSDL, tự động cập nhật ngày kết thúc (`endDate`).
+* `POST /api/classes/{classId}/enroll`: Hội viên đăng ký vào lớp nhóm, tạo hóa đơn giữ chỗ trong 5 phút kèm Database Lock.
+* `POST /api/classes/{classId}/cancel-enrollment` (hoặc `DELETE /api/enrollments/{id}`): Chặn hủy lớp Normal (`NORMAL_CLASS_NON_CANCELLABLE`, học viên vắng tự chịu).
+* `GET /api/classes/{classId}/enrollments`: Danh sách học viên đã đăng ký vào lớp học.
+* `GET /api/members/{memberId}/enrollments`: Lịch sử các lớp học viên đã tham gia.
+
+#### 7. Nhóm Gói Hội Viên & Khóa Học 1:1 Linh Hoạt (Advanced - 12 Credit)
+* `GET /api/packages`: Danh sách gói hội viên & gói 1:1 (kèm `packageType`, `totalCredit`).
+* `POST /api/packages`: Quản lý tạo gói hội viên mới.
+* `PUT /api/packages/{id}`: Sửa thông tin gói hội viên.
+* `PATCH /api/packages/{id}/status`: Đổi trạng thái gói hội viên.
+* `GET /api/public/membership-packages`: Tra cứu danh sách gói công khai.
+* `POST /api/members/me/subscriptions` (hoặc alias `POST /api/member-packages/subscribe-me`): Hội viên mua gói 1:1 (nhận 12 Credit, kích hoạt hạn 45 ngày).
+* `GET /api/members/{memberId}/packages` (hoặc alias `/subscriptions`): Xem danh sách gói, số dư Credit còn lại và ngày hết hạn.
+* `POST /api/sessions/book-private`: Hội viên đặt lịch ca học 1:1 theo giờ rảnh HLV (sĩ số 1:1, trừ 1 credit, yêu cầu trước >= 12h, khóa dòng chống tranh chấp).
+* `POST /api/sessions/{sessionId}/cancel-private`: Hội viên hủy ca học 1:1 (hủy trước >= 24h hoàn 1 credit; hủy dưới 24h từ chối với lỗi `CANCEL_TOO_LATE` và tiêu thụ 1 credit).
+* `POST /api/sessions/{sessionId}/absence`: Học viên báo vắng mặt buổi học 1:1 (tiêu thụ 1 credit, bảo vệ thù lao HLV).
+
+#### 8. Nhóm Quản Lý Buổi Học & Xử Lý Sự Cố (Sessions & Incidents)
+* `GET /api/sessions`: Tra cứu danh sách buổi học (lọc theo phòng, HLV, lớp, ngày).
+* `GET /api/sessions/{id}`: Chi tiết buổi học.
+* `POST /api/sessions`: Tạo buổi học đơn lẻ thủ công.
+* `PUT /api/sessions/{id}`: Cập nhật thông tin ca học.
+* `PATCH /api/sessions/{id}/status`: Cập nhật trạng thái ca học (`Scheduled`, `InProgress`, `Completed`, `Cancelled`).
+* `POST /api/sessions/check-conflict`: Kiểm tra trùng lịch phòng và HLV `(A_Start < B_End AND A_End > B_Start)`.
+* `POST /api/sessions/{sessionId}/reschedule`: Quản lý dời lịch buổi học do sự cố (mưa bão, cúp điện; tự động kéo dài ngày hết hạn nếu là ca 1:1 dời quá 45 ngày).
+* `POST /api/sessions/{sessionId}/substitute-coach`: Quản lý chỉ định HLV dạy thay khi HLV chính ốm đột xuất (kiểm tra trùng lịch và ghi Audit Log).
+* `POST /api/member-packages/{id}/extend`: Quản lý chủ động gia hạn bù ngày sử dụng cho gói hội viên.
+* `DELETE /api/sessions/{id}`: Xóa buổi học (chỉ cho phép khi buổi học chưa diễn ra).
+
+#### 9. Nhóm Quản Lý Ngày Nghỉ Lễ (Holidays Management)
+* `GET /api/holidays`: Danh sách toàn bộ ngày nghỉ lễ theo 3 nhóm chuẩn (`NATIONAL_FIXED`, `LUNAR_FESTIVAL`, `CENTER_EVENT`).
+* `GET /api/holidays/active`: Danh sách các ngày lễ đang được Bật (`is_active = true`).
+* `POST /api/holidays`: Quản lý thêm ngày nghỉ đột xuất hoặc sự kiện riêng của trung tâm.
+* `PATCH /api/holidays/{id}/toggle`: Quản lý Bật/Tắt một ngày nghỉ lễ (khi Tắt, thuật toán sinh 12 buổi sẽ xếp lớp bình thường vào ngày này).
+
+#### 10. Nhóm Quản Lý Cơ Sở Vật Chất & Sân Bãi (Rooms & Facilities)
+* `GET /api/rooms`: Danh sách sân/phòng tập (kèm loại hình `Indoor`/`Outdoor`, sức chứa, thiết bị).
+* `POST /api/rooms`: Thêm phòng/sân tập mới.
+* `PUT /api/rooms/{id}`: Sửa thông tin sân tập.
+* `PATCH /api/rooms/{id}/status`: Đổi trạng thái sân tập (`Active`, `Maintenance`, `Closed`).
+
+#### 11. Nhóm Điểm Danh & Mã QR Check-in TOTP (Attendance & Check-in)
+* `GET /api/members/me/checkin-code` (hoặc alias `GET /api/attendance/checkin-code`): Hội viên lấy mã TOTP 6 số (chuẩn RFC 6238, đếm ngược 30s) để hiển thị mã QR trên điện thoại.
+* `POST /api/attendance/scan`: Lễ tân hoặc Huấn luyện viên quét mã QR từ màn hình học viên để ghi nhận điểm danh tức thì.
+* `POST /api/attendance/check-in`: Lễ tân/HLV điểm danh thủ công bằng tay.
+* `POST /api/attendance/check-out`: Điểm danh ra về cho học viên.
+* `POST /api/attendance/correct`: Điều chỉnh lại trạng thái điểm danh khi có sai sót.
+* `GET /api/attendance`: Tra cứu lịch sử điểm danh theo buổi, học viên, trạng thái (`Present`, `Absent`, `CheckedIn`).
+
+#### 12. Nhóm Đánh Giá & Kế Hoạch Tập Luyện (Training & Feedback)
+* `GET /api/classes/{classId}/feedback`: Danh sách nhận xét, đánh giá của học viên về lớp học.
+* `GET /api/classes/{classId}/feedback/me`: Xem đánh giá của chính mình cho lớp học.
+* `POST /api/classes/{classId}/feedback`: Học viên gửi đánh giá sao và nhận xét cho lớp/HLV sau khi hoàn thành.
+* `GET /api/coaches/me/feedback`: Huấn luyện viên xem tổng hợp đánh giá về bản thân.
+* `GET /api/training-plans`: Danh mục giáo trình/kế hoạch bài tập huấn luyện.
+* `POST /api/training-plans`: HLV tạo giáo trình huấn luyện mới.
+* `PUT /api/training-plans/{id}`: Sửa giáo trình.
+* `DELETE /api/training-plans/{id}`: Xóa giáo trình.
+* `GET /api/training-results`: Xem kết quả tập luyện thể chất của học viên.
+* `POST /api/training-results`: Ghi nhận chỉ số thể chất (chiều cao, cân nặng, sức bền).
+* `POST /api/training-results/bulk`: Nhập kết quả tập luyện hàng loạt cho nhiều học viên.
+* `GET /api/evaluations`: Danh sách phiếu đánh giá tiến bộ định kỳ của học viên.
+* `POST /api/evaluations`: HLV tạo đánh giá tiến bộ cho học viên.
+* `PUT /api/evaluations/{id}`: Sửa đánh giá.
+* `DELETE /api/evaluations/{id}`: Xóa đánh giá.
+
+#### 13. Nhóm Hóa Đơn & Thanh Toán (Invoices & Payment Gateways)
+* `GET /api/invoices`: Quản lý/Thu ngân xem danh sách hóa đơn toàn hệ thống (lọc theo `Pending`, `Paid`, `Cancelled`).
+* `GET /api/invoices/{id}`: Chi tiết hóa đơn (lưu chết số tiền, hạn giữ chỗ chuẩn 5 phút).
+* `GET /api/members/me/invoices`: Hội viên xem lịch sử hóa đơn cá nhân.
+* `GET /api/members/me/invoices/{id}`: Hội viên xem chi tiết một hóa đơn của mình.
+* `POST /api/invoices/{id}/confirm-cash` (hoặc alias `pay-cash`): Quầy thu ngân xác nhận đã thu tiền mặt -> Hóa đơn chuyển `Paid`, kích hoạt suất học/gói tập.
+* `POST /api/invoices/{id}/pay-online`: Khởi tạo cổng thanh toán online VNPay Sandbox -> Trả về `paymentUrl` hiển thị mã VNPAY-QR to ở giữa màn hình.
+* `GET /api/payments/vnpay/return`: Endpoint VNPay chuyển hướng học viên quay về sau khi hoàn tất thanh toán.
+* `GET /api/payments/vnpay/ipn`: Webhook Server-to-Server tiếp nhận kết quả thanh toán từ VNPay.
+* `POST /api/invoices/{id}/cancel`: Hủy hóa đơn đang ở trạng thái `Pending`.
+
+#### 14. Nhóm Báo Cáo Doanh Thu, Kiểm Toán & Giám Sát (Reports & System)
+* `GET /api/reports/dashboard`: Thống kê KPI tổng quan trung tâm (doanh thu ngày/tháng, số hội viên mới, số lớp mở, tỷ lệ lấp đầy).
+* `GET /api/reports/revenue`: Báo cáo chi tiết doanh thu theo khoảng thời gian, theo bộ môn hoặc theo gói hội viên.
+* `GET /api/reports/members`: Thống kê biến động hội viên, hội viên sắp hết hạn, hội viên vắng nhiều.
+* `GET /api/audit-logs`: Nhật ký kiểm toán hệ thống (ghi vết ai tạo lớp, sửa giá, dời lịch, thu tiền, điểm danh).
+* `GET /api/health`: Health check container hệ thống (trả về HTTP 200 {"status":"UP","message":"pong"} cho Render giám sát).
+
+
+---
+
+### IV. VIỆC TIẾP THEO CẦN LÀM - FE
+→ PHÂN NÀY CHỈ LÀ THAM KHẢO, CÓ THỂ SÓT VÀI THỨ, VD NHƯ: UI HIỆN QR THANH TOÁN
+→ CHƯA LÀM, NẾU LAN ANH KO LÀM ĐC THÌ ANH LÀM SAU: 
+THÔNG BÁO & MẤY CÁI LIÊN QUAN
+CHATBOX HỖ TRỢ (AI hoặc không, có thể làm tạm dạng FAQ, giả lập auto reply để demo)
+SMTP GMAIL ĐĂNG KÝ
 
 Hệ thống đã hoàn thành **100% Giai đoạn 1 đến Giai đoạn 5** (Toàn bộ nội dung/flow trong Member.pdf, CSDL, Cronjobs, Xử lý sự cố, 178 tests pass).
 
@@ -85,3 +246,36 @@ Nhiệm vụ tiếp theo là **Giai đoạn 6: Tích Hợp Giao Diện Frontend 
    * Hiển thị số dư Credit còn lại và số ngày hết hạn (đếm ngược từ mốc 45 ngày).
    * Lưới chọn ngày và ca học rảnh của Huấn luyện viên (`GET /api/coaches/{coachId}/available-slots`): Tự động vô hiệu hóa các ca đã trùng, ca trong quá khứ hoặc ca sốc nhiệt (Ca 3, Ca 4 nếu môn ngoài trời).
    * Nút Hủy ca học: Hiển thị cảnh báo nếu hủy trước 24h thì hoàn credit, còn dưới 24h thì không được hủy.
+   
+---
+
+### V. Thông tin linh tinh
+
+1. Sandbox QR thanh toán: Cơ chế hoạt động & Sinh QR ra sao? Có cần tài khoản không?
+Cơ chế hoạt động:
+Online (VNPay-QR): Khi tạo đơn mua gói/lớp chọn VNPay, Backend sinh ra 1 đường link bảo mật (đã băm mã HMAC-SHA512). Khi user mở link này, chính cổng VNPay Sandbox sẽ tự render một mã VNPAY-QR to ở giữa màn hình kèm tùy chọn thanh toán bằng thẻ demo (NCB).
+Chuyển khoản quầy (VietQR): Sinh trực tiếp qua thẻ ảnh API Napas:
+https://img.vietqr.io/image/<BANK>-<STK>-compact2.png?amount=<TIỀN>&addInfo=<MÃ_HÓA_ĐƠN>
+Mã QR này tự động điền sẵn số tiền và mã hóa đơn khi khách quét bằng bất kỳ App ngân hàng nào.
+Có cần đăng ký/tài khoản gì không?:
+Phía người dùng (học viên): KHÔNG. Dùng App ngân hàng bất kỳ để quét mã, hoặc dùng thông tin thẻ test NCB công khai (9704198526191432198, OTP: 123456).
+Phía Backend: Dùng mã Sandbox chung của VNPay cấp miễn phí (VNPAY_TMN_CODE = 2QXUI4B4, VNPAY_HASH_SECRET = RAOQUI25088809890), không mất phí. VietQR không cần tài khoản hay API key.
+
+2. Checkin QR sẽ được user nhận ở đâu? Đã sinh QR ok chưa?
+User nhận ở đâu:
+Học viên đăng nhập vào giao diện web/mobile, vào trang Cá nhân hoặc Điểm danh.
+FE gọi API GET /api/members/me/checkin-code và nhận về:
+json
+{ "payload": "899357", "expiresInSeconds": 30 }
+FE truyền chuỗi 6 số payload này vào component tạo mã QR (ví dụ qrcode.react) để hiển thị ảnh QR trên màn hình điện thoại học viên.
+Đã sinh QR ok chưa?:
+Phía Backend: ĐÃ XONG VÀ TEST OK 100%. Mã TOTP 6 số tự động đếm ngược và đổi mới mỗi 30 giây chống gian lận.
+Phía Frontend: Chỉ cần component hiển thị QR từ chuỗi số trên.
+
+3. OTP gmail đăng ký sẽ được user nhận từ đâu?
+User nhận từ đâu:
+Nhận trực tiếp trong Hộp thư đến (Inbox / Spam) của tài khoản Gmail mà user đã nhập khi đăng ký tài khoản (POST /api/auth/register).
+Backend gửi mail qua giao thức SMTP (smtp.gmail.com:587) với tiêu đề "Mã OTP xác thực đăng ký", mã gồm 6 số có hạn trong 10 phút.
+Điều kiện: Cần cấu hình 2 biến môi trường trên server: MAIL_USERNAME (Gmail của trung tâm) và MAIL_APP_PASSWORD (Mật khẩu ứng dụng 16 ký tự do Google cấp). Nếu chưa cấu hình mail, hệ thống hỗ trợ biến REGISTRATION_DEMO_OTP (ví dụ 123456) để test trực tiếp mà không cần gửi email thật.
+
+---

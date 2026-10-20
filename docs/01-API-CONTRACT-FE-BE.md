@@ -428,7 +428,7 @@ Theo quy định tại `Member.pdf` (Trang 7) và `AGENTS.md`, bảng giá chu�
 ## 6. NHÓM API KHÓA ADVANCED (HỌC 1:1 LINH HOẠT BẰNG 12 CREDIT)
 
 ### 6.1. Mua Gói 1:1 & Kiểm Tra Số Dư Credit
-* **Mua Gói:** `POST /api/member-packages/subscribe-me`
+* **Mua Gói:** `POST /api/members/me/subscriptions` *(hoặc alias `POST /api/member-packages/subscribe-me`)*
 * **Quyền:** `hasRole('MEMBER')`
 * **Request Body:**
 ```json
@@ -735,9 +735,16 @@ Theo quy định tại `Member.pdf` (Trang 7) và `AGENTS.md`, bảng giá chu�
 ## 10. ĐIỂM DANH & QUÉT MÃ QR TOTP
 
 ### 10.1. Lấy Mã QR TOTP Check-in (Member)
-* **Endpoint:** `GET /api/attendance/checkin-code`
+* **Endpoint:** `GET /api/members/me/checkin-code` *(hoặc alias `GET /api/attendance/checkin-code`)*
 * **Quyền:** `hasRole('MEMBER')`
-* **Response (200 OK):** Mã 6 số đổi liên tục mỗi 30 giây để chống gian lận điểm danh.
+* **Response (200 OK):**
+```json
+{
+  "payload": "974219",
+  "expiresInSeconds": 30
+}
+```
+*(Trường `payload` là chuỗi mã 6 chữ số đổi liên tục mỗi 30 giây để chống gian lận điểm danh; trường `expiresInSeconds` là thời gian đếm ngược còn lại của mã).*
 
 ### 10.2. Quét Mã Check-in (Staff / Coach)
 * **Endpoint:** `POST /api/attendance/scan`
