@@ -14,6 +14,11 @@ public record TrainingResultRequest(
 
         String content,
 
-        String attendanceStatus
+        String attendanceStatus,
+        String reason
 ) {
+    public TrainingResultRequest(Integer sessionId, Integer memberId, Integer coachId,
+                                 String content, String attendanceStatus) {
+        this(sessionId, memberId, coachId, content, attendanceStatus, null);
+    }
 }

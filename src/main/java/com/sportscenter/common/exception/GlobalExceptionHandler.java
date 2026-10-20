@@ -1,9 +1,12 @@
 package com.sportscenter.common.exception;
 
+import com.sportscenter.feedback.ClassFeedbackConflictException;
+import com.sportscenter.invoice.InvoiceConflictException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.AuthenticationException;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -22,6 +25,13 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(BusinessException.class)
     ResponseEntity<Map<String, Object>> business(BusinessException ex) {
+        int separator = ex.getMessage() == null ? -1 : ex.getMessage().indexOf(":");
+        if (separator > 0 && ex.getMessage().substring(0, separator).matches("[A-Z_]+")) {
+            Map<String, Object> body = new LinkedHashMap<>();
+            body.put("code", ex.getMessage().substring(0, separator));
+            body.put("message", ex.getMessage().substring(separator + 1).trim());
+            return ResponseEntity.badRequest().body(body);
+        }
         return error(HttpStatus.BAD_REQUEST, ex.getMessage());
     }
 
@@ -30,9 +40,24 @@ public class GlobalExceptionHandler {
         return error(HttpStatus.UNAUTHORIZED, "Invalid email or password");
     }
 
+    @ExceptionHandler(AccessDeniedException.class)
+    ResponseEntity<Map<String, Object>> forbidden(AccessDeniedException ex) {
+        return error(HttpStatus.FORBIDDEN, ex.getMessage());
+    }
+
     @ExceptionHandler(DataIntegrityViolationException.class)
     ResponseEntity<Map<String, Object>> integrity(DataIntegrityViolationException ex) {
         return error(HttpStatus.CONFLICT, "Operation violates a database constraint");
+    }
+
+    @ExceptionHandler(ClassFeedbackConflictException.class)
+    ResponseEntity<Map<String, Object>> classFeedbackConflict(ClassFeedbackConflictException ex) {
+        return error(HttpStatus.CONFLICT, ex.getMessage());
+    }
+
+    @ExceptionHandler(InvoiceConflictException.class)
+    ResponseEntity<Map<String, Object>> invoiceConflict(InvoiceConflictException ex) {
+        return error(HttpStatus.CONFLICT, ex.getMessage());
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

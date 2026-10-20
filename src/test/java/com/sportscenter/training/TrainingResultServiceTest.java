@@ -3,6 +3,7 @@ package com.sportscenter.training;
 import com.sportscenter.audit.AuditService;
 import com.sportscenter.session.Session;
 import com.sportscenter.session.SessionRepository;
+import com.sportscenter.sportclass.SportsClass;
 import com.sportscenter.user.User;
 import com.sportscenter.user.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -12,9 +13,14 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 
 import java.util.List;
 import java.util.Optional;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneId;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -38,6 +44,12 @@ class TrainingResultServiceTest {
     @Mock
     private AuditService auditService;
 
+    @Mock
+    private com.sportscenter.enrollment.ClassEnrollmentRepository enrollmentRepository;
+
+    @Mock
+    private Clock clock;
+
     @InjectMocks
     private TrainingResultService trainingResultService;
 
@@ -47,6 +59,8 @@ class TrainingResultServiceTest {
 
     @BeforeEach
     void setUp() {
+        lenient().when(clock.instant()).thenReturn(Instant.parse("2026-10-16T03:00:00Z"));
+        lenient().when(clock.getZone()).thenReturn(ZoneId.of("Asia/Ho_Chi_Minh"));
         sampleCoach = new User();
         sampleCoach.setId(2);
         sampleCoach.setFullName("Trần Thị Hương");
@@ -57,6 +71,11 @@ class TrainingResultServiceTest {
 
         sampleSession = new Session();
         sampleSession.setId(1);
+        var sportsClass = new com.sportscenter.sportclass.SportsClass();
+        sportsClass.setId(3);
+        sportsClass.setCoach(sampleCoach);
+        sampleSession.setSportsClass(sportsClass);
+        lenient().when(enrollmentRepository.existsByMemberIdAndSportsClassIdAndStatusIn(7, 3, List.of("Registered", "Completed"))).thenReturn(true);
     }
 
     @Test
@@ -112,5 +131,30 @@ class TrainingResultServiceTest {
         assertEquals(1, responses.size());
         assertEquals("Present", responses.get(0).attendanceStatus());
         verify(trainingResultRepository, atLeastOnce()).save(any(TrainingResult.class));
+    }
+
+    @Test
+    @DisplayName("Coach cannot spoof coachId to record results for another coach's class")
+    void recordResult_CoachCannotSpoofCoachId() {
+        sampleCoach.setEmail("coach@example.test");
+        SportsClass sportsClass = new SportsClass();
+        User otherCoach = new User();
+        otherCoach.setId(9);
+        sportsClass.setCoach(otherCoach);
+        sampleSession.setSportsClass(sportsClass);
+
+        Authentication authentication = org.mockito.Mockito.mock(Authentication.class);
+        when(authentication.getName()).thenReturn("coach@example.test");
+        when(authentication.getAuthorities()).thenAnswer(invocation -> java.util.List.of(new SimpleGrantedAuthority("ROLE_COACH")));
+        when(sessionRepository.findById(1)).thenReturn(Optional.of(sampleSession));
+        when(userRepository.findById(7)).thenReturn(Optional.of(sampleMember));
+        when(userRepository.findById(2)).thenReturn(Optional.of(sampleCoach));
+        when(userRepository.findByEmailIgnoreCase("coach@example.test")).thenReturn(Optional.of(sampleCoach));
+
+        TrainingResultRequest request = new TrainingResultRequest(1, 7, 9, "spoof", "Present");
+        assertThrows(com.sportscenter.common.exception.BusinessException.class,
+                () -> trainingResultService.recordResult(request, authentication));
+        verify(userRepository, never()).findById(9);
+        verify(trainingResultRepository, never()).save(any(TrainingResult.class));
     }
 }

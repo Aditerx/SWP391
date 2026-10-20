@@ -1,6 +1,7 @@
 package com.sportscenter.user.dto;
 
 import jakarta.validation.constraints.NotBlank;
+import java.util.Set;
 
 public record StaffRequest(
         @NotBlank String name,
@@ -9,5 +10,7 @@ public record StaffRequest(
         @NotBlank String role,
         String specialization,
         String password,
-        String status
+        String status,
+        Integer centerId,
+        Set<Integer> specializationIds
 ) {}

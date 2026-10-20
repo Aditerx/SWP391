@@ -22,7 +22,9 @@ public record MemberResponse(
         BigDecimal totalSpent,
         String goal,
         String healthNote,
-        String status
+        String status,
+        Boolean emailSent,
+        String warning
 ) {
     public static MemberResponse from(User user, Member member, MemberPackage currentPackage, BigDecimal totalSpent) {
         String code = "MB-" + (1000 + user.getId());
@@ -50,7 +52,15 @@ public record MemberResponse(
                 totalSpent != null ? totalSpent : BigDecimal.ZERO,
                 member != null ? member.getGoal() : null,
                 member != null ? member.getHealthNote() : null,
-                user.getStatus() != null ? user.getStatus().toLowerCase() : "active"
+                user.getStatus() != null ? user.getStatus().toLowerCase() : "active",
+                null,
+                null
         );
+    }
+
+    public MemberResponse withEmailDelivery(boolean sent, String warning) {
+        return new MemberResponse(id, code, name, email, phone, joinDate, currentPackageId,
+                currentPackageName, membershipStatus, primaryCoachId, primaryCoachName, totalSpent,
+                goal, healthNote, status, sent, warning);
     }
 }

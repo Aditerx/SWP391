@@ -1,0 +1,15 @@
+{
+  "passed": true,
+  "checks": [
+    "Real registration UI accepts backend demo OTP 123456",
+    "Member UI creates one Pending Cash invoice and retains it after F5",
+    "Class UI uses DB tuition and reserves a Pending place",
+    "Cash payment activates paid enrollment; free enrollment has no invoice",
+    "Coach UI loads real roster and saves Present to backend",
+    "Member feedback UI persists after F5",
+    "Manager UI reads real class feedback",
+    "Coach feedback response omits member identity"
+  ],
+  "memberEmail": "demo.browser.1791616372711@example.test",
+  "classId": 29
+}

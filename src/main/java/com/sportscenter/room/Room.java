@@ -27,4 +27,14 @@ public class Room {
 
     @Column(name = "status")
     private String status;
+
+    @Column(name = "facility_type", length = 20)
+    private String facilityType = "Indoor";
+
+    @Column(name = "center_id", nullable = false)
+    private Integer centerId = 1;
+
+    public boolean isOutdoor() {
+        return "Outdoor".equalsIgnoreCase(facilityType);
+    }
 }

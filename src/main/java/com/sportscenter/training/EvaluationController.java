@@ -5,6 +5,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -16,16 +17,19 @@ public class EvaluationController {
     private final EvaluationService evaluationService;
 
     @GetMapping
+    @PreAuthorize("hasAnyAuthority('MANAGE_CLASSES', 'MANAGE_USERS') or hasRole('COACH') or hasRole('MEMBER')")
     public ResponseEntity<List<EvaluationResponse>> searchEvaluations(
             @RequestParam(required = false) Integer memberId,
-            @RequestParam(required = false) Integer coachId
+            @RequestParam(required = false) Integer coachId,
+            Authentication authentication
     ) {
-        return ResponseEntity.ok(evaluationService.searchEvaluations(memberId, coachId));
+        return ResponseEntity.ok(evaluationService.searchEvaluations(memberId, coachId, authentication));
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<EvaluationResponse> findById(@PathVariable Integer id) {
-        return ResponseEntity.ok(evaluationService.findById(id));
+    @PreAuthorize("hasAnyAuthority('MANAGE_CLASSES', 'MANAGE_USERS') or hasRole('COACH') or hasRole('MEMBER')")
+    public ResponseEntity<EvaluationResponse> findById(@PathVariable Integer id, Authentication authentication) {
+        return ResponseEntity.ok(evaluationService.findById(id, authentication));
     }
 
     @PostMapping

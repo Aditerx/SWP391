@@ -5,6 +5,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
@@ -13,40 +14,49 @@ import java.time.LocalTime;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/attendances")
+@RequestMapping({"/api/attendances", "/api/attendance"})
 @RequiredArgsConstructor
 public class AttendanceController {
     private final AttendanceService attendanceService;
 
     @GetMapping
+    @PreAuthorize("hasAnyAuthority('RECORD_RESULT', 'REGISTER_MEMBER', 'MANAGE_CLASSES', 'MANAGE_USERS') or hasRole('MEMBER')")
     public ResponseEntity<List<AttendanceResponse>> searchAttendances(
             @RequestParam(required = false) Integer sessionId,
             @RequestParam(required = false) Integer memberId,
             @RequestParam(required = false) Integer recordedBy,
             @RequestParam(required = false) String state,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+            Authentication authentication
     ) {
         LocalDateTime start = startDate != null ? startDate.atStartOfDay() : null;
         LocalDateTime end = endDate != null ? endDate.atTime(LocalTime.MAX) : null;
-        return ResponseEntity.ok(attendanceService.searchAttendances(sessionId, memberId, recordedBy, state, start, end));
+        return ResponseEntity.ok(attendanceService.searchAttendances(sessionId, memberId, recordedBy, state, start, end, authentication));
     }
 
     @PostMapping("/check-in")
     @PreAuthorize("hasAnyAuthority('RECORD_RESULT', 'REGISTER_MEMBER', 'MANAGE_USERS')")
-    public ResponseEntity<AttendanceResponse> checkIn(@Valid @RequestBody CheckInRequest request) {
-        return ResponseEntity.ok(attendanceService.checkIn(request.memberId(), request.recordedBy()));
+    public ResponseEntity<AttendanceResponse> checkIn(@Valid @RequestBody CheckInRequest request, Authentication authentication) {
+        return ResponseEntity.ok(attendanceService.checkIn(request.memberId(), authentication.getName()));
     }
 
     @PostMapping("/check-out")
     @PreAuthorize("hasAnyAuthority('RECORD_RESULT', 'REGISTER_MEMBER', 'MANAGE_USERS')")
-    public ResponseEntity<AttendanceResponse> checkOut(@RequestParam Integer memberId) {
-        return ResponseEntity.ok(attendanceService.checkOut(memberId));
+    public ResponseEntity<AttendanceResponse> checkOut(@RequestParam Integer memberId, Authentication authentication) {
+        return ResponseEntity.ok(attendanceService.checkOut(memberId, authentication.getName()));
+    }
+
+    @PostMapping("/scan")
+    @PreAuthorize("hasAnyAuthority('RECORD_RESULT', 'REGISTER_MEMBER', 'MANAGE_USERS')")
+    public ResponseEntity<AttendanceResponse> scan(@Valid @RequestBody CheckinScanRequest request, Authentication authentication) {
+        return ResponseEntity.ok(attendanceService.scanCheckin(request.memberId(), request.code(), request.sessionId(), authentication.getName()));
     }
 
     @PostMapping("/correct")
     @PreAuthorize("hasAnyAuthority('RECORD_RESULT', 'MANAGE_CLASSES', 'MANAGE_USERS')")
-    public ResponseEntity<AttendanceResponse> correctAttendance(@Valid @RequestBody AttendanceCorrectionRequest request) {
-        return ResponseEntity.ok(attendanceService.correctAttendance(request));
+    public ResponseEntity<AttendanceResponse> correctAttendance(@Valid @RequestBody AttendanceCorrectionRequest request, Authentication authentication) {
+        return ResponseEntity.ok(attendanceService.correctAttendance(request, authentication.getName()));
     }
+
 }

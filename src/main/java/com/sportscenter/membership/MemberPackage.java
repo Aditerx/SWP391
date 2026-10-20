@@ -33,6 +33,12 @@ public class MemberPackage {
     @Column(name = "end_date")
     private LocalDate endDate;
 
+    @Column(name = "remaining_credit")
+    private Integer remainingCredit = 0;
+
+    @Column(name = "validity_days")
+    private Integer validityDays = 45;
+
     @Column(name = "status")
     private String status;
 }

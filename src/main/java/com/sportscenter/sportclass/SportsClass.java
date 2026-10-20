@@ -8,6 +8,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import java.time.LocalDate;
+import java.math.BigDecimal;
 
 @Entity
 @Table(name = "classes")
@@ -34,6 +35,15 @@ public class SportsClass {
     @Column(name = "max_capacity")
     private Integer maxCapacity;
 
+    @Column(name = "tuition_fee", nullable = false, precision = 12, scale = 2)
+    private BigDecimal tuitionFee = BigDecimal.ZERO;
+
+    @Column(name = "class_type", length = 20)
+    private String classType = "Normal";
+
+    @Column(name = "total_sessions")
+    private Integer totalSessions = 12;
+
     @Column(name = "start_date")
     private LocalDate startDate;
 
@@ -42,4 +52,15 @@ public class SportsClass {
 
     @Column(name = "status")
     private String status;
+
+    @Column(name = "center_id", nullable = false)
+    private Integer centerId = 1;
+
+    public boolean isAdvanced() {
+        return "Advanced".equalsIgnoreCase(classType);
+    }
+
+    public boolean isNormal() {
+        return classType == null || "Normal".equalsIgnoreCase(classType);
+    }
 }

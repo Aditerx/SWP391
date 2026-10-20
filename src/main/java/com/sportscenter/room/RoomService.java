@@ -65,6 +65,9 @@ public class RoomService {
         room.setCapacity(request.capacity());
         String status = request.status() == null ? "Available" : normalizeRoomStatus(request.status());
         room.setStatus(status);
+        if (request.facilityType() != null && !request.facilityType().isBlank()) {
+            room.setFacilityType(request.facilityType());
+        }
     }
 
     private String normalizeRoomStatus(String status) {

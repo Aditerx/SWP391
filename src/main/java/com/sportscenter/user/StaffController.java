@@ -4,6 +4,7 @@ import com.sportscenter.user.dto.StaffRequest;
 import com.sportscenter.user.dto.StaffResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
@@ -17,22 +18,26 @@ public class StaffController {
     private final StaffService staffService;
 
     @GetMapping
+    @PreAuthorize("hasAuthority('MANAGE_USERS')")
     public List<StaffResponse> getAllStaff() {
         return staffService.findAllStaff();
     }
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("hasAuthority('MANAGE_USERS')")
     public StaffResponse createStaff(@Valid @RequestBody StaffRequest request) {
         return staffService.createStaff(request);
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasAuthority('MANAGE_USERS')")
     public StaffResponse updateStaff(@PathVariable Integer id, @Valid @RequestBody StaffRequest request) {
         return staffService.updateStaff(id, request);
     }
 
     @PatchMapping("/{id}/status")
+    @PreAuthorize("hasAuthority('MANAGE_USERS')")
     public StaffResponse updateStaffStatus(@PathVariable Integer id, @RequestBody Map<String, String> body) {
         String status = body != null ? body.get("status") : null;
         return staffService.updateStaffStatus(id, status);

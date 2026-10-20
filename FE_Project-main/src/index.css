@@ -1,0 +1,263 @@
+@import url('https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400;1,600&family=Inter:wght@400;500;600;700&family=Barlow:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,300;0,400;0,500;0,700;0,900;1,300;1,400;1,500;1,700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+@import 'tailwindcss';
+
+@theme {
+  --font-sans: 'Be Vietnam Pro', 'Inter', system-ui, -apple-system, sans-serif;
+  --font-mlc: 'Lexend', sans-serif;
+  --font-display: 'Be Vietnam Pro', 'Inter', sans-serif;
+  --font-barlow: 'Barlow', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+
+  /* Sports Center public site */
+  --color-mlc-surface-base: #000000;
+  --color-mlc-ink: #181d25;
+  --color-mlc-red: #e31628;
+  --color-mlc-muted: #676f7e;
+  --color-mlc-border: #e5e7eb;
+  --color-mlc-surface: #f7f8fa;
+  --shadow-mlc: 0 8px 30px -5px rgb(227 22 40 / 30%);
+
+  /* SCMS Webzone Operations System - 6 Primitives */
+  --color-webzone-black: #181818;      /* Eerie Black: ink chính, sidebar, dark surface */
+  --color-webzone-charcoal: #323232;   /* Dark Charcoal: ink phụ, hover dark surface */
+  --color-webzone-platinum: #E4E4E4;   /* Platinum: canvas, divider, neutral surface */
+  --color-webzone-maxred: #D62323;     /* Maximum Red: accent, focus, selection */
+  --color-webzone-red: #BA0000;        /* UE Red: primary action, active nav */
+  --color-webzone-darkred: #8E0000;    /* Dark Red: hover/pressed, destructive emphasis */
+
+  /* Webzone Semantic Tokens */
+  --color-wz-canvas: #E4E4E4;
+  --color-wz-surface: #FFFFFF;
+  --color-wz-dark-surface: #181818;
+  --color-wz-ink: #181818;
+  --color-wz-ink-secondary: #323232;
+  --color-wz-border: #E4E4E4;
+  --color-wz-border-subtle: #D4D4D4;
+  --color-wz-primary: #BA0000;
+  --color-wz-primary-hover: #8E0000;
+  --color-wz-accent: #D62323;
+  --color-wz-focus: #D62323;
+  --color-wz-destructive: #8E0000;
+
+  /* Semantic Status Tokens (separate from brand red) */
+  --color-wz-success: #047857;
+  --color-wz-warning: #D97706;
+  --color-wz-info: #0284C7;
+
+  /* Backward-compatible aliases (deprecated: mapped to Webzone palette) */
+  --color-pearl-canvas: #E4E4E4;
+  --color-admin-canvas: #E4E4E4;
+  --color-pearl-surface: #FFFFFF;
+  --color-brand-flame: #BA0000;
+  --color-brand-flame-hover: #8E0000;
+  --color-brand-amber: #D62323;
+  --color-brand-soft-bg: #FEF2F2;
+  --color-brand-soft-border: #FECACA;
+  --color-brand-dark: #181818;
+
+  --color-sc-primary: #BA0000;
+  --color-sc-primary-soft: #181818;
+  --color-sc-accent: #D62323;
+  --color-sc-lime: #D62323;
+  --color-sc-ink: #181818;
+  --color-sc-paper: #181818;
+  --color-sc-muted: #E4E4E4;
+  --color-sc-border: #323232;
+  --color-sc-border-soft: #242424;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: var(--color-sc-paper);
+  color: #ffffff;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-display);
+  letter-spacing: 0.02em;
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Warm scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-sc-border-soft);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-sc-border);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-sc-muted);
+}
+
+@keyframes marquee {
+  0% {
+    transform: translateX(0%);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+@keyframes vibe-slogan-cycle {
+  0% {
+    opacity: 0;
+    filter: blur(12px);
+    transform: translate3d(0.12em, 0.3em, 0) skewX(-10deg);
+  }
+  5%,
+  20% {
+    opacity: 1;
+    filter: blur(0);
+    transform: translate3d(0, 0, 0) skewX(-8deg);
+  }
+  25%,
+  100% {
+    opacity: 0;
+    filter: blur(8px);
+    transform: translate3d(-0.08em, -0.24em, 0) skewX(-8deg);
+  }
+}
+
+.vibe-hero-accent {
+  position: absolute;
+  inset: 0 0 0 auto;
+  z-index: -10;
+  width: 28%;
+  pointer-events: none;
+  background: linear-gradient(180deg, transparent, rgb(227 22 40 / 12%));
+  clip-path: polygon(65% 0, 100% 0, 100% 100%, 0 100%);
+}
+
+.vibe-slogan-stage {
+  position: relative;
+  display: block;
+  min-height: 1.25em;
+  isolation: isolate;
+}
+
+.vibe-slogan-word {
+  position: absolute;
+  inset: 0 auto auto 0;
+  width: 100%;
+  white-space: nowrap;
+  text-transform: uppercase;
+  color: #fff;
+  line-height: 1.12;
+  opacity: 0;
+  animation: vibe-slogan-cycle 12s cubic-bezier(0.2, 0.75, 0.25, 1) infinite both;
+  will-change: opacity, filter, transform;
+}
+
+.vibe-slogan-word:nth-child(even) {
+  color: var(--color-mlc-red);
+}
+
+.vibe-slogan-word::after {
+  content: "";
+  position: absolute;
+  bottom: -0.025em;
+  left: 0.04em;
+  width: 1.1em;
+  height: 0.045em;
+  background: var(--color-mlc-red);
+  clip-path: polygon(5% 0, 100% 0, 95% 100%, 0 100%);
+}
+
+.vibe-slogan-word:nth-child(even)::after {
+  background: #fff;
+}
+
+.vibe-hero[data-paused="true"] .vibe-slogan-word {
+  animation-play-state: paused;
+}
+
+.vibe-hero[data-paused="true"] .vibe-slogan-word {
+  visibility: hidden;
+}
+
+.vibe-hero[data-paused="true"] .vibe-slogan-word[data-pause-visible="true"] {
+  visibility: visible;
+  opacity: 1 !important;
+  filter: none !important;
+  transform: skewX(-8deg) !important;
+}
+
+.sports-marquee-track {
+  animation: marquee 32s linear infinite;
+}
+
+.admin-shell ::-webkit-scrollbar-track {
+  background: #F5F5F4;
+}
+
+.admin-shell ::-webkit-scrollbar-thumb {
+  background: #A8A29E;
+  border-radius: 3px;
+}
+
+.admin-shell ::-webkit-scrollbar-thumb:hover {
+  background: #78716C;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  .vibe-slogan-stage {
+    display: flex;
+    min-height: 0;
+    flex-wrap: wrap;
+    column-gap: 0.24em;
+    font-size: clamp(2.5rem, 7vw, 5.5rem);
+  }
+
+  .vibe-slogan-word {
+    position: static;
+    width: auto;
+    opacity: 1;
+    filter: none;
+    transform: none;
+    animation: none !important;
+    will-change: auto;
+  }
+
+  .vibe-slogan-word::after {
+    display: none;
+  }
+
+  .vibe-hero[data-paused="true"] .vibe-slogan-word {
+    visibility: visible;
+    transform: none !important;
+  }
+
+  .vibe-slogan-word:not(:last-child)::after {
+    position: static;
+    display: inline;
+    width: auto;
+    height: auto;
+    background: none;
+    clip-path: none;
+    content: "·";
+    color: #ffffff99;
+    margin-left: 0.24em;
+  }
+}
