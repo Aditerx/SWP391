@@ -278,4 +278,25 @@ Nhận trực tiếp trong Hộp thư đến (Inbox / Spam) của tài khoản G
 Backend gửi mail qua giao thức SMTP (smtp.gmail.com:587) với tiêu đề "Mã OTP xác thực đăng ký", mã gồm 6 số có hạn trong 10 phút.
 Điều kiện: Cần cấu hình 2 biến môi trường trên server: MAIL_USERNAME (Gmail của trung tâm) và MAIL_APP_PASSWORD (Mật khẩu ứng dụng 16 ký tự do Google cấp). Nếu chưa cấu hình mail, hệ thống hỗ trợ biến REGISTRATION_DEMO_OTP (ví dụ 123456) để test trực tiếp mà không cần gửi email thật.
 
+4.
+* Tag NATIONAL_FIXED (Lễ Quốc Gia Dương Lịch Cố Định):
+01/01: Tết Dương Lịch
+30/04: Ngày Giải phóng miền Nam
+01/05: Ngày Quốc tế Lao động
+02/09 & 03/09: Ngày Quốc khánh Việt Nam
+* Tag LUNAR_FESTIVAL (Lễ Hội Truyền Thống / Âm Lịch theo năm):
+Giỗ Tổ Hùng Vương (10/03 Âm lịch)
+Chuỗi 7 ngày nghỉ Tết Nguyên Đán (Từ 28/29 Tháng Chạp đến Mùng 5 Tết)
+* Tag CENTER_EVENT (Lịch Nghỉ Riêng Của Trung Tâm):
+Bảo trì sân bãi định kỳ, sự kiện đại hội thể thao, nâng cấp cơ sở vật chất...
+* Xanh dương cho NATIONAL_FIXED
+Đỏ/Cam cho LUNAR_FESTIVAL
+Xám/Tím cho CENTER_EVENT
+* Công tắc Toggle On/Off (is_active): Manager chỉ cần click công tắc để Bật/Tắt một ngày nghỉ mà không cần phải xóa dữ liệu.
+Nút "Thêm ngày nghỉ đột xuất": Manager chọn ngày, đặt tên và chọn tag CENTER_EVENT.
+* Thuật toán sinh 12 buổi học: Khi nhảy ngày sinh lịch, thuật toán chỉ cần lọc:
+sql
+SELECT holiday_date FROM holidays WHERE is_active = TRUE;
+* Nếu ngày học rơi trúng ngày có is_active = TRUE, hệ thống tự động nhảy sang tuần tiếp theo cho đến khi đủ 12 buổi.
+
 ---

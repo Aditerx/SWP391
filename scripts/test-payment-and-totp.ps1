@@ -7,7 +7,9 @@
 
 param(
     [string]$BaseUrl = "http://localhost:8080",
+    [Alias("Email")]
     [string]$MemberEmail = "abc1@ex.com",
+    [Alias("Password")]
     [string]$MemberPassword = "abc1@ex.com"
 )
 
@@ -59,6 +61,8 @@ if (-not $loginSuccess) {
         Write-Host "    ==> MÃ TOTP HIỆN TẠI : " -NoNewline
         Write-Host "$($totp1.payload)" -ForegroundColor Green -BackgroundColor Black
         Write-Host "    ==> THỜI GIAN HIỆU LỰC: $($totp1.expiresInSeconds) giây còn lại" -ForegroundColor Yellow
+        Write-Host "    ==> LINK XEM ẢNH QR ĐIỂM DANH (Dán vào Chrome/Edge hoặc quét bằng điện thoại):" -ForegroundColor Cyan
+        Write-Host "        https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=$($totp1.payload)" -ForegroundColor Blue
 
         Write-Host "`n3. Kiểm tra tính năng làm mới mã sau 30 giây:"
         Write-Host "    Đang chờ 5 giây để quan sát thời gian đếm ngược..."
@@ -142,9 +146,10 @@ Write-Host "    $vietQrUrl" -ForegroundColor Blue
 Write-Host "    ------------------------------------------------------------------" -ForegroundColor DarkGray
 Write-Host "    HƯỚNG DẪN TEST:" -ForegroundColor Yellow
 Write-Host "    - Dán đường link trên vào trình duyệt -> Ảnh mã QR ngân hàng MBBank sẽ hiện ra."
-Write-Host "    - Dùng điện thoại quét: Số tiền 900.000đ và nội dung 'INV-2026-000105' tự động điền sẵn!"
+Write-Host "    - Dung dien thoai quet: So tien 900.000d va noi dung INV-2026-000105 tu dong dien san!"
 
 Write-Host ""
 Write-Host "======================================================================" -ForegroundColor Yellow
 Write-Host " HOÀN TẤT KỊCH BẢN TEST ĐỘC LẬP!" -ForegroundColor Yellow
-Write-Host "======================================================================`n"
+Write-Host "======================================================================"
+Write-Host ""
