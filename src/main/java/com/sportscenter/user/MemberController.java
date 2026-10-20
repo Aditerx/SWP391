@@ -10,20 +10,20 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Map;
+import org.springframework.security.core.Authentication;
+import com.sportscenter.training.AttendanceService;
+import com.sportscenter.training.CheckinCodeResponse;
+import com.sportscenter.report.AtRiskMemberResponse;
+import com.sportscenter.report.ChurnRiskService;
 
 @RestController
 @RequestMapping("/api/members")
 @RequiredArgsConstructor
 public class MemberController {
     private final MemberService memberService;
-    private final UserRepository userRepository;
-
-    @GetMapping("/me")
-    @PreAuthorize("hasRole('MEMBER')")
-    public MemberResponse getCurrentMember(org.springframework.security.core.Authentication authentication) {
-        User user = userRepository.findByEmailIgnoreCase(authentication.getName()).orElseThrow();
-        return memberService.findById(user.getId());
-    }
+    private final AttendanceService attendanceService;
+    private final BookingBlockService bookingBlockService;
+    private final ChurnRiskService churnRiskService;
 
     @GetMapping
     @PreAuthorize("hasAnyAuthority('MANAGE_USERS', 'REGISTER_MEMBER')")
@@ -62,5 +62,25 @@ public class MemberController {
     public MemberResponse updateMemberStatus(@PathVariable Integer id, @RequestBody Map<String, String> body) {
         String status = body != null ? body.get("status") : null;
         return memberService.updateMemberStatus(id, status);
+    }
+
+    @GetMapping("/me/checkin-code")
+    @PreAuthorize("hasRole('MEMBER')")
+    public CheckinCodeResponse checkinCode(Authentication authentication) {
+        return attendanceService.createCheckinCode(authentication.getName());
+    }
+
+    @GetMapping("/at-risk")
+    @PreAuthorize("hasAuthority('VIEW_REPORTS')")
+    public List<AtRiskMemberResponse> atRiskMembers() {
+        return churnRiskService.forCenter();
+    }
+
+    @PatchMapping("/{id}/booking-block/lift")
+    @PreAuthorize("hasAuthority('MANAGE_USERS')")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void liftBookingBlock(@PathVariable Integer id, @Valid @RequestBody BookingBlockLiftRequest request,
+                                 org.springframework.security.core.Authentication authentication) {
+        bookingBlockService.lift(id, request.reason(), authentication.getName());
     }
 }

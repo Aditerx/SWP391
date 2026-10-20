@@ -35,6 +35,9 @@ public class Attendance {
     @Column(name = "state", nullable = false, length = 20)
     private String state = "Present";
 
+    @Column(name = "note")
+    private String note;
+
     @Column(name = "check_in_time")
     private LocalDateTime checkInTime;
 

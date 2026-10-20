@@ -51,4 +51,14 @@ public interface AttendanceRepository extends JpaRepository<Attendance, Integer>
            "WHERE a.session IS NULL AND a.member.id = :memberId AND a.checkOutTime IS NULL " +
            "ORDER BY a.attendanceId DESC")
     List<Attendance> findOpenCheckInsByMemberId(@Param("memberId") Integer memberId);
+
+    @Query("SELECT COUNT(a) FROM Attendance a WHERE a.member.id = :memberId AND a.state = 'Absent' " +
+            "AND a.session.sessionDate >= :fromDate AND a.session.sessionDate < :toDate")
+    long countAbsencesForMemberInRange(@Param("memberId") Integer memberId,
+            @Param("fromDate") java.time.LocalDate fromDate, @Param("toDate") java.time.LocalDate toDate);
+
+    @Query("SELECT CASE WHEN COUNT(a) > 0 THEN true ELSE false END FROM Attendance a WHERE a.member.id = :memberId " +
+            "AND a.state IN ('Present', 'Late', 'CheckedIn') AND a.checkInTime >= :since AND a.checkInTime <= :until")
+    boolean hasRecentAttendance(@Param("memberId") Integer memberId, @Param("since") LocalDateTime since,
+            @Param("until") LocalDateTime until);
 }

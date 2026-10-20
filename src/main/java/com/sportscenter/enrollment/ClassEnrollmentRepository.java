@@ -52,4 +52,20 @@ public interface ClassEnrollmentRepository extends JpaRepository<ClassEnrollment
     List<Object[]> countGroupedByClass(@Param("statuses") List<String> statuses);
 
     boolean existsByMemberIdAndSportsClassIdAndStatus(Integer memberId, Integer classId, String status);
+
+    List<ClassEnrollment> findBySportsClassIdAndStatusOrderByEnrolledAtAscIdAsc(Integer classId, String status);
+
+    long countBySportsClassIdAndStatusAndEnrolledAtLessThan(Integer classId, String status, java.time.LocalDateTime enrolledAt);
+
+    @Query("SELECT DISTINCT e FROM ClassEnrollment e JOIN FETCH e.member m JOIN FETCH e.sportsClass c " +
+            "WHERE e.status = 'Registered' AND c.status = 'Ongoing' AND m.centerId = :centerId " +
+            "AND c.centerId = :centerId " +
+            "AND c.coach.id = :coachId")
+    List<ClassEnrollment> findRiskCandidatesForCoach(@Param("coachId") Integer coachId,
+            @Param("centerId") Integer centerId);
+
+    @Query("SELECT DISTINCT e FROM ClassEnrollment e JOIN FETCH e.member m JOIN FETCH e.sportsClass c " +
+            "WHERE e.status = 'Registered' AND c.status = 'Ongoing' AND m.centerId = :centerId " +
+            "AND c.centerId = :centerId")
+    List<ClassEnrollment> findRiskCandidatesByCenter(@Param("centerId") Integer centerId);
 }

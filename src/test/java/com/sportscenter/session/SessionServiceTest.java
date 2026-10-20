@@ -22,6 +22,9 @@ import java.time.LocalTime;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneId;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -48,6 +51,9 @@ class SessionServiceTest {
     @Mock
     private AuditService auditService;
 
+    @Mock
+    private Clock clock;
+
     @InjectMocks
     private SessionService sessionService;
 
@@ -57,6 +63,8 @@ class SessionServiceTest {
 
     @BeforeEach
     void setUp() {
+        lenient().when(clock.instant()).thenReturn(Instant.parse("2026-10-16T03:00:00Z"));
+        lenient().when(clock.getZone()).thenReturn(ZoneId.of("Asia/Ho_Chi_Minh"));
         sampleCoach = new User();
         sampleCoach.setId(3);
         sampleCoach.setFullName("Trần Thị Hương");

@@ -25,6 +25,13 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(BusinessException.class)
     ResponseEntity<Map<String, Object>> business(BusinessException ex) {
+        int separator = ex.getMessage() == null ? -1 : ex.getMessage().indexOf(":");
+        if (separator > 0 && ex.getMessage().substring(0, separator).matches("[A-Z_]+")) {
+            Map<String, Object> body = new LinkedHashMap<>();
+            body.put("code", ex.getMessage().substring(0, separator));
+            body.put("message", ex.getMessage().substring(separator + 1).trim());
+            return ResponseEntity.badRequest().body(body);
+        }
         return error(HttpStatus.BAD_REQUEST, ex.getMessage());
     }
 

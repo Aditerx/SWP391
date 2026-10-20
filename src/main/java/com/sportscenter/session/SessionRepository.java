@@ -1,14 +1,21 @@
 package com.sportscenter.session;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.time.LocalDateTime;
 import java.util.List;
 
 public interface SessionRepository extends JpaRepository<Session, Integer> {
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT s FROM Session s WHERE s.id = :id")
+    java.util.Optional<Session> findByIdForUpdate(@Param("id") Integer id);
 
     @Query("SELECT s FROM Session s " +
            "JOIN FETCH s.sportsClass c " +
@@ -84,4 +91,31 @@ public interface SessionRepository extends JpaRepository<Session, Integer> {
     List<Session> findBySessionDateBetween(LocalDate startDate, LocalDate endDate);
 
     long countBySessionDate(LocalDate sessionDate);
+
+    @Query("SELECT s FROM Session s WHERE s.sportsClass.id = :classId AND s.status <> 'Cancelled' " +
+            "AND (s.sessionDate > :today OR (s.sessionDate = :today AND s.startTime >= :nowTime)) " +
+            "ORDER BY s.sessionDate, s.startTime")
+    List<Session> findNextUpcomingForClass(@Param("classId") Integer classId,
+            @Param("today") LocalDate today, @Param("nowTime") LocalTime nowTime);
+
+    @Query("SELECT DISTINCT s FROM Session s JOIN FETCH s.sportsClass c " +
+            "WHERE EXISTS (SELECT e.id FROM ClassEnrollment e WHERE e.sportsClass.id = c.id " +
+            "AND e.member.id = :memberId AND e.status IN ('Registered', 'Pending')) " +
+            "AND c.id <> :targetClassId AND s.status <> 'Cancelled' " +
+            "AND (s.sessionDate > :today OR (s.sessionDate = :today AND s.startTime >= :nowTime)) " +
+            "AND EXISTS (SELECT target.id FROM Session target WHERE target.sportsClass.id = :targetClassId " +
+            "AND target.status <> 'Cancelled' AND (target.sessionDate > :today OR " +
+            "(target.sessionDate = :today AND target.startTime >= :nowTime)) " +
+            "AND target.sessionDate = s.sessionDate AND s.startTime < target.endTime AND s.endTime > target.startTime) " +
+            "ORDER BY s.sessionDate, s.startTime")
+    List<Session> findFutureEnrollmentScheduleConflicts(@Param("memberId") Integer memberId,
+            @Param("targetClassId") Integer targetClassId, @Param("today") LocalDate today,
+            @Param("nowTime") LocalTime nowTime);
+
+    @Query("SELECT s FROM Session s WHERE s.attendanceFinalized = false AND s.status <> 'Cancelled' " +
+            "AND (s.sessionDate > :cutoffDate OR (s.sessionDate = :cutoffDate AND s.endTime >= :cutoffTime)) " +
+            "AND (s.sessionDate < :today OR (s.sessionDate = :today AND s.endTime <= :nowTime))")
+    List<Session> findSessionsReadyForAttendanceFinalization(@Param("today") LocalDate today,
+            @Param("nowTime") LocalTime nowTime, @Param("cutoffDate") LocalDate cutoffDate,
+            @Param("cutoffTime") LocalTime cutoffTime);
 }

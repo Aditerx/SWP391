@@ -77,25 +77,27 @@ public class EnrollmentController {
             Authentication authentication) {
         String userEmail = authentication != null ? authentication.getName() : null;
         Integer memberId = request != null ? request.memberId() : null;
-        return ResponseEntity.ok(enrollmentService.cancelEnrollment(classId, memberId, userEmail));
+        return ResponseEntity.ok(enrollmentService.cancelEnrollment(classId, memberId, userEmail, request != null ? request.reason() : null));
     }
 
     @PatchMapping("/enrollments/{id}/cancel")
     @PreAuthorize("hasAnyAuthority('REGISTER_MEMBER', 'MANAGE_CLASSES') or hasRole('MEMBER')")
     public ResponseEntity<EnrollmentResponse> cancelById(
             @PathVariable Integer id,
+            @RequestBody(required = false) EnrollmentRequest request,
             Authentication authentication) {
         String userEmail = authentication != null ? authentication.getName() : null;
-        return ResponseEntity.ok(enrollmentService.cancelById(id, userEmail));
+        return ResponseEntity.ok(enrollmentService.cancelById(id, userEmail, request != null ? request.reason() : null));
     }
 
     @DeleteMapping("/enrollments/{id}")
     @PreAuthorize("hasAnyAuthority('REGISTER_MEMBER', 'MANAGE_CLASSES') or hasRole('MEMBER')")
     public ResponseEntity<EnrollmentResponse> deleteEnrollment(
             @PathVariable Integer id,
+            @RequestBody(required = false) EnrollmentRequest request,
             Authentication authentication) {
         String userEmail = authentication != null ? authentication.getName() : null;
-        return ResponseEntity.ok(enrollmentService.cancelById(id, userEmail));
+        return ResponseEntity.ok(enrollmentService.cancelById(id, userEmail, request != null ? request.reason() : null));
     }
 
     private String clientIp(HttpServletRequest request) {

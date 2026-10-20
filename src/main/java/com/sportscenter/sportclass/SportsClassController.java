@@ -5,6 +5,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -34,8 +35,9 @@ public class SportsClassController {
     @PutMapping("/{id}")
     @PreAuthorize("hasAuthority('MANAGE_CLASSES')")
     public ResponseEntity<SportsClassResponse> update(@PathVariable Integer id,
-                                                       @Valid @RequestBody SportsClassRequest request) {
-        return ResponseEntity.ok(service.update(id, request));
+                                                       @Valid @RequestBody SportsClassRequest request,
+                                                       Authentication authentication) {
+        return ResponseEntity.ok(service.update(id, request, authentication.getName()));
     }
 
     @PatchMapping("/{id}/coach")
