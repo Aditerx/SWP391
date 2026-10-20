@@ -16,7 +16,6 @@ public record SessionGenerateRequest(
         @NotNull(message = "startDate is required")
         LocalDate startDate,
 
-        @NotNull(message = "endDate is required")
         LocalDate endDate,
 
         @NotEmpty(message = "daysOfWeek cannot be empty")
@@ -27,4 +26,9 @@ public record SessionGenerateRequest(
 
         @NotNull(message = "endTime is required")
         LocalTime endTime
-) {}
+) {
+    public SessionGenerateRequest(Integer classId, Integer roomId, LocalDate startDate,
+                                  List<Integer> daysOfWeek, LocalTime startTime, LocalTime endTime) {
+        this(classId, roomId, startDate, null, daysOfWeek, startTime, endTime);
+    }
+}

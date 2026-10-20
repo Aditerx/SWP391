@@ -230,15 +230,32 @@ public class InvoiceService {
     }
 
     private void activateSubscription(MemberPackage subscription) {
-        LocalDate start = LocalDate.now(BUSINESS_ZONE);
-        MemberPackage latestActive = memberPackageRepository.findByMemberId(subscription.getMember().getId()).stream()
-                .filter(mp -> mp != subscription && "Active".equalsIgnoreCase(mp.getStatus()) && mp.getEndDate() != null)
-                .max(java.util.Comparator.comparing(MemberPackage::getEndDate)).orElse(null);
-        if (latestActive != null && !latestActive.getEndDate().isBefore(start)) start = latestActive.getEndDate().plusDays(1);
-        int days = subscription.getMembershipPackage().getDurationDays() == null ? 30 : subscription.getMembershipPackage().getDurationDays();
-        subscription.setStartDate(start);
-        subscription.setEndDate(start.plusDays(days));
-        subscription.setStatus("Active");
+        MembershipPackage pkg = subscription.getMembershipPackage();
+        LocalDate now = LocalDate.now(BUSINESS_ZONE);
+        if (pkg != null && pkg.isAdvanced()) {
+            int days = (subscription.getValidityDays() != null && subscription.getValidityDays() > 0)
+                    ? subscription.getValidityDays()
+                    : (pkg.getDurationDays() != null ? pkg.getDurationDays() : 45);
+            int credits = (pkg.getTotalCredit() != null && pkg.getTotalCredit() > 0) ? pkg.getTotalCredit() : 12;
+            subscription.setStartDate(now);
+            subscription.setEndDate(now.plusDays(days));
+            subscription.setRemainingCredit(credits);
+            subscription.setValidityDays(days);
+            subscription.setStatus("Active");
+        } else {
+            LocalDate start = now;
+            MemberPackage latestActive = memberPackageRepository.findByMemberId(subscription.getMember().getId()).stream()
+                    .filter(mp -> mp != subscription && "Active".equalsIgnoreCase(mp.getStatus())
+                            && (mp.getMembershipPackage() == null || !mp.getMembershipPackage().isAdvanced())
+                            && mp.getEndDate() != null)
+                    .max(java.util.Comparator.comparing(MemberPackage::getEndDate)).orElse(null);
+            if (latestActive != null && !latestActive.getEndDate().isBefore(start)) start = latestActive.getEndDate().plusDays(1);
+            int days = (pkg != null && pkg.getDurationDays() != null) ? pkg.getDurationDays() : 30;
+            subscription.setStartDate(start);
+            subscription.setEndDate(start.plusDays(days));
+            subscription.setRemainingCredit(0);
+            subscription.setStatus("Active");
+        }
     }
 
     private void activateClassEnrollment(Invoice invoice) {

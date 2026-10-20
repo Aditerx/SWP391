@@ -78,8 +78,8 @@ class DemoDataPreparationTest {
                     name, subject, coach.getId(), 4, BigDecimal.valueOf(n == 0 ? 150000 : 0), today, today.plusDays(7), "Ongoing")).id();
             if (sessionRepository.findFiltered(classId, null, null, today, today, null).isEmpty()) {
                 boolean scheduled = false;
-                for (int hour = 8; hour < 22; hour++) {
-                    LocalTime start = LocalTime.of(hour, 0), end = start.plusMinutes(30);
+                for (TimeSlot slot : TimeSlot.values()) {
+                    LocalTime start = slot.getStartTime(), end = slot.getEndTime();
                     if (!sessions.checkConflict(new ConflictCheckRequest(classId, coach.getId(), room, today, start, end, null)).hasConflict()) {
                         sessions.create(new SessionRequest(classId, room, today, start, end, "Scheduled")); scheduled = true; break;
                     }

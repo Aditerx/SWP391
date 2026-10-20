@@ -19,8 +19,34 @@ public record SessionResponse(
         LocalTime endTime,
         String status,
         Integer enrolledCount,
-        Integer maxCapacity
+        Integer maxCapacity,
+        Integer bookedMemberId,
+        String bookedMemberName,
+        Boolean isPrivate
 ) {
+    public SessionResponse(
+            Integer id,
+            Integer classId,
+            String className,
+            Integer subjectId,
+            String subjectName,
+            Integer coachId,
+            String coachName,
+            Integer roomId,
+            String roomName,
+            String roomLocation,
+            LocalDate sessionDate,
+            LocalTime startTime,
+            LocalTime endTime,
+            String status,
+            Integer enrolledCount,
+            Integer maxCapacity
+    ) {
+        this(id, classId, className, subjectId, subjectName, coachId, coachName,
+                roomId, roomName, roomLocation, sessionDate, startTime, endTime,
+                status, enrolledCount, maxCapacity, null, null, false);
+    }
+
     public static SessionResponse from(Session session) {
         return from(session, null);
     }
@@ -29,14 +55,17 @@ public record SessionResponse(
         if (session == null) return null;
         var sc = session.getSportsClass();
         var room = session.getRoom();
+        var coach = session.getCoach() != null ? session.getCoach() : (sc != null ? sc.getCoach() : null);
+        var bookedMember = session.getBookedMember();
+        boolean isPrivate = session.isPrivateSession();
         return new SessionResponse(
                 session.getId(),
                 sc != null ? sc.getId() : null,
                 sc != null ? sc.getName() : null,
                 sc != null && sc.getSubject() != null ? sc.getSubject().getId() : null,
                 sc != null && sc.getSubject() != null ? sc.getSubject().getName() : null,
-                sc != null && sc.getCoach() != null ? sc.getCoach().getId() : null,
-                sc != null && sc.getCoach() != null ? sc.getCoach().getFullName() : null,
+                coach != null ? coach.getId() : null,
+                coach != null ? coach.getFullName() : null,
                 room != null ? room.getId() : null,
                 room != null ? room.getName() : null,
                 room != null ? room.getLocation() : null,
@@ -45,7 +74,10 @@ public record SessionResponse(
                 session.getEndTime(),
                 session.getStatus(),
                 enrolledCount,
-                sc != null ? sc.getMaxCapacity() : (room != null ? room.getCapacity() : null)
+                sc != null ? sc.getMaxCapacity() : (room != null ? room.getCapacity() : null),
+                bookedMember != null ? bookedMember.getId() : null,
+                bookedMember != null ? bookedMember.getFullName() : null,
+                isPrivate
         );
     }
 }

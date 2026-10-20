@@ -57,6 +57,12 @@ public class SubjectService {
         subject.setStatus(request.status() == null ? "Active" : request.status());
         subject.setSlug(request.slug() == null || request.slug().isBlank()
                 ? slugify(request.name()) : slugify(request.slug()));
+        if (request.normalPrice() != null) {
+            subject.setNormalPrice(request.normalPrice());
+        }
+        if (request.advancedPrice() != null) {
+            subject.setAdvancedPrice(request.advancedPrice());
+        }
     }
 
     private String slugify(String value) {

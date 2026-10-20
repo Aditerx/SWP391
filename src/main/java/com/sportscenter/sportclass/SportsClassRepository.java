@@ -11,4 +11,6 @@ public interface SportsClassRepository extends JpaRepository<SportsClass, Intege
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT c FROM SportsClass c WHERE c.id = :id")
     Optional<SportsClass> findByIdForUpdate(@Param("id") Integer id);
+
+    Optional<SportsClass> findFirstBySubjectIdAndClassType(Integer subjectId, String classType);
 }

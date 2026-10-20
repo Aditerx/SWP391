@@ -1,0 +1,908 @@
+=== PAGE 1 ===
+ID
+Nhóm Nghiệp 
+Vụ
+Chức năng 
+chi tiết
+Actor (Người 
+thực hiện)
+Khóa Normal (Học nhóm - 
+Lịch cố định)
+Khóa Advanced (Học 1Ю1 - 
+Lịch linh hoạt)
+Điều kiện ràng buộc 
+hệ thống (System 
+Rules)
+Dữ liệu liên quan 
+(Database Entities)
+1.1 Khởi tạo Khóa 
+học
+Cấu hình 
+thông tin cơ 
+bản
+Center Manager
+1. Drop box: Tên môn.
+2. Nhập: Học phí.
+3. Nhập: Sức chứa: 15 
+người.
+4. Nhập: Tổng số buổi: 12 
+buổi.
+(Không cần cấu hình thời 
+hạn).
+1. Drop box: Tên môn.
+2. Nhập: Học phí.
+3. Nhập: Sức chứa: 15 
+người.
+4. Hệ thống gán cứng 
+(Read-only): Sức chứa = 
+1.
+5. Nhập: Thời hạn sử 
+dụng: 45 ngày.
+Số buổi = 12.
+Khóa 1Ю1 bắt buộc có 
+Validity_Days (Thời 
+hạn).
+Khóa 1Ю1 bắt buộc 
+MaxCapacity = 1.
+Subject (Đổ dữ liệu 
+cho Drop box)
+Class (Lưu thông tin 
+tạo khóa)
+1.2 Khởi tạo Lớp 
+học
+Phân công & 
+Tạo chuỗi 
+lịch
+Center Manager
+Sinh lịch cứng: 
+1. Gán Coach & Gán 
+Sân/Phòng.
+2. Cấu hình lịch lặp (Chọn 
+ngày khai giảng, các Thứ 
+trong tuần, Khung giờ 
+học).
+3. Preview (Xem trước) 
+danh sách 12 buổi để rà 
+soát.
+4. Xác nhận để hệ thống tự 
+động sinh 12 records vào 
+DB.
+Không áp dụng
+Sân/Phòng không bị 
+trùng lịch.   HLV 
+không bị trùng lịch.
+Class, Session
+`
+
+
+=== PAGE 2 ===
+2.1 Hiển thị & Lựa 
+chọn
+Xem thông 
+tin trước 
+đăng ký
+Member
+1. Xem danh sách Môn 
+học.
+2. Chọn Môn để xem danh 
+sách các Lớp (Class) đang 
+mở.
+3. Xem chi tiết Lớp: Giá 
+tiền, Lịch học cố định (12 
+buổi), Sĩ số hiện tại (VD: 
+5/15), và HLV phụ trách.
+1. Xem danh sách Môn 
+học.
+2. Chọn Môn để xem chi 
+tiết Gói 1Ю1: Giá tiền, Tổng 
+số tín chỉ (12 buổi), Thời 
+hạn sử dụng (45 ngày), 
+Thời lượng (90 
+phút/buổi).
+3. Xem danh sách và 
+Profile HLV (Kinh nghiệm, 
+chuyên môn) để tham 
+khảo trước khi mua.
+Normal: Khóa nút 
+Đăng ký nếu lớp đã 
+đủ 15 người hoặc đã 
+khai giảng.
+Subject (Lấy môn 
+học & Giá)
+Class (Lấy DS lớp 
+Normal)
+User / Coach_Profile 
+(Lấy thông tin HLV)
+3.1 Đăng ký Khóa 
+học
+Chọn ca học / 
+Khớp lịch
+Member / 
+Receptionist
+Đăng ký theo Lớp: Chọn 
+Lớp có sẵn lịch học cố 
+định phù hợp, sau đó bấm 
+"Đăng ký".
+Hệ thống sẽ không bắt 
+giữ cả 12 slot trước khi 
+thanh toán. Luồng chuẩn 
+là: Thanh toán thành 
+công -> Nạp 12 Credit -> 
+Member dùng Credit để 
+book từng ca học sau. 
+Thời gian giữ chỗ ở màn 
+hình thanh toán để mua 
+gói chỉ là 5 phút. Đặt lịch 
+linh động: Sau khi nạp 
+Credit, chọn HLV chính 
+đúng bộ môn và tự book 
+các ca học. Nhịp học 
+khuyến nghị 2-4 
+ngày/tuần trong vòng 45 
+ngày.
+Khóa 1Ю1: Bắt buộc 
+phải đặt lịch trước tối 
+thiểu 12 - 24 tiếng.
+Course_Registration
+Class (Dành cho 
+Normal)
+Session (Đổi từ 
+Class_Sessions)
+3.2 Đăng ký Khóa 
+học
+Kiểm tra xung 
+đột (Conflict 
+Check)
+System (Hệ 
+thống)
+Tự động kiểm tra sĩ số của 
+Lớp, đảm bảo không vượt 
+quá sức chứa tối đa (15 
+người).
+Tự động kiểm tra trùng 
+lịch: 1 Coach hoặc 1 Sơ sở 
+vật chất/Sân không thể 
+có 2 lịch trùng giờ tại 
+cùng một thời điểm.
+Trả về thông báo lỗi 
+cụ thể trên giao diện 
+nếu xảy ra xung đột 
+tài nguyên hoặc đầy 
+chỗ, không cho phép 
+tiếp tục thanh toán.
+Class
+Session
+Facility
+
+
+=== PAGE 3 ===
+4.1 Thanh toán
+Ghi nhận 
+Giao dịch
+Member / 
+Receptionist
+Giữ chỗ ở trạng thái "Chờ 
+thanh toán" trong khoảng 
+thời gian quy định (Ví dụ: 5 
+phút).
+Giữ chỗ ở trạng thái "Chờ 
+thanh toán" trong 
+khoảng thời gian quy 
+định (VD: 5 phút).
+Hết thời gian chờ mà 
+chưa hoàn tất thanh 
+toán, hệ thống sẽ tự 
+động hủy giữ chỗ 
+(Cancel) và trả lại 
+slot trống vào hệ 
+Invoice
+Transactions
+4.2 Thanh toán
+Nạp dữ liệu 
+học viên
+System (Hệ 
+thống)
+Khi trạng thái thanh toán 
+thành công (Success), hệ 
+thống tự động thêm học 
+viên vào danh sách của 
+Lớp và gán tên học viên 
+vào toàn bộ 12 record lịch 
+học đã sinh sẵn.
+Trả lời: Mốc 45 ngày đếm 
+ngược tính từ thời điểm 
+Thanh toán thành công 
+(Success). Đối với buổi 
+học do trung tâm 
+(HLV/mưa bão) dời lịch 
+mà vô tình bị đẩy vượt 
+quá thời hạn 45 ngày, hệ 
+thống sẽ tự động hoàn lại 
+Chỉ xử lý ghi nhận dữ 
+liệu khi trạng thái 
+giao dịch trả về là 
+Success. Khóa 1Ю1 bắt 
+đầu đếm ngược thời 
+hạn 45 ngày từ thời 
+điểm này.
+Course_Registration
+Class
+Session
+5.1 Quản lý Nghỉ / 
+Hủy
+Báo nghỉ / 
+Hủy lịch hợp 
+lệ
+Member / 
+Receptionist
+Không hỗ trợ Hủy/Dời lịch: 
+Học viên vắng mặt tự chịu 
+trách nhiệm, không được 
+hoàn lại buổi học.
+Cho phép Hủy/Dời lịch 
+hợp lệ: Nút này chỉ hoạt 
+động khi khoảng cách 
+đến giờ học ≥ 24 tiếng. 
+Dưới 24 tiếng, học viên sẽ 
+không thể bấm gì trên 
+App.
+Khóa 1Ю1: Hủy 
+lịch/Báo nghỉ phải 
+thực hiện khi còn ít 
+nhất 24 giờ (≥24h). 
+Hủy đúng hạn trả lại 1 
+credit; hủy dưới 24h 
+hoặc Vắng tiêu thụ 
+luôn buổi đó (không 
+trừ 2 lần).
+Course_Registration
+Session
+5.2 Quản lý Nghỉ / 
+Hủy
+Vắng mặt 
+(No-show)
+System (Hệ 
+thống)
+Coach điểm danh học viên 
+vắng mặt. Hệ thống ghi 
+nhận mất buổi học. Trung 
+tâm không hỗ trợ sắp xếp 
+lớp học bù.
+Hủy sát giờ hoặc không 
+đến lớp, Coach điểm 
+danh vắng mặt khiến học 
+viên bị trừ 1 Credit. Trung 
+tâm không hoàn lại. Buổi 
+học vẫn diễn ra như bình 
+thường, nếu học viên 
+không tới, Coach sẽ là 
+người thao tác điểm danh 
+"Vắng mặt" (No-show) 
+sau khi buổi học kết thúc, 
+và hệ thống sẽ trừ 1 
+Credit vào lúc này. Cách 
+vận hành này chống thao 
+tác rác (spam) từ học 
+viên và bảo vệ thu nhập 
+cho Coach rõ ràng nhất.
+Hệ thống tuyệt đối 
+không sinh ra bất kỳ 
+record học bù (Make-
+up class) nào cho lỗi 
+vắng mặt của học 
+viên.
+Attendance, 
+Course_Registration
+
+
+=== PAGE 4 ===
+5.3 Quản lý Nghỉ / 
+Hủy
+Lỗi từ Trung 
+tâm (Mưa 
+bão, HLV 
+nghỉ)
+Center Manager
+Hệ thống đề xuất giờ học 
+thay thế; Manager kiểm 
+tra lại lịch trống của 
+Coach, Sân rồi mới bấm 
+Xác nhận để thông báo dời 
+buổi học xuống cuối khóa.
+Coach báo Manager. 
+Manager phối hợp cùng 
+Member để chọn Coach 
+có cùng chuyên môn dạy 
+thay ca đó, hoặc dời buổi 
+với Coach chính. Cấp 
+quyền cho Coach thay 
+xem hồ sơ buổi học.
+Phân quyền: Chỉ có 
+tài khoản cấp Admin 
+hoặc Center Manager 
+mới có quyền thao 
+tác hủy lịch do sự cố 
+trung tâm.
+Session
+Course_Registration
+Attendance
+6.1 Điểm danh & 
+Kết quả
+Check-in / 
+Điểm danh
+Coach / 
+Receptionist
+Mở danh sách lớp cố định, 
+chọn buổi học hôm nay và 
+bấm Check-in (Có mặt 
+hoặc Vắng mặt) cho từng 
+học viên.
+Mở lịch dạy cá nhân, 
+chọn buổi học khớp với 
+học viên 1Ю1 và bấm xác 
+nhận Check-in.
+Chỉ cho phép thực 
+hiện Check-in trong 
+giới hạn khoảng thời 
+gian trước hoặc sau 
+khi ca học diễn ra 30 
+phút.
+Attendance
+Session
+6.2 Điểm danh & 
+Kết quả
+Ghi nhận tiến 
+độ
+Coach
+Đánh giá chung về tình 
+hình học tập và tiến độ 
+của cả tập thể lớp sau buổi 
+tập.
+Cập nhật kết quả chi tiết, 
+nội dung đã tập và đánh 
+giá năng lực của riêng cá 
+nhân học viên 1Ю1 sau 
+buổi học.
+Không bắt buộc, 
+nhưng là dữ liệu quan 
+trọng để học viên 
+theo dõi quá trình tập 
+luyện trên ứng dụng 
+cá nhân.
+Attendance
+Session
+7.1 Giao diện & 
+Báo cáo
+Xem lịch cá 
+nhân
+Member / Coach
+Member: Xem rõ chuỗi 12 
+buổi học cố định từ ngày 
+bắt đầu đến khi kết thúc.
+Coach: Xem danh sách các 
+Lớp cố định đang phụ 
+trách.
+Member: Xem các ca học 
+đã book lịch và số dư 
+Credit còn lại.
+Coach: Xem lịch hẹn 1Ю1 
+chi tiết theo từng ca dạy.
+Phân quyền dữ liệu: 
+Mỗi tài khoản chỉ xem 
+được lịch học hoặc 
+lịch dạy tương ứng 
+với cá nhân mình.
+Session
+Course_Registration
+7.2 Giao diện & 
+Báo cáo
+Hoàn thành / 
+Hết hạn
+System (Hệ 
+thống)
+Khi buổi học thứ 12 (buổi 
+cuối cùng) kết thúc, trạng 
+thái của gói đăng ký sẽ tự 
+động chuyển sang 
+"Completed".
+Khi dùng hết 12 Credit 
+hoặc quá thời hạn 45 
+ngày, trạng thái gói đăng 
+ký sẽ đổi sang 
+"Completed" (nếu học 
+hết) hoặc "Expired" (nếu 
+hết hạn), đồng thời hủy 
+bỏ các Credit dư thừa 
+chưa dùng.
+Khóa 1Ю1: Hệ thống sử 
+dụng tác vụ chạy 
+ngầm tự động (Cron 
+job/Background job) 
+quét mỗi đêm lúc 00:
+00 để kiểm tra và xử 
+lý các gói đã quá mốc 
+thời gian 45 ngày.
+Course_Registration
+Session
+
+
+=== PAGE 5 ===
+Mã YC
+Nhóm
+Vai trò
+Chức năng
+Yêu cầu chi tiết đã cập nhật
+FR-009
+Khóa học
+Center 
+Manager
+Tạo khóa 
+Normal / 
+Advanced
+Normal không cần Validity_Days. Advanced bắt buộc có 
+Validity_Days (VD: 45 ngày). Sức chứa Normal tối đa 15 người. 
+Khóa 1Ю1 ấn định 90 phút/buổi.
+FR-011
+Normal
+Center 
+Manager
+Tạo ca Normal 
+cố định
+Lên lịch lặp lại (VD: T2-4-6). Hệ thống tự động sinh ra 12 record 
+buổi học tĩnh đưa vào Database. Sân/Phòng không được trùng với 
+lịch đã có. Tự động loại trừ giờ nắng nóng cho môn Ngoài trời.
+FR-014
+Normal
+Member, 
+Receptionist
+Đăng ký toàn 
+khóa Normal
+Member chọn Lớp (có sẵn chuỗi lịch 12 buổi). Thanh toán = 
+"Success" $\rightarrow$ Tự động add Member vào 12 record buổi 
+học. Nút Đăng ký disabled nếu lớp đủ 15 người.
+FR-015
+Normal
+Member, 
+Receptionist
+Không hỗ trợ 
+Báo vắng / Hủy
+Nút "Hủy lịch" bị vô hiệu hóa. Lịch học diễn ra bình thường. 
+Member vắng tự chịu trách nhiệm mất buổi (Không hoàn 
+credit, không xếp học bù).
+FR-017
+Advanced
+Member, 
+Receptionist
+Mua khóa & 
+Nạp Credit
+Thanh toán = "Success" $\rightarrow$ Hệ thống nạp 12 Credit vào 
+tài khoản Member và bắt đầu đếm ngược thời hạn.
+FR-018
+Advanced
+Member, 
+Receptionist
+Đặt lịch / Hủy 
+lịch 1Ю1
+Member chọn giờ rảnh của Coach. Cho phép Hủy lịch trên App khi 
+còn ít nhất 24 giờ (≥24h) $\rightarrow$ Hoàn 1 Credit. Dưới 24h 
+không hoàn.
+FR-020
+Advanced
+Hệ thống, 
+Coach
+Phạt vắng mặt 
+(No-show)
+Hủy < 24h hoặc không đến $\rightarrow$ Khóa nút hủy. Coach 
+điểm danh "Vắng" $\rightarrow$ Trừ 1 Credit (Bảo vệ lương HLV).
+FR-022
+Lịch
+Center 
+Manager
+Xử lý sự cố 
+Trung tâm
+HLV bệnh, mưa bão: Hệ thống đề xuất giờ thay thế. Manager phải 
+kiểm tra Coach, sân và bấm xác nhận mới tạo buổi học bù ở cuối 
+khóa.
+FR-024
+Lịch
+Hệ thống
+Khóa khung giờ 
+trưa
+Khung 10Ю30 - 15Ю15 là đề xuất chính sách; chỉ chặn hệ thống nếu 
+trung tâm bật cấu hình bắt buộc cho môn/sân đó.
+
+
+=== PAGE 6 ===
+Mã
+Thao tác (Chức 
+năng)
+Admin
+Center 
+Manager
+Receptionist
+Coach
+Member
+Giới hạn / Ghi chú
+RP-04
+Quản lý tài 
+khoản 
+Admin/Manager
+Q
+—
+—
+—
+—
+Chỉ Admin tạo và phân quyền Manager.
+Q: Quản trị hệ thống
+ T: Toàn trung tâm
+ P: Theo phân công 
+C: Bản thân
+ H: Hỗ trợ theo nghiệp vụ 
+—: Không cấp
+RP-05
+Quản lý nhân 
+sự (Lễ tân, 
+Coach)
+—
+T
+—
+—
+—
+Center Manager toàn quyền vận hành nhân sự.
+RP-08
+Xem hồ sơ 
+Member
+—
+T
+T
+P
+C
+Coach chỉ xem hồ sơ học viên của lớp mình.
+RP-10
+Quản lý bộ môn 
+/ sân phòng
+—
+T
+—
+—
+—
+Manager cài đặt biến Indoor/Outdoor cho sân.
+RP-13
+Tạo / Công bố 
+khóa học
+—
+T
+—
+—
+—
+Giá Subject là mặc định. Admin/Manager được 
+phân quyền sửa giá khi công bố lớp. Đơn và biên 
+lai (Invoice) lưu chết mức giá Member đã đồng ý 
+mua.
+RP-14
+Tạo lớp Normal 
+/ Sinh 12 buổi 
+cố định
+—
+T
+—
+—
+—
+Hệ thống báo lỗi nếu Manager xếp lịch vào giờ 
+cấm.
+RP-16
+Đăng ký khóa / 
+Thanh toán
+—
+—
+H
+—
+C
+Lễ tân thực hiện trên máy POS tại quầy.
+RP-17
+Báo vắng 
+Normal (Vô 
+hiệu hóa)
+—
+—
+—
+—
+—
+Chốt quy định không bù -> Không ai có nút này.
+RP-19
+Đặt lịch / Hủy 
+lịch Advanced > 
+24h
+—
+—
+H
+—
+C
+Đặt lịch / Hủy lịch Advanced ≥ 24h (Còn ít nhất 24 
+giờ).
+RP-21
+Ghi nhận Hủy 
+trễ / No-show
+—
+—
+—
+P
+—
+Coach bấm "Vắng", hệ thống tự động trừ điểm.
+RP-24
+Hủy lịch do Sự 
+cố Trung tâm
+—
+T
+—
+—
+—
+Chỉ Manager duyệt Hủy sự cố (Sinh lịch bù / Hoàn 
+credit).
+RP-34
+Ghi nhận 
+Check-in (Điểm 
+danh)
+—
+—
+H
+P
+—
+Coach điểm danh lớp phụ trách (Phạm vi 30p 
+trước/sau ca).
+RP-36
+Tạo kế hoạch / 
+Đánh giá tiến 
+độ
+—
+—
+—
+P
+—
+Coach ghi nhận điểm mạnh/yếu của Member.
+RP-43
+Xem nhật ký 
+hoạt động 
+(Action Logs)
+Q
+T
+—
+—
+—
+Admin xem lỗi bảo mật; Manager xem hoạt động 
+dòng tiền.
+RP-45
+Hủy Khóa học / 
+Hoàn Tiền
+—
+T
+—
+—
+—
+KHÔNG đưa vào bản MVP. Tính năng hủy toàn 
+khóa và công thức tính tiền hoàn lại quá phức 
+tạp, chúng ta chốt Hoãn (Pending) ở giai đoạn 
+này. Nếu có trường hợp bắt buộc phải hủy khóa 
+do khiếu nại, Manager/Admin sẽ tiếp nhận, quyết 
+định trả tiền bằng chuyển khoản thủ công bên 
+ngoài, sau đó vào Database thay đổi trạng thái 
+gói thành "Cancelled".
+
+
+=== PAGE 7 ===
+Môn Thể Thao
+Học phí Khóa Normal (Nhóm 10-
+15 người)
+Học phí Khóa Advanced (1Ю1)
+Quần vợt (Tennis)
+2.500.000 đ
+8.000.000 đ
+Bơi lội
+1.500.000 đ
+4.500.000 đ
+Pickleball
+1.800.000 đ
+5.000.000 đ
+Bắn cung
+2.000.000 đ
+6.000.000 đ
+Bóng rổ
+1.200.000 đ
+3.500.000 đ
+Bóng đá
+1.000.000 đ
+3.500.000 đ
+Bóng chuyền
+1.000.000 đ
+3.500.000 đ
+Cầu lông
+900.000 đ
+3.000.000 đ
+Bóng bàn
+800.000 đ
+2.500.000 đ
+
+
+=== PAGE 8 ===
+2. Luồng vận hành thực tế trên hệ thống (Flow)
+Màn hình Quản lý Môn học (Dành cho Admin/Center Manager): Khi Admin tạo hoặc chỉnh sửa 
+môn "Quần vợt", họ sẽ nhập 2 mức giá là 2.500.000đ và 8.000.000đ vào 2 trường tương ứng. 
+Bảng giá này có thể được chỉnh sửa bất cứ lúc nào nếu trung tâm muốn thay đổi học phí.
+Màn hình Tạo Lớp (Dành cho Center Manager): Khi Manager tạo một Class (Lớp học) mới, họ 
+chọn môn học từ Dropdown (ví dụ: Pickleball) và chọn loại lớp (Normal). Hệ thống (Backend) 
+sẽ tự động chọc vào bảng Subject, lấy đúng giá trị NormalPrice (1.800.000đ) để gắn cho lớp 
+học này.
+Màn hình Thanh toán (Dành cho Member/Receptionist): Khi học viên đăng ký, hệ thống hiển 
+thị đúng mức giá đã được cấu hình ở bảng Subject.
+3. Ràng buộc dữ liệu cực kỳ quan trọng (Lưu ý cho Team Dev) Mặc dù bạn cấu hình giá ở bảng 
+Subject, khi học viên thực hiện thanh toán thành công, hệ thống bắt buộc phải copy số tiền đó 
+và lưu cứng vào thuộc tính Amount của bảng Invoice (Hóa đơn). Việc này đảm bảo tính toàn 
+vẹn của dữ liệu kế toán: Nếu tháng sau trung tâm tăng giá môn Cầu lông Normal từ 900.000đ 
+lên 1.000.000đ, thì những hóa đơn cũ của các học viên đã đăng ký tháng trước (được lưu trong 
+bảng Invoice) vẫn giữ nguyên giá trị gốc là 900.000đ.
+
+
+=== PAGE 9 ===
+STT
+PROBLEM
+METHOD
+1 Race Condition (Vấn đề 
+tranh chấp đồng thời)
+1. Tình huống: Lớp Normal còn đúng 1 chỗ (14/15). Hai Member A và B 
+cùng bấm thanh toán cùng một giây (millisecond). Nếu BE không xử lý tốt, 
+cả 2 sẽ cùng lọt vào lớp -> Sĩ số thành 16/15 (Lỗi nghiêm trọng).
+2. Dev cần tìm hiểu: Cơ chế Database Locking (Pessimistic Lock / 
+Optimistic Lock) hoặc sử dụng Transaction Isolation Level để khóa record 
+khi update sĩ số.
+2 Validation Logic (Kiểm tra 
+điều kiện ở Backend)
+1. Quy tắc: Tuyệt đối không tin tưởng Front-End. Dù FE đã ẩn nút đăng 
+ký, hacker vẫn có thể dùng Postman bắn API.
+2. Dev cần làm: Trước khi xử lý Insert vào bảng đăng ký, BE luôn phải có 
+đoạn code Check (Current_Members < MaxCapacity). Nếu >= thì Throw 
+Exception 400 (Bad Request). Cần viết tiêu chí kết quả rõ ràng: Trả mã lỗi 
+400, không cho phép xác nhận 11/12 buổi Advanced (phải đủ 12 hợp lệ 
+nếu book lặp). Khóa DB (Lock) chống trùng lịch thao tác đồng thời.
+3 Auto-generation Logic 
+(Thuật toán sinh buổi học)
+1. Quy tắc: Khi tạo lớp Normal, Manager chỉ nhập "T2-T4-T6, bắt đầu từ 
+ngày X, tổng 12 buổi".
+2. Dev cần tìm hiểu: Viết vòng lặp (Loop) kết hợp thư viện xử lý 
+Ngày/Tháng (Date/Time manipulation) để từ ngày bắt đầu, tịnh tiến cộng 
+ngày, tự động sinh ra đúng 12 bản ghi (record) Session Insert xuống 
+Database. (Cần chú ý thuật toán bỏ qua các ngày Lễ/Tết).
+
+
+=== PAGE 10 ===
+STT
+Problem
+1
+Price
+Thêm 2 thuộc tính mới vào bảng Subject
+Do mỗi môn học gắn liền với 2 mức giá cố định như trong hình, bạn hãy thêm 2 cột (attributes) này vào bảng Subject: 
+- NormalPrice (Kiểu tiền tệ/Decimal): Lưu mức giá của Khóa Normal (Ví dụ: Bơi lội sẽ lưu 1.500.000đ).   
+- AdvancedPrice (Kiểu tiền tệ/Decimal): Lưu mức giá của Khóa 1:1 (Ví dụ: Bơi lội sẽ lưu 4.500.000đ).
+2
+1. Nhóm Bảng Môn học & Lớp học
+Bảng subjects:
+Thêm cột: normal_price (numeric) — Giá chuẩn cho khóa học nhóm.
+Thêm cột: advanced_price (numeric) — Giá chuẩn cho khóa 1:1.
+Bảng classes:
+Thêm cột: class_type (varchar) — Ràng buộc CHECK chỉ nhận giá trị 'Normal' hoặc 'Advanced'.
+Thêm cột: total_sessions (integer) — Tổng số buổi học quy định.
+Sửa ràng buộc (Constraint): Thay đổi chk_class_capacity để tự động chặn lỗi: CHECK ( (class_type = 'Normal' AND max_capacity <= 15) OR (class_type = 
+'Advanced' AND max_capacity = 1) ).
+2. Nhóm Bảng Gói Thành Viên (Tái sử dụng làm lõi quản lý)
+Thay vì tạo bảng course_registrations mới, chúng ta dùng luôn 2 bảng membership_packages (Gói khuôn mẫu) và member_packages (Khách hàng đăng ký 
+gói).
+Bảng membership_packages (Khuôn mẫu gói Normal / 1:1):
+Thêm cột: package_type (varchar) — CHECK: 'Normal', 'Advanced'.
+Thêm cột: total_credit (integer) — Số tín chỉ mặc định của gói (VD: 12).
+
+
+=== PAGE 11 ===
+Buổi
+Ca
+Khung giờ 
+(90p)
+Nghỉ chuyển tiếp (15p)
+Phân loại & Ràng buộc thời tiết
+SÁNG
+Ca 1
+06Ю00 – 07Ю30
+07Ю30 – 07Ю45
+Mở toàn bộ: Khung giờ sáng sớm mát mẻ nhất 
+(bơi lội, tennis, chạy bộ, bóng đá) trước khi đi 
+làm/đi học.
+Ca 2
+07Ю45 – 09Ю15
+09Ю15 – 09Ю30
+Mở toàn bộ: Ca sáng tiêu chuẩn, thời tiết dịu 
+mát cho cả môn trong nhà và ngoài trời.
+Ca 3
+09Ю30 – 11Ю00
+11Ю00 – 13Ю00
+Mở toàn bộ: Kết thúc đúng 11Ю00, vừa chạm 
+ngưỡng bắt đầu giờ trưa nên các môn ngoài 
+trời vẫn tập luyện an toàn.
+TRƯA
+—
+11Ю00 – 13Ю00
+Nghỉ trưa 120 phút
+ĐÓNG CỬA NGHỈ TRƯA / ĂN UỐNG / TẮT ĐÈN 
+BẢO TRÌ SÂN (Tránh trọn vẹn nắng gắt đỉnh 
+điểm).
+CHIỀU
+Ca 4
+13Ю00 – 14Ю30
+14Ю30 – 14Ю45
+Chỉ mở môn trong nhà (Indoor).
+(Khóa toàn bộ 4 môn ngoài trời Outdoor do 
+còn dính nắng nóng đến 15Ю15).
+Ca 5
+14Ю45 – 16Ю15
+16Ю15 – 16Ю30
+Mở toàn bộ: Thời điểm từ 14Ю45 trở đi nắng đã 
+hạ nhiệt, mở lại toàn bộ sân ngoài trời.
+TỐI
+Ca 6
+16Ю30 – 18Ю00
+18Ю00 – 18Ю15
+Giờ cao điểm 1: Học sinh tan trường, người đi 
+làm về sớm.
+Ca 7
+18Ю15 – 19Ю45
+19Ю45 – 21Ю00
+Giờ cao điểm 2: Khung giờ vàng đông khách 
+nhất trong ngày.
+STT
+Tên môn thể 
+thao
+Phân loại
+Cơ sở vật chất (rooms / facilities)
+Ràng buộc giờ cấm nắng nóng
+1 Bóng đá
+Outdoor
+Sân cỏ ngoài trời
+Có (Khóa Ca 3 & Ca 4)
+2 Quần vợt 
+(Tennis)
+Outdoor
+Sân Tennis ngoài trời
+Có (Khóa Ca 3 & Ca 4)
+3 Bắn cung
+Outdoor
+Trường bắn ngoài trời
+Có (Khóa Ca 3 & Ca 4)
+4 Bơi lội
+Outdoor
+Hồ bơi ngoài trời
+Có (Khóa Ca 3 & Ca 4)
+5 Cầu lông
+Indoor
+Nhà thi đấu (Sàn thảm)
+Không (Mở toàn bộ)
+6 Bóng bàn
+Indoor
+Phòng bóng bàn
+Không (Mở toàn bộ)
+7 Bóng rổ
+Indoor
+Nhà thi đấu đa năng
+Không (Mở toàn bộ)
+
+
+=== PAGE 12 ===
+8 Bóng chuyền
+Indoor
+Nhà thi đấu đa năng
+Không (Mở toàn bộ)
+9 Pickleball
+Indoor
+Sân có mái che / trong nhà
+Không (Mở toàn bộ)
+
+
+=== PAGE 13 ===
+
+

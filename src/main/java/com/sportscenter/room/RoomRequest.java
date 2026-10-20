@@ -8,5 +8,10 @@ public record RoomRequest(
         @NotBlank String name,
         String location,
         @NotNull @Positive Integer capacity,
-        String status) {
+        String status,
+        String facilityType) {
+
+    public RoomRequest(String name, String location, Integer capacity, String status) {
+        this(name, location, capacity, status, "Indoor");
+    }
 }

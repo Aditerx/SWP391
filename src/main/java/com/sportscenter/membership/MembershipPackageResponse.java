@@ -8,15 +8,25 @@ public record MembershipPackageResponse(
         Integer durationDays,
         BigDecimal price,
         String benefits,
-        String status) {
+        String status,
+        String packageType,
+        Integer totalCredit) {
 
-    static MembershipPackageResponse from(MembershipPackage membershipPackage) {
+    public MembershipPackageResponse(Integer id, String name, Integer durationDays,
+                                     BigDecimal price, String benefits, String status) {
+        this(id, name, durationDays, price, benefits, status, "Normal", 12);
+    }
+
+    public static MembershipPackageResponse from(MembershipPackage membershipPackage) {
+        if (membershipPackage == null) return null;
         return new MembershipPackageResponse(
                 membershipPackage.getId(),
                 membershipPackage.getName(),
                 membershipPackage.getDurationDays(),
                 membershipPackage.getPrice(),
                 membershipPackage.getBenefits(),
-                membershipPackage.getStatus());
+                membershipPackage.getStatus(),
+                membershipPackage.getPackageType(),
+                membershipPackage.getTotalCredit());
     }
 }

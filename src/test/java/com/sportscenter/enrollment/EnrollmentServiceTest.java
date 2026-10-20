@@ -107,6 +107,7 @@ class EnrollmentServiceTest {
         sampleClass.setName("Yoga Buổi Sáng");
         sampleClass.setMaxCapacity(20);
         sampleClass.setStatus("Open");
+        sampleClass.setClassType("Advanced");
 
         sampleActivePackage = new MemberPackage();
         sampleActivePackage.setSubscriptionId(1);
@@ -611,5 +612,24 @@ class EnrollmentServiceTest {
         assertEquals(88, response.invoiceId());
         assertEquals("Pending", response.paymentStatus());
         assertEquals("https://vnpay.test/pay", response.paymentUrl());
+    }
+
+    @Test
+    @DisplayName("Member cancellation for Normal class is strictly blocked")
+    void cancelEnrollment_NormalClass_IsStrictlyBlocked() {
+        SportsClass normalClass = new SportsClass();
+        normalClass.setId(2);
+        normalClass.setName("Normal Badminton");
+        normalClass.setClassType("Normal");
+
+        ClassEnrollment existing = registeredEnrollment();
+        existing.setSportsClass(normalClass);
+
+        when(classRepository.findByIdForUpdate(2)).thenReturn(Optional.of(normalClass));
+        when(enrollmentRepository.findByMemberIdAndSportsClassId(8, 2)).thenReturn(Optional.of(existing));
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> enrollmentService.cancelEnrollment(2, 8, sampleMember.getEmail()));
+        assertTrue(ex.getMessage().contains("NORMAL_CLASS_NON_CANCELLABLE"));
     }
 }

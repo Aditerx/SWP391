@@ -34,9 +34,41 @@ public class SessionController {
         return ResponseEntity.ok(sessionService.findAll(classId, coachId, roomId, memberId, startDate, endDate, status));
     }
 
+    @GetMapping("/time-slots")
+    public ResponseEntity<List<TimeSlotResponse>> getTimeSlots(
+            @RequestParam(required = false) Boolean isOutdoor) {
+        return ResponseEntity.ok(sessionService.getTimeSlots(isOutdoor));
+    }
+
+    @GetMapping("/coaches/{coachId}/available-slots")
+    public ResponseEntity<List<CoachAvailableSlotResponse>> getCoachAvailableSlots(
+            @PathVariable Integer coachId,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+            @RequestParam(required = false) Integer subjectId,
+            @RequestParam(required = false) Integer roomId) {
+        return ResponseEntity.ok(sessionService.getCoachAvailableSlots(coachId, date, subjectId, roomId));
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<SessionResponse> findById(@PathVariable Integer id) {
         return ResponseEntity.ok(sessionService.findById(id));
+    }
+
+    @PostMapping("/book-private")
+    @PreAuthorize("hasAnyRole('MEMBER', 'ADMIN', 'MANAGER')")
+    public ResponseEntity<SessionResponse> bookPrivate(
+            @Valid @RequestBody PrivateBookingRequest request,
+            Authentication authentication) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(sessionService.bookPrivateSession(request, authentication));
+    }
+
+    @PostMapping("/{sessionId}/cancel-private")
+    @PreAuthorize("hasAnyRole('MEMBER', 'ADMIN', 'MANAGER')")
+    public ResponseEntity<SessionResponse> cancelPrivate(
+            @PathVariable Integer sessionId,
+            Authentication authentication) {
+        return ResponseEntity.ok(sessionService.cancelPrivateSession(sessionId, authentication));
     }
 
     @PostMapping("/{sessionId}/absence")
@@ -50,6 +82,12 @@ public class SessionController {
     @PreAuthorize("hasAuthority('MANAGE_CLASSES')")
     public ResponseEntity<ConflictCheckResponse> checkConflict(@Valid @RequestBody ConflictCheckRequest request) {
         return ResponseEntity.ok(sessionService.checkConflict(request));
+    }
+
+    @PostMapping("/preview-recurring")
+    @PreAuthorize("hasAuthority('MANAGE_CLASSES')")
+    public ResponseEntity<RecurringPreviewResponse> previewRecurring(@Valid @RequestBody RecurringPreviewRequest request) {
+        return ResponseEntity.ok(sessionService.previewRecurringSessions(request));
     }
 
     @PostMapping
@@ -76,6 +114,24 @@ public class SessionController {
     public ResponseEntity<SessionResponse> updateStatus(@PathVariable Integer id,
                                                         @Valid @RequestBody SessionStatusRequest request) {
         return ResponseEntity.ok(sessionService.updateStatus(id, request.status()));
+    }
+
+    @PostMapping("/{sessionId}/reschedule")
+    @PreAuthorize("hasAuthority('MANAGE_CLASSES')")
+    public ResponseEntity<SessionResponse> reschedule(
+            @PathVariable Integer sessionId,
+            @Valid @RequestBody SessionRescheduleRequest request,
+            Authentication authentication) {
+        return ResponseEntity.ok(sessionService.rescheduleSession(sessionId, request, authentication));
+    }
+
+    @PostMapping("/{sessionId}/substitute-coach")
+    @PreAuthorize("hasAuthority('MANAGE_CLASSES')")
+    public ResponseEntity<SessionResponse> substituteCoach(
+            @PathVariable Integer sessionId,
+            @Valid @RequestBody SubstituteCoachRequest request,
+            Authentication authentication) {
+        return ResponseEntity.ok(sessionService.substituteCoach(sessionId, request, authentication));
     }
 
     @DeleteMapping("/{id}")

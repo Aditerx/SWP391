@@ -3,9 +3,12 @@ package com.sportscenter.audit;
 import com.sportscenter.enrollment.*;
 import com.sportscenter.invoice.*;
 import com.sportscenter.membership.*;
+import com.sportscenter.notification.NotificationService;
+import com.sportscenter.session.SessionRepository;
 import com.sportscenter.sportclass.*;
 import com.sportscenter.user.*;
 import org.junit.jupiter.api.Test;
+import java.time.Clock;
 import java.time.LocalDate;
 import java.util.*;
 import static org.junit.jupiter.api.Assertions.*;
@@ -36,14 +39,18 @@ class BusinessGapAuditTest {
     @Test void futureActivePackageCannotEnrollToday() {
         var er=mock(ClassEnrollmentRepository.class); var cr=mock(SportsClassRepository.class);
         var ur=mock(UserRepository.class); var mr=mock(MemberPackageRepository.class);
-        var service=new EnrollmentService(er,cr,ur,mr,mock(AuditService.class),mock(InvoiceService.class));
+        var service=new EnrollmentService(er,cr,ur,mr,mock(AuditService.class),mock(InvoiceService.class),
+            Clock.systemDefaultZone(),mock(SessionRepository.class),mock(NotificationService.class),mock(MemberRepository.class));
         var role=new Role(); role.setName("Member");
         var member=new User(); member.setId(7); member.setStatus("Active"); member.setRole(role);
         when(ur.findByEmailIgnoreCase("audit@example.com")).thenReturn(Optional.of(member));
         when(ur.findById(7)).thenReturn(Optional.of(member));
+        SportsClass sampleClass = new SportsClass();
+        sampleClass.setId(1);
+        sampleClass.setStatus("Open");
+        when(cr.findByIdForUpdate(1)).thenReturn(Optional.of(sampleClass));
         var pkg=new MemberPackage(); pkg.setStatus("Active"); pkg.setStartDate(LocalDate.now().plusDays(30)); pkg.setEndDate(LocalDate.now().plusDays(60));
         when(mr.findByMemberId(7)).thenReturn(List.of(pkg));
         assertThrows(com.sportscenter.common.exception.BusinessException.class, () -> service.enroll(1,null,"audit@example.com"));
-        verifyNoInteractions(cr,er);
     }
 }

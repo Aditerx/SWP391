@@ -4,14 +4,15 @@ import com.sportscenter.user.CoachRepository;
 import com.sportscenter.center.CenterContext;
 import com.sportscenter.report.AtRiskMemberResponse;
 import com.sportscenter.report.ChurnRiskService;
+import com.sportscenter.session.CoachAvailableSlotResponse;
+import com.sportscenter.session.SessionService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.util.List;
 
 @RestController
@@ -22,11 +23,21 @@ public class CoachController {
     private final CoachSpecializationRepository coachSpecializationRepository;
     private final CenterContext centerContext;
     private final ChurnRiskService churnRiskService;
+    private final SessionService sessionService;
 
     @GetMapping("/me/at-risk-members")
     @PreAuthorize("hasRole('COACH')")
     public List<AtRiskMemberResponse> atRiskMembers(Authentication authentication) {
         return churnRiskService.forCoach(authentication);
+    }
+
+    @GetMapping("/{coachId}/available-slots")
+    public List<CoachAvailableSlotResponse> getAvailableSlots(
+            @PathVariable Integer coachId,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+            @RequestParam(required = false) Integer subjectId,
+            @RequestParam(required = false) Integer roomId) {
+        return sessionService.getCoachAvailableSlots(coachId, date, subjectId, roomId);
     }
 
     @GetMapping

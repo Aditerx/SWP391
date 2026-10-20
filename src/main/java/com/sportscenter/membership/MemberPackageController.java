@@ -55,4 +55,12 @@ public class MemberPackageController {
         String status = body != null ? body.get("status") : null;
         return memberPackageService.updateStatus(id, status);
     }
+
+    @PostMapping({"/member-packages/{id}/extend", "/subscriptions/{id}/extend"})
+    @PreAuthorize("hasAuthority('MANAGE_SUBSCRIPTIONS')")
+    public MemberPackageResponse extendValidity(@PathVariable Integer id,
+                                                @Valid @RequestBody PackageExtensionRequest request,
+                                                Authentication authentication) {
+        return memberPackageService.extendValidity(id, request, authentication);
+    }
 }

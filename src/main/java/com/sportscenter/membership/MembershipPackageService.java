@@ -59,6 +59,12 @@ public class MembershipPackageService {
         membershipPackage.setPrice(request.price());
         membershipPackage.setBenefits(request.benefits());
         membershipPackage.setStatus(request.status() == null ? "ACTIVE" : request.status());
+        if (request.packageType() != null && !request.packageType().isBlank()) {
+            membershipPackage.setPackageType(request.packageType());
+        }
+        if (request.totalCredit() != null) {
+            membershipPackage.setTotalCredit(request.totalCredit());
+        }
     }
 
     private void auditStatusChange(String previousStatus, MembershipPackage saved, String action) {

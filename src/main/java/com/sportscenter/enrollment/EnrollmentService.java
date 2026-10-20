@@ -101,8 +101,10 @@ public class EnrollmentService {
             throw new BusinessException("BOOKING_BLOCKED: booking is blocked until " + profile.getBookingBlockedUntil());
         }
         List<MemberPackage> activePackages = memberPackageRepository.findByMemberId(memberId).stream()
-                .filter(p -> "Active".equalsIgnoreCase(p.getStatus()) && p.getEndDate() != null
-                        && !p.getEndDate().isBefore(LocalDate.now(clock))).toList();
+                .filter(p -> "Active".equalsIgnoreCase(p.getStatus())
+                        && (p.getStartDate() == null || !p.getStartDate().isAfter(LocalDate.now(clock)))
+                        && (p.getEndDate() == null || !p.getEndDate().isBefore(LocalDate.now(clock))))
+                .toList();
         if (activePackages.isEmpty()) throw new BusinessException("PACKAGE_EXPIRED: member package is expired or inactive");
 
         if (!"Open".equalsIgnoreCase(sportsClass.getStatus()) && !"Ongoing".equalsIgnoreCase(sportsClass.getStatus())) {
@@ -241,6 +243,12 @@ public class EnrollmentService {
             return;
         }
         if ("Waitlisted".equalsIgnoreCase(enrollment.getStatus())) return;
+
+        // Ràng buộc Khóa Normal: CẤM HỦY / BÁO VẮNG (Member.pdf FR-015, RP-17, AGENTS.md 2.4)
+        if (enrollment.getSportsClass() != null && enrollment.getSportsClass().isNormal()) {
+            throw new BusinessException("NORMAL_CLASS_NON_CANCELLABLE: Lớp học nhóm cố định 12 buổi không hỗ trợ hủy hoặc hoàn tiền theo quy chế trung tâm.");
+        }
+
         Integer classId = enrollment.getSportsClass().getId();
         LocalDateTime now = LocalDateTime.now(clock);
         List<Session> upcoming = sessionRepository.findNextUpcomingForClass(classId, now.toLocalDate(), now.toLocalTime());
@@ -273,7 +281,9 @@ public class EnrollmentService {
             User member = waiting.getMember();
             if (member == null || !"Active".equalsIgnoreCase(member.getStatus())) continue;
             boolean packageActive = memberPackageRepository.findByMemberId(member.getId()).stream()
-                    .anyMatch(p -> "Active".equalsIgnoreCase(p.getStatus()) && p.getEndDate() != null && !p.getEndDate().isBefore(LocalDate.now(clock)));
+                    .anyMatch(p -> "Active".equalsIgnoreCase(p.getStatus())
+                            && (p.getStartDate() == null || !p.getStartDate().isAfter(LocalDate.now(clock)))
+                            && (p.getEndDate() == null || !p.getEndDate().isBefore(LocalDate.now(clock))));
             if (!packageActive) continue;
             Member profile = memberRepository.findById(member.getId()).orElse(null);
             if (profile != null && profile.getBookingBlockedUntil() != null && profile.getBookingBlockedUntil().isAfter(LocalDateTime.now(clock))) continue;

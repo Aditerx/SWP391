@@ -126,9 +126,7 @@ public class AttendanceService {
         if (request.reason() == null || request.reason().isBlank()) {
             throw new BusinessException("A reason is required for attendance correction");
         }
-        if (authentication != null && authentication.getAuthorities().stream()
-                .anyMatch(a -> "ROLE_COACH".equals(a.getAuthority()))) {
-            User actor = userRepository.findByEmailIgnoreCase(authentication.getName()).orElseThrow();
+        if (actor.getRole() != null && ("Coach".equalsIgnoreCase(actor.getRole().getName()) || "ROLE_COACH".equalsIgnoreCase(actor.getRole().getName()))) {
             if (att.getSession() == null || att.getSession().getSportsClass() == null
                     || att.getSession().getSportsClass().getCoach() == null
                     || !actor.getId().equals(att.getSession().getSportsClass().getCoach().getId())) {
@@ -243,7 +241,11 @@ public class AttendanceService {
             Session session = sessionRepository.findById(sessionId)
                     .orElseThrow(() -> new ResourceNotFoundException("Session not found: " + sessionId));
             Integer classId = session.getSportsClass().getId();
-            if (!enrollmentRepository.existsByMemberIdAndSportsClassIdAndStatus(memberId, classId, "Registered")) {
+            if (session.getBookedMember() != null) {
+                if (!session.getBookedMember().getId().equals(memberId)) {
+                    throw new BusinessException("NOT_YOUR_CLASS: member is not the booked member for this private session");
+                }
+            } else if (!enrollmentRepository.existsByMemberIdAndSportsClassIdAndStatus(memberId, classId, "Registered")) {
                 throw new BusinessException("NOT_YOUR_CLASS: member is not Registered in the class");
             }
             LocalDateTime startsAt = LocalDateTime.of(session.getSessionDate(), session.getStartTime());

@@ -102,6 +102,37 @@ class InvoiceServiceTest {
     }
 
     @Test
+    void cashConfirmationActivatesAdvancedPackageWith12CreditsAnd45Days() {
+        User receptionist = new User(); receptionist.setId(5); receptionist.setEmail("desk@example.com");
+        User member = new User(); member.setId(7);
+        MembershipPackage pkg = new MembershipPackage();
+        pkg.setPackageType("Advanced");
+        pkg.setTotalCredit(12);
+        pkg.setDurationDays(45);
+        MemberPackage subscription = new MemberPackage();
+        subscription.setMember(member);
+        subscription.setMembershipPackage(pkg);
+        subscription.setStatus("Pending");
+        subscription.setRemainingCredit(0);
+        subscription.setValidityDays(45);
+
+        Invoice invoice = new Invoice(); invoice.setInvoiceId(25); invoice.setInvoiceCode("INV-2026-000025");
+        invoice.setMember(member); invoice.setSubscription(subscription); invoice.setPaymentMethod("Cash"); invoice.setPaymentStatus("Pending");
+        var auth = new UsernamePasswordAuthenticationToken("desk@example.com", "n/a", List.of(new SimpleGrantedAuthority("ROLE_RECEPTIONIST")));
+        when(userRepository.findByEmailIgnoreCase("desk@example.com")).thenReturn(Optional.of(receptionist));
+        when(invoiceRepository.findByIdForUpdate(25)).thenReturn(Optional.of(invoice));
+
+        InvoiceResponse response = invoiceService.confirmCash(25, auth);
+
+        assertEquals("Paid", response.paymentStatus());
+        assertEquals("Active", subscription.getStatus());
+        assertEquals(12, subscription.getRemainingCredit());
+        assertEquals(45, subscription.getValidityDays());
+        assertNotNull(subscription.getStartDate());
+        assertEquals(subscription.getStartDate().plusDays(45), subscription.getEndDate());
+    }
+
+    @Test
     void verifiedVnPayCallbackIsIdempotentAndActivatesPackage() {
         User member = new User(); member.setId(7);
         MembershipPackage pkg = new MembershipPackage(); pkg.setDurationDays(30);

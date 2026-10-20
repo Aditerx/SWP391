@@ -30,9 +30,19 @@ public class MembershipPackage {
     @Column(name = "benefits")
     private String benefits;
 
+    @Column(name = "package_type", length = 20)
+    private String packageType = "Normal";
+
+    @Column(name = "total_credit")
+    private Integer totalCredit = 12;
+
     @Column(name = "status")
     private String status;
 
     @Column(name = "center_id", nullable = false)
     private Integer centerId = 1;
+
+    public boolean isAdvanced() {
+        return "Advanced".equalsIgnoreCase(packageType);
+    }
 }

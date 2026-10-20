@@ -1,7 +1,9 @@
 package com.sportscenter.session;
 
+import com.sportscenter.membership.MemberPackage;
 import com.sportscenter.room.Room;
 import com.sportscenter.sportclass.SportsClass;
+import com.sportscenter.user.User;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -29,6 +31,18 @@ public class Session {
     @JoinColumn(name = "room_id", nullable = false)
     private Room room;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "coach_id")
+    private User coach;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "booked_member_id")
+    private User bookedMember;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "subscription_id")
+    private MemberPackage memberPackage;
+
     @Column(name = "session_date", nullable = false)
     private LocalDate sessionDate;
 
@@ -40,6 +54,11 @@ public class Session {
 
     @Column(name = "status", nullable = false)
     private String status = "Scheduled";
+
     @Column(name = "attendance_finalized", nullable = false)
     private boolean attendanceFinalized;
+
+    public boolean isPrivateSession() {
+        return bookedMember != null || (sportsClass != null && sportsClass.isAdvanced());
+    }
 }

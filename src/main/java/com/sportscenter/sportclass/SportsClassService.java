@@ -13,6 +13,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 
@@ -87,12 +88,43 @@ public class SportsClassService {
         sportsClass.setName(request.name());
         sportsClass.setSubject(subject);
         sportsClass.setCoach(request.coachId() == null ? null : getCoach(request.coachId()));
-        sportsClass.setMaxCapacity(request.maxCapacity());
-        if (request.tuitionFee() != null) {
-            sportsClass.setTuitionFee(request.tuitionFee());
-        } else if (sportsClass.getTuitionFee() == null) {
-            sportsClass.setTuitionFee(java.math.BigDecimal.ZERO);
+
+        String classType = (request.classType() != null && !request.classType().isBlank())
+                ? request.classType()
+                : (sportsClass.getClassType() != null ? sportsClass.getClassType() : "Normal");
+
+        if ("Normal".equalsIgnoreCase(classType)) {
+            if (request.maxCapacity() != null && request.maxCapacity() > 15) {
+                throw new BusinessException("Lớp học nhóm Normal chỉ có sức chứa tối đa 15 học viên (maxCapacity <= 15).");
+            }
+            sportsClass.setClassType("Normal");
+            sportsClass.setTotalSessions(request.totalSessions() != null ? request.totalSessions() : 12);
+            // Tự động gán mức giá chuẩn từ Subject.normal_price (Freeze price logic)
+            if (subject.getNormalPrice() != null && subject.getNormalPrice().compareTo(BigDecimal.ZERO) > 0) {
+                sportsClass.setTuitionFee(subject.getNormalPrice());
+            } else if (request.tuitionFee() != null) {
+                sportsClass.setTuitionFee(request.tuitionFee());
+            } else {
+                sportsClass.setTuitionFee(BigDecimal.ZERO);
+            }
+        } else if ("Advanced".equalsIgnoreCase(classType)) {
+            if (request.maxCapacity() != null && request.maxCapacity() != 1) {
+                throw new BusinessException("Khóa học 1:1 Advanced bắt buộc có sức chứa bằng 1 (maxCapacity = 1).");
+            }
+            sportsClass.setClassType("Advanced");
+            sportsClass.setTotalSessions(12);
+            if (subject.getAdvancedPrice() != null && subject.getAdvancedPrice().compareTo(BigDecimal.ZERO) > 0) {
+                sportsClass.setTuitionFee(subject.getAdvancedPrice());
+            } else if (request.tuitionFee() != null) {
+                sportsClass.setTuitionFee(request.tuitionFee());
+            } else {
+                sportsClass.setTuitionFee(BigDecimal.ZERO);
+            }
+        } else {
+            throw new BusinessException("Loại lớp học không hợp lệ: " + classType + ". Chỉ chấp nhận 'Normal' hoặc 'Advanced'.");
         }
+
+        sportsClass.setMaxCapacity(request.maxCapacity());
         sportsClass.setStartDate(request.startDate());
         sportsClass.setEndDate(request.endDate());
         sportsClass.setStatus(request.status() == null ? "Open" : normalizeClassStatus(request.status()));

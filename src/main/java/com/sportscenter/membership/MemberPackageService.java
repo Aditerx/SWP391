@@ -68,7 +68,9 @@ public class MemberPackageService {
         if (!"Active".equalsIgnoreCase(pkg.getStatus())) throw new BusinessException("Cannot subscribe to an Inactive membership package");
         String method = request.paymentMethod() == null || request.paymentMethod().isBlank() ? "Cash" : request.paymentMethod();
         LocalDate startDate = LocalDate.now(ZoneId.of("Asia/Ho_Chi_Minh"));
-        int days = pkg.getDurationDays() != null ? pkg.getDurationDays() : 30;
+        int days = pkg.isAdvanced()
+                ? (pkg.getDurationDays() != null ? pkg.getDurationDays() : 45)
+                : (pkg.getDurationDays() != null ? pkg.getDurationDays() : 30);
 
         MemberPackage mp = new MemberPackage();
         mp.setMember(memberUser);
@@ -76,6 +78,8 @@ public class MemberPackageService {
         mp.setStartDate(startDate);
         mp.setEndDate(startDate.plusDays(days));
         mp.setStatus("Pending");
+        mp.setRemainingCredit(0);
+        mp.setValidityDays(days);
         MemberPackage saved = memberPackageRepository.save(mp);
         InvoiceOrderResponse order = invoiceService.createPackageOrder(memberUser, pkg, method, saved, clientIp);
         auditService.log(null, "SUBSCRIBE_PACKAGE", "MEMBER_PACKAGE", saved.getSubscriptionId(),
@@ -105,15 +109,71 @@ public class MemberPackageService {
         String previousStatus = mp.getStatus();
         if (!"Active".equalsIgnoreCase(previousStatus) && "Active".equals(normalizedStatus)) {
             invoiceService.requirePaidSubscription(subscriptionId);
+            if (mp.getMembershipPackage() != null && mp.getMembershipPackage().isAdvanced()
+                    && (mp.getRemainingCredit() == null || mp.getRemainingCredit() == 0)) {
+                int credits = mp.getMembershipPackage().getTotalCredit() != null ? mp.getMembershipPackage().getTotalCredit() : 12;
+                mp.setRemainingCredit(credits);
+            }
         }
-        if ("Cancelled".equals(normalizedStatus) || "Expired".equals(normalizedStatus))
+        if ("Cancelled".equals(normalizedStatus) || "Expired".equals(normalizedStatus)) {
             invoiceService.cancelPendingSubscriptionPayment(subscriptionId);
+            if ("Expired".equals(normalizedStatus)) {
+                mp.setRemainingCredit(0);
+            }
+        }
         mp.setStatus(normalizedStatus);
         MemberPackage saved = memberPackageRepository.save(mp);
 
         auditService.log(null, "CHANGE_SUBSCRIPTION_STATUS", "MEMBER_PACKAGE", saved.getSubscriptionId(),
                 previousStatus + " -> " + normalizedStatus);
         return MemberPackageResponse.from(saved);
+    }
+
+    @Transactional
+    public MemberPackageResponse extendValidity(Integer subscriptionId, PackageExtensionRequest request, Authentication authentication) {
+        if (request.extendDays() == null || request.extendDays() <= 0) {
+            throw new BusinessException("Số ngày gia hạn phải lớn hơn 0");
+        }
+
+        MemberPackage mp = memberPackageRepository.findByIdForUpdate(subscriptionId)
+                .orElseThrow(() -> new ResourceNotFoundException("Member package subscription not found: " + subscriptionId));
+
+        LocalDate today = LocalDate.now(ZoneId.of("Asia/Ho_Chi_Minh"));
+        LocalDate currentEnd = mp.getEndDate() != null ? mp.getEndDate() : today;
+        LocalDate newEnd = currentEnd.plusDays(request.extendDays());
+        int oldValidity = mp.getValidityDays() != null ? mp.getValidityDays() : 45;
+
+        mp.setEndDate(newEnd);
+        mp.setValidityDays(oldValidity + request.extendDays());
+
+        if ("Expired".equalsIgnoreCase(mp.getStatus()) && newEnd.isAfter(today)) {
+            mp.setStatus("Active");
+        }
+
+        MemberPackage saved = memberPackageRepository.save(mp);
+        Integer actorId = null;
+        if (authentication != null && authentication.getName() != null) {
+            actorId = userRepository.findByEmailIgnoreCase(authentication.getName()).map(User::getId).orElse(null);
+        }
+        auditService.log(actorId, "EXTEND_PACKAGE_VALIDITY", "MEMBER_PACKAGE", saved.getSubscriptionId(),
+                String.format("Gia hạn gói %d ngày (hạn mới: %s). Lý do: %s",
+                        request.extendDays(), newEnd, request.reason() != null ? request.reason() : "N/A"));
+
+        return MemberPackageResponse.from(saved);
+    }
+
+    @Transactional
+    public int expireOutdatedPackages() {
+        LocalDate today = LocalDate.now(ZoneId.of("Asia/Ho_Chi_Minh"));
+        List<MemberPackage> outdated = memberPackageRepository.findExpiredActivePackages(today);
+        for (MemberPackage mp : outdated) {
+            mp.setStatus("Expired");
+            mp.setRemainingCredit(0);
+            memberPackageRepository.save(mp);
+            auditService.log(null, "EXPIRE_MEMBER_PACKAGE", "MEMBER_PACKAGE", mp.getSubscriptionId(),
+                    "Package expired past " + mp.getEndDate() + ". Remaining credits wiped.");
+        }
+        return outdated.size();
     }
 
     private String normalizeStatus(String status) {

@@ -12,5 +12,11 @@ public record MembershipPackageRequest(
         @NotNull @Positive Integer durationDays,
         @NotNull @DecimalMin("0.0") BigDecimal price,
         String benefits,
-        String status) {
+        String status,
+        String packageType,
+        Integer totalCredit) {
+
+    public MembershipPackageRequest(String name, Integer durationDays, BigDecimal price, String benefits, String status) {
+        this(name, durationDays, price, benefits, status, "Normal", 12);
+    }
 }

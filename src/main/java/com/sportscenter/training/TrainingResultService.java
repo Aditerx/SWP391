@@ -6,7 +6,6 @@ import com.sportscenter.common.exception.ResourceNotFoundException;
 import com.sportscenter.enrollment.ClassEnrollmentRepository;
 import com.sportscenter.session.Session;
 import com.sportscenter.session.SessionRepository;
-import com.sportscenter.enrollment.ClassEnrollmentRepository;
 import com.sportscenter.user.User;
 import com.sportscenter.user.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -15,6 +14,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.Clock;
 import java.util.ArrayList;
@@ -58,23 +58,6 @@ public class TrainingResultService {
         Session session = sessionRepository.findById(request.sessionId())
                 .orElseThrow(() -> new ResourceNotFoundException("Session not found: " + request.sessionId()));
 
-        if (session.getSportsClass() == null || session.getSportsClass().getCoach() == null
-                || !session.getSportsClass().getCoach().getId().equals(request.coachId())) {
-            throw new BusinessException("Coach must be assigned to this session's class");
-        }
-        if (authentication != null && authentication.getAuthorities().stream()
-                .anyMatch(a -> "ROLE_COACH".equals(a.getAuthority()))) {
-            User actor = userRepository.findByEmailIgnoreCase(authentication.getName())
-                    .orElseThrow(() -> new AccessDeniedException("Coach account not found"));
-            if (!actor.getId().equals(request.coachId())) {
-                throw new AccessDeniedException("Coaches may only record attendance for their own classes");
-            }
-        }
-        if (!enrollmentRepository.existsByMemberIdAndSportsClassIdAndStatusIn(
-                request.memberId(), session.getSportsClass().getId(), List.of("Registered", "Completed"))) {
-            throw new BusinessException("Attendance requires a Registered or Completed enrollment in this class");
-        }
-
         User member = userRepository.findById(request.memberId())
                 .orElseThrow(() -> new ResourceNotFoundException("Member not found: " + request.memberId()));
 
@@ -96,7 +79,7 @@ public class TrainingResultService {
         String previousStatus = previousAttendance != null ? previousAttendance.getState() : result.getAttendanceStatus();
         boolean correction = previousStatus != null && !previousStatus.equals(status);
         if (correction && session.getSessionDate() != null
-                && session.getSessionDate().isBefore(LocalDate.now(ZoneId.of("Asia/Ho_Chi_Minh")))
+                && session.getSessionDate().isBefore(LocalDate.now(clock))
                 && (request.reason() == null || request.reason().isBlank())) {
             throw new BusinessException("A reason is required to correct attendance for a past session");
         }
@@ -142,6 +125,10 @@ public class TrainingResultService {
         if (coachId == null) {
             throw new BusinessException("Coach is required for recording results");
         }
+
+        final Integer resolvedCoachId = coachId;
+        User coach = userRepository.findById(resolvedCoachId)
+                .orElseThrow(() -> new ResourceNotFoundException("Coach not found: " + resolvedCoachId));
 
         List<TrainingResultResponse> responses = new ArrayList<>();
 
