@@ -37,7 +37,7 @@ public class MemberPackageController {
         return memberPackageService.subscribe(memberId, request, clientIp(httpRequest));
     }
 
-    @PostMapping("/members/me/subscriptions")
+    @PostMapping({"/members/me/subscriptions", "/member-packages/subscribe-me"})
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("hasRole('MEMBER')")
     public SubscriptionOrderResponse subscribeMe(@Valid @RequestBody MemberPackageRequest request, Authentication authentication, HttpServletRequest httpRequest) {

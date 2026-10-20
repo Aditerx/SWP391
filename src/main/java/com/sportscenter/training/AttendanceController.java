@@ -35,6 +35,12 @@ public class AttendanceController {
         return ResponseEntity.ok(attendanceService.searchAttendances(sessionId, memberId, recordedBy, state, start, end, authentication));
     }
 
+    @GetMapping({"/checkin-code", "/me/checkin-code"})
+    @PreAuthorize("hasRole('MEMBER')")
+    public ResponseEntity<CheckinCodeResponse> checkinCode(Authentication authentication) {
+        return ResponseEntity.ok(attendanceService.createCheckinCode(authentication.getName()));
+    }
+
     @PostMapping("/check-in")
     @PreAuthorize("hasAnyAuthority('RECORD_RESULT', 'REGISTER_MEMBER', 'MANAGE_USERS')")
     public ResponseEntity<AttendanceResponse> checkIn(@Valid @RequestBody CheckInRequest request, Authentication authentication) {

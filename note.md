@@ -62,9 +62,14 @@ Hợp đồng API đã được chuẩn hóa thành **11 mục rõ ràng**, bao 
 
 ---
 
-### III. VIỆC TIẾP THEO CẦN LÀM
+### III. Tổng hợp lại toàn bộ API cùng mô tả chức năng
+[https://scms-app-p1gy.onrender.com/swagger-ui/index.html#/]
+
+---
+
+### IV. VIỆC TIẾP THEO CẦN LÀM
 → PHÂN NÀY CHỈ LÀ THAM KHẢO, CÓ THỂ SÓT VÀI THỨ, VD NHƯ UI HIỆN QR THANH TOÁN
-BE CHƯA LÀM: PHẦN THÔNG BÁO, OTP GMAIL ĐĂNG KÝ (NẾU LAN ANH KO LÀM ĐC THÌ A LÀM SAU)
+BE CHƯA LÀM: PHẦN THÔNG BÁO, SMTP GMAIL ĐĂNG KÝ (NẾU LAN ANH KO LÀM ĐC THÌ ANH LÀM SAU)
 
 Hệ thống đã hoàn thành **100% Giai đoạn 1 đến Giai đoạn 5** (Toàn bộ nội dung/flow trong Member.pdf, CSDL, Cronjobs, Xử lý sự cố, 178 tests pass).
 
