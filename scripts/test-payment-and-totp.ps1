@@ -1,4 +1,4 @@
-# ==============================================================================
+﻿# ==============================================================================
 # SCRIPT TEST RIÊNG MÃ QR THANH TOÁN VÀ MÃ TOTP 30S (KHÔNG CẦN QUA FE)
 # Hỗ trợ test độc lập trên Local (http://localhost:8080) hoặc Render
 # Cách chạy:
@@ -146,9 +146,10 @@ Write-Host "    $vietQrUrl" -ForegroundColor Blue
 Write-Host "    ------------------------------------------------------------------" -ForegroundColor DarkGray
 Write-Host "    HƯỚNG DẪN TEST:" -ForegroundColor Yellow
 Write-Host "    - Dán đường link trên vào trình duyệt -> Ảnh mã QR ngân hàng MBBank sẽ hiện ra."
-Write-Host "    - Dùng điện thoại quét: Số tiền 900.000đ và nội dung 'INV-2026-000105' tự động điền sẵn!"
+Write-Host "    - Dung dien thoai quet: So tien 900.000d va noi dung INV-2026-000105 tu dong dien san!"
 
 Write-Host ""
 Write-Host "======================================================================" -ForegroundColor Yellow
 Write-Host " HOÀN TẤT KỊCH BẢN TEST ĐỘC LẬP!" -ForegroundColor Yellow
-Write-Host "======================================================================`n"
+Write-Host "======================================================================"
+Write-Host ""
