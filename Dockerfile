@@ -16,8 +16,8 @@ RUN mvn package -DskipTests -q
 FROM eclipse-temurin:17-jre-alpine
 WORKDIR /app
 
-# Limit heap for Render Free (512 MB RAM) & force IPv4 to avoid Network unreachable errors
-ENV JAVA_OPTS="-Xmx400m -Xms200m -Djava.net.preferIPv4Stack=true"
+# Limit heap for Render Free (512 MB RAM), force IPv4 & enforce Asia/Ho_Chi_Minh timezone
+ENV JAVA_OPTS="-Xmx400m -Xms200m -Djava.net.preferIPv4Stack=true -Duser.timezone=Asia/Ho_Chi_Minh"
 
 COPY --from=be-build /app/target/*.jar app.jar
 

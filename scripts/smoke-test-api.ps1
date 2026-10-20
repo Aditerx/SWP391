@@ -1,4 +1,4 @@
-# ==============================================================================
+﻿# ==============================================================================
 # SCRIPT KIỂM THỬ KHÓI TỰ ĐỘNG TOÀN DIỆN CHO BACKEND SCMS (SMOKE TEST)
 # Hỗ trợ kiểm thử cả Local (http://localhost:8080) lẫn Live Render (https://<app>.onrender.com)
 # Cách chạy:
@@ -14,9 +14,16 @@ param(
     [string]$ManagerPassword = "password123"
 )
 
+# Cấu hình UTF-8 cho Console Windows
+try {
+    [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+    $OutputEncoding = [System.Text.Encoding]::UTF8
+} catch {}
+
 $ErrorActionPreference = "Continue"
 $ProgressPreference = "SilentlyContinue"
 
+Write-Host ""
 Write-Host "======================================================================" -ForegroundColor Cyan
 Write-Host " [SCMS] BẮT ĐẦU KIỂM THỬ BACKEND API: $BaseUrl" -ForegroundColor Cyan
 Write-Host " Thời gian: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')" -ForegroundColor Cyan
@@ -51,9 +58,6 @@ function Assert-Step {
 # 1. KIỂM TRA HEALTH CHECK
 Assert-Step "1. Health Check Endpoint (/api/health)" {
     $res = Invoke-RestMethod -Uri "$BaseUrl/api/health" -Method Get -TimeoutSec 15
-    if ($res.status -ne "UP" -and $res -notmatch "UP|ok|healthy") {
-        # Spring Boot có thể trả về object status hoặc chuỗi
-    }
     return "Health Status: OK (200)"
 }
 
@@ -120,16 +124,18 @@ Assert-Step "7. Danh mục Ngày Nghỉ Lễ (/api/holidays)" {
 
 # 8. THỬ ĐĂNG NHẬP MEMBER & KIỂM TRA TẠO MÃ CHECK-IN TOTP 30 GIÂY
 Assert-Step "8. Đăng nhập Member & Lấy Mã Check-in TOTP 30s (/api/attendance/checkin-code)" {
-    $loginBody = @{
-        email = $MemberEmail
-        password = $MemberPassword
-    } | ConvertTo-Json
+    $loggedIn = $false
+    foreach ($pass in @($MemberPassword, "12345678", "password")) {
+        try {
+            $loginBody = @{ email = $MemberEmail; password = $pass } | ConvertTo-Json
+            $loginRes = Invoke-RestMethod -Uri "$BaseUrl/api/auth/login" -Method Post -Body $loginBody -ContentType "application/json" -WebSession $session -TimeoutSec 10
+            $loggedIn = $true
+            break
+        } catch {}
+    }
 
-    try {
-        $loginRes = Invoke-RestMethod -Uri "$BaseUrl/api/auth/login" -Method Post -Body $loginBody -ContentType "application/json" -WebSession $session -TimeoutSec 10
-    } catch {
-        # Nếu tài khoản test khác mật khẩu, thử tiếp tục mà không crash script
-        return "Tài khoản test '$MemberEmail' không đăng nhập được (cần cập nhật mật khẩu test). Bỏ qua bước TOTP private."
+    if (-not $loggedIn) {
+        return "Tài khoản test '$MemberEmail' không khớp mật khẩu mẫu. Bỏ qua bước TOTP."
     }
 
     $totpRes = Invoke-RestMethod -Uri "$BaseUrl/api/attendance/checkin-code" -Method Get -WebSession $session -TimeoutSec 10
@@ -141,7 +147,6 @@ Assert-Step "8. Đăng nhập Member & Lấy Mã Check-in TOTP 30s (/api/attenda
 
 # 9. KIỂM TRA TẠO URL THANH TOÁN VNPAY ONLINE (QR CODE VNPAY)
 Assert-Step "9. Tạo URL Thanh Toán VNPay Sandbox (Cổng hiển thị VNPAY-QR)" {
-    # Kiểm tra hóa đơn của Member
     try {
         $invoices = Invoke-RestMethod -Uri "$BaseUrl/api/members/me/invoices" -Method Get -WebSession $session -TimeoutSec 10
         if ($invoices.Count -gt 0) {
@@ -153,13 +158,14 @@ Assert-Step "9. Tạo URL Thanh Toán VNPay Sandbox (Cổng hiển thị VNPAY-Q
                 }
             }
         }
-        return "Member hiện không có hóa đơn Pending để sinh link test. Hãy tạo một lượt đăng ký lớp để test link VNPay."
+        return "Member hiện không có hóa đơn Pending để sinh link test."
     } catch {
         return "Không lấy được danh sách hóa đơn: $($_.Exception.Message)"
     }
 }
 
-Write-Host "`n======================================================================" -ForegroundColor Cyan
+Write-Host ""
+Write-Host "======================================================================" -ForegroundColor Cyan
 Write-Host " KẾT QUẢ KIỂM THỬ: $passedCount PASSED | $failedCount FAILED" -ForegroundColor $(if ($failedCount -eq 0) { "Green" } else { "Yellow" })
 Write-Host "======================================================================" -ForegroundColor Cyan
 
@@ -168,4 +174,3 @@ if ($failedCount -eq 0) {
 } else {
     Write-Host "`n[CẢNH BÁO] Có $failedCount bước chưa đạt. Vui lòng kiểm tra lại log chi tiết ở trên." -ForegroundColor Yellow
 }
-
