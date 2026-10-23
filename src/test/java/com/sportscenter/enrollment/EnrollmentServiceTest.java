@@ -74,6 +74,7 @@ class EnrollmentServiceTest {
 
     @InjectMocks
     private EnrollmentService enrollmentService;
+    @Mock private com.sportscenter.session.ScheduleWriteLock scheduleWriteLock;
 
     private User sampleMember;
     private User sampleAdmin;
@@ -85,7 +86,7 @@ class EnrollmentServiceTest {
         lenient().when(clock.instant()).thenReturn(Instant.parse("2026-10-16T03:00:00Z"));
         lenient().when(clock.getZone()).thenReturn(ZoneId.of("Asia/Ho_Chi_Minh"));
         sampleMember = new User();
-        sampleMember.setId(8);
+        sampleMember.setId(8); sampleMember.setCenterId(1);
         sampleMember.setFullName("Hoàng Thị Oanh");
         sampleMember.setEmail("oanh.hoang@fitzone.vn");
         sampleMember.setStatus("Active");
@@ -113,8 +114,8 @@ class EnrollmentServiceTest {
         sampleActivePackage.setSubscriptionId(1);
         sampleActivePackage.setMember(sampleMember);
         sampleActivePackage.setStatus("Active");
-        sampleActivePackage.setStartDate(LocalDate.now().minusDays(10));
-        sampleActivePackage.setEndDate(LocalDate.now().plusDays(20));
+        sampleActivePackage.setStartDate(LocalDate.now(clock).minusDays(10));
+        sampleActivePackage.setEndDate(LocalDate.now(clock).plusDays(20));
     }
 
     @Test
@@ -131,7 +132,7 @@ class EnrollmentServiceTest {
         saved.setMember(sampleMember);
         saved.setSportsClass(sampleClass);
         saved.setStatus("Registered");
-        saved.setEnrolledAt(LocalDateTime.now());
+        saved.setEnrolledAt(LocalDateTime.now(clock));
 
         when(enrollmentRepository.save(any(ClassEnrollment.class))).thenReturn(saved);
 
@@ -293,7 +294,7 @@ class EnrollmentServiceTest {
     @DisplayName("Competing requests serialize through the locked class row")
     void enroll_CompetingRequests_LastSeatIsReservedOnce() {
         sampleClass.setMaxCapacity(1);
-        User secondMember = activeMember(9);
+        User secondMember = activeMember(9); secondMember.setCenterId(1);
         when(userRepository.findById(8)).thenReturn(Optional.of(sampleMember));
         when(userRepository.findById(9)).thenReturn(Optional.of(secondMember));
         when(memberPackageRepository.findByMemberId(8)).thenReturn(List.of(sampleActivePackage));
@@ -382,7 +383,7 @@ class EnrollmentServiceTest {
         waiting.setMember(sampleMember);
         waiting.setSportsClass(sampleClass);
         waiting.setStatus("Waitlisted");
-        when(classRepository.findById(1)).thenReturn(Optional.of(sampleClass));
+        when(classRepository.findByIdForUpdate(1)).thenReturn(Optional.of(sampleClass));
         when(enrollmentRepository.countBySportsClassIdAndStatusIn(1, List.of("Registered", "Pending"))).thenReturn(0L);
         when(enrollmentRepository.findBySportsClassIdAndStatusOrderByEnrolledAtAscIdAsc(1, "Waitlisted"))
                 .thenReturn(List.of(waiting));
@@ -418,7 +419,7 @@ class EnrollmentServiceTest {
         MemberPackage validPackage = new MemberPackage();
         validPackage.setStatus("Active");
         validPackage.setEndDate(LocalDate.of(2026, 11, 30));
-        when(classRepository.findById(1)).thenReturn(Optional.of(sampleClass));
+        when(classRepository.findByIdForUpdate(1)).thenReturn(Optional.of(sampleClass));
         when(enrollmentRepository.countBySportsClassIdAndStatusIn(1, List.of("Registered", "Pending"))).thenReturn(1L);
         when(enrollmentRepository.findBySportsClassIdAndStatusOrderByEnrolledAtAscIdAsc(1, "Waitlisted"))
                 .thenReturn(List.of(expired, firstEligible, beyondCapacity));
@@ -441,7 +442,7 @@ class EnrollmentServiceTest {
     void promoteWaitlist_PaidClass_PromotesAsPending() {
         sampleClass.setTuitionFee(new BigDecimal("50.00"));
         ClassEnrollment waiting = waiting(84, sampleMember);
-        when(classRepository.findById(1)).thenReturn(Optional.of(sampleClass));
+        when(classRepository.findByIdForUpdate(1)).thenReturn(Optional.of(sampleClass));
         when(enrollmentRepository.countBySportsClassIdAndStatusIn(1, List.of("Registered", "Pending"))).thenReturn(0L);
         when(enrollmentRepository.findBySportsClassIdAndStatusOrderByEnrolledAtAscIdAsc(1, "Waitlisted"))
                 .thenReturn(List.of(waiting));
@@ -460,7 +461,7 @@ class EnrollmentServiceTest {
         ClassEnrollment waiting = waiting(86, sampleMember);
         com.sportscenter.user.Member profile = new com.sportscenter.user.Member();
         profile.setBookingBlockedUntil(LocalDateTime.now(clock).plusDays(1));
-        when(classRepository.findById(1)).thenReturn(Optional.of(sampleClass));
+        when(classRepository.findByIdForUpdate(1)).thenReturn(Optional.of(sampleClass));
         when(enrollmentRepository.countBySportsClassIdAndStatusIn(1, List.of("Registered", "Pending"))).thenReturn(0L);
         when(enrollmentRepository.findBySportsClassIdAndStatusOrderByEnrolledAtAscIdAsc(1, "Waitlisted"))
                 .thenReturn(List.of(waiting));
@@ -603,8 +604,8 @@ class EnrollmentServiceTest {
             ClassEnrollment e = invocation.getArgument(0); e.setId(77); return e;
         });
         when(invoiceService.createClassOrder(sampleMember, sampleClass, "VNPay", "203.0.113.5"))
-                .thenReturn(new InvoiceOrderResponse(88, "INV-2026-000088", new BigDecimal("125.00"), "VNPay", "Pending",
-                        LocalDateTime.now().plusMinutes(15), "https://vnpay.test/pay"));
+                .thenAnswer(call -> new InvoiceOrderResponse(88, "INV-2026-000088", new BigDecimal("125.00"), "VNPay", "Pending",
+                        LocalDateTime.now(clock).plusMinutes(15), "https://vnpay.test/pay"));
 
         EnrollmentResponse response = enrollmentService.enroll(1, 8, "admin@scms.com", "VNPay", "203.0.113.5");
 
@@ -631,5 +632,13 @@ class EnrollmentServiceTest {
         BusinessException ex = assertThrows(BusinessException.class,
                 () -> enrollmentService.cancelEnrollment(2, 8, sampleMember.getEmail()));
         assertTrue(ex.getMessage().contains("NORMAL_CLASS_NON_CANCELLABLE"));
+    }
+
+    @Test void inactiveSubjectCannotSellAnotherClassRegistration() {
+        var subject = new com.sportscenter.subject.Subject(); subject.setStatus("Inactive"); sampleClass.setSubject(subject);
+        when(userRepository.findById(8)).thenReturn(Optional.of(sampleMember));
+        when(classRepository.findByIdForUpdate(1)).thenReturn(Optional.of(sampleClass));
+        assertTrue(assertThrows(BusinessException.class, () -> enrollmentService.enroll(1,8,"admin@scms.com")).getMessage().startsWith("SUBJECT_INACTIVE:"));
+        verify(enrollmentRepository,never()).save(any()); verifyNoInteractions(invoiceService);
     }
 }

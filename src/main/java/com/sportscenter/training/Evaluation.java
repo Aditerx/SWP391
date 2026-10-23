@@ -29,7 +29,7 @@ public class Evaluation {
     private User coach;
 
     @Column(name = "evaluation_date", nullable = false)
-    private LocalDate evaluationDate = LocalDate.now();
+    private LocalDate evaluationDate;
 
     @Column(name = "comment", columnDefinition = "NVARCHAR(MAX)")
     private String comment;

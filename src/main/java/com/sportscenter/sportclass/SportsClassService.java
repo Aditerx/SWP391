@@ -26,6 +26,9 @@ public class SportsClassService {
     private final ClassEnrollmentRepository classEnrollmentRepository;
     private final AuditService auditService;
     private final EnrollmentService enrollmentService;
+    private final java.time.Clock clock;
+    private final com.sportscenter.session.SessionRepository sessionRepository;
+    private final com.sportscenter.session.ScheduleWriteLock scheduleWriteLock;
 
     @Transactional(readOnly = true)
     public List<SportsClassResponse> findAll() {
@@ -49,7 +52,13 @@ public class SportsClassService {
         validateNewClassDate(request);
         validateDateRange(request);
         SportsClass sportsClass = new SportsClass();
+        var authentication = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        if (authentication != null && authentication.isAuthenticated()) {
+            sportsClass.setCenterId(userRepository.findByEmailIgnoreCase(authentication.getName()).orElseThrow().getCenterId());
+        }
         apply(sportsClass, request);
+        // The legacy two-request setup remains closed until the schedule is complete.
+        if (sportsClass.isNormal() && "Open".equals(sportsClass.getStatus())) sportsClass.setStatus("Closed");
         SportsClass saved = repository.save(sportsClass);
         auditService.log(null, "CREATE_CLASS", "CLASS", saved.getId(), saved.getName());
         return SportsClassResponse.from(saved, 0);
@@ -58,10 +67,25 @@ public class SportsClassService {
     @Transactional
     public SportsClassResponse update(Integer id, SportsClassRequest request, String actorEmail) {
         validateDateRange(request);
+        scheduleWriteLock.acquire(repository.findCenterIdById(id).orElseThrow(() -> new ResourceNotFoundException("Class center not found")));
         SportsClass sportsClass = repository.findByIdForUpdate(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Class not found: " + id));
         Integer previousCapacity = sportsClass.getMaxCapacity();
+        BigDecimal previousFee = sportsClass.getTuitionFee();
+        long occupied = classEnrollmentRepository.countBySportsClassIdAndStatusIn(id, List.of("Registered", "Pending"));
+        if (request.maxCapacity() != null && request.maxCapacity() < occupied) throw new BusinessException("CLASS_CAPACITY_EXCEEDED: Cannot reduce capacity below reserved seats");
+        if (sessionRepository.countBySportsClassIdAndStatusNot(id, "Cancelled") > 0
+                && (!java.util.Objects.equals(request.subjectId(), sportsClass.getSubject().getId())
+                || request.classType() != null && !request.classType().equalsIgnoreCase(sportsClass.getClassType())
+                || !java.util.Objects.equals(request.coachId(), sportsClass.getCoach() == null ? null : sportsClass.getCoach().getId()))) {
+            throw new BusinessException("CLASS_HAS_SCHEDULE: Use per-session incident handling to change the assigned coach; the subject/type is fixed once scheduled");
+        }
+        if (sportsClass.isNormal() && "Open".equalsIgnoreCase(request.status())) {
+            com.sportscenter.session.NormalSchedulePolicy.requireReady(sportsClass, sessionRepository, clock);
+        }
         apply(sportsClass, request);
+        // Updating metadata does not silently reprice a previously created class.
+        if (previousFee != null) sportsClass.setTuitionFee(previousFee);
         SportsClass saved = repository.save(sportsClass);
         if (saved.getMaxCapacity() != null && (previousCapacity == null || saved.getMaxCapacity() > previousCapacity)) {
             Integer actorId = userRepository.findByEmailIgnoreCase(actorEmail).map(User::getId).orElse(null);
@@ -73,7 +97,9 @@ public class SportsClassService {
 
     @Transactional
     public SportsClassResponse assignCoach(Integer id, Integer coachId) {
-        SportsClass sportsClass = getEntity(id);
+        scheduleWriteLock.acquire(repository.findCenterIdById(id).orElseThrow(() -> new ResourceNotFoundException("Class center not found")));
+        SportsClass sportsClass = repository.findByIdForUpdate(id).orElseThrow();
+        if (sessionRepository.countBySportsClassIdAndStatusNot(id, "Cancelled") > 0) throw new BusinessException("CLASS_HAS_SCHEDULE: Use substitute-coach for individual scheduled sessions to preserve history");
         User coach = getCoach(coachId);
         sportsClass.setCoach(coach);
         SportsClass saved = repository.save(sportsClass);
@@ -85,6 +111,7 @@ public class SportsClassService {
     private void apply(SportsClass sportsClass, SportsClassRequest request) {
         Subject subject = subjectRepository.findById(request.subjectId())
                 .orElseThrow(() -> new ResourceNotFoundException("Subject not found: " + request.subjectId()));
+        if (!"Active".equalsIgnoreCase(subject.getStatus())) throw new BusinessException("SUBJECT_INACTIVE: Cannot create or publish classes for an inactive subject");
         sportsClass.setName(request.name());
         sportsClass.setSubject(subject);
         sportsClass.setCoach(request.coachId() == null ? null : getCoach(request.coachId()));
@@ -98,7 +125,8 @@ public class SportsClassService {
                 throw new BusinessException("Lớp học nhóm Normal chỉ có sức chứa tối đa 15 học viên (maxCapacity <= 15).");
             }
             sportsClass.setClassType("Normal");
-            sportsClass.setTotalSessions(request.totalSessions() != null ? request.totalSessions() : 12);
+            if (request.totalSessions() != null && request.totalSessions() != 12) throw new BusinessException("NORMAL_SESSION_COUNT: Normal classes require exactly 12 sessions");
+            sportsClass.setTotalSessions(12);
             // Tự động gán mức giá chuẩn từ Subject.normal_price (Freeze price logic)
             if (subject.getNormalPrice() != null && subject.getNormalPrice().compareTo(BigDecimal.ZERO) > 0) {
                 sportsClass.setTuitionFee(subject.getNormalPrice());
@@ -156,7 +184,7 @@ public class SportsClassService {
     private void validateNewClassDate(SportsClassRequest request) {
         if ("Open".equalsIgnoreCase(request.status())
                 && request.startDate() != null
-                && request.startDate().isBefore(LocalDate.now())) {
+                && request.startDate().isBefore(LocalDate.now(clock))) {
             throw new BusinessException("A new Open class cannot start in the past");
         }
     }

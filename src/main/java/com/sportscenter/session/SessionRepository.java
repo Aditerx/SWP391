@@ -12,6 +12,12 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 public interface SessionRepository extends JpaRepository<Session, Integer> {
+    @Query("select s.sportsClass.centerId from Session s where s.id = :id")
+    java.util.Optional<Integer> findCenterIdById(@Param("id") Integer id);
+    long countBySportsClassIdAndStatusNot(Integer classId, String status);
+    long countBySportsClassIdAndStatusAndAttendanceFinalizedFalse(Integer classId, String status);
+    long countByMemberPackageSubscriptionIdAndStatusAndAttendanceFinalizedFalse(Integer subscriptionId, String status);
+    boolean existsBySportsClassSubjectIdAndStatusAndSessionDateGreaterThanEqual(Integer subjectId, String status, LocalDate date);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT s FROM Session s WHERE s.id = :id")
@@ -88,7 +94,7 @@ public interface SessionRepository extends JpaRepository<Session, Integer> {
            "LEFT JOIN FETCH s.coach " +
            "JOIN FETCH s.room r " +
            "WHERE (s.bookedMember.id = :memberId " +
-           "   OR c.id IN (SELECT e.sportsClass.id FROM ClassEnrollment e WHERE e.member.id = :memberId AND e.status = 'Registered')) " +
+           "   OR c.id IN (SELECT e.sportsClass.id FROM ClassEnrollment e WHERE e.member.id = :memberId AND e.status IN ('Registered', 'Pending'))) " +
            "  AND s.sessionDate = :sessionDate " +
            "  AND s.status <> 'Cancelled' " +
            "  AND (:excludeSessionId IS NULL OR s.id <> :excludeSessionId) " +
@@ -106,7 +112,7 @@ public interface SessionRepository extends JpaRepository<Session, Integer> {
            "LEFT JOIN FETCH s.coach " +
            "LEFT JOIN FETCH s.bookedMember " +
            "JOIN FETCH s.room r " +
-           "WHERE (c.id IN (SELECT e.sportsClass.id FROM ClassEnrollment e WHERE e.member.id = :memberId AND e.status = 'Registered') " +
+           "WHERE (c.id IN (SELECT e.sportsClass.id FROM ClassEnrollment e WHERE e.member.id = :memberId AND e.status IN ('Registered', 'Completed')) " +
            "   OR s.bookedMember.id = :memberId) " +
            "  AND (CAST(:startDate AS date) IS NULL OR s.sessionDate >= :startDate) " +
            "  AND (CAST(:endDate AS date) IS NULL OR s.sessionDate <= :endDate) " +
@@ -128,8 +134,8 @@ public interface SessionRepository extends JpaRepository<Session, Integer> {
             @Param("today") LocalDate today, @Param("nowTime") LocalTime nowTime);
 
     @Query("SELECT DISTINCT s FROM Session s JOIN FETCH s.sportsClass c " +
-            "WHERE EXISTS (SELECT e.id FROM ClassEnrollment e WHERE e.sportsClass.id = c.id " +
-            "AND e.member.id = :memberId AND e.status IN ('Registered', 'Pending')) " +
+            "WHERE (s.bookedMember.id = :memberId OR EXISTS (SELECT e.id FROM ClassEnrollment e WHERE e.sportsClass.id = c.id " +
+            "AND e.member.id = :memberId AND e.status IN ('Registered', 'Pending'))) " +
             "AND c.id <> :targetClassId AND s.status <> 'Cancelled' " +
             "AND (s.sessionDate > :today OR (s.sessionDate = :today AND s.startTime >= :nowTime)) " +
             "AND EXISTS (SELECT target.id FROM Session target WHERE target.sportsClass.id = :targetClassId " +

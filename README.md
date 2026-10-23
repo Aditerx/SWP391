@@ -31,22 +31,28 @@ bởi Git.
 .\mvnw.cmd spring-boot:run
 ```
 
-## Swagger
+## Swagger & Demo Accounts
 
 [http://localhost:8080/swagger-ui/index.html](http://localhost:8080/swagger-ui/index.html)
 
-Gọi `POST /api/auth/login` với JSON:
+Đăng nhập qua `POST /api/auth/login`. Mật khẩu mặc định toàn hệ thống là **`Scms@2026`**.
 
 ```json
-{"email":"manager@scms.com","password":"12345678"}
+{"email":"manager@scms.com","password":"Scms@2026"}
 ```
 
-Session cookie được giữ trong trình duyệt/Swagger; không dùng Basic Auth nữa.
+Session cookie được giữ trong trình duyệt/Swagger; không dùng Basic Auth.
 
-Nếu login trả `400 email: must be a well-formed email address`, hãy dùng đúng
-JSON ở trên (email phải là `manager@scms.com`, không phải username `manager`).
-Sau khi login thành công, giữ nguyên tab Swagger để cookie session được gửi cho
-các request `GET`/`POST` tiếp theo.
+### Bảng tài khoản demo chính:
+| Vai trò | Email đăng nhập | Mật khẩu |
+|---|---|---|
+| **Center Manager** | `manager@scms.com` | `Scms@2026` |
+| **Lễ tân (Receptionist)** | `receptionist@scms.com` | `Scms@2026` |
+| **Coach đại diện** | `coach@scms.com` | `Scms@2026` |
+| **Member (12 Credit / 45 ngày)** | `member@scms.com` | `Scms@2026` |
+| **Admin** | `admin@scms.com` | `Scms@2026` |
+
+*Chi tiết danh sách HLV 9 môn thể thao và các kịch bản hội viên xem tại [docs/01-API-CONTRACT-FE-BE.md](docs/01-API-CONTRACT-FE-BE.md).*
 
 ## Demo endpoints
 

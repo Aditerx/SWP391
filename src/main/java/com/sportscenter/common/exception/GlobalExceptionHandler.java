@@ -17,6 +17,10 @@ import java.util.Map;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+    @ExceptionHandler(BusinessConflictException.class)
+    ResponseEntity<Map<String, Object>> conflict(BusinessConflictException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(business(ex).getBody());
+    }
 
     @ExceptionHandler(ResourceNotFoundException.class)
     ResponseEntity<Map<String, Object>> notFound(ResourceNotFoundException ex) {

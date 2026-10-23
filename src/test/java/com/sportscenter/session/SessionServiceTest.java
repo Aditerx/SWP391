@@ -76,6 +76,10 @@ class SessionServiceTest {
 
     @InjectMocks
     private SessionService sessionService;
+    @Mock private ScheduleWriteLock scheduleWriteLock;
+    @Mock private com.sportscenter.user.MemberRepository memberRepository;
+    @Mock private com.sportscenter.specialization.CoachSpecializationRepository coachSpecializationRepository;
+
 
     private SportsClass sampleClass;
     private Room sampleRoom;
@@ -83,14 +87,28 @@ class SessionServiceTest {
 
     @BeforeEach
     void setUp() {
+        lenient().when(sessionRepository.findCenterIdById(anyInt())).thenReturn(Optional.of(1));
+        lenient().when(sportsClassRepository.findCenterIdById(anyInt())).thenReturn(Optional.of(1));
+        lenient().when(coachSpecializationRepository.findByCoachUserId(anyInt())).thenAnswer(call -> {
+            var a = new com.sportscenter.specialization.CoachSpecialization();
+            var spec = new com.sportscenter.specialization.Specialization();
+            var subject = new Subject(); subject.setId(1); subject.setOutdoor(false); subject.setOutdoor(false); spec.setSubject(subject); spec.setStatus("Active"); a.setSpecialization(spec);
+            var b = new com.sportscenter.specialization.CoachSpecialization();
+            var spec2 = new com.sportscenter.specialization.Specialization();
+            var subject2 = new Subject(); subject2.setId(2); subject2.setOutdoor(false); spec2.setSubject(subject2); spec2.setStatus("Active"); b.setSpecialization(spec2);
+            return List.of(a,b);
+        });
+        lenient().when(sessionRepository.findByIdForUpdate(anyInt())).thenAnswer(call -> sessionRepository.findByIdWithDetails(call.getArgument(0)));
+
         lenient().when(clock.instant()).thenReturn(Instant.parse("2026-10-16T03:00:00Z"));
         lenient().when(clock.getZone()).thenReturn(ZoneId.of("Asia/Ho_Chi_Minh"));
         sampleCoach = new User();
-        sampleCoach.setId(3);
+        sampleCoach.setId(3); sampleCoach.setCenterId(1); sampleCoach.setStatus("Active");
+        var role = new com.sportscenter.user.Role(); role.setName("Coach"); sampleCoach.setRole(role);
         sampleCoach.setFullName("Trần Thị Hương");
 
         sampleClass = new SportsClass();
-        sampleClass.setId(1);
+        sampleClass.setId(1); var subject = new Subject(); subject.setId(1); subject.setOutdoor(false); subject.setOutdoor(false); sampleClass.setSubject(subject);
         sampleClass.setName("Yoga Buổi Sáng");
         sampleClass.setCoach(sampleCoach);
         sampleClass.setMaxCapacity(20);

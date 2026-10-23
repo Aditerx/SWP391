@@ -17,17 +17,19 @@ import java.util.stream.Collectors;
 
 @Component
 public class VnPayGateway {
+    private final java.time.Clock clock;
     private static final ZoneId VIETNAM_ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
     private static final DateTimeFormatter VNPAY_DATE = DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
     private final PaymentProperties properties;
 
-    public VnPayGateway(PaymentProperties properties) {
+    public VnPayGateway(PaymentProperties properties, java.time.Clock clock) {
+        this.clock = clock;
         this.properties = properties;
     }
 
     public String createPaymentUrl(Invoice invoice, String clientIp) {
         requireConfigured();
-        var now = java.time.ZonedDateTime.now(VIETNAM_ZONE);
+        var now = java.time.ZonedDateTime.now(clock);
         TreeMap<String, String> params = new TreeMap<>();
         params.put("vnp_Version", "2.1.0");
         params.put("vnp_Command", "pay");
@@ -52,6 +54,7 @@ public class VnPayGateway {
     }
 
     public boolean verifyCallback(Map<String, String> callbackParams) {
+        if (properties.getVnpayTmnCode() == null || !properties.getVnpayTmnCode().equals(callbackParams.get("vnp_TmnCode"))) return false;
         String suppliedHash = callbackParams.get("vnp_SecureHash");
         if (suppliedHash == null || suppliedHash.isBlank() || properties.getVnpayHashSecret().isBlank()) {
             return false;

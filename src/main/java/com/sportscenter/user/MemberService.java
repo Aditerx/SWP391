@@ -26,16 +26,18 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class MemberService {
+    private final java.time.Clock clock;
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
     private final MemberRepository memberRepository;
     private final MemberPackageRepository memberPackageRepository;
-    private final MembershipPackageRepository membershipPackageRepository;
+    private final com.sportscenter.invoice.InvoiceRepository invoiceRepository;
     private final AuditService auditService;
     private final PasswordEncoder passwordEncoder;
     private final CenterContext centerContext;
     private final EmailService emailService;
     private final TemporaryPasswordGenerator temporaryPasswordGenerator;
+    private final com.sportscenter.membership.MemberPackageService subscriptionService;
 
     @Transactional(readOnly = true)
     public List<MemberResponse> findAllMembers() {
@@ -57,9 +59,7 @@ public class MemberService {
                     .findFirst()
                     .orElse(packages.isEmpty() ? null : packages.get(packages.size() - 1));
 
-            BigDecimal totalSpent = packages.stream()
-                    .map(p -> p.getMembershipPackage() != null ? p.getMembershipPackage().getPrice() : BigDecimal.ZERO)
-                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            BigDecimal totalSpent = paidTotal(u.getId());
 
             return MemberResponse.from(u, member, activePkg, totalSpent);
         }).toList();
@@ -76,9 +76,7 @@ public class MemberService {
                 .findFirst()
                 .orElse(packages.isEmpty() ? null : packages.get(packages.size() - 1));
 
-        BigDecimal totalSpent = packages.stream()
-                .map(p -> p.getMembershipPackage() != null ? p.getMembershipPackage().getPrice() : BigDecimal.ZERO)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal totalSpent = paidTotal(id);
 
         return MemberResponse.from(user, member, activePkg, totalSpent);
     }
@@ -114,7 +112,7 @@ public class MemberService {
         member.setUser(savedUser);
         member.setGoal(request.goal());
         member.setHealthNote(request.healthNote());
-        member.setJoinDate(LocalDate.now());
+        member.setJoinDate(LocalDate.now(clock));
 
         org.springframework.security.core.Authentication auth =
                 org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
@@ -127,22 +125,13 @@ public class MemberService {
 
         MemberPackage createdPackage = null;
         if (request.packageId() != null) {
-            MembershipPackage pkg = membershipPackageRepository.findById(request.packageId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Package not found: " + request.packageId()));
-
-            MemberPackage mp = new MemberPackage();
-            mp.setMember(savedUser);
-            mp.setMembershipPackage(pkg);
-            mp.setStartDate(LocalDate.now());
-            int days = pkg.getDurationDays() != null ? pkg.getDurationDays() : 30;
-            mp.setEndDate(LocalDate.now().plusDays(days));
-            mp.setStatus("Active");
-            createdPackage = memberPackageRepository.save(mp);
+            var order = subscriptionService.subscribe(savedUser.getId(),
+                    new com.sportscenter.membership.MemberPackageRequest(request.packageId(), null, null, false, "Cash", null));
+            createdPackage = memberPackageRepository.findById(order.subscriptionId()).orElseThrow();
         }
 
         auditService.log(null, "CREATE_MEMBER", "USER", savedUser.getId(), savedUser.getFullName());
-        BigDecimal totalSpent = createdPackage != null && createdPackage.getMembershipPackage() != null
-                ? createdPackage.getMembershipPackage().getPrice() : BigDecimal.ZERO;
+        BigDecimal totalSpent = BigDecimal.ZERO; // Pending orders are not money received.
         boolean emailSent = emailService.sendWelcomeEmail(savedUser.getEmail(), savedUser.getFullName(), temporaryPassword);
         return MemberResponse.from(savedUser, savedMember, createdPackage, totalSpent).withEmailDelivery(emailSent,
                 emailSent ? null : "Tạo tài khoản thành công nhưng gửi email thất bại. Dùng chức năng cấp lại mật khẩu để gửi lại.");
@@ -190,4 +179,10 @@ public class MemberService {
         if ("inactive".equalsIgnoreCase(status)) return "Inactive";
         return "Active";
     }
+    private BigDecimal paidTotal(Integer memberId) {
+        return invoiceRepository.findByMemberId(memberId).stream()
+                .filter(i -> "Paid".equals(i.getPaymentStatus()) && i.getAmount() != null)
+                .map(com.sportscenter.invoice.Invoice::getAmount).reduce(BigDecimal.ZERO,BigDecimal::add);
+    }
+
 }

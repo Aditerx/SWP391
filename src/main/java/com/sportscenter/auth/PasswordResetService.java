@@ -20,6 +20,7 @@ import java.util.regex.Pattern;
 @Service
 @RequiredArgsConstructor
 public class PasswordResetService {
+    private final java.time.Clock clock;
     public static final String GENERIC_FORGOT_MESSAGE =
             "Nếu email hợp lệ, hướng dẫn đặt lại mật khẩu sẽ được gửi đến hộp thư.";
     private static final String PURPOSE = "RESET_PASSWORD";
@@ -38,7 +39,7 @@ public class PasswordResetService {
     public void requestReset(String rawEmail) {
         String email = normalize(rawEmail);
         if (otpRepository.countByEmailIgnoreCaseAndPurposeAndCreatedAtAfter(
-                email, PURPOSE, LocalDateTime.now().minusHours(1)) >= 3) {
+                email, PURPOSE, LocalDateTime.now(clock).minusHours(1)) >= 3) {
             return;
         }
 
@@ -61,7 +62,7 @@ public class PasswordResetService {
         if (otp == null || otp.getUser() == null) {
             throw new BusinessException("OTP is invalid or expired");
         }
-        if (otp.getExpiresAt().isBefore(LocalDateTime.now())) {
+        if (otp.getExpiresAt().isBefore(LocalDateTime.now(clock))) {
             otp.setUsed(true);
             otpRepository.save(otp);
             throw new BusinessException("OTP is invalid or expired");
@@ -110,7 +111,7 @@ public class PasswordResetService {
         otp.setUser(user);
         otp.setPurpose(purpose);
         otp.setOtpHash(passwordEncoder.encode(rawOtp));
-        otp.setExpiresAt(LocalDateTime.now().plusMinutes(10));
+        otp.setExpiresAt(LocalDateTime.now(clock).plusMinutes(10));
         otp.setAttempts(0);
         otp.setUsed(false);
         otpRepository.save(otp);
@@ -121,7 +122,7 @@ public class PasswordResetService {
         marker.setEmail(email);
         marker.setPurpose(PURPOSE);
         marker.setOtpHash(passwordEncoder.encode("quota-marker-" + RANDOM.nextLong()));
-        marker.setExpiresAt(LocalDateTime.now().plusMinutes(10));
+        marker.setExpiresAt(LocalDateTime.now(clock).plusMinutes(10));
         marker.setAttempts(0);
         marker.setUsed(true);
         otpRepository.save(marker);

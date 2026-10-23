@@ -27,6 +27,7 @@ import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class SportsClassServiceTest {
+    @org.mockito.Spy private java.time.Clock clock = java.time.Clock.system(java.time.ZoneId.of("Asia/Ho_Chi_Minh"));
 
     @Mock
     private SportsClassRepository repository;
@@ -46,6 +47,8 @@ class SportsClassServiceTest {
     @Mock
     private EnrollmentService enrollmentService;
 
+    @Mock com.sportscenter.session.SessionRepository sessionRepository;
+    @Mock com.sportscenter.session.ScheduleWriteLock scheduleWriteLock;
     @InjectMocks
     private SportsClassService sportsClassService;
 
@@ -65,7 +68,7 @@ class SportsClassServiceTest {
         coachRole.setName("Coach");
 
         sampleCoach = new User();
-        sampleCoach.setId(10);
+        sampleCoach.setId(10); sampleCoach.setCenterId(1);
         sampleCoach.setFullName("Coach Tuấn");
         sampleCoach.setRole(coachRole);
     }
@@ -73,7 +76,7 @@ class SportsClassServiceTest {
     @Test
     @DisplayName("Create Normal class auto-assigns Subject.normal_price and totalSessions = 12")
     void create_NormalClass_AutoAssignsNormalPrice() {
-        LocalDate startDate = LocalDate.now().plusDays(5);
+        LocalDate startDate = LocalDate.now(clock).plusDays(5);
         LocalDate endDate = startDate.plusMonths(1);
         SportsClassRequest request = new SportsClassRequest(
                 "Tennis Nhóm K01", 1, 10, 15, null, startDate, endDate, "Open", "Normal", 12
@@ -100,7 +103,7 @@ class SportsClassServiceTest {
     @Test
     @DisplayName("Create Normal class with capacity > 15 throws BusinessException")
     void create_NormalClass_ExceedCapacity15_ThrowsException() {
-        LocalDate startDate = LocalDate.now().plusDays(5);
+        LocalDate startDate = LocalDate.now(clock).plusDays(5);
         SportsClassRequest request = new SportsClassRequest(
                 "Tennis Nhóm Lớn", 1, 10, 20, null, startDate, startDate.plusMonths(1), "Open", "Normal", 12
         );
@@ -116,7 +119,7 @@ class SportsClassServiceTest {
     @Test
     @DisplayName("Create Advanced class with capacity != 1 throws BusinessException")
     void create_AdvancedClass_CapacityNotOne_ThrowsException() {
-        LocalDate startDate = LocalDate.now().plusDays(5);
+        LocalDate startDate = LocalDate.now(clock).plusDays(5);
         SportsClassRequest request = new SportsClassRequest(
                 "Tennis 1:1", 1, 10, 2, null, startDate, startDate.plusMonths(1), "Open", "Advanced", 12
         );
@@ -132,7 +135,7 @@ class SportsClassServiceTest {
     @Test
     @DisplayName("Create Advanced class auto-assigns Subject.advanced_price")
     void create_AdvancedClass_AutoAssignsAdvancedPrice() {
-        LocalDate startDate = LocalDate.now().plusDays(5);
+        LocalDate startDate = LocalDate.now(clock).plusDays(5);
         SportsClassRequest request = new SportsClassRequest(
                 "Tennis 1:1 VIP", 1, 10, 1, null, startDate, startDate.plusMonths(1), "Open", "Advanced", 12
         );

@@ -45,6 +45,7 @@ public class EnrollmentService {
     private final SessionRepository sessionRepository;
     private final NotificationService notificationService;
     private final MemberRepository memberRepository;
+    private final com.sportscenter.session.ScheduleWriteLock scheduleWriteLock;
 
     @Transactional(readOnly = true)
     public List<EnrollmentResponse> findAll(Integer classId, Integer memberId, String status, String actorEmail) {
@@ -88,10 +89,15 @@ public class EnrollmentService {
         final Integer memberId = resolveMemberScope(actor, targetMemberId);
         User member = userRepository.findById(memberId)
                 .orElseThrow(() -> new ResourceNotFoundException("Member user not found: " + memberId));
+        scheduleWriteLock.acquire(member.getCenterId());
 
         // Validate class
         SportsClass sportsClass = classRepository.findByIdForUpdate(classId)
                 .orElseThrow(() -> new ResourceNotFoundException("Class not found: " + classId));
+        if (!java.util.Objects.equals(member.getCenterId(), sportsClass.getCenterId())) throw new AccessDeniedException("Class belongs to another center");
+        if (sportsClass.getSubject() != null && !"Active".equalsIgnoreCase(sportsClass.getSubject().getStatus())) {
+            throw new BusinessException("SUBJECT_INACTIVE: New registrations are closed for this subject");
+        }
 
         if (!"Active".equalsIgnoreCase(member.getStatus())) {
             throw new BusinessException("MEMBER_NOT_ACTIVE: member account is not active");
@@ -109,6 +115,10 @@ public class EnrollmentService {
 
         if (!"Open".equalsIgnoreCase(sportsClass.getStatus()) && !"Ongoing".equalsIgnoreCase(sportsClass.getStatus())) {
             throw new BusinessException("CLASS_NOT_OPEN: class status is '" + sportsClass.getStatus() + "'");
+        }
+        if (sportsClass.isNormal()) {
+            if (!"Open".equalsIgnoreCase(sportsClass.getStatus())) throw new BusinessException("CLASS_NOT_READY: Normal registration is closed");
+            com.sportscenter.session.NormalSchedulePolicy.requireReady(sportsClass, sessionRepository, clock);
         }
 
         ClassEnrollment enrollment = enrollmentRepository.findByMemberIdAndSportsClassId(memberId, classId).orElse(null);
@@ -171,6 +181,7 @@ public class EnrollmentService {
     public EnrollmentResponse cancelEnrollment(Integer classId, Integer targetMemberId, String actorEmail, String reason) {
         User actor = requireActor(actorEmail);
         final Integer memberId = resolveMemberScope(actor, targetMemberId);
+        scheduleWriteLock.acquire(actor.getCenterId());
         classRepository.findByIdForUpdate(classId)
                 .orElseThrow(() -> new ResourceNotFoundException("Class not found: " + classId));
         ClassEnrollment enrollment = enrollmentRepository.findByMemberIdAndSportsClassId(memberId, classId)
@@ -212,6 +223,7 @@ public class EnrollmentService {
         resolveMemberScope(actor, enrollment.getMember() != null ? enrollment.getMember().getId() : null);
         Integer classId = enrollment.getSportsClass() != null ? enrollment.getSportsClass().getId() : null;
         if (classId == null) throw new ResourceNotFoundException("Class not found for enrollment: " + enrollmentId);
+        scheduleWriteLock.acquire(actor.getCenterId());
         classRepository.findByIdForUpdate(classId)
                 .orElseThrow(() -> new ResourceNotFoundException("Class not found: " + classId));
         if ("Cancelled".equalsIgnoreCase(enrollment.getStatus()) || "Completed".equalsIgnoreCase(enrollment.getStatus())) {
@@ -238,6 +250,9 @@ public class EnrollmentService {
     }
 
     private void checkCancellationPolicy(User actor, ClassEnrollment enrollment, String reason) {
+        if (enrollment.getSportsClass() != null && enrollment.getSportsClass().isNormal() && !"Waitlisted".equalsIgnoreCase(enrollment.getStatus())) {
+            throw new BusinessException("NORMAL_CLASS_NON_CANCELLABLE: Normal registrations cannot be cancelled through this endpoint");
+        }
         if (!isMemberActor(actor)) {
             if (reason == null || reason.isBlank()) throw new BusinessException("Cancellation reason is required");
             return;
@@ -272,7 +287,7 @@ public class EnrollmentService {
     }
 
     private void promote(Integer classId, Integer actorId) {
-        SportsClass sportsClass = classRepository.findById(classId).orElse(null);
+        SportsClass sportsClass = classRepository.findByIdForUpdate(classId).orElse(null);
         if (sportsClass == null || sportsClass.getMaxCapacity() == null) return;
         long occupied = enrollmentRepository.countBySportsClassIdAndStatusIn(classId, List.of("Registered", "Pending"));
         int free = Math.max(0, sportsClass.getMaxCapacity() - (int) occupied);
@@ -292,6 +307,9 @@ public class EnrollmentService {
             waiting.setStatus(statusForNewEnrollment(sportsClass));
             waiting.setPromotedAt(LocalDateTime.now(clock));
             ClassEnrollment promoted = enrollmentRepository.save(waiting);
+            if ("Pending".equals(waiting.getStatus())) {
+                invoiceService.createClassOrder(member, sportsClass, "Cash", "127.0.0.1");
+            }
             auditService.log(actorId, "PROMOTE_WAITLIST", "CLASS_ENROLLMENT", promoted.getId(),
                     "Promoted member " + member.getId() + " from waitlist for class " + classId);
             safeNotify(member.getId(), "Waitlist update", "A place opened in " + sportsClass.getName() + ". Your status is " + waiting.getStatus() + ".", "Schedule");

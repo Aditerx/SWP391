@@ -11,7 +11,6 @@ import lombok.Setter;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import org.hibernate.annotations.CreationTimestamp;
 
 @Entity
 @Table(name = "invoices")
@@ -19,6 +18,8 @@ import org.hibernate.annotations.CreationTimestamp;
 @Setter
 @NoArgsConstructor
 public class Invoice {
+    @Column(name = "reconciliation_required", nullable = false)
+    private boolean reconciliationRequired;
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "invoice_id")
@@ -59,7 +60,6 @@ public class Invoice {
     @Column(name = "payment_date")
     private LocalDateTime paymentDate;
 
-    @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 

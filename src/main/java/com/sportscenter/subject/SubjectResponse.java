@@ -10,7 +10,7 @@ public record SubjectResponse(
         BigDecimal advancedPrice,
         String status,
         String slug,
-        boolean outdoor) {
+        Boolean outdoor) {
 
     public SubjectResponse(Integer id, String name, String description) {
         this(id, name, description, BigDecimal.ZERO, BigDecimal.ZERO, "Active", null, false);
@@ -26,7 +26,7 @@ public record SubjectResponse(
                 subject.getAdvancedPrice() != null ? subject.getAdvancedPrice() : BigDecimal.ZERO,
                 subject.getStatus(),
                 subject.getSlug(),
-                subject.isOutdoor()
+                subject.getOutdoor()
         );
     }
 }

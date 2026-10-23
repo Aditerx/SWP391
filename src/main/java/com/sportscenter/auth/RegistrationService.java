@@ -22,6 +22,7 @@ import java.util.regex.Pattern;
 @Service
 @RequiredArgsConstructor
 public class RegistrationService {
+    private final java.time.Clock clock;
     private static final String PURPOSE = "REGISTER";
     private static final String GENERIC_MESSAGE = "Nếu thông tin hợp lệ, mã xác thực sẽ được gửi đến hộp thư.";
     private static final Pattern PASSWORD_POLICY = Pattern.compile("^(?=.*[A-Za-z])(?=.*\\d).{8,}$");
@@ -67,7 +68,7 @@ public class RegistrationService {
 
         Member member = new Member();
         member.setUser(saved);
-        member.setJoinDate(LocalDate.now());
+        member.setJoinDate(LocalDate.now(clock));
         memberRepository.save(member);
         auditService.log(saved.getId(), "REGISTER_MEMBER_PENDING", "USER", saved.getId(),
                 "Member self-registration is awaiting email verification");
@@ -80,7 +81,7 @@ public class RegistrationService {
         String email = normalize(request.email());
         List<EmailOtp> codes = otpRepository.findUnusedForUpdate(email, PURPOSE);
         EmailOtp otp = codes.isEmpty() ? null : codes.get(0);
-        if (otp == null || otp.getUser() == null || otp.getExpiresAt().isBefore(LocalDateTime.now())) {
+        if (otp == null || otp.getUser() == null || otp.getExpiresAt().isBefore(LocalDateTime.now(clock))) {
             throw new BusinessException("OTP is invalid or expired");
         }
         if (!passwordEncoder.matches(request.otp(), otp.getOtpHash())) {
@@ -115,7 +116,7 @@ public class RegistrationService {
         if (!PURPOSE.equals(purpose)) throw new BusinessException("Unsupported OTP purpose");
         String email = normalize(request.email());
         if (otpRepository.countByEmailIgnoreCaseAndPurposeAndCreatedAtAfter(
-                email, PURPOSE, LocalDateTime.now().minusHours(1)) >= 3) {
+                email, PURPOSE, LocalDateTime.now(clock).minusHours(1)) >= 3) {
             throw new BusinessException("OTP request limit reached. Try again later.");
         }
         User user = userRepository.findByEmailIgnoreCase(email)
@@ -125,7 +126,7 @@ public class RegistrationService {
 
     private void issueOtp(String email, User user) {
         if (otpRepository.countByEmailIgnoreCaseAndPurposeAndCreatedAtAfter(
-                email, PURPOSE, LocalDateTime.now().minusHours(1)) >= 3) return;
+                email, PURPOSE, LocalDateTime.now(clock).minusHours(1)) >= 3) return;
         otpRepository.findUnusedForUpdate(email, PURPOSE).forEach(previous -> {
             previous.setUsed(true);
             otpRepository.save(previous);
@@ -137,7 +138,7 @@ public class RegistrationService {
         otp.setUser(user);
         otp.setPurpose(PURPOSE);
         otp.setOtpHash(passwordEncoder.encode(rawOtp));
-        otp.setExpiresAt(LocalDateTime.now().plusMinutes(10));
+        otp.setExpiresAt(LocalDateTime.now(clock).plusMinutes(10));
         otp.setAttempts(0);
         otp.setUsed(false);
         otpRepository.save(otp);

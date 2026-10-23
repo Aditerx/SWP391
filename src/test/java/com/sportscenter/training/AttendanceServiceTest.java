@@ -58,11 +58,11 @@ class AttendanceServiceTest {
         lenient().when(clock.instant()).thenReturn(Instant.parse("2026-10-16T03:00:00Z"));
         lenient().when(clock.getZone()).thenReturn(ZoneId.of("Asia/Ho_Chi_Minh"));
         sampleMember = new User();
-        sampleMember.setId(7);
+        sampleMember.setId(7); sampleMember.setCenterId(1);
         sampleMember.setFullName("Hoàng Thị Oanh");
 
         sampleReceptionist = new User();
-        sampleReceptionist.setId(5);
+        sampleReceptionist.setId(5); sampleReceptionist.setCenterId(1);
         sampleReceptionist.setEmail("staff@example.test");
         sampleReceptionist.setFullName("Đỗ Thị Mai");
     }
@@ -132,8 +132,8 @@ class AttendanceServiceTest {
     }
 
     @Test
-    @DisplayName("Member may excuse an upcoming registered session with notice")
-    void requestAbsence_WithinNotice_SavesExcused() {
+    @DisplayName("Normal absence requests are rejected regardless of notice")
+    void requestAbsence_NormalIsRejected() {
         sampleMember.setEmail("member@example.test");
         Session session = new Session();
         session.setId(88);
@@ -144,15 +144,11 @@ class AttendanceServiceTest {
         session.setSportsClass(sportsClass);
         when(userRepository.findByEmailIgnoreCase("member@example.test")).thenReturn(Optional.of(sampleMember));
         when(sessionRepository.findById(88)).thenReturn(Optional.of(session));
-        when(enrollmentRepository.existsByMemberIdAndSportsClassIdAndStatus(7, 3, "Registered")).thenReturn(true);
-        when(attendanceRepository.findBySessionIdAndMemberId(88, 7)).thenReturn(Optional.empty());
-        when(attendanceRepository.save(any(Attendance.class))).thenAnswer(call -> call.getArgument(0));
 
-        AttendanceResponse response = attendanceService.requestAbsence(88, "Medical appointment", "member@example.test");
-
-        assertEquals("Excused", response.state());
-        verify(attendanceRepository).save(argThat(a -> "Medical appointment".equals(a.getNote())));
-        verify(trainingResultRepository, never()).save(any(TrainingResult.class));
+        var error = assertThrows(com.sportscenter.common.exception.BusinessException.class,
+                () -> attendanceService.requestAbsence(88, "Medical appointment", "member@example.test"));
+        assertTrue(error.getMessage().startsWith("NORMAL_CLASS_NON_CANCELLABLE:"));
+        verify(attendanceRepository, never()).save(any());
     }
 
     @Test
@@ -164,7 +160,7 @@ class AttendanceServiceTest {
         session.setSessionDate(java.time.LocalDate.of(2026, 10, 16));
         session.setStartTime(java.time.LocalTime.of(9, 0));
         com.sportscenter.sportclass.SportsClass sportsClass = new com.sportscenter.sportclass.SportsClass();
-        sportsClass.setId(3);
+        sportsClass.setId(3); sportsClass.setClassType("Advanced");
         session.setSportsClass(sportsClass);
         when(userRepository.findByEmailIgnoreCase("member@example.test")).thenReturn(Optional.of(sampleMember));
         when(sessionRepository.findById(89)).thenReturn(Optional.of(session));
@@ -194,7 +190,7 @@ class AttendanceServiceTest {
         session.setSessionDate(java.time.LocalDate.of(2026, 10, 16));
         session.setStartTime(java.time.LocalTime.of(13, 0));
         com.sportscenter.sportclass.SportsClass sportsClass = new com.sportscenter.sportclass.SportsClass();
-        sportsClass.setId(3);
+        sportsClass.setId(3); sportsClass.setClassType("Advanced");
         session.setSportsClass(sportsClass);
         when(userRepository.findByEmailIgnoreCase("member@example.test")).thenReturn(Optional.of(sampleMember));
         when(sessionRepository.findById(sessionId)).thenReturn(Optional.of(session));
@@ -222,10 +218,13 @@ class AttendanceServiceTest {
 
         when(attendanceRepository.findAllWithDetails()).thenReturn(java.util.List.of(att1, att2));
 
-        var all = attendanceService.searchAttendances(null, null, null, null, null, null, null);
+        sampleMember.setCenterId(1); sampleReceptionist.setCenterId(1);
+        when(userRepository.findByEmailIgnoreCase("staff@example.test")).thenReturn(Optional.of(sampleReceptionist));
+        var auth = new org.springframework.security.authentication.UsernamePasswordAuthenticationToken("staff@example.test", "", java.util.List.of(new org.springframework.security.core.authority.SimpleGrantedAuthority("REGISTER_MEMBER")));
+        var all = attendanceService.searchAttendances(null, null, null, null, null, null, auth);
         assertEquals(2, all.size());
 
-        var filtered = attendanceService.searchAttendances(null, null, null, "Present", null, null, null);
+        var filtered = attendanceService.searchAttendances(null, null, null, "Present", null, null, auth);
         assertEquals(1, filtered.size());
         assertEquals("Present", filtered.get(0).state());
     }

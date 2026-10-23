@@ -44,10 +44,23 @@ public class SessionService {
     private final Clock clock;
     private final MemberPackageRepository memberPackageRepository;
     private final SubjectRepository subjectRepository;
+    private final ScheduleWriteLock scheduleWriteLock;
+    private final com.sportscenter.user.MemberRepository memberRepository;
+    private final com.sportscenter.specialization.CoachSpecializationRepository coachSpecializationRepository;
 
     @Transactional(readOnly = true)
     public List<SessionResponse> findAll(Integer classId, Integer coachId, Integer roomId, Integer memberId,
-                                         LocalDate startDate, LocalDate endDate, String status) {
+                                         LocalDate startDate, LocalDate endDate, String status, Authentication authentication) {
+        User actor = requireActor(authentication);
+        if (hasRole(authentication, "MEMBER")) {
+            if (memberId != null && !memberId.equals(actor.getId())) throw new AccessDeniedException("Members may only view their own schedule");
+            memberId = actor.getId();
+        } else if (hasRole(authentication, "COACH")) {
+            if (coachId != null && !coachId.equals(actor.getId())) throw new AccessDeniedException("Coaches may only view their assigned schedule");
+            coachId = actor.getId();
+        } else {
+            requireScheduleStaff(authentication);
+        }
         List<Session> list;
         if (memberId != null) {
             list = sessionRepository.findByEnrolledMember(memberId, startDate, endDate, status);
@@ -56,17 +69,32 @@ public class SessionService {
         }
         var counts = classEnrollmentRepository.countGroupedByClass(List.of("Registered")).stream()
                 .collect(java.util.stream.Collectors.toMap(r -> (Integer) r[0], r -> ((Number) r[1]).intValue()));
-        return list.stream().map(s -> {
-            int count = counts.getOrDefault(s.getSportsClass().getId(), 0);
+        final Integer effectiveClass = classId, effectiveCoach = coachId, effectiveRoom = roomId;
+        return list.stream().filter(s -> inCenter(actor, s))
+                .filter(s -> effectiveClass == null || effectiveClass.equals(s.getSportsClass().getId()))
+                .filter(s -> effectiveRoom == null || effectiveRoom.equals(s.getRoom().getId()))
+                .filter(s -> effectiveCoach == null || effectiveCoach.equals(coachId(s)))
+                .map(s -> {
+            int count = s.getBookedMember() != null ? ("Cancelled".equals(s.getStatus()) ? 0 : 1) : counts.getOrDefault(s.getSportsClass().getId(), 0);
             return SessionResponse.from(s, count);
         }).toList();
     }
 
     @Transactional(readOnly = true)
-    public SessionResponse findById(Integer id) {
+    public SessionResponse findById(Integer id, Authentication authentication) {
         Session session = sessionRepository.findByIdWithDetails(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Session not found: " + id));
-        int count = (int) classEnrollmentRepository.countBySportsClassIdAndStatus(session.getSportsClass().getId(), "Registered");
+        User actor = requireActor(authentication);
+        if (!inCenter(actor, session)) throw new AccessDeniedException("Session belongs to another center");
+        if (hasRole(authentication, "MEMBER")) {
+            boolean owns = session.getBookedMember() != null ? actor.getId().equals(session.getBookedMember().getId())
+                    : classEnrollmentRepository.existsByMemberIdAndSportsClassIdAndStatusIn(actor.getId(), session.getSportsClass().getId(), List.of("Registered", "Completed"));
+            if (!owns) throw new AccessDeniedException("Members may only view their own sessions");
+        } else if (hasRole(authentication, "COACH")) {
+            if (!actor.getId().equals(coachId(session))) throw new AccessDeniedException("Session is not assigned to this coach");
+        } else requireScheduleStaff(authentication);
+        int count = session.getBookedMember() != null ? ("Cancelled".equals(session.getStatus()) ? 0 : 1)
+                : (int) classEnrollmentRepository.countBySportsClassIdAndStatus(session.getSportsClass().getId(), "Registered");
         return SessionResponse.from(session, count);
     }
 
@@ -79,24 +107,35 @@ public class SessionService {
     }
 
     @Transactional(readOnly = true)
+    public List<CatalogSessionResponse> publicTimetable(Integer classId) {
+        SportsClass c = sportsClassRepository.findById(classId).orElseThrow(() -> new ResourceNotFoundException("Class not found"));
+        if (!c.isNormal() || !List.of("Open","Ongoing").contains(c.getStatus())) throw new ResourceNotFoundException("Published Normal class not found");
+        return sessionRepository.findFiltered(classId,null,null,null,null,"Scheduled").stream()
+                .filter(s -> s.getBookedMember() == null).map(CatalogSessionResponse::from).toList();
+    }
+
+    @Transactional(readOnly = true)
     public List<CoachAvailableSlotResponse> getCoachAvailableSlots(
             Integer coachId, LocalDate date, Integer subjectId, Integer roomId) {
         if (date == null) {
             throw new BusinessException("Date is required to check coach availability");
         }
-        userRepository.findById(coachId)
+        User availableCoach = userRepository.findById(coachId)
                 .orElseThrow(() -> new ResourceNotFoundException("Coach not found: " + coachId));
+        if (!"Active".equalsIgnoreCase(availableCoach.getStatus()) || availableCoach.getRole() == null
+                || !"Coach".equalsIgnoreCase(availableCoach.getRole().getName())) throw new BusinessException("COACH_INACTIVE: An active coach is required");
 
         boolean isOutdoor = false;
         if (subjectId != null) {
-            Subject subject = subjectRepository.findById(subjectId).orElse(null);
+            Subject subject = subjectRepository.findById(subjectId).orElseThrow(() -> new ResourceNotFoundException("Subject not found"));
             if (subject != null) {
                 isOutdoor = subject.isOutdoor();
             }
-        } else if (roomId != null) {
-            Room room = roomRepository.findById(roomId).orElse(null);
+        }
+        if (roomId != null) {
+            Room room = roomRepository.findById(roomId).orElseThrow(() -> new ResourceNotFoundException("Room not found"));
             if (room != null) {
-                isOutdoor = room.isOutdoor();
+                isOutdoor = isOutdoor || room.isOutdoor();
             }
         }
 
@@ -169,6 +208,10 @@ public class SessionService {
         User currentUser = userRepository.findByEmailIgnoreCase(authentication.getName())
                 .orElseThrow(() -> new ResourceNotFoundException("Authenticated user not found"));
 
+        // All writers take the center lock before subscription/session locks.
+        Integer centerId = memberPackageRepository.findCenterIdById(request.subscriptionId())
+                .orElseThrow(() -> new ResourceNotFoundException("Subscription center not found"));
+        scheduleWriteLock.acquire(centerId);
         MemberPackage subscription = memberPackageRepository.findByIdForUpdate(request.subscriptionId())
                 .orElseThrow(() -> new ResourceNotFoundException("Gói hội viên không tồn tại: " + request.subscriptionId()));
 
@@ -189,22 +232,34 @@ public class SessionService {
         }
 
         if (subscription.getRemainingCredit() == null || subscription.getRemainingCredit() < 1) {
-            throw new BusinessException("Gói học 1:1 đã hết tín chỉ (Credit = 0). Vui lòng mua thêm gói.");
+            throw new BusinessException("OUT_OF_CREDIT: Gói học 1:1 đã hết tín chỉ (Credit = 0). Vui lòng mua thêm gói.");
         }
 
         LocalDate today = LocalDate.now(clock);
         if (subscription.getEndDate() != null && today.isAfter(subscription.getEndDate())) {
-            throw new BusinessException("Gói học 1:1 đã hết hạn sử dụng 45 ngày.");
+            throw new BusinessException("ADVANCED_PACKAGE_EXPIRED: Gói học 1:1 đã hết hạn sử dụng 45 ngày.");
         }
+        if ((subscription.getStartDate() != null && request.sessionDate().isBefore(subscription.getStartDate()))
+                || subscription.getEndDate() == null || request.sessionDate().isAfter(subscription.getEndDate())) {
+            throw new BusinessException("ADVANCED_PACKAGE_EXPIRED: Session date must be within the subscription validity period");
+        }
+        if (!"Active".equalsIgnoreCase(subscription.getMember().getStatus())) {
+            throw new BusinessException("MEMBER_NOT_ACTIVE: member account is not active");
+        }
+        memberRepository.findById(subscription.getMember().getId()).ifPresent(profile -> {
+            if (profile.getBookingBlockedUntil() != null && profile.getBookingBlockedUntil().isAfter(LocalDateTime.now(clock))) {
+                throw new BusinessException("BOOKING_BLOCKED: member bookings are currently blocked");
+            }
+        });
 
         LocalDateTime now = LocalDateTime.now(clock);
         LocalDateTime sessionStart = LocalDateTime.of(request.sessionDate(), request.startTime());
         if (sessionStart.isBefore(now.plusHours(12))) {
-            throw new BusinessException("Yêu cầu đặt lịch trước tối thiểu 12 tiếng.");
+            throw new BusinessException("ADVANCED_BOOKING_TOO_LATE: Yêu cầu đặt lịch trước tối thiểu 12 tiếng.");
         }
 
         if (holidayRepository.existsByHolidayDateAndIsActiveTrue(request.sessionDate())) {
-            throw new BusinessException("Không thể đặt lịch vào ngày nghỉ lễ của trung tâm.");
+            throw new BusinessException("HOLIDAY_BLOCKED: Không thể đặt lịch vào ngày nghỉ lễ của trung tâm.");
         }
 
         User coach = userRepository.findById(request.coachId())
@@ -233,17 +288,22 @@ public class SessionService {
 
         sessionSlotValidator.validateSession(sportsClass, room, request.startTime(), request.endTime());
         validateRoomAndCapacity(room, sportsClass);
+        validateCoach(coach, sportsClass);
+        if (!subscription.getMember().getCenterId().equals(sportsClass.getCenterId())
+                || !subscription.getMember().getCenterId().equals(room.getCenterId())) {
+            throw new AccessDeniedException("Booking resources must belong to the member's center");
+        }
 
         List<Session> coachConflicts = sessionRepository.findCoachConflicts(
                 coach.getId(), request.sessionDate(), request.startTime(), request.endTime(), null);
         if (!coachConflicts.isEmpty()) {
-            throw new BusinessException("HLV đã có lịch dạy vào khung giờ này.");
+            throw new com.sportscenter.common.exception.BusinessConflictException("COACH_CONFLICT: HLV đã có lịch dạy vào khung giờ này.");
         }
 
         List<Session> roomConflicts = sessionRepository.findRoomConflicts(
                 room.getId(), request.sessionDate(), request.startTime(), request.endTime(), null);
         if (!roomConflicts.isEmpty()) {
-            throw new BusinessException("Phòng/sân đã có lịch vào khung giờ này.");
+            throw new com.sportscenter.common.exception.BusinessConflictException("ROOM_CONFLICT: Phòng/sân đã có lịch vào khung giờ này.");
         }
 
         List<Session> memberConflicts = sessionRepository.findMemberConflicts(
@@ -280,6 +340,7 @@ public class SessionService {
         User currentUser = userRepository.findByEmailIgnoreCase(authentication.getName())
                 .orElseThrow(() -> new ResourceNotFoundException("Authenticated user not found"));
 
+        scheduleWriteLock.acquire(sessionRepository.findCenterIdById(sessionId).orElseThrow(() -> new ResourceNotFoundException("Session center not found")));
         Session session = sessionRepository.findByIdForUpdate(sessionId)
                 .orElseThrow(() -> new ResourceNotFoundException("Session not found: " + sessionId));
 
@@ -315,14 +376,15 @@ public class SessionService {
         if (sub != null) {
             sub = memberPackageRepository.findByIdForUpdate(sub.getSubscriptionId()).orElse(null);
         }
-        if (sub == null && session.getBookedMember() != null) {
-            List<MemberPackage> active = memberPackageRepository.findByMemberIdAndStatus(session.getBookedMember().getId(), "Active");
-            sub = active.stream()
-                    .filter(p -> p.getMembershipPackage() != null && p.getMembershipPackage().isAdvanced())
-                    .findFirst().orElse(null);
+        if (sub == null || session.getBookedMember() == null || !sub.getMember().getId().equals(session.getBookedMember().getId())) {
+            throw new BusinessException("SUBSCRIPTION_LINK_REQUIRED: Cannot refund credit without the original subscription");
         }
-
+        if (!"Active".equals(sub.getStatus()) || sub.getEndDate() == null || sub.getEndDate().isBefore(LocalDate.now(clock))) {
+            throw new BusinessException("ADVANCED_PACKAGE_EXPIRED: Expired entitlements cannot be refunded as new credit");
+        }
         if (sub != null) {
+            int limit = sub.getMembershipPackage() != null && sub.getMembershipPackage().getTotalCredit() != null ? sub.getMembershipPackage().getTotalCredit() : 12;
+            if (sub.getRemainingCredit() != null && sub.getRemainingCredit() >= limit) throw new BusinessException("CREDIT_LIMIT_EXCEEDED: Credit refund exceeds the original entitlement");
             sub.setRemainingCredit((sub.getRemainingCredit() != null ? sub.getRemainingCredit() : 0) + 1);
             memberPackageRepository.save(sub);
         }
@@ -338,6 +400,7 @@ public class SessionService {
     public SessionResponse create(SessionRequest request) {
         validateDateNotInPast(request.sessionDate());
 
+        scheduleWriteLock.acquire(sportsClassRepository.findCenterIdById(request.classId()).orElseThrow(() -> new ResourceNotFoundException("Class center not found")));
         SportsClass sportsClass = sportsClassRepository.findById(request.classId())
                 .orElseThrow(() -> new ResourceNotFoundException("Class not found: " + request.classId()));
         Room room = roomRepository.findById(request.roomId())
@@ -345,6 +408,8 @@ public class SessionService {
 
         sessionSlotValidator.validateSession(sportsClass, room, request.startTime(), request.endTime());
         validateRoomAndCapacity(room, sportsClass);
+        if (sportsClass.getCoach() == null) throw new BusinessException("COACH_REQUIRED: Assign a coach before scheduling");
+        validateCoach(sportsClass.getCoach(), sportsClass);
 
         ConflictCheckResponse conflict = checkScheduleConflict(
                 sportsClass, room, request.sessionDate(), request.startTime(), request.endTime(), null);
@@ -443,6 +508,7 @@ public class SessionService {
             throw new BusinessException("Cannot generate sessions starting in the past");
         }
 
+        scheduleWriteLock.acquire(sportsClassRepository.findCenterIdById(request.classId()).orElseThrow(() -> new ResourceNotFoundException("Class center not found")));
         SportsClass sportsClass = sportsClassRepository.findById(request.classId())
                 .orElseThrow(() -> new ResourceNotFoundException("Class not found: " + request.classId()));
         Room room = roomRepository.findById(request.roomId())
@@ -450,8 +516,13 @@ public class SessionService {
 
         sessionSlotValidator.validateSession(sportsClass, room, request.startTime(), request.endTime());
         validateRoomAndCapacity(room, sportsClass);
+        if (sportsClass.getCoach() == null) throw new BusinessException("COACH_REQUIRED: Assign a coach before scheduling");
+        validateCoach(sportsClass.getCoach(), sportsClass);
 
-        int targetSessions = sportsClass.getTotalSessions() != null ? sportsClass.getTotalSessions() : 12;
+        if (!sportsClass.isNormal()) throw new BusinessException("NORMAL_CLASS_REQUIRED: Recurring generation is only for Normal classes");
+        if (sessionRepository.countBySportsClassIdAndStatusNot(sportsClass.getId(), "Cancelled") > 0) throw new BusinessException("SCHEDULE_ALREADY_EXISTS: Recurring schedule has already been generated");
+        if (request.daysOfWeek().stream().anyMatch(d -> d == null || d < 1 || d > 7)) throw new BusinessException("INVALID_DAYS: Weekdays must be in 1..7");
+        int targetSessions = 12;
         Map<LocalDate, Holiday> activeHolidays = holidayRepository.findByIsActiveTrue().stream()
                 .collect(java.util.stream.Collectors.toMap(Holiday::getHolidayDate, h -> h, (h1, h2) -> h1));
 
@@ -493,8 +564,12 @@ public class SessionService {
         if (toCreate.size() < targetSessions) {
             throw new BusinessException("Không thể tìm đủ " + targetSessions + " buổi học hợp lệ: chỉ tìm thấy " + toCreate.size() + " buổi khả dụng.");
         }
+        if (!LocalDateTime.of(toCreate.get(0).getSessionDate(), toCreate.get(0).getStartTime()).isAfter(LocalDateTime.now(clock))) {
+            throw new BusinessException("CLASS_ALREADY_STARTED: The first session must start in the future");
+        }
 
         LocalDate lastSessionDate = toCreate.get(toCreate.size() - 1).getSessionDate();
+        sportsClass.setStartDate(toCreate.get(0).getSessionDate());
         sportsClass.setEndDate(lastSessionDate);
         sportsClassRepository.save(sportsClass);
 
@@ -508,8 +583,11 @@ public class SessionService {
 
     @Transactional
     public SessionResponse update(Integer id, SessionRequest request) {
-        Session session = sessionRepository.findByIdWithDetails(id)
+        scheduleWriteLock.acquire(sessionRepository.findCenterIdById(id).orElseThrow(() -> new ResourceNotFoundException("Session center not found")));
+        Session session = sessionRepository.findByIdForUpdate(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Session not found: " + id));
+        requireMutableSession(session);
+        if (session.getBookedMember() != null) throw new BusinessException("USE_INCIDENT_ENDPOINT: Use reschedule for a booked private session");
 
         SportsClass sportsClass = sportsClassRepository.findById(request.classId())
                 .orElseThrow(() -> new ResourceNotFoundException("Class not found: " + request.classId()));
@@ -518,6 +596,8 @@ public class SessionService {
 
         sessionSlotValidator.validateSession(sportsClass, room, request.startTime(), request.endTime());
         validateRoomAndCapacity(room, sportsClass);
+        if (sportsClass.getCoach() == null) throw new BusinessException("COACH_REQUIRED: Assign a coach before scheduling");
+        validateCoach(sportsClass.getCoach(), sportsClass);
 
         ConflictCheckResponse conflict = checkScheduleConflict(
                 sportsClass, room, request.sessionDate(), request.startTime(), request.endTime(), id);
@@ -545,8 +625,13 @@ public class SessionService {
     @Transactional
     public SessionResponse updateStatus(Integer id, String rawStatus) {
         String status = normalizeSessionStatus(rawStatus);
-        Session session = sessionRepository.findByIdWithDetails(id)
+        scheduleWriteLock.acquire(sessionRepository.findCenterIdById(id).orElseThrow(() -> new ResourceNotFoundException("Session center not found")));
+        Session session = sessionRepository.findByIdForUpdate(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Session not found: " + id));
+        if ("Cancelled".equals(status) && (session.getBookedMember() != null
+                || classEnrollmentRepository.countBySportsClassIdAndStatusIn(session.getSportsClass().getId(), List.of("Registered", "Pending")) > 0)) {
+            throw new BusinessException("INCIDENT_POLICY_REQUIRED: Direct cancellation must not discard a paid entitlement; use reschedule");
+        }
 
         session.setStatus(status);
         Session saved = sessionRepository.save(session);
@@ -558,8 +643,14 @@ public class SessionService {
 
     @Transactional
     public void delete(Integer id) {
-        Session session = sessionRepository.findByIdWithDetails(id)
+        scheduleWriteLock.acquire(sessionRepository.findCenterIdById(id).orElseThrow(() -> new ResourceNotFoundException("Session center not found")));
+        Session session = sessionRepository.findByIdForUpdate(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Session not found: " + id));
+        requireMutableSession(session);
+        if (session.getBookedMember() != null || "Open".equals(session.getSportsClass().getStatus())
+                || classEnrollmentRepository.countBySportsClassIdAndStatusIn(session.getSportsClass().getId(), List.of("Registered", "Pending")) > 0) {
+            throw new BusinessException("SESSION_IN_USE: Published or booked sessions cannot be deleted");
+        }
         sessionRepository.delete(session);
         auditService.log(null, "DELETE_SESSION", "SESSION", id, "Deleted session ID " + id);
     }
@@ -567,12 +658,15 @@ public class SessionService {
     @Transactional
     public SessionResponse rescheduleSession(Integer sessionId, SessionRescheduleRequest request, Authentication authentication) {
         Integer actorId = getActorId(authentication);
-        Session session = sessionRepository.findByIdWithDetails(sessionId)
+        scheduleWriteLock.acquire(sessionRepository.findCenterIdById(sessionId).orElseThrow(() -> new ResourceNotFoundException("Session center not found")));
+        Session session = sessionRepository.findByIdForUpdate(sessionId)
                 .orElseThrow(() -> new ResourceNotFoundException("Session not found: " + sessionId));
 
         if ("Completed".equalsIgnoreCase(session.getStatus())) {
             throw new BusinessException("Không thể dời buổi học đã hoàn thành.");
         }
+
+        requireMutableSession(session);
 
         if (request.newDate().isBefore(LocalDate.now(clock))) {
             throw new BusinessException("Không thể dời buổi học về ngày trong quá khứ.");
@@ -600,7 +694,7 @@ public class SessionService {
         List<Session> roomConflicts = sessionRepository.findRoomConflicts(
                 room.getId(), request.newDate(), request.newStartTime(), request.newEndTime(), session.getId());
         if (!roomConflicts.isEmpty()) {
-            throw new BusinessException("Phòng/sân đã có lịch vào khung giờ này.");
+            throw new com.sportscenter.common.exception.BusinessConflictException("ROOM_CONFLICT: Phòng/sân đã có lịch vào khung giờ này.");
         }
 
         Integer coachId = session.getCoach() != null ? session.getCoach().getId() :
@@ -609,7 +703,7 @@ public class SessionService {
             List<Session> coachConflicts = sessionRepository.findCoachConflicts(
                     coachId, request.newDate(), request.newStartTime(), request.newEndTime(), session.getId());
             if (!coachConflicts.isEmpty()) {
-                throw new BusinessException("HLV đã có lịch dạy vào khung giờ này.");
+                throw new com.sportscenter.common.exception.BusinessConflictException("COACH_CONFLICT: HLV đã có lịch dạy vào khung giờ này.");
             }
         }
 
@@ -686,7 +780,8 @@ public class SessionService {
     @Transactional
     public SessionResponse substituteCoach(Integer sessionId, SubstituteCoachRequest request, Authentication authentication) {
         Integer actorId = getActorId(authentication);
-        Session session = sessionRepository.findByIdWithDetails(sessionId)
+        scheduleWriteLock.acquire(sessionRepository.findCenterIdById(sessionId).orElseThrow(() -> new ResourceNotFoundException("Session center not found")));
+        Session session = sessionRepository.findByIdForUpdate(sessionId)
                 .orElseThrow(() -> new ResourceNotFoundException("Session not found: " + sessionId));
 
         if ("Completed".equalsIgnoreCase(session.getStatus())) {
@@ -696,6 +791,8 @@ public class SessionService {
             throw new BusinessException("Không thể đổi HLV cho buổi học đã bị hủy.");
         }
 
+        requireMutableSession(session);
+
         User newCoach = userRepository.findById(request.newCoachId())
                 .orElseThrow(() -> new ResourceNotFoundException("Coach not found: " + request.newCoachId()));
         if (newCoach.getRole() == null || (!"Coach".equalsIgnoreCase(newCoach.getRole().getName())
@@ -703,10 +800,11 @@ public class SessionService {
             throw new BusinessException("Người dùng được chỉ định không phải là Huấn luyện viên.");
         }
 
+        validateCoach(newCoach, session.getSportsClass());
         List<Session> coachConflicts = sessionRepository.findCoachConflicts(
                 newCoach.getId(), session.getSessionDate(), session.getStartTime(), session.getEndTime(), session.getId());
         if (!coachConflicts.isEmpty()) {
-            throw new BusinessException("HLV thay thế đã có lịch dạy vào khung giờ này.");
+            throw new com.sportscenter.common.exception.BusinessConflictException("SUBSTITUTE_COACH_CONFLICT: HLV thay thế đã có lịch dạy vào khung giờ này.");
         }
 
         User oldCoach = session.getCoach() != null ? session.getCoach() :
@@ -731,6 +829,37 @@ public class SessionService {
         return userRepository.findByEmailIgnoreCase(authentication.getName())
                 .map(User::getId)
                 .orElse(null);
+    }
+
+    private User requireActor(Authentication authentication) {
+        if (authentication == null || !authentication.isAuthenticated()) throw new AccessDeniedException("Authentication required");
+        return userRepository.findByEmailIgnoreCase(authentication.getName()).orElseThrow(() -> new AccessDeniedException("Account not found"));
+    }
+
+    private void requireMutableSession(Session session) {
+        if (session.isAttendanceFinalized() || "Completed".equals(session.getStatus())
+                || !LocalDateTime.of(session.getSessionDate(), session.getEndTime()).isAfter(LocalDateTime.now(clock))) {
+            throw new BusinessException("SESSION_HISTORY_IMMUTABLE: Ended or finalized sessions cannot be rescheduled or deleted");
+        }
+    }
+
+    private boolean hasRole(Authentication authentication, String role) {
+        return authentication.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_" + role));
+    }
+
+    private void requireScheduleStaff(Authentication authentication) {
+        if (authentication.getAuthorities().stream().noneMatch(a -> List.of("MANAGE_CLASSES", "REGISTER_MEMBER").contains(a.getAuthority()))) {
+            throw new AccessDeniedException("Schedule access requires an assigned operational permission");
+        }
+    }
+
+    private boolean inCenter(User actor, Session session) {
+        return actor.getCenterId() != null && actor.getCenterId().equals(session.getSportsClass().getCenterId());
+    }
+
+    private Integer coachId(Session session) {
+        return session.getCoach() != null ? session.getCoach().getId()
+                : session.getSportsClass().getCoach() != null ? session.getSportsClass().getCoach().getId() : null;
     }
 
     @Transactional(readOnly = true)
@@ -824,6 +953,7 @@ public class SessionService {
     }
 
     private void validateRoomAndCapacity(Room room, SportsClass sportsClass) {
+        if (!java.util.Objects.equals(room.getCenterId(), sportsClass.getCenterId())) throw new AccessDeniedException("Room belongs to another center");
         if (!"Available".equalsIgnoreCase(room.getStatus())) {
             throw new BusinessException("New or updated sessions require an Available room (current status: " + room.getStatus() + ")");
         }
@@ -831,6 +961,19 @@ public class SessionService {
                 && sportsClass.getMaxCapacity() > room.getCapacity()) {
             throw new BusinessException("Class capacity (" + sportsClass.getMaxCapacity() +
                     ") cannot exceed room capacity (" + room.getCapacity() + ")");
+        }
+    }
+
+    private void validateCoach(User coach, SportsClass sportsClass) {
+        if (!"Active".equalsIgnoreCase(coach.getStatus()) || coach.getRole() == null
+                || !"Coach".equalsIgnoreCase(coach.getRole().getName())) {
+            throw new BusinessException("COACH_INACTIVE: An active coach is required");
+        }
+        if (!java.util.Objects.equals(coach.getCenterId(), sportsClass.getCenterId())) throw new BusinessException("COACH_CENTER_MISMATCH: Coach belongs to another center");
+        if (sportsClass.getSubject() == null || coachSpecializationRepository.findByCoachUserId(coach.getId()).stream().noneMatch(a ->
+                a.getSpecialization() != null && "Active".equalsIgnoreCase(a.getSpecialization().getStatus())
+                && a.getSpecialization().getSubject() != null && sportsClass.getSubject().getId().equals(a.getSpecialization().getSubject().getId()))) {
+            throw new BusinessException("COACH_SUBJECT_MISMATCH: Coach must have an active specialization linked to the subject");
         }
     }
 

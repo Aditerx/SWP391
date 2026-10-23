@@ -23,6 +23,8 @@ import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class MemberPackageExtensionTest {
+    @Mock private com.sportscenter.session.ScheduleWriteLock scheduleWriteLock;
+    @org.mockito.Spy private java.time.Clock clock = java.time.Clock.system(java.time.ZoneId.of("Asia/Ho_Chi_Minh"));
 
     @Mock
     private MemberPackageRepository memberPackageRepository;
@@ -42,6 +44,7 @@ class MemberPackageExtensionTest {
 
     @BeforeEach
     void setUp() {
+        lenient().when(memberPackageRepository.findCenterIdById(anyInt())).thenReturn(Optional.of(1));
         managerUser = new User();
         managerUser.setId(1);
         managerUser.setEmail("manager@sportscenter.com");
@@ -103,7 +106,7 @@ class MemberPackageExtensionTest {
 
         assertNotNull(response);
         assertEquals("Active", response.status());
-        assertTrue(response.endDate().isAfter(LocalDate.now()));
+        assertTrue(response.endDate().isAfter(LocalDate.now(clock)));
     }
 
     @Test

@@ -7,8 +7,8 @@
 
 param(
     [string]$BaseUrl = "http://localhost:8080",
-    [string]$Email = "abc1@ex.com",
-    [string]$Password = "abc1@ex.com"
+    [string]$Email = $env:SCMS_TEST_MEMBER_EMAIL,
+    [string]$Password = $env:SCMS_TEST_MEMBER_PASSWORD
 )
 
 # Cấu hình UTF-8 cho Console Windows
@@ -17,7 +17,8 @@ try {
     $OutputEncoding = [System.Text.Encoding]::UTF8
 } catch {}
 
-$ErrorActionPreference = "Continue"
+$ErrorActionPreference = "Stop"
+if (-not $Email -or -not $Password) { throw "Provide SCMS_TEST_MEMBER_EMAIL and SCMS_TEST_MEMBER_PASSWORD or explicit parameters." }
 $ProgressPreference = "SilentlyContinue"
 
 Write-Host ""
@@ -55,6 +56,7 @@ function Assert-Step {
 # 1. KIỂM TRA HEALTH CHECK (PUBLIC ENDPOINT KHÔNG CẦN LOGIN)
 Assert-Step "1. Health Check Endpoint (/api/health)" {
     $res = Invoke-RestMethod -Uri "$BaseUrl/api/health" -Method Get -TimeoutSec 15
+    if ($res.status -ne "UP") { throw "Health endpoint did not return UP." }
     return "Health Status: OK (200), Response: $($res | ConvertTo-Json -Compress)"
 }
 
@@ -62,7 +64,7 @@ Assert-Step "1. Health Check Endpoint (/api/health)" {
 $isLoggedIn = $false
 $userRole = ""
 Assert-Step "2. Xác thực Đăng Nhập (/api/auth/login)" {
-    $passwordsToTry = @($Password, "12345678", "Scms@2026", "password", "Admin@123", "DemoCash2026") | Select-Object -Unique
+    $passwordsToTry = @($Password) # Never guess passwords.
 
     foreach ($p in $passwordsToTry) {
         try {
@@ -106,7 +108,12 @@ Assert-Step "4. Danh mục Môn Thể Thao & Giá Chuẩn (/api/subjects)" {
     if (-not $tennis) {
         throw "Không tìm thấy bộ môn Tennis."
     }
-    return "Đã xác minh $($subjects.Count) môn thể thao. Có đầy đủ normalPrice, advancedPrice, outdoor."
+    foreach ($subject in $subjects) {
+        foreach ($field in @('normalPrice','advancedPrice','outdoor')) {
+            if (-not $subject.PSObject.Properties[$field]) { throw "Subject response is missing $field." }
+        }
+    }
+    return "Đã kiểm tra schema của $($subjects.Count) môn. Bảng giá chính thức cần xác nhận riêng."
 }
 
 # 5. KIỂM TRA GÓI HỘI VIÊN & GÓI 1:1
@@ -142,7 +149,7 @@ Assert-Step "9. Mã Check-in TOTP 30s (/api/members/me/checkin-code)" {
         }
         return "Mã TOTP 6 số: $($totpRes.payload), Thời gian hiệu lực còn lại: $($totpRes.expiresInSeconds) giây."
     } catch {
-        if ($script:userRole -ne "MEMBER" -and $script:userRole -ne "Member") {
+        if ($script:userRole -ne "MEMBER" -and $script:userRole -ne "Member" -and $_.Exception.Response -and [int]$_.Exception.Response.StatusCode -eq 403) {
             return "Tài khoản hiện tại có Role là '$($script:userRole)' (chỉ Member mới có mã TOTP checkin cá nhân, đúng thiết kế bảo mật)."
         }
         throw $_
@@ -155,5 +162,7 @@ Write-Host " KẾT QUẢ KIỂM THỬ: $passedCount PASSED | $failedCount FAILED
 Write-Host "======================================================================" -ForegroundColor Cyan
 
 if ($failedCount -eq 0) {
-    Write-Host "`n[CHÚC MỪNG] Tất cả các API cốt lõi đã sẵn sàng 100% để phục vụ Frontend!" -ForegroundColor Green
+    Write-Host "`n[CHÚC MỪNG] Các bước smoke đã pass; chưa thay thế nghiệm thu nghiệp vụ hoặc thanh toán." -ForegroundColor Green
 }
+if ($failedCount -gt 0) { exit 1 }
+exit 0

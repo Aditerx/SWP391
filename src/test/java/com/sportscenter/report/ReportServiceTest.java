@@ -29,6 +29,7 @@ import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class ReportServiceTest {
+    @org.mockito.Spy private java.time.Clock clock = java.time.Clock.system(java.time.ZoneId.of("Asia/Ho_Chi_Minh"));
 
     @Mock
     private UserRepository userRepository;
@@ -93,7 +94,7 @@ class ReportServiceTest {
         inv1.setAmount(BigDecimal.valueOf(500000));
         inv1.setPaymentStatus("Paid");
         inv1.setPaymentMethod("Cash");
-        inv1.setPaymentDate(LocalDateTime.now());
+        inv1.setPaymentDate(LocalDateTime.now(clock));
 
         Invoice inv2 = new Invoice();
         inv2.setInvoiceId(2);
@@ -104,12 +105,19 @@ class ReportServiceTest {
 
         when(invoiceRepository.findAllWithDetails()).thenReturn(List.of(inv1, inv2));
 
-        RevenueReportResponse res = reportService.revenueReport(LocalDate.now().minusDays(30), LocalDate.now().plusDays(1), "month");
+        RevenueReportResponse res = reportService.revenueReport(LocalDate.now(clock).minusDays(30), LocalDate.now(clock).plusDays(1), "month");
 
         assertNotNull(res);
         assertEquals(BigDecimal.valueOf(500000), res.totalRevenue());
         assertEquals(1L, res.totalTransactions());
         assertEquals(1, res.revenueByPackage().size());
         assertEquals("Goi 1 Thang", res.revenueByPackage().get(0).packageName());
+    }
+
+    @Test void emptyRevenueDoesNotInventATimelinePeriod() {
+        when(invoiceRepository.findAllWithDetails()).thenReturn(List.of());
+        var response = reportService.revenueReport(LocalDate.of(2026,1,1),LocalDate.of(2026,1,31),"month");
+        assertEquals(BigDecimal.ZERO,response.totalRevenue());
+        assertTrue(response.timeline().isEmpty());
     }
 }

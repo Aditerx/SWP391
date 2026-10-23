@@ -28,7 +28,7 @@ public record MemberResponse(
 ) {
     public static MemberResponse from(User user, Member member, MemberPackage currentPackage, BigDecimal totalSpent) {
         String code = "MB-" + (1000 + user.getId());
-        LocalDate joinDate = member != null && member.getJoinDate() != null ? member.getJoinDate() : (user.getCreatedAt() != null ? user.getCreatedAt().toLocalDate() : LocalDate.now());
+        LocalDate joinDate = member != null && member.getJoinDate() != null ? member.getJoinDate() : (user.getCreatedAt() != null ? user.getCreatedAt().toLocalDate() : null);
 
         Integer pkgId = currentPackage != null && currentPackage.getMembershipPackage() != null
                 ? currentPackage.getMembershipPackage().getId() : null;

@@ -32,6 +32,8 @@ import java.util.List;
 @Configuration
 @EnableMethodSecurity
 public class SecurityConfig {
+    @org.springframework.beans.factory.annotation.Value("${scms.frontend-origins:${FRONTEND_URL:}}")
+    private String frontendOrigins = "";
 
     @Bean
     PasswordEncoder passwordEncoder() {
@@ -100,6 +102,7 @@ public class SecurityConfig {
                 "http://localhost:*",
                 "http://127.0.0.1:*"
         ));
+        java.util.Arrays.stream(frontendOrigins.split(",")).map(String::trim).filter(s -> !s.isBlank()).forEach(configuration::addAllowedOrigin);
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("*"));
         configuration.setAllowCredentials(true);

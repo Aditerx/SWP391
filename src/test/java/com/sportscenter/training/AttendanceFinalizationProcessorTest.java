@@ -41,6 +41,7 @@ class AttendanceFinalizationProcessorTest {
     @Mock AuditService auditService;
     @Mock NotificationService notificationService;
     @Mock Clock clock;
+    @Mock MemberPackageRepository memberPackageRepository;
     @InjectMocks AttendanceFinalizationProcessor processor;
 
     private Session session;
@@ -112,6 +113,7 @@ class AttendanceFinalizationProcessorTest {
 
     @Test
     void process_ThirdMonthlyAbsenceLocksBookingForSevenDays() {
+        org.springframework.test.util.ReflectionTestUtils.setField(processor, "bookingBlockEnabled", true);
         ClassEnrollment registered = enrollment("Registered");
         Member profile = new Member(); profile.setUser(memberUser);
         when(sessionRepository.findByIdForUpdate(90)).thenReturn(Optional.of(session));
@@ -166,10 +168,52 @@ class AttendanceFinalizationProcessorTest {
         verify(auditService, never()).log(any(), eq("BOOKING_BLOCK_APPLIED"), anyString(), any(), anyString());
     }
 
+    @Test void disabledPolicyStillMarksThirdAbsenceWithoutBlocking() {
+        ClassEnrollment registered = enrollment("Registered");
+        Member profile = new Member(); profile.setUser(memberUser);
+        when(sessionRepository.findByIdForUpdate(90)).thenReturn(Optional.of(session));
+        when(enrollmentRepository.findByClassIdWithDetails(12)).thenReturn(List.of(registered));
+        when(attendanceRepository.findBySessionIdAndMemberId(90,31)).thenReturn(Optional.empty());
+        when(attendanceRepository.save(any(Attendance.class))).thenAnswer(call -> call.getArgument(0));
+        when(attendanceRepository.countAbsencesForMemberInRange(anyInt(),any(),any())).thenReturn(3L);
+        when(memberRepository.findByIdForUpdate(31)).thenReturn(Optional.of(profile));
+        processor.process(90);
+        assertNull(profile.getBookingBlockedUntil());
+        verify(attendanceRepository).save(argThat(a -> "Absent".equals(a.getState())));
+        verify(notificationService,never()).send(any(),any(),any(),any());
+    }
+
     private ClassEnrollment enrollment(String status) {
         ClassEnrollment enrollment = new ClassEnrollment();
         enrollment.setMember(memberUser);
         enrollment.setStatus(status);
         return enrollment;
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(longs={0,1})
+    void privatePackageCompletesOnlyAfterItsLastReservedSession(long remainingSessions) {
+        var subscription = new com.sportscenter.membership.MemberPackage(); subscription.setSubscriptionId(8);
+        subscription.setStatus("Active"); subscription.setRemainingCredit(0);
+        session.setBookedMember(memberUser); session.setMemberPackage(subscription);
+        when(sessionRepository.findByIdForUpdate(90)).thenReturn(Optional.of(session));
+        when(attendanceRepository.findBySessionIdAndMemberId(90,31)).thenReturn(Optional.empty());
+        when(attendanceRepository.save(any(Attendance.class))).thenAnswer(call -> call.getArgument(0));
+        when(memberPackageRepository.findByIdForUpdate(8)).thenReturn(Optional.of(subscription));
+        when(sessionRepository.countByMemberPackageSubscriptionIdAndStatusAndAttendanceFinalizedFalse(8,"Scheduled")).thenReturn(remainingSessions);
+        processor.process(90);
+        assertEquals(remainingSessions == 0 ? "Completed" : "Active",subscription.getStatus());
+        assertEquals(0,subscription.getRemainingCredit());
+    }
+
+    @Test void normalEnrollmentCompletesAfterTwelveFinalizedSessions() {
+        var registered = enrollment("Registered");
+        when(sessionRepository.findByIdForUpdate(90)).thenReturn(Optional.of(session));
+        when(enrollmentRepository.findByClassIdWithDetails(12)).thenReturn(List.of(registered));
+        when(attendanceRepository.findBySessionIdAndMemberId(90,31)).thenReturn(Optional.empty());
+        when(attendanceRepository.save(any(Attendance.class))).thenAnswer(call -> call.getArgument(0));
+        when(sessionRepository.countBySportsClassIdAndStatusNot(12,"Cancelled")).thenReturn(12L);
+        processor.process(90);
+        assertEquals("Completed",registered.getStatus());
     }
 }

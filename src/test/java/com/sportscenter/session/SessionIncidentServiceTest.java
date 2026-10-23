@@ -79,6 +79,10 @@ class SessionIncidentServiceTest {
 
     @InjectMocks
     private SessionService sessionService;
+    @Mock private ScheduleWriteLock scheduleWriteLock;
+    @Mock private com.sportscenter.user.MemberRepository memberRepository;
+    @Mock private com.sportscenter.specialization.CoachSpecializationRepository coachSpecializationRepository;
+
 
     private User managerUser;
     private Authentication managerAuth;
@@ -94,6 +98,19 @@ class SessionIncidentServiceTest {
 
     @BeforeEach
     void setUp() {
+        lenient().when(sessionRepository.findCenterIdById(anyInt())).thenReturn(Optional.of(1));
+        lenient().when(sportsClassRepository.findCenterIdById(anyInt())).thenReturn(Optional.of(1));
+        lenient().when(coachSpecializationRepository.findByCoachUserId(anyInt())).thenAnswer(call -> {
+            var a = new com.sportscenter.specialization.CoachSpecialization();
+            var spec = new com.sportscenter.specialization.Specialization();
+            var subject = new Subject(); subject.setId(1); subject.setOutdoor(false); spec.setSubject(subject); spec.setStatus("Active"); a.setSpecialization(spec);
+            var b = new com.sportscenter.specialization.CoachSpecialization();
+            var spec2 = new com.sportscenter.specialization.Specialization();
+            var subject2 = new Subject(); subject2.setId(2); subject2.setOutdoor(false); spec2.setSubject(subject2); spec2.setStatus("Active"); b.setSpecialization(spec2);
+            return List.of(a,b);
+        });
+        lenient().when(sessionRepository.findByIdForUpdate(anyInt())).thenAnswer(call -> sessionRepository.findByIdWithDetails(call.getArgument(0)));
+
         Role managerRole = new Role();
         managerRole.setName("Manager");
         managerUser = new User();
@@ -106,17 +123,17 @@ class SessionIncidentServiceTest {
         Role coachRole = new Role();
         coachRole.setName("Coach");
         coach1 = new User();
-        coach1.setId(10);
+        coach1.setId(10); coach1.setCenterId(1);
         coach1.setFullName("HLV Nguyễn Văn A");
-        coach1.setRole(coachRole);
+        coach1.setRole(coachRole); coach1.setStatus("Active");
 
         coach2 = new User();
-        coach2.setId(11);
+        coach2.setId(11); coach2.setCenterId(1);
         coach2.setFullName("HLV Trần Văn B");
-        coach2.setRole(coachRole);
+        coach2.setRole(coachRole); coach2.setStatus("Active");
 
         Subject indoorSubject = new Subject();
-        indoorSubject.setId(1);
+        indoorSubject.setId(1); indoorSubject.setOutdoor(false);
         indoorSubject.setName("Cầu Lông");
         indoorSubject.setSlug("cau-long");
 

@@ -8,6 +8,9 @@ import jakarta.persistence.LockModeType;
 import java.util.Optional;
 
 public interface SportsClassRepository extends JpaRepository<SportsClass, Integer> {
+    boolean existsBySubjectId(Integer subjectId);
+    @Query("select c.centerId from SportsClass c where c.id = :id")
+    Optional<Integer> findCenterIdById(@Param("id") Integer id);
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT c FROM SportsClass c WHERE c.id = :id")
     Optional<SportsClass> findByIdForUpdate(@Param("id") Integer id);

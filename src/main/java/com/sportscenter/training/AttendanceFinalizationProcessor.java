@@ -31,6 +31,9 @@ public class AttendanceFinalizationProcessor {
     private final AuditService auditService;
     private final NotificationService notificationService;
     private final Clock clock;
+    private final com.sportscenter.membership.MemberPackageRepository memberPackageRepository;
+    @org.springframework.beans.factory.annotation.Value("${scms.booking-block.enabled:false}")
+    private boolean bookingBlockEnabled;
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void process(Integer sessionId) {
@@ -67,7 +70,7 @@ public class AttendanceFinalizationProcessor {
                 LocalDate monthStart = now.toLocalDate().withDayOfMonth(1);
                 long absences = attendanceRepository.countAbsencesForMemberInRange(memberId, monthStart, monthStart.plusMonths(1));
                 Member member = memberRepository.findByIdForUpdate(memberId).orElse(null);
-                if (absences >= 3 && member != null && (member.getBookingBlockedUntil() == null || !member.getBookingBlockedUntil().isAfter(now))) {
+                if (bookingBlockEnabled && absences >= 3 && member != null && (member.getBookingBlockedUntil() == null || !member.getBookingBlockedUntil().isAfter(now))) {
                     member.setBookingBlockedUntil(now.plusDays(7));
                     memberRepository.save(member);
                     auditService.log(null, "BOOKING_BLOCK_APPLIED", "members", memberId,
@@ -77,7 +80,23 @@ public class AttendanceFinalizationProcessor {
             }
         }
         session.setAttendanceFinalized(true);
+        session.setStatus("Completed");
         sessionRepository.save(session);
+        if (session.getBookedMember() != null && session.getMemberPackage() != null) {
+            var sub = memberPackageRepository.findByIdForUpdate(session.getMemberPackage().getSubscriptionId()).orElse(null);
+            if (sub != null && "Active".equals(sub.getStatus()) && Integer.valueOf(0).equals(sub.getRemainingCredit())
+                    && sessionRepository.countByMemberPackageSubscriptionIdAndStatusAndAttendanceFinalizedFalse(sub.getSubscriptionId(), "Scheduled") == 0) {
+                sub.setStatus("Completed"); memberPackageRepository.save(sub);
+            }
+        }
+        if (session.getBookedMember() == null && session.getSportsClass().isNormal()
+                && sessionRepository.countBySportsClassIdAndStatusNot(session.getSportsClass().getId(), "Cancelled") == 12
+                && sessionRepository.countBySportsClassIdAndStatusAndAttendanceFinalizedFalse(session.getSportsClass().getId(), "Scheduled") == 0) {
+            enrollmentRepository.findByClassIdWithDetails(session.getSportsClass().getId()).stream()
+                    .filter(e -> "Registered".equals(e.getStatus())).forEach(e -> {
+                        e.setStatus("Completed"); enrollmentRepository.save(e);
+                    });
+        }
     }
 
     private void safeNotify(Integer userId, String title, String content, String type) {

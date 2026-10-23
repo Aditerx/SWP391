@@ -77,6 +77,10 @@ class PrivateSessionServiceTest {
 
     @InjectMocks
     private SessionService sessionService;
+    @Mock private ScheduleWriteLock scheduleWriteLock;
+    @Mock private com.sportscenter.user.MemberRepository memberRepository;
+    @Mock private com.sportscenter.specialization.CoachSpecializationRepository coachSpecializationRepository;
+
 
     private User sampleCoach;
     private User sampleMember;
@@ -91,6 +95,19 @@ class PrivateSessionServiceTest {
 
     @BeforeEach
     void setUp() {
+        lenient().when(sessionRepository.findCenterIdById(anyInt())).thenReturn(Optional.of(1));
+        lenient().when(sportsClassRepository.findCenterIdById(anyInt())).thenReturn(Optional.of(1));
+        lenient().when(coachSpecializationRepository.findByCoachUserId(anyInt())).thenAnswer(call -> {
+            var a = new com.sportscenter.specialization.CoachSpecialization();
+            var spec = new com.sportscenter.specialization.Specialization();
+            var subject = new Subject(); subject.setId(1); subject.setOutdoor(false); spec.setSubject(subject); spec.setStatus("Active"); a.setSpecialization(spec);
+            var b = new com.sportscenter.specialization.CoachSpecialization();
+            var spec2 = new com.sportscenter.specialization.Specialization();
+            var subject2 = new Subject(); subject2.setId(2); subject2.setOutdoor(false); spec2.setSubject(subject2); spec2.setStatus("Active"); b.setSpecialization(spec2);
+            return List.of(a,b);
+        });
+        lenient().when(sessionRepository.findByIdForUpdate(anyInt())).thenAnswer(call -> sessionRepository.findByIdWithDetails(call.getArgument(0)));
+
         // Mock current time: 2026-10-20 08:00:00 Asia/Ho_Chi_Minh
         Instant fixedInstant = LocalDateTime.of(2026, 10, 20, 8, 0, 0)
                 .atZone(ZoneId.of("Asia/Ho_Chi_Minh")).toInstant();
@@ -102,19 +119,21 @@ class PrivateSessionServiceTest {
         coachRole.setName("Coach");
 
         sampleCoach = new User();
-        sampleCoach.setId(10);
+        sampleCoach.setId(10); sampleCoach.setCenterId(1);
         sampleCoach.setFullName("HLV Nguyễn Văn A");
         sampleCoach.setRole(coachRole);
+        sampleCoach.setStatus("Active");
 
         Role memberRole = new Role();
         memberRole.setId(1);
         memberRole.setName("Member");
 
         sampleMember = new User();
-        sampleMember.setId(20);
+        sampleMember.setId(20); sampleMember.setCenterId(1);
         sampleMember.setEmail("member@example.com");
         sampleMember.setFullName("Học Viên B");
         sampleMember.setRole(memberRole);
+        sampleMember.setStatus("Active"); sampleMember.setCenterId(1);
 
         memberAuth = new UsernamePasswordAuthenticationToken(
                 "member@example.com", "n/a", List.of(new SimpleGrantedAuthority("ROLE_MEMBER")));
@@ -138,14 +157,15 @@ class PrivateSessionServiceTest {
         activeSubscription.setStartDate(LocalDate.of(2026, 10, 15));
         activeSubscription.setEndDate(LocalDate.of(2026, 11, 29)); // 45 days
         activeSubscription.setStatus("Active");
+        lenient().when(memberPackageRepository.findCenterIdById(50)).thenReturn(Optional.of(1));
 
         tennisSubject = new Subject();
-        tennisSubject.setId(1);
+        tennisSubject.setId(1); tennisSubject.setOutdoor(true); tennisSubject.setOutdoor(true);
         tennisSubject.setName("Quần vợt (Tennis)");
         tennisSubject.setSlug("quan-vot-tennis");
 
         badmintonSubject = new Subject();
-        badmintonSubject.setId(2);
+        badmintonSubject.setId(2); badmintonSubject.setOutdoor(false);
         badmintonSubject.setName("Cầu lông");
         badmintonSubject.setSlug("cau-long");
 
@@ -174,6 +194,23 @@ class PrivateSessionServiceTest {
     // =========================================================================
     // 1. GET COACH AVAILABLE SLOTS
     // =========================================================================
+
+    @Test void bookingOutsideSubscriptionDatesIsRejectedBeforeCreditIsChanged() {
+        when(memberPackageRepository.findByIdForUpdate(50)).thenReturn(Optional.of(activeSubscription));
+        var request = new PrivateBookingRequest(50,10,1,activeSubscription.getEndDate().plusDays(1),LocalTime.of(6,0),LocalTime.of(7,30),200,1);
+        var error = assertThrows(BusinessException.class, () -> sessionService.bookPrivateSession(request, memberAuth));
+        assertTrue(error.getMessage().startsWith("ADVANCED_PACKAGE_EXPIRED:"));
+        assertEquals(12,activeSubscription.getRemainingCredit()); verify(sessionRepository,never()).save(any());
+    }
+
+    @Test void blockedMemberCannotBookEvenWithActiveCredit() {
+        when(memberPackageRepository.findByIdForUpdate(50)).thenReturn(Optional.of(activeSubscription));
+        var profile = new com.sportscenter.user.Member(); profile.setBookingBlockedUntil(LocalDateTime.now(clock).plusDays(1));
+        when(memberRepository.findById(20)).thenReturn(Optional.of(profile));
+        var request = new PrivateBookingRequest(50,10,1,LocalDate.of(2026,10,25),LocalTime.of(6,0),LocalTime.of(7,30),200,1);
+        assertTrue(assertThrows(BusinessException.class, () -> sessionService.bookPrivateSession(request,memberAuth)).getMessage().startsWith("BOOKING_BLOCKED:"));
+        assertEquals(12,activeSubscription.getRemainingCredit());
+    }
 
     @Test
     @DisplayName("getCoachAvailableSlots: Returns all slots unavailable if date is in the past")
@@ -398,7 +435,7 @@ class PrivateSessionServiceTest {
     @DisplayName("cancelPrivateSession: Success >= 24h, sets Cancelled and refunds 1 credit")
     void cancelPrivateSession_SuccessWithRefund() {
         // Session is 48 hours away: 2026-10-22 08:00
-        Session session = new Session();
+        Session session = new Session(); session.setSportsClass(advancedClass);
         session.setId(777);
         session.setSessionDate(LocalDate.of(2026, 10, 22));
         session.setStartTime(LocalTime.of(7, 45));
@@ -429,7 +466,7 @@ class PrivateSessionServiceTest {
     @DisplayName("cancelPrivateSession: Fails with CANCEL_TOO_LATE when cancelling under 24 hours")
     void cancelPrivateSession_Under24Hours_ThrowsCancelTooLate() {
         // Session is tomorrow morning 2026-10-21 07:45 (23h45m away < 24h)
-        Session session = new Session();
+        Session session = new Session(); session.setSportsClass(advancedClass);
         session.setId(778);
         session.setSessionDate(LocalDate.of(2026, 10, 21));
         session.setStartTime(LocalTime.of(7, 45));
@@ -454,7 +491,7 @@ class PrivateSessionServiceTest {
         SportsClass groupClass = new SportsClass();
         groupClass.setClassType("Normal");
 
-        Session session = new Session();
+        Session session = new Session(); session.setSportsClass(advancedClass);
         session.setId(779);
         session.setSessionDate(LocalDate.of(2026, 10, 25));
         session.setStartTime(LocalTime.of(7, 45));

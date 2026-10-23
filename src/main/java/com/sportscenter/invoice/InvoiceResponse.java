@@ -23,7 +23,8 @@ public record InvoiceResponse(
         LocalDateTime createdAt,
         LocalDateTime expiresAt,
         Integer classId,
-        String className
+        String className,
+        boolean reconciliationRequired
 ) {
     public static InvoiceResponse from(Invoice invoice) {
         if (invoice == null) return null;
@@ -60,7 +61,8 @@ public record InvoiceResponse(
                 invoice.getCreatedAt(),
                 invoice.getExpiresAt(),
                 invoice.getSportsClass() != null ? invoice.getSportsClass().getId() : null,
-                invoice.getSportsClass() != null ? invoice.getSportsClass().getName() : null
+                invoice.getSportsClass() != null ? invoice.getSportsClass().getName() : null,
+                invoice.isReconciliationRequired()
         );
     }
 }

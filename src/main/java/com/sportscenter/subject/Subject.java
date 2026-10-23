@@ -36,19 +36,10 @@ public class Subject {
     @Column(name = "slug", unique = true)
     private String slug;
 
+    @Column(name = "outdoor")
+    private Boolean outdoor;
+
     public boolean isOutdoor() {
-        if (slug != null) {
-            String s = slug.toLowerCase();
-            if (s.contains("tennis") || s.contains("boi-loi") || s.contains("ban-cung") || s.contains("bong-da")) {
-                return true;
-            }
-        }
-        if (name != null) {
-            String n = name.toLowerCase();
-            if (n.contains("tennis") || n.contains("quần vợt") || n.contains("bơi lội") || n.contains("bắn cung") || n.contains("bóng đá")) {
-                return true;
-            }
-        }
-        return false;
+        return Boolean.TRUE.equals(outdoor);
     }
 }
