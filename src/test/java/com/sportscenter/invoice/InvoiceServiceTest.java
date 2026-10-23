@@ -17,6 +17,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.context.ApplicationEventPublisher;
+import java.time.Clock;
+import java.time.ZoneId;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -39,6 +42,8 @@ class InvoiceServiceTest {
     @Mock AuditService auditService;
     @Mock PaymentProperties paymentProperties;
     @Mock VnPayGateway vnPayGateway;
+    @Mock ApplicationEventPublisher eventPublisher;
+    @org.mockito.Spy Clock clock = Clock.system(ZoneId.of("Asia/Ho_Chi_Minh"));
     @InjectMocks InvoiceService invoiceService;
 
     @Test

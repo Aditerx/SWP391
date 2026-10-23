@@ -19,7 +19,8 @@ class BusinessGapAuditTest {
     @Test void cancelledSubscriptionRequiresPaidInvoiceBeforeReactivation() {
         var packages=mock(MemberPackageRepository.class);
         var invoices=mock(InvoiceService.class);
-        var service=new MemberPackageService(packages,mock(MembershipPackageRepository.class),mock(UserRepository.class),mock(AuditService.class),invoices);
+        var service=new MemberPackageService(packages,mock(MembershipPackageRepository.class),mock(UserRepository.class),mock(AuditService.class),invoices,
+            mock(org.springframework.context.ApplicationEventPublisher.class),Clock.system(java.time.ZoneId.of("Asia/Ho_Chi_Minh")));
         var mp=new MemberPackage(); mp.setSubscriptionId(9); mp.setStatus("Cancelled");
         // Supply DTO relations only; there is deliberately no Paid invoice.
         var user=new User(); user.setId(7); var pkg=new MembershipPackage(); pkg.setId(2);
@@ -32,7 +33,8 @@ class BusinessGapAuditTest {
     @Test void memberIdAndOtherInvoiceFiltersAreAppliedTogether() {
         var repo=mock(InvoiceRepository.class);
         var service=new InvoiceService(repo,mock(UserRepository.class),mock(MembershipPackageRepository.class),mock(MemberPackageRepository.class),
-            mock(SportsClassRepository.class),mock(ClassEnrollmentRepository.class),mock(AuditService.class),mock(PaymentProperties.class),mock(VnPayGateway.class));
+            mock(SportsClassRepository.class),mock(ClassEnrollmentRepository.class),mock(AuditService.class),mock(PaymentProperties.class),mock(VnPayGateway.class),
+            mock(org.springframework.context.ApplicationEventPublisher.class),Clock.system(java.time.ZoneId.of("Asia/Ho_Chi_Minh")));
         service.findAll(7,null,null,"Pending","Cash","INV-",null,null,null);
         verify(repo).searchInvoices(7,null,null,"Pending","Cash","INV-",null,null);
     }

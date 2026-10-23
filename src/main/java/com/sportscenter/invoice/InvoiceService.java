@@ -7,6 +7,9 @@ import com.sportscenter.enrollment.ClassEnrollment;
 import com.sportscenter.enrollment.ClassEnrollmentRepository;
 import com.sportscenter.membership.MemberPackage;
 import com.sportscenter.membership.MemberPackageRepository;
+import com.sportscenter.notification.NotificationEvent;
+import com.sportscenter.notification.NotificationTemplates;
+import com.sportscenter.notification.NotificationType;
 import com.sportscenter.membership.MembershipPackage;
 import com.sportscenter.membership.MembershipPackageRepository;
 import com.sportscenter.sportclass.SportsClass;
@@ -15,6 +18,7 @@ import com.sportscenter.user.User;
 import com.sportscenter.user.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,14 +26,13 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.ZoneId;
+import java.time.Clock;
 import java.util.List;
 import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
 public class InvoiceService {
-    private static final ZoneId BUSINESS_ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
     private final InvoiceRepository invoiceRepository;
     private final UserRepository userRepository;
     private final MembershipPackageRepository membershipPackageRepository;
@@ -39,6 +42,8 @@ public class InvoiceService {
     private final AuditService auditService;
     private final PaymentProperties paymentProperties;
     private final VnPayGateway vnPayGateway;
+    private final ApplicationEventPublisher eventPublisher;
+    private final Clock clock;
 
     @Transactional(readOnly = true)
     public List<InvoiceResponse> findAll(Integer memberId, Integer packageId, Integer receptionistId,
@@ -108,11 +113,11 @@ public class InvoiceService {
         invoice.setAmount(amount);
         invoice.setPaymentMethod("VNPay".equalsIgnoreCase(method) ? "VNPay" : "Cash");
         invoice.setPaymentStatus("Pending");
-        LocalDateTime now = LocalDateTime.now(BUSINESS_ZONE);
+        LocalDateTime now = LocalDateTime.now(clock);
         invoice.setCreatedAt(now);
         invoice.setExpiresAt(now.plusMinutes(paymentProperties.getExpireMinutes()));
         long code = invoiceRepository.nextInvoiceCodeValue();
-        invoice.setInvoiceCode(String.format("INV-%d-%06d", LocalDate.now(BUSINESS_ZONE).getYear(), code));
+        invoice.setInvoiceCode(String.format("INV-%d-%06d", LocalDate.now(clock).getYear(), code));
         return invoice;
     }
 
@@ -201,7 +206,7 @@ public class InvoiceService {
 
     @Transactional(readOnly = true)
     public List<Integer> findExpiredPendingInvoiceIds() {
-        return invoiceRepository.findByPaymentStatusAndExpiresAtBefore("Pending", LocalDateTime.now(BUSINESS_ZONE)).stream()
+        return invoiceRepository.findByPaymentStatusAndExpiresAtBefore("Pending", LocalDateTime.now(clock)).stream()
                 .map(Invoice::getInvoiceId).toList();
     }
 
@@ -212,6 +217,10 @@ public class InvoiceService {
         invoice.setPaymentStatus("Expired");
         expireLinked(invoice);
         auditService.log(null, "EXPIRE_INVOICE", "invoices", invoice.getInvoiceId(), "Pending invoice expired");
+        eventPublisher.publishEvent(NotificationTemplates.event(NotificationType.PAYMENT_EXPIRED,
+                List.of(invoice.getMember().getId()),
+                NotificationTemplates.paymentExpired(invoice.getInvoiceCode()),
+                "INVOICE", invoice.getInvoiceId(), "PAYMENT_EXPIRED:" + invoice.getInvoiceId()));
         return true;
     }
 
@@ -221,9 +230,19 @@ public class InvoiceService {
         }
         if (receptionist != null) invoice.setReceptionist(receptionist);
         invoice.setPaymentStatus("Paid");
-        invoice.setPaymentDate(LocalDateTime.now(BUSINESS_ZONE));
+        invoice.setPaymentDate(LocalDateTime.now(clock));
         if (invoice.getSubscription() != null) activateSubscription(invoice.getSubscription());
         if (invoice.getSportsClass() != null) activateClassEnrollment(invoice);
+        eventPublisher.publishEvent(NotificationTemplates.event(NotificationType.PAYMENT_SUCCESS,
+                List.of(invoice.getMember().getId()),
+                NotificationTemplates.paymentSuccess(invoice.getInvoiceCode()),
+                "INVOICE", invoice.getInvoiceId(), "PAYMENT_SUCCESS:" + invoice.getInvoiceId()));
+        if (invoice.getSportsClass() != null && !invoice.getSportsClass().isAdvanced()) {
+            eventPublisher.publishEvent(NotificationTemplates.event(NotificationType.ENROLLMENT_CONFIRMED,
+                    List.of(invoice.getMember().getId()),
+                    NotificationTemplates.enrollmentConfirmed(invoice.getSportsClass().getName()),
+                    "CLASS", invoice.getSportsClass().getId(), "ENROLLMENT_CONFIRMED:" + invoice.getInvoiceId()));
+        }
         auditService.log(receptionist != null ? receptionist.getId() : null,
                 paidAfterExpiry ? "PAID_AFTER_EXPIRY" : "PROCESS_PAYMENT", "invoices", invoice.getInvoiceId(),
                 "Invoice " + invoice.getInvoiceCode() + " paid by " + invoice.getPaymentMethod());
@@ -231,7 +250,7 @@ public class InvoiceService {
 
     private void activateSubscription(MemberPackage subscription) {
         MembershipPackage pkg = subscription.getMembershipPackage();
-        LocalDate now = LocalDate.now(BUSINESS_ZONE);
+        LocalDate now = LocalDate.now(clock);
         if (pkg != null && pkg.isAdvanced()) {
             int days = (subscription.getValidityDays() != null && subscription.getValidityDays() > 0)
                     ? subscription.getValidityDays()
@@ -321,7 +340,7 @@ public class InvoiceService {
             }
         }
     }
-    private boolean expired(Invoice invoice) { return invoice.getExpiresAt() != null && !invoice.getExpiresAt().isAfter(LocalDateTime.now(BUSINESS_ZONE)); }
+    private boolean expired(Invoice invoice) { return invoice.getExpiresAt() != null && !invoice.getExpiresAt().isAfter(LocalDateTime.now(clock)); }
     private User currentUser(Authentication authentication) {
         if (authentication == null) throw new AccessDeniedException("Authenticated user is required");
         return userRepository.findByEmailIgnoreCase(authentication.getName()).orElseThrow(() -> new AccessDeniedException("Authenticated user account was not found"));

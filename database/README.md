@@ -14,7 +14,8 @@ database/
 │   ├── 01_migration_dynamic_permissions.sql
 │   ├── 02_migration_class_feedback.sql
 │   ├── 03_migration_payment.sql
-│   └── 04_migration_member_flow_v2.sql  # [HIỆN TẠI] Migration mới nhất theo Member.pdf
+│   ├── 04_migration_member_flow_v2.sql
+│   └── 05_migration_notifications.sql   # Mở rộng thông báo tương thích ngược
 └── archive/                           # Lưu trữ lịch sử (Không dùng trong môi trường live)
     ├── legacy_mssql_20260926.sql           # Schema cũ thời kỳ MS SQL Server
     ├── legacy_postgres_backup_20261003.sql # Bản backup Postgres ngày 03/10/2026
@@ -25,10 +26,12 @@ database/
 
 ## 2. Hướng Dẫn Chạy Migration Mới Nhất Trên Supabase
 
-Hiện tại, hệ thống đã hoàn tất **Giai đoạn 1 (Chuẩn hóa CSDL theo Member.pdf)**.
+Chạy migration theo thứ tự trên DB mới. DB đã áp dụng migration 01–04 chỉ cần chạy migration 05.
 
 ### File cần chạy trên Supabase SQL Editor:
-👉 `database/migrations/04_migration_member_flow_v2.sql`
+👉 `database/migrations/05_migration_notifications.sql`
+
+Migration 05 chỉ thêm cột và index vào `notifications` / `notification_recipients`; không xóa, đổi tên hay ghi đè dữ liệu cũ. Loại thông báo nghiệp vụ được lưu ở `notification_type` để giữ nguyên CHECK constraint và cột `type` legacy. Trạng thái đọc của người nhận nằm ở `notification_recipients`.
 
 ### Các nội dung cập nhật trong file 04:
 1. **`subjects`**: Thêm cột `normal_price`, `advanced_price` và seed bảng giá chuẩn 9 môn thể thao theo trang 7 `Member.pdf`.

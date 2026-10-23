@@ -781,3 +781,76 @@ Bảng đối chiếu mã lỗi để Frontend hiển thị thông báo (Toast /
 | `SUBSTITUTE_COACH_CONFLICT` | 409 | HLV thay thế được chỉ định bị trùng lịch dạy khác. | Toast lỗi: *"HLV thay thế đã có lịch dạy khác trong khung giờ này. Vui lòng chọn HLV khác."* |
 | `ROOM_HAS_FUTURE_SESSIONS` | 400 | Đổi trạng thái phòng sang Bảo trì/Đóng cửa khi còn ca học tương lai. | Toast lỗi: *"Phòng/Sân tập vẫn còn các buổi học đã xếp lịch trong tương lai. Vui lòng dời lịch các buổi học trước khi đóng sân."* |
 | `INVALID_TIME_SLOT` | 400 | Giờ bắt đầu / kết thúc gửi lên không khớp 7 ca học chuẩn. | Toast lỗi: *"Khung giờ học không hợp lệ. Vui lòng chọn đúng 1 trong 7 ca học chuẩn của trung tâm."* |
+| `NOTIFICATION_NOT_FOUND` | 404 | Thông báo không tồn tại hoặc không thuộc người đang đăng nhập. | Hiển thị thông báo đã bị xóa hoặc không còn khả dụng. |
+
+---
+
+## 12. THÔNG BÁO TRONG ỨNG DỤNG
+
+Tất cả endpoint yêu cầu đăng nhập và chỉ truy cập thông báo của user trong session. Member, Coach, Receptionist và Manager đều dùng được. Không có email, push hay WebSocket.
+
+### 12.1. Danh sách thông báo
+
+`GET /api/notifications/me?unreadOnly=false&type=SESSION_REMINDER&page=0&size=20`
+
+Query params:
+
+| Tên | Kiểu | Mặc định | Mô tả |
+|---|---|---:|---|
+| `unreadOnly` | boolean | `false` | Chỉ lấy thông báo chưa đọc khi `true`. |
+| `type` | enum | — | Lọc theo một `NotificationType`. |
+| `page` | integer | `0` | Trang, bắt đầu từ 0. |
+| `size` | integer | `20` | Số mục mỗi trang, tối đa 100. |
+
+Response là Spring `Page`:
+
+```json
+{
+  "content": [
+    {
+      "id": 101,
+      "type": "SESSION_RESCHEDULED",
+      "title": "Buổi học được dời lịch",
+      "message": "Buổi học Cầu lông đã được dời sang 28/10/2026, 07:45–09:15, Sân A2.",
+      "relatedType": "SESSION",
+      "relatedId": 5531,
+      "isRead": false,
+      "createdAt": "2026-10-22T09:15:00+07:00"
+    }
+  ],
+  "number": 0,
+  "size": 20,
+  "totalElements": 1,
+  "totalPages": 1
+}
+```
+
+### 12.2. Đếm và cập nhật trạng thái đọc
+
+| Method | Endpoint | Thành công |
+|---|---|---|
+| `GET` | `/api/notifications/me/unread-count` | `200 { "unreadCount": 3 }` |
+| `PATCH` | `/api/notifications/{id}/read` | `204 No Content` |
+| `PATCH` | `/api/notifications/me/read-all` | `204 No Content` |
+
+Thông báo không thuộc user hiện tại và ID không tồn tại đều trả `404` với mã `NOTIFICATION_NOT_FOUND`.
+
+### 12.3. Các loại thông báo
+
+| `NotificationType` | Ý nghĩa |
+|---|---|
+| `ENROLLMENT_CONFIRMED` | Thanh toán thành công và ghi danh lớp Normal. |
+| `PRIVATE_BOOKING_CONFIRMED` | Đặt lịch học 1:1 thành công. |
+| `PRIVATE_BOOKING_CANCELLED` | Hủy lịch 1:1; nội dung nêu trạng thái hoàn credit. |
+| `SESSION_RESCHEDULED` | Lịch buổi học được dời. |
+| `COACH_SUBSTITUTED` | HLV dạy buổi học được thay đổi. |
+| `PAYMENT_SUCCESS` | Hóa đơn đã thanh toán. |
+| `PAYMENT_EXPIRED` | Hóa đơn hết hạn giữ chỗ. |
+| `PACKAGE_EXTENDED` | Gói 1:1 được gia hạn. |
+| `PACKAGE_EXPIRING_SOON` | Gói 1:1 còn không quá 3 ngày. |
+| `PACKAGE_EXPIRED` | Gói 1:1 hết hạn. |
+| `CREDIT_LOW` | Số dư credit sau khi đặt buổi học còn không quá 2. |
+| `NO_SHOW_RECORDED` | Buổi vắng/no-show đã được chốt. |
+| `SESSION_REMINDER` | Nhắc lịch khoảng 24 giờ trước buổi học. |
+
+FE có thể poll `GET /api/notifications/me/unread-count` mỗi 30–60 giây để cập nhật badge. Module không dùng WebSocket. Các bản ghi legacy giữ nguyên nội dung và cột `type`; các loại nghiệp vụ mới lưu trong `notification_type` và được API trả dưới tên trường `type`.

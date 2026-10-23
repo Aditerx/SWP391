@@ -8,6 +8,9 @@ import com.sportscenter.holiday.Holiday;
 import com.sportscenter.holiday.HolidayRepository;
 import com.sportscenter.membership.MemberPackage;
 import com.sportscenter.membership.MemberPackageRepository;
+import com.sportscenter.notification.NotificationEvent;
+import com.sportscenter.notification.NotificationTemplates;
+import com.sportscenter.notification.NotificationType;
 import com.sportscenter.room.Room;
 import com.sportscenter.room.RoomRepository;
 import com.sportscenter.sportclass.SportsClass;
@@ -20,6 +23,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
@@ -29,6 +33,7 @@ import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.LinkedHashSet;
 
 @Service
 @RequiredArgsConstructor
@@ -44,6 +49,7 @@ public class SessionService {
     private final Clock clock;
     private final MemberPackageRepository memberPackageRepository;
     private final SubjectRepository subjectRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional(readOnly = true)
     public List<SessionResponse> findAll(Integer classId, Integer coachId, Integer roomId, Integer memberId,
@@ -272,6 +278,18 @@ public class SessionService {
         auditService.log(subscription.getMember().getId(), "BOOK_PRIVATE_SESSION", "SESSION", saved.getId(),
                 "Booked 1:1 session with coach " + coach.getFullName() + ". Remaining credit: " + subscription.getRemainingCredit());
 
+        publish(NotificationType.PRIVATE_BOOKING_CONFIRMED,
+                List.of(subscription.getMember().getId(), coach.getId()),
+                NotificationTemplates.privateBookingConfirmed(subjectName(sportsClass), request.sessionDate(),
+                        request.startTime(), request.endTime(), coach.getFullName()), "SESSION", saved.getId(),
+                "PRIVATE_BOOKING_CONFIRMED:" + saved.getId());
+        if (subscription.getRemainingCredit() <= 2) {
+            publish(NotificationType.CREDIT_LOW, List.of(subscription.getMember().getId()),
+                    NotificationTemplates.creditLow(subscription.getRemainingCredit()),
+                    "MEMBER_PACKAGE", subscription.getSubscriptionId(),
+                    "CREDIT_LOW:" + subscription.getSubscriptionId() + ":" + saved.getId());
+        }
+
         return SessionResponse.from(saved, 1);
     }
 
@@ -330,6 +348,15 @@ public class SessionService {
         Session saved = sessionRepository.save(session);
         auditService.log(currentUser.getId(), "CANCEL_PRIVATE_SESSION", "SESSION", saved.getId(),
                 "Cancelled 1:1 session >= 24h. Refunded 1 credit. Remaining: " + (sub != null ? sub.getRemainingCredit() : "N/A"));
+        List<Integer> recipients = new ArrayList<>();
+        if (session.getBookedMember() != null) recipients.add(session.getBookedMember().getId());
+        User coach = assignedCoach(session);
+        if (coach != null) recipients.add(coach.getId());
+        String subject = subjectName(session.getSportsClass());
+        publish(NotificationType.PRIVATE_BOOKING_CANCELLED, recipients,
+                NotificationTemplates.privateBookingCancelled(subject, session.getSessionDate(), session.getStartTime(),
+                        session.getEndTime(), sub != null),
+                "SESSION", saved.getId(), "PRIVATE_BOOKING_CANCELLED:" + saved.getId());
 
         return SessionResponse.from(saved, 0);
     }
@@ -678,6 +705,13 @@ public class SessionService {
                         request.newDate(), request.newStartTime(), request.newEndTime(), room.getName(),
                         request.reason() != null ? request.reason() : "Sự cố trung tâm"));
 
+        List<Integer> recipients = sessionRecipients(saved);
+        publish(NotificationType.SESSION_RESCHEDULED, recipients,
+                NotificationTemplates.sessionRescheduled(subjectName(sportsClass), request.newDate(),
+                        request.newStartTime(), request.newEndTime(), room.getName()),
+                "SESSION", saved.getId(), "SESSION_RESCHEDULED:" + saved.getId() + ":" + request.newDate()
+                        + ":" + request.newStartTime() + ":" + room.getId());
+
         int count = session.isPrivateSession() ? 1 :
                 (int) classEnrollmentRepository.countBySportsClassIdAndStatus(sportsClass.getId(), "Registered");
         return SessionResponse.from(saved, count);
@@ -721,6 +755,14 @@ public class SessionService {
                         newCoach.getFullName(), newCoach.getId(),
                         request.reason() != null ? request.reason() : "Sự cố HLV nghỉ"));
 
+        List<Integer> recipients = new ArrayList<>(sessionRecipients(saved));
+        if (newCoach.getId() != null) recipients.add(newCoach.getId());
+        if (oldCoach != null) recipients.add(oldCoach.getId());
+        publish(NotificationType.COACH_SUBSTITUTED, recipients,
+                NotificationTemplates.coachSubstituted(subjectName(session.getSportsClass()), session.getSessionDate(),
+                        session.getStartTime(), session.getEndTime(), oldCoachName, newCoach.getFullName()),
+                "SESSION", saved.getId(), "COACH_SUBSTITUTED:" + saved.getId() + ":" + newCoach.getId());
+
         int count = session.isPrivateSession() ? 1 :
                 (int) classEnrollmentRepository.countBySportsClassIdAndStatus(session.getSportsClass().getId(), "Registered");
         return SessionResponse.from(saved, count);
@@ -731,6 +773,35 @@ public class SessionService {
         return userRepository.findByEmailIgnoreCase(authentication.getName())
                 .map(User::getId)
                 .orElse(null);
+    }
+
+    private void publish(NotificationType type, List<Integer> recipientIds, String message,
+                         String relatedType, Integer relatedId, String dedupeKey) {
+        eventPublisher.publishEvent(NotificationTemplates.event(type, recipientIds, message, relatedType, relatedId, dedupeKey));
+    }
+
+    private List<Integer> sessionRecipients(Session session) {
+        LinkedHashSet<Integer> ids = new LinkedHashSet<>();
+        if (session.getBookedMember() != null) ids.add(session.getBookedMember().getId());
+        if (session.getCoach() != null) ids.add(session.getCoach().getId());
+        else if (session.getSportsClass() != null && session.getSportsClass().getCoach() != null) {
+            ids.add(session.getSportsClass().getCoach().getId());
+        }
+        if (session.getBookedMember() == null && session.getSportsClass() != null) {
+            classEnrollmentRepository.findByClassIdWithDetails(session.getSportsClass().getId()).stream()
+                    .filter(enrollment -> "Registered".equalsIgnoreCase(enrollment.getStatus()))
+                    .map(enrollment -> enrollment.getMember().getId()).forEach(ids::add);
+        }
+        return List.copyOf(ids);
+    }
+
+    private User assignedCoach(Session session) {
+        if (session.getCoach() != null) return session.getCoach();
+        return session.getSportsClass() == null ? null : session.getSportsClass().getCoach();
+    }
+
+    private String subjectName(SportsClass sportsClass) {
+        return sportsClass == null || sportsClass.getSubject() == null ? "buổi học" : sportsClass.getSubject().getName();
     }
 
     @Transactional(readOnly = true)

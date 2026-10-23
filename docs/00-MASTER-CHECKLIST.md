@@ -94,9 +94,25 @@ Tài liệu này là chốt chặn quản lý tiến độ tổng thể và lị
 - [x] Bổ sung Unit Test cho: Slot Validator 7 ca chuẩn & Outdoor Heat Policy (26 tests).
 - [x] Chạy kiểm tra hồi quy: `.\mvnw.cmd test` đảm bảo 100% tests pass (178 tests run, 163 passed, 15 skipped, 0 fail).
 
+### Giai đoạn 8: Thông Báo Trong Ứng Dụng
+- [x] Mở rộng tương thích ngược `notifications` và `notification_recipients`; giữ dữ liệu và luồng legacy.
+- [x] API danh sách, lọc, đếm chưa đọc, đánh dấu một/tất cả đã đọc; giới hạn theo user đăng nhập.
+- [x] Event listener chạy AFTER_COMMIT trong transaction riêng; lỗi lưu thông báo không ảnh hưởng nghiệp vụ chính.
+- [x] Tích hợp 13 loại sự kiện, job nhắc lịch 24 giờ và job gói 1:1 sắp hết hạn.
+- [x] Bổ sung test service, controller/role, listener và job với Clock cố định.
+- [x] Cập nhật hợp đồng API và hướng dẫn migration.
+- [x] Chạy hồi quy `.\mvnw.cmd clean test`: 193 tests run, 178 passed, 15 skipped, 0 failed.
+- [ ] Chạy migration 05 trên PostgreSQL DB sạch và DB có notifications legacy để xác nhận thực tế.
+
 ---
 
 ## 📜 PHẦN II: LỊCH SỬ HOÀN THÀNH (HISTORY)
+
+### [Đợt 22/10/2026] — Giai đoạn 8: Thông Báo Trong Ứng Dụng
+* **Trạng thái:** Code và kiểm thử Backend hoàn tất; cần xác nhận migration trên PostgreSQL mới và có dữ liệu cũ.
+* **Thay đổi:** Mở rộng schema notification tương thích ngược, API cá nhân, 13 loại event, job nhắc lịch và gói sắp hết hạn; FE không thay đổi.
+* **Kiểm thử:** 193 tests run, 178 passed, 15 skipped, 0 failed, 0 errors (`.\mvnw.cmd clean test`).
+* **DB:** Migration được rà cú pháp/idempotence; chưa chạy trên PostgreSQL vì môi trường hiện tại không có `psql`, Docker hay kết nối DB được cấp.
 
 ### [Đợt 20/10/2026] — Chuẩn Hóa DTOs Danh Mục & Hoàn Thiện Hợp Đồng API Frontend (Sẵn Sàng Giai Đoạn 6)
 * **Trạng thái:** Hoàn tất 100%, 178 tests run (163 passed, 15 skipped, 0 fail, 0 error).

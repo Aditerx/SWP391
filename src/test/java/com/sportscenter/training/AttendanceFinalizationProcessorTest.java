@@ -5,6 +5,7 @@ import com.sportscenter.enrollment.ClassEnrollment;
 import com.sportscenter.enrollment.ClassEnrollmentRepository;
 import com.sportscenter.membership.MemberPackageRepository;
 import com.sportscenter.notification.NotificationService;
+import com.sportscenter.notification.NotificationEvent;
 import com.sportscenter.session.Session;
 import com.sportscenter.session.SessionRepository;
 import com.sportscenter.sportclass.SportsClass;
@@ -17,6 +18,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.time.Clock;
 import java.time.Instant;
@@ -40,6 +42,7 @@ class AttendanceFinalizationProcessorTest {
     @Mock MemberRepository memberRepository;
     @Mock AuditService auditService;
     @Mock NotificationService notificationService;
+    @Mock ApplicationEventPublisher eventPublisher;
     @Mock Clock clock;
     @InjectMocks AttendanceFinalizationProcessor processor;
 
@@ -79,6 +82,11 @@ class AttendanceFinalizationProcessorTest {
 
         verify(attendanceRepository, times(1)).save(argThat(a -> "Absent".equals(a.getState()) && a.getRecordedBy() == null));
         verify(sessionRepository, times(1)).save(session);
+        org.mockito.ArgumentCaptor<Object> eventCaptor = org.mockito.ArgumentCaptor.forClass(Object.class);
+        verify(eventPublisher).publishEvent(eventCaptor.capture());
+        NotificationEvent event = (NotificationEvent) eventCaptor.getValue();
+        assertEquals("NO_SHOW_RECORDED", event.type().name());
+        assertEquals(List.of(31), event.recipientIds());
         verifyNoInteractions(notificationService);
     }
 
