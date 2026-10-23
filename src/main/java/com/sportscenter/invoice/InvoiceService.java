@@ -29,6 +29,7 @@ import java.util.Map;
 @Service
 @RequiredArgsConstructor
 public class InvoiceService {
+    private final java.time.Clock clock;
     private static final ZoneId BUSINESS_ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
     private final InvoiceRepository invoiceRepository;
     private final UserRepository userRepository;
@@ -39,6 +40,7 @@ public class InvoiceService {
     private final AuditService auditService;
     private final PaymentProperties paymentProperties;
     private final VnPayGateway vnPayGateway;
+    private final com.sportscenter.session.ScheduleWriteLock scheduleWriteLock;
 
     @Transactional(readOnly = true)
     public List<InvoiceResponse> findAll(Integer memberId, Integer packageId, Integer receptionistId,
@@ -108,11 +110,11 @@ public class InvoiceService {
         invoice.setAmount(amount);
         invoice.setPaymentMethod("VNPay".equalsIgnoreCase(method) ? "VNPay" : "Cash");
         invoice.setPaymentStatus("Pending");
-        LocalDateTime now = LocalDateTime.now(BUSINESS_ZONE);
+        LocalDateTime now = LocalDateTime.now(clock);
         invoice.setCreatedAt(now);
         invoice.setExpiresAt(now.plusMinutes(paymentProperties.getExpireMinutes()));
         long code = invoiceRepository.nextInvoiceCodeValue();
-        invoice.setInvoiceCode(String.format("INV-%d-%06d", LocalDate.now(BUSINESS_ZONE).getYear(), code));
+        invoice.setInvoiceCode(String.format("INV-%d-%06d", LocalDate.now(clock).getYear(), code));
         return invoice;
     }
 
@@ -137,7 +139,9 @@ public class InvoiceService {
     @Transactional
     public InvoiceResponse confirmCash(Integer invoiceId, Authentication authentication) {
         User receptionist = currentUser(authentication);
+        scheduleWriteLock.acquire(receptionist.getCenterId());
         Invoice invoice = lockInvoice(invoiceId);
+        if (!java.util.Objects.equals(receptionist.getCenterId(), invoice.getMember().getCenterId())) throw new AccessDeniedException("Invoice belongs to another center");
         if (!"Cash".equals(invoice.getPaymentMethod())) throw new InvoiceConflictException("Only Cash invoices can be confirmed at the counter");
         if (!"Pending".equals(invoice.getPaymentStatus()) || expired(invoice)) throw new InvoiceConflictException("Invoice is no longer payable");
         markPaidAndActivate(invoice, receptionist, false);
@@ -147,7 +151,9 @@ public class InvoiceService {
     @Transactional
     public InvoiceResponse cancel(Integer invoiceId, Authentication authentication) {
         User actor = currentUser(authentication);
+        scheduleWriteLock.acquire(actor.getCenterId());
         Invoice invoice = lockInvoice(invoiceId);
+        if (!java.util.Objects.equals(actor.getCenterId(), invoice.getMember().getCenterId())) throw new AccessDeniedException("Invoice belongs to another center");
         boolean member = authentication.getAuthorities().stream().anyMatch(a -> "ROLE_MEMBER".equals(a.getAuthority()));
         if (member && !invoice.getMember().getId().equals(actor.getId())) throw new ResourceNotFoundException("Invoice not found: " + invoiceId);
         if (!"Pending".equals(invoice.getPaymentStatus())) throw new InvoiceConflictException("Only Pending invoices can be cancelled");
@@ -171,6 +177,9 @@ public class InvoiceService {
     @Transactional
     public VnPayResult processVnpayResult(Map<String, String> params) {
         if (!vnPayGateway.isValid(params)) return new VnPayResult("97", "Invalid signature", null);
+        Integer centerId = invoiceRepository.findCenterIdByCode(params.get("vnp_TxnRef")).orElse(null);
+        if (centerId == null) return new VnPayResult("01", "Order not found", null);
+        scheduleWriteLock.acquire(centerId);
         Invoice invoice = invoiceRepository.findByInvoiceCodeForUpdate(params.get("vnp_TxnRef"))
                 .orElse(null);
         if (invoice == null) return new VnPayResult("01", "Order not found", null);
@@ -183,12 +192,16 @@ public class InvoiceService {
 
         boolean success = "00".equals(params.get("vnp_ResponseCode")) && "00".equals(params.get("vnp_TransactionStatus"));
         if (success) {
-            if (!"Pending".equals(invoice.getPaymentStatus()) && !"Expired".equals(invoice.getPaymentStatus())) {
-                return new VnPayResult("99", "Order is no longer payable", invoice);
-            }
-            boolean paidAfterExpiry = "Expired".equals(invoice.getPaymentStatus()) || expired(invoice);
+            boolean paidAfterExpiry = !"Pending".equals(invoice.getPaymentStatus()) || expired(invoice);
             invoice.setGatewayTransactionRef(params.get("vnp_TransactionNo"));
-            markPaidAndActivate(invoice, null, paidAfterExpiry);
+            if (paidAfterExpiry) {
+                // Preserve evidence of money received without selling a released seat again.
+                invoice.setPaymentStatus("Paid");
+                invoice.setReconciliationRequired(true);
+                invoice.setPaymentDate(LocalDateTime.now(clock));
+                cancelLinked(invoice);
+                auditService.log(null, "PAYMENT_RECONCILIATION_REQUIRED", "invoices", invoice.getInvoiceId(), "Verified payment received after reservation became unavailable");
+            } else markPaidAndActivate(invoice, null, false);
             return new VnPayResult("00", "Confirm Success", invoice);
         }
         if ("Pending".equals(invoice.getPaymentStatus()) || "Expired".equals(invoice.getPaymentStatus())) {
@@ -201,12 +214,15 @@ public class InvoiceService {
 
     @Transactional(readOnly = true)
     public List<Integer> findExpiredPendingInvoiceIds() {
-        return invoiceRepository.findByPaymentStatusAndExpiresAtBefore("Pending", LocalDateTime.now(BUSINESS_ZONE)).stream()
+        return invoiceRepository.findByPaymentStatusAndExpiresAtBefore("Pending", LocalDateTime.now(clock)).stream()
                 .map(Invoice::getInvoiceId).toList();
     }
 
     @Transactional
     public boolean expireInvoice(Integer invoiceId) {
+        Integer centerId = invoiceRepository.findCenterIdById(invoiceId).orElse(null);
+        if (centerId == null) return false;
+        scheduleWriteLock.acquire(centerId);
         Invoice invoice = invoiceRepository.findByIdForUpdate(invoiceId).orElse(null);
         if (invoice == null || !"Pending".equals(invoice.getPaymentStatus()) || !expired(invoice)) return false;
         invoice.setPaymentStatus("Expired");
@@ -221,7 +237,7 @@ public class InvoiceService {
         }
         if (receptionist != null) invoice.setReceptionist(receptionist);
         invoice.setPaymentStatus("Paid");
-        invoice.setPaymentDate(LocalDateTime.now(BUSINESS_ZONE));
+        invoice.setPaymentDate(LocalDateTime.now(clock));
         if (invoice.getSubscription() != null) activateSubscription(invoice.getSubscription());
         if (invoice.getSportsClass() != null) activateClassEnrollment(invoice);
         auditService.log(receptionist != null ? receptionist.getId() : null,
@@ -231,7 +247,7 @@ public class InvoiceService {
 
     private void activateSubscription(MemberPackage subscription) {
         MembershipPackage pkg = subscription.getMembershipPackage();
-        LocalDate now = LocalDate.now(BUSINESS_ZONE);
+        LocalDate now = LocalDate.now(clock);
         if (pkg != null && pkg.isAdvanced()) {
             int days = (subscription.getValidityDays() != null && subscription.getValidityDays() > 0)
                     ? subscription.getValidityDays()
@@ -272,7 +288,7 @@ public class InvoiceService {
 
     private void cancelLinked(Invoice invoice) {
         if (invoice.getSubscription() != null && "Pending".equals(invoice.getSubscription().getStatus())) invoice.getSubscription().setStatus("Cancelled");
-        if (invoice.getSportsClass() != null) enrollmentRepository.findByMemberIdAndSportsClassId(invoice.getMember().getId(), invoice.getSportsClass().getId())
+        if (invoice.getSportsClass() != null && !hasNewerPendingClassOrder(invoice)) enrollmentRepository.findByMemberIdAndSportsClassId(invoice.getMember().getId(), invoice.getSportsClass().getId())
                 .filter(e -> "Pending".equals(e.getStatus())).ifPresent(e -> e.setStatus("Cancelled"));
     }
 
@@ -280,8 +296,7 @@ public class InvoiceService {
         if (invoice.getSubscription() != null && "Pending".equals(invoice.getSubscription().getStatus())) {
             invoice.getSubscription().setStatus("Cancelled");
         }
-        // Keep a VNPay class seat reserved until its signed callback reports success or failure.
-        if (invoice.getSportsClass() != null && "Cash".equals(invoice.getPaymentMethod())) {
+        if (invoice.getSportsClass() != null && !hasNewerPendingClassOrder(invoice)) {
             enrollmentRepository.findByMemberIdAndSportsClassId(invoice.getMember().getId(), invoice.getSportsClass().getId())
                     .filter(e -> "Pending".equals(e.getStatus())).ifPresent(e -> e.setStatus("Cancelled"));
         }
@@ -304,9 +319,13 @@ public class InvoiceService {
     private Invoice lockInvoice(Integer id) {
         return invoiceRepository.findByIdForUpdate(id).orElseThrow(() -> new ResourceNotFoundException("Invoice not found: " + id));
     }
+    private boolean hasNewerPendingClassOrder(Invoice invoice) {
+        return invoiceRepository.existsByMemberIdAndSportsClassIdAndPaymentStatusAndInvoiceIdNot(
+                invoice.getMember().getId(), invoice.getSportsClass().getId(), "Pending", invoice.getInvoiceId());
+    }
     @Transactional(readOnly = true)
     public void requirePaidSubscription(Integer subscriptionId) {
-        if (!invoiceRepository.existsBySubscriptionSubscriptionIdAndPaymentStatus(subscriptionId, "Paid")) {
+        if (!invoiceRepository.existsBySubscriptionSubscriptionIdAndPaymentStatusAndReconciliationRequiredFalse(subscriptionId, "Paid")) {
             throw new BusinessException("A subscription can only be activated after its invoice is Paid");
         }
     }
@@ -321,7 +340,7 @@ public class InvoiceService {
             }
         }
     }
-    private boolean expired(Invoice invoice) { return invoice.getExpiresAt() != null && !invoice.getExpiresAt().isAfter(LocalDateTime.now(BUSINESS_ZONE)); }
+    private boolean expired(Invoice invoice) { return invoice.getExpiresAt() != null && !invoice.getExpiresAt().isAfter(LocalDateTime.now(clock)); }
     private User currentUser(Authentication authentication) {
         if (authentication == null) throw new AccessDeniedException("Authenticated user is required");
         return userRepository.findByEmailIgnoreCase(authentication.getName()).orElseThrow(() -> new AccessDeniedException("Authenticated user account was not found"));

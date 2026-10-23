@@ -6,7 +6,7 @@
 
 ## 1. KIẾN TRÚC MÔI TRƯỜNG TRIỂN KHAI
 
-* **Backend Service:** Render Web Service (Java 17, Spring Boot 3.3.3, Dockerfile hoặc Native Java Maven).
+* **Backend Service:** Render Web Service (Java 17, Spring Boot 3.3.5, Dockerfile hoặc Native Java Maven).
 * **Database:** Supabase PostgreSQL (Managed Cloud Database).
 * **Frontend Service:** Vercel / Netlify / Render Static Site (React + Vite).
 * **Múi giờ:** Ép cứng `Asia/Ho_Chi_Minh` (UTC+7) qua Spring bean `Clock`.
@@ -142,3 +142,20 @@ Khi thực hiện thanh toán trên cổng VNPay Sandbox, nhập thông tin th�
 2. Render tự động build và deploy web service.
 3. Khi Render báo `Live`, người dùng copy đường link Web Service (VD: `https://scms-backend.onrender.com`) gửi vào đoạn chat.
 4. AI sẽ hỗ trợ phân tích log, hướng dẫn chạy smoke test hoặc xác thực toàn bộ các endpoint quan trọng để đảm bảo Backend sẵn sàng 100% cho Frontend kết nối.
+
+## 7. TRIỂN KHAI BẢN SỬA AN TOÀN 23/10/2026
+
+1. Không chạy migration 05 như bước nâng cấp: đây là reset demo phá hủy dữ liệu, đã thêm guard chặn chạy vô tình. Chỉ dùng trên DB demo dùng một lần; không chạy schema/reset lên DB thật để lấy tài khoản mẫu.
+2. Áp dụng migration 06 trước khi khởi động code mới: `database/migrations/06_schedule_safety_postgres.sql` cho Supabase hoặc `06_schedule_safety_mssql.sql` cho SQL Server; chỉ chọn một bản đúng hệ quản trị. Script thêm outdoor, reconciliation_required, normal_class_requests và Completed cho member_packages; không đổi giá/số dư/hóa đơn cũ. Kiểm tra constraint status tùy chỉnh ngoài schema hiện hành trước khi áp dụng.
+3. Preflight: center/bảng nền tồn tại; kiểm tra `SELECT DISTINCT status FROM member_packages`. Trạng thái hợp lệ: Pending/Active/Expired/Cancelled/Completed. Custom Subject chưa phân loại cần Manager đặt outdoor; specialization.subject_id phải được gắn đúng. PostgreSQL chỉ backfill tên built-in khớp rõ ràng; SQL Server cần gắn chuyên môn qua quản lý. Không suy từ tên gói/email.
+4. CORS nhận `FRONTEND_URL` hoặc `SCMS_FRONTEND_ORIGINS` (nhiều origin cách dấu phẩy). FE bật credentials. Với HTTPS khác site: `SESSION_COOKIE_SAME_SITE=none`, `SESSION_COOKIE_SECURE=true`; local mặc định lax/false. Phải thử bằng trình duyệt thực sau deploy.
+5. Giữ `SCMS_BOOKING_BLOCK_ENABLED=false` và cấu hình holding hiện tại khi 5/15 phút chưa được chọn lại.
+6. Script dùng `SCMS_TEST_MEMBER_EMAIL`/`SCMS_TEST_MEMBER_PASSWORD`, không dò/in mật khẩu. Payment test chỉ tạo đơn nếu truyền `-CreateOrder -PackageId <id>` trên DB test; mặc định không tạo đơn. Rotation TOTP không thay thế kiểm thử quét/replay/Cash/IPN.
+7. Các bài DB mới dùng H2 in-memory riêng, không thực thi SQL của PostgreSQL/SQL Server hoặc ghi Supabase. Nghiệm thu migration, DB thật và VNPay Sandbox còn phải chạy riêng.
+
+```powershell
+.\mvnw.cmd -DskipTests clean package
+.\mvnw.cmd clean test
+cd FE_Project-main
+npm run build
+```

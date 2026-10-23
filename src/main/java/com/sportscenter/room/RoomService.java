@@ -14,6 +14,7 @@ import java.util.List;
 public class RoomService {
     private final RoomRepository repository;
     private final AuditService auditService;
+    private final java.time.Clock clock;
 
     @Transactional(readOnly = true)
     public List<RoomResponse> findAll() {
@@ -34,6 +35,11 @@ public class RoomService {
         Room room = getEntity(id);
         String previousStatus = room.getStatus();
         validateRoomCanBecomeUnavailable(room, request.status());
+        if ((!java.util.Objects.equals(room.getCapacity(), request.capacity())
+                || request.facilityType() != null && !request.facilityType().equals(room.getFacilityType()))
+                && !repository.findFutureScheduledSessions(id, java.time.LocalDate.now(clock)).isEmpty()) {
+            throw new BusinessException("ROOM_HAS_SCHEDULE: Resolve future sessions before changing room capacity or facility type");
+        }
         apply(room, request);
         Room saved = repository.save(room);
         auditStatusChange(previousStatus, saved, "UPDATE_ROOM");
@@ -45,7 +51,7 @@ public class RoomService {
         Room room = getEntity(id);
         String previousStatus = room.getStatus();
         validateRoomCanBecomeUnavailable(room, status);
-        room.setStatus(status);
+        room.setStatus(normalizeRoomStatus(status));
         Room saved = repository.save(room);
         if (!previousStatus.equalsIgnoreCase(saved.getStatus())) {
             auditService.log(null, "CHANGE_ROOM_STATUS", "ROOM", saved.getId(),
@@ -83,7 +89,7 @@ public class RoomService {
             return;
         }
 
-        List<RoomScheduleConflict> conflicts = repository.findFutureScheduledSessions(room.getId());
+        List<RoomScheduleConflict> conflicts = repository.findFutureScheduledSessions(room.getId(), java.time.LocalDate.now(clock));
         if (!conflicts.isEmpty()) {
             String affected = conflicts.stream()
                     .limit(5)
@@ -92,7 +98,7 @@ public class RoomService {
                     .reduce((left, right) -> left + ", " + right)
                     .orElse("");
             String suffix = conflicts.size() > 5 ? ", ..." : "";
-            throw new BusinessException("Room still has future scheduled sessions: " + affected + suffix
+            throw new BusinessException("ROOM_HAS_FUTURE_SESSIONS: Room still has future scheduled sessions: " + affected + suffix
                     + ". Reassign or cancel them before changing the room status.");
         }
     }

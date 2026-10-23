@@ -69,6 +69,7 @@ public class TrainingResultService {
         User coach = userRepository.findById(coachId)
                 .orElseThrow(() -> new ResourceNotFoundException("Coach not found: " + coachId));
         if (coachActor) ensureCoachCanRecord(session, member, actor);
+        if (actor != null && !coachActor) validateStaffAttendance(session, member, request.content());
 
         String status = normalizeAttendanceStatus(request.attendanceStatus());
 
@@ -139,6 +140,7 @@ public class TrainingResultService {
                 User member = userRepository.findById(item.memberId()).orElse(null);
                 if (member == null) continue;
                 if (coachActor) ensureCoachCanRecord(session, member, actor);
+                if (actor != null && !coachActor) validateStaffAttendance(session, member, item.content());
 
                 String status = normalizeAttendanceStatus(item.attendanceStatus());
 
@@ -186,10 +188,11 @@ public class TrainingResultService {
     }
 
     private void ensureCoachCanRecord(Session session, User member, User coach) {
-        if (session.getSportsClass() == null || session.getSportsClass().getCoach() == null
-                || !coach.getId().equals(session.getSportsClass().getCoach().getId())
-                || !enrollmentRepository.existsByMemberIdAndSportsClassIdAndStatus(
-                member.getId(), session.getSportsClass().getId(), "Registered")) {
+        User assigned = session.getCoach() != null ? session.getCoach()
+                : session.getSportsClass() != null ? session.getSportsClass().getCoach() : null;
+        boolean eligible = session.getBookedMember() != null ? member.getId().equals(session.getBookedMember().getId())
+                : session.getSportsClass() != null && enrollmentRepository.existsByMemberIdAndSportsClassIdAndStatus(member.getId(), session.getSportsClass().getId(), "Registered");
+        if (assigned == null || !coach.getId().equals(assigned.getId()) || !eligible) {
             throw new BusinessException("NOT_YOUR_CLASS: coach may only record results for registered members in their own class");
         }
     }
@@ -199,5 +202,12 @@ public class TrainingResultService {
         if ("Late".equalsIgnoreCase(status) || "late".equalsIgnoreCase(status)) return "Late";
         if ("Excused".equalsIgnoreCase(status) || "excused".equalsIgnoreCase(status)) return "Excused";
         return "Present";
+    }
+
+    private void validateStaffAttendance(Session session, User member, String content) {
+        if (content != null && !content.isBlank()) throw new AccessDeniedException("Only the assigned coach may write training assessments");
+        boolean eligible = session.getBookedMember() != null ? member.getId().equals(session.getBookedMember().getId())
+                : enrollmentRepository.existsByMemberIdAndSportsClassIdAndStatus(member.getId(), session.getSportsClass().getId(), "Registered");
+        if (!eligible) throw new BusinessException("NOT_YOUR_CLASS: Member does not belong to this session");
     }
 }

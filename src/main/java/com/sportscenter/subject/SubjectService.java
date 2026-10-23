@@ -14,6 +14,10 @@ import java.text.Normalizer;
 public class SubjectService {
     private final SubjectRepository repository;
     private final AuditService auditService;
+    private final com.sportscenter.session.SessionRepository sessions;
+    private final com.sportscenter.sportclass.SportsClassRepository classes;
+    private final com.sportscenter.specialization.SpecializationRepository specializations;
+    private final java.time.Clock clock;
 
     @Transactional(readOnly = true)
     public List<SubjectResponse> findAll() {
@@ -27,6 +31,7 @@ public class SubjectService {
 
     @Transactional
     public SubjectResponse create(SubjectRequest request) {
+        if (request.outdoor() == null) throw new com.sportscenter.common.exception.BusinessException("OUTDOOR_REQUIRED: Specify whether the subject is outdoor");
         Subject subject = new Subject();
         apply(subject, request);
         Subject saved = repository.save(subject);
@@ -37,13 +42,22 @@ public class SubjectService {
     @Transactional
     public SubjectResponse update(Integer id, SubjectRequest request) {
         Subject subject = getEntity(id);
+        if (request.outdoor() != null && request.outdoor() != subject.isOutdoor()
+                && sessions.existsBySportsClassSubjectIdAndStatusAndSessionDateGreaterThanEqual(id, "Scheduled", java.time.LocalDate.now(clock))) {
+            throw new com.sportscenter.common.exception.BusinessException("SUBJECT_HAS_SCHEDULE: Resolve future sessions before changing indoor/outdoor policy");
+        }
         apply(subject, request);
+        auditService.log(null, "UPDATE_SUBJECT", "SUBJECT", id, "Updated subject configuration");
         return SubjectResponse.from(repository.save(subject));
     }
 
     @Transactional
     public void delete(Integer id) {
+        if (classes.existsBySubjectId(id) || specializations.existsBySubjectId(id)) {
+            throw new com.sportscenter.common.exception.BusinessConflictException("SUBJECT_IN_USE: Subject is referenced by classes or specializations; deactivate it instead");
+        }
         repository.delete(getEntity(id));
+        auditService.log(null, "DELETE_SUBJECT", "SUBJECT", id, "Deleted unused subject");
     }
 
     private Subject getEntity(Integer id) {
@@ -54,7 +68,8 @@ public class SubjectService {
     private void apply(Subject subject, SubjectRequest request) {
         subject.setName(request.name());
         subject.setDescription(request.description());
-        subject.setStatus(request.status() == null ? "Active" : request.status());
+        if (request.status() != null) subject.setStatus(request.status());
+        if (request.outdoor() != null) subject.setOutdoor(request.outdoor());
         subject.setSlug(request.slug() == null || request.slug().isBlank()
                 ? slugify(request.name()) : slugify(request.slug()));
         if (request.normalPrice() != null) {

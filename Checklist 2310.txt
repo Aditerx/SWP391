@@ -1,0 +1,26 @@
+**Đã hoàn thành:**
+
+- [x] Tạo Normal kèm đủ 12 buổi trong một transaction; chống tạo lặp, rollback nếu sinh lịch lỗi.
+- [x] Giới hạn đọc lịch theo Member/Coach/center; thêm lịch catalog an toàn để xem trước mua.
+- [x] Kiểm tra hạn booking, trạng thái/chuyên môn Coach, phòng và credit; khóa DB chống tranh tài nguyên.
+- [x] Sửa hết hạn VNPay, tiền về muộn, hoàn credit và lỗi cấp lại credit khi đổi trạng thái.
+- [x] Chặn kích hoạt gói chưa Paid khi tạo Member tại quầy — phát hiện bổ sung trong run.
+- [x] Sửa toggle khóa 7 ngày, báo vắng Normal, điểm danh Coach thay thế, lifecycle Completed và invoice cho waitlist.
+- [x] Chuẩn hóa Clock, CORS, validation Subject/Room, báo cáo và script kiểm thử.
+- [x] Cập nhật [API contract](D:/Projects/SWP391/docs/01-API-CONTRACT-FE-BE.md:825) và hướng dẫn triển khai.
+
+**Các quyết định còn chờ bạn — và vì sao cần chọn:**
+
+| Nhóm | Nội dung cần chốt |
+|---|---|
+| **Luồng Advanced** | Mua credit rồi book từng ca như hiện tại, hay chọn đủ 12 ca trước thanh toán? Phương án thứ hai cần đổi cấu trúc đơn, giữ lịch và quyền học. |
+| **Hạn 45 ngày** | Từ lúc Paid hay buổi đầu? Hết vào cuối ngày hay đúng 45×24 giờ? Run này chỉ chặn ca ngoài hạn đã lưu. |
+| **Holding/callback** | Giữ chỗ 5 hay 15 phút? Return URL chỉ hiển thị hay được xử lý callback hợp lệ? Hiện chưa đổi lựa chọn cũ; tiền về muộn được đánh dấu đối soát. |
+| **Giá bán** | Chọn bảng `Member.pdf` hay giá demo/docs; có cho 0đ và override giá không? Chưa sửa giá vận hành hoặc hóa đơn cũ. |
+| **Gói và credit** | Normal mua trực tiếp hay phải có gói Active? Credit Advanced theo một môn hay dùng chung? Chưa tự thêm liên kết Package–Subject. |
+| **Sự cố và quyền** | Ai duyệt gia hạn, tự động hay duyệt trước; Member có phải đồng ý Coach thay; bù credit đã Expired thế nào? Quyền gia hạn và quyền Manager thu Cash chưa tự phân lại. |
+| **Đặt lịch/điểm danh** | Ngưỡng đặt trước 12 hay 24 giờ; có nút báo không đến dưới 24 giờ không; cửa sổ ghi/sửa điểm danh cụ thể. |
+| **Lễ/nắng** | Giữ khóa ca bắt buộc hay cho cấu hình? Khi bật Holiday trùng lịch cũ thì cảnh báo, dời hay hủy theo quy trình nào? |
+| **MVP phụ** | Định nghĩa `expiredMembers`, ghi chú Cash, sửa/xóa Holiday và check-in cửa có thuộc MVP không? |
+
+Bản code mới cần migration 06 đúng hệ DB trước khi chạy; xem [hướng dẫn triển khai](D:/Projects/SWP391/docs/02-DEPLOYMENT-GUIDE.md:146). Kiểm thử PostgreSQL/SQL Server, VNPay live và FE trên trình duyệt vẫn nằm trong checklist tích hợp.

@@ -3,6 +3,9 @@
 > **Mục tiêu:** Đây là tài liệu duy nhất và chính thức quy định toàn bộ Endpoints, Headers, Request Body, Response Schema, Bảng giá chuẩn 9 bộ môn, và Từ điển Mã lỗi (Error Codes Dictionary) để đội Frontend (`FE_Project-main/`) tích hợp thông suốt với Backend SCMS (Sports Center Management System).
 > **Nguyên tắc cốt lõi:** Bám sát tuyệt đối [AGENTS.md](file:///d:/Projects/SWP391/AGENTS.md) và tài liệu nghiệp vụ `Member.pdf`. Không tin tưởng dữ liệu Client, price freezing trên hóa đơn, pessimistic locking chống race condition, và toàn hệ thống đồng nhất múi giờ `Asia/Ho_Chi_Minh` (UTC+7).
 
+
+> **Bản sửa 23/10/2026:** Cần migration 06 trước khi chạy backend. Mục 12 bên dưới quy định hành vi an toàn mới; bảng giá và các chính sách còn xung đột vẫn chờ quyết định.
+
 ---
 
 ## 1. QUY CHUẨN GIAO TIẾP CHUNG & XÁC THỰC
@@ -35,12 +38,47 @@
   * Body: `{ "email": "a@example.com", "otp": "123456", "newPassword": "NewPassword123" }`
 * **Đăng xuất:** `POST /api/auth/logout`
 
+### 1.3. Danh Sách Tài Khoản Demo Hệ Thống (Mật Khẩu Đồng Bộ: `Scms@2026`)
+Toàn bộ tài khoản mẫu đã được khởi tạo trong cơ sở dữ liệu (`schema_postgres.sql` / `schema_user_2310.sql`) với mật khẩu chuẩn hóa: **`Scms@2026`** (BCrypt: `$2a$10$QBctKpWoGbyJxKd43TNSPemf2xsDeVUugnAhEEfkZH6pLU8ncMqMi`).
+
+#### A. Nhóm 5 Vai Trò Đại Diện Cốt Lõi (1 Account / 1 Role)
+| STT | Vai Trò (Role) | Email Đăng Nhập | Mật Khẩu | Họ Và Tên | Mục Đích Kiểm Thử / Demo |
+|:---:|---|---|---|---|---|
+| 1 | **CenterManager** | `manager@scms.com` | `Scms@2026` | Nguyễn Văn An | Quản lý vận hành lớp học, phân công HLV, duyệt dời lịch, xem báo cáo |
+| 2 | **Receptionist** | `receptionist@scms.com` | `Scms@2026` | Phạm Thị Thu | Đăng ký hội viên tại quầy, thu học phí tiền mặt, check-in QR, hỗ trợ |
+| 3 | **Coach (Đại diện)** | `coach@scms.com` | `Scms@2026` | Nguyễn Văn Hùng | Điểm danh ca học, ghi nhận kết quả tập luyện, xem lịch dạy |
+| 4 | **Member (Đại diện)**| `member@scms.com` | `Scms@2026` | Nguyễn Văn Thành | Sẵn **12 Credit / 45 ngày** $\rightarrow$ Demo tra cứu ca rảnh, đặt lịch 1:1, hủy hoàn credit |
+| 5 | **Admin** | `admin@scms.com` | `Scms@2026` | Admin Hệ Thống | Quản trị người dùng, ma trận phân quyền RBAC |
+| 6 | **Receptionist 2** | `thu.reception@scms.com`| `Scms@2026` | Phạm Thị Thu (Ca Chiều)| Đồng bộ với tài khoản lễ tân phụ trên Frontend |
+
+#### B. Đội Ngũ Huấn Luyện Viên 9 Bộ Môn Chuẩn (2 HLV / Môn)
+| STT | Bộ Môn | Sân Bãi | HLV 1 (Khớp Frontend) | HLV 2 (Phụ / 1:1 Nâng Cao) |
+|:---:|---|:---:|---|---|
+| 1 | **Bóng đá (Football)** | *Outdoor* | `coach.football@scms.com`<br>*(Lê Trần Phi - AFC Pro)* | `coach.football2@scms.com`<br>*(Nguyễn Tuấn Vũ)* |
+| 2 | **Quần vợt (Tennis)** | *Outdoor* | `coach.tennis@scms.com`<br>*(Huỳnh Diễm My - ITF L2)* | `coach.tennis2@scms.com`<br>*(Trần Quốc Bảo)* |
+| 3 | **Bơi lội (Swimming)** | *Outdoor* | `coach.swimming@scms.com`<br>*(Lê Phương Anh - FINA L2)* | `coach.swimming2@scms.com`<br>*(Đỗ Hải Đăng)* |
+| 4 | **Bắn cung (Archery)** | *Outdoor* | `coach.archery@scms.com`<br>*(Lê Nguyễn Thiên Phúc - Kiện tướng)* | `coach.archery2@scms.com`<br>*(Hoàng Minh Tâm)* |
+| 5 | **Cầu lông (Badminton)** | *Indoor* | `coach.badminton@scms.com`<br>*(Trần Thị Hương - BWF L2)* | `coach.badminton2@scms.com`<br>*(Lê Minh Khang)* |
+| 6 | **Bóng bàn (Table Tennis)**| *Indoor* | `coach.tabletennis@scms.com`<br>*(Lê Minh Khoa - ITTF L2)* | `coach.tabletennis2@scms.com`<br>*(Nguyễn Đức Trí)* |
+| 7 | **Bóng rổ (Basketball)** | *Indoor* | `coach.basketball@scms.com`<br>*(Trần Anh Dũng - FIBA L1)* | `coach.basketball2@scms.com`<br>*(Phan Hoàng Nam)* |
+| 8 | **Bóng chuyền (Volleyball)**| *Indoor* | `coach.volleyball@scms.com`<br>*(Nguyễn Văn Hoàng - FIVB L1)* | `coach.volleyball2@scms.com`<br>*(Đặng Tuấn Anh)* |
+| 9 | **Pickleball** | *Indoor* | `coach.pickleball@scms.com`<br>*(Phan Thị Lan - IPTPA L2)* | `coach.pickleball2@scms.com`<br>*(Vũ Thị Thảo)* |
+
+#### C. Hội Viên Theo Kịch Bản Nghiệp Vụ
+| STT | Email Đăng Nhập | Mật Khẩu | Họ Và Tên | Kịch Bản Nghiệp Vụ Sẵn Có |
+|:---:|---|---|---|---|
+| 1 | `member@scms.com` | `Scms@2026` | Nguyễn Văn Thành | Đã kích hoạt Gói 1:1 Advanced, còn **12 Credit**, hạn 45 ngày |
+| 2 | `member.normal@scms.com` | `Scms@2026` | Hoàng Thị Oanh | Đã ghi danh Lớp Cầu lông 12 buổi cố định $\rightarrow$ Test chặn nút hủy |
+| 3 | `member.new@scms.com` | `Scms@2026` | Bùi Văn Phúc | Hội viên mới, có hóa đơn giữ chỗ 5 phút $\rightarrow$ Test thanh toán |
+| 4 | `member.expired@scms.com`| `Scms@2026` | Đặng Văn Sơn | Gói 1:1 đã quá hạn 45 ngày $\rightarrow$ Test thông báo & gia hạn gói |
+| 5 | `member.active2@scms.com`| `Scms@2026` | Ngô Thị Quyên | Đã ghi danh lớp Pickleball $\rightarrow$ Test sĩ số và lịch tập |
+
 ---
 
 ## 2. BẢNG GIÁ CHUẨN 9 BỘ MÔN THỂ THAO & HAI DÒNG SẢN PHẨM (ĐỐI CHIẾU MEMBER.PDF)
 
 ### 2.1. Ma Trận Giá 9 Môn Thể Thao
-Theo quy định tại `Member.pdf` (Trang 7) và `AGENTS.md`, bảng giá chuẩn đã được nạp chết (seeded) vào bảng `subjects` của cơ sở dữ liệu:
+**Chưa chốt giá:** Bảng dưới là giá demo của contract cũ, khác 16/18 ô so với Member.pdf trang 7. Không dùng làm giá chính thức hoặc để ghi đè DB vận hành. Chờ người dùng chọn nguồn giá; amount trên hóa đơn cũ giữ nguyên.
 
 | STT | Môn Thể Thao | Loại Sân / Phòng | Ca Học Cho Phép | Học Phí Khóa Normal (12 buổi nhóm cố định) | Giá Gói Khóa Advanced (1:1 linh hoạt 12 Credit) |
 | :---: | :--- | :---: | :---: | :---: | :---: |
@@ -267,8 +305,10 @@ Theo quy định tại `Member.pdf` (Trang 7) và `AGENTS.md`, bảng giá chu�
 ```json
 [
   {
-    "userId": 3,
-    "fullName": "Trần Thị Hương",
+    "id": 3,
+    "name": "Trần Thị Hương",
+    "avatarUrl": null,
+    "status": "Active",
     "specializations": ["Cầu lông", "Pickleball"],
     "bio": "HLV cấp quốc gia với hơn 8 năm kinh nghiệm huấn luyện chuyên sâu",
     "certification": "Bằng HLV Quốc Tế BWF Cấp 2",
@@ -402,19 +442,19 @@ Theo quy định tại `Member.pdf` (Trang 7) và `AGENTS.md`, bảng giá chu�
 * **Response (201 Created):**
 ```json
 {
-  "enrollmentId": 210,
+  "id": 210,
   "status": "Pending",
   "invoiceId": 501,
   "invoiceCode": "INV-2026-000501",
   "amount": 900000.00,
   "paymentUrl": "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html?...",
-  "expiresAt": "2026-10-20T16:05:00+07:00"
+  "expiresAt": "2026-10-20T16:05:00"
 }
 ```
 *(Cửa sổ giữ chỗ thanh toán chuẩn hóa là **5 phút**. Khi hóa đơn được thanh toán thành công, học viên chuyển sang `Registered` và được gán vào 12 buổi học).*
 
 ### 5.5. Chặn Hủy Khóa Normal (`NORMAL_CLASS_NON_CANCELLABLE`)
-* **Endpoint:** `POST /api/enrollments/{enrollmentId}/cancel`
+* **Endpoint:** `PATCH /api/enrollments/{enrollmentId}/cancel`
 * **Hành vi:** Với lớp Normal, Backend **từ chối 400 Bad Request**:
 ```json
 {
@@ -446,7 +486,7 @@ Theo quy định tại `Member.pdf` (Trang 7) và `AGENTS.md`, bảng giá chu�
   "amount": 10000000.00,
   "paymentMethod": "VNPay",
   "status": "Pending",
-  "expiresAt": "2026-10-20T16:05:00+07:00",
+  "expiresAt": "2026-10-20T16:05:00",
   "paymentUrl": "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html?..."
 }
 ```
@@ -528,7 +568,7 @@ Theo quy định tại `Member.pdf` (Trang 7) và `AGENTS.md`, bảng giá chu�
 
 ### 6.3. Member Đặt Lịch Ca Học 1:1 (Flexible Booking)
 * **Endpoint:** `POST /api/sessions/book-private`
-* **Quyền:** `hasAnyRole('MEMBER', 'ADMIN', 'MANAGER')`
+* **Quyền:** `hasRole('MEMBER') or hasAuthority('REGISTER_MEMBER') or hasAuthority('MANAGE_CLASSES')`
 * **Ràng buộc kiểm tra nghiêm ngặt (Backend Validation):**
   1. Gói học 1:1 phải ở trạng thái `Active`, còn hạn 45 ngày (`today <= endDate`) và còn ít nhất 1 Credit (`remainingCredit >= 1`).
   2. Bắt buộc đặt trước tối thiểu **12 tiếng** (`sessionStart >= now + 12h`).
@@ -575,7 +615,7 @@ Theo quy định tại `Member.pdf` (Trang 7) và `AGENTS.md`, bảng giá chu�
 
 ### 6.4. Hủy Lịch Học 1:1
 * **Endpoint:** `POST /api/sessions/{sessionId}/cancel-private`
-* **Quyền:** `hasAnyRole('MEMBER', 'ADMIN', 'MANAGER')` (Member chỉ được hủy buổi của chính mình).
+* **Quyền:** `hasRole('MEMBER') or hasAuthority('REGISTER_MEMBER') or hasAuthority('MANAGE_CLASSES')` (Member chỉ được hủy buổi của chính mình).
 * **Quy tắc thời gian (24h Cutoff):**
   * **Hủy trước $\ge 24h$:** Hợp lệ $\rightarrow$ Buổi học chuyển sang `Cancelled`, hoàn trả 1 Credit vào gói học 1:1 của Member. Trả về `200 OK`.
   * **Hủy dưới 24h:** Backend từ chối `400 Bad Request` kèm mã lỗi:
@@ -716,7 +756,7 @@ Theo quy định tại `Member.pdf` (Trang 7) và `AGENTS.md`, bảng giá chu�
 ## 9. NHÓM API THANH TOÁN (VNPAY SANDBOX & TIỀN MẶT TẠI QUẦY)
 
 ### 9.1. Xác nhận Thu Tiền Mặt Tại Quầy (Receptionist)
-* **Endpoint:** `POST /api/invoices/{invoiceId}/pay-cash`
+* **Endpoint:** `POST /api/invoices/{invoiceId}/confirm-cash`
 * **Quyền:** `hasAuthority('MANAGE_INVOICES')`
 * **Xử lý:** Xác nhận thanh toán hóa đơn `Paid` $\rightarrow$ Kích hoạt ngay suất học hoặc gói 1:1.
 
@@ -755,7 +795,7 @@ Theo quy định tại `Member.pdf` (Trang 7) và `AGENTS.md`, bảng giá chu�
 
 ## 11. BẢNG TRA CỨU MÃ LỖI CHUẨN TOÀN HỆ THỐNG (ERROR CODES DICTIONARY)
 
-Tất cả các lỗi nghiệp vụ trả về từ Backend đều có cấu trúc JSON thống nhất:
+BusinessException có tiền tố mã chuẩn trả cấu trúc sau; FE cần fallback theo message/HTTP status cho lỗi legacy, validation hoặc 401/403 chưa có code:
 ```json
 {
   "code": "MÃ_LỖI_CHUẨN",
@@ -776,8 +816,57 @@ Bảng đối chiếu mã lỗi để Frontend hiển thị thông báo (Toast /
 | `ROOM_CONFLICT` | 409 | Phòng / Sân tập đã có lớp hoặc ca học khác chiếm chỗ. | Toast lỗi: *"Sân tập/Phòng học này đã có lịch đặt trong khung giờ đã chọn. Vui lòng chọn sân hoặc khung giờ khác."* |
 | `COACH_CONFLICT` | 409 | HLV đã có lịch dạy ca học khác trong khung giờ đó. | Toast lỗi: *"Huấn luyện viên đã có lịch dạy trong khung giờ này. Vui lòng kiểm tra lại bảng ca rảnh của HLV."* |
 | `CLASS_CAPACITY_EXCEEDED` | 400 | Sĩ số lớp nhóm đã đạt tối đa (`Registered` + `Pending` $\ge$ `maxCapacity`). | Gắn nhãn *"Hết chỗ (Full)"* trên card lớp, khóa nút Đăng ký: *"Lớp học đã đủ sĩ số tối đa (15 học viên)."* |
-| `PAYMENT_EXPIRED` | 400 | Đã quá 5 phút giữ chỗ thanh toán đơn hàng. | Chuyển hướng người dùng về giỏ hàng/danh mục: *"Đơn hàng giữ chỗ đã hết hạn (5 phút). Vui lòng thực hiện đặt lại."* |
+| `PAYMENT_NOT_PAYABLE` (dùng fallback message; chưa có code riêng) | 409 | Hóa đơn không còn payable. | Hiển thị lỗi và tải lại hóa đơn. |
 | `HOLIDAY_BLOCKED` | 400 | Đặt lịch vào ngày nghỉ lễ/Tết đang được trung tâm kích hoạt. | Tô đỏ ô lịch ngày lễ: *"Trung tâm tạm đóng cửa nghỉ lễ trong ngày này. Vui lòng chọn ngày học khác."* |
 | `SUBSTITUTE_COACH_CONFLICT` | 409 | HLV thay thế được chỉ định bị trùng lịch dạy khác. | Toast lỗi: *"HLV thay thế đã có lịch dạy khác trong khung giờ này. Vui lòng chọn HLV khác."* |
 | `ROOM_HAS_FUTURE_SESSIONS` | 400 | Đổi trạng thái phòng sang Bảo trì/Đóng cửa khi còn ca học tương lai. | Toast lỗi: *"Phòng/Sân tập vẫn còn các buổi học đã xếp lịch trong tương lai. Vui lòng dời lịch các buổi học trước khi đóng sân."* |
 | `INVALID_TIME_SLOT` | 400 | Giờ bắt đầu / kết thúc gửi lên không khớp 7 ca học chuẩn. | Toast lỗi: *"Khung giờ học không hợp lệ. Vui lòng chọn đúng 1 trong 7 ca học chuẩn của trung tâm."* |
+
+## 12. CONTRACT AN TOÀN BỔ SUNG NGÀY 23/10/2026
+
+### 12.1. Tạo Normal và 12 Session nguyên khối
+`POST /api/classes/normal-with-sessions`, authority `MANAGE_CLASSES`, trả 201 `SportsClassResponse`.
+
+```json
+{
+  "requestId": "5c337454-c07a-45a9-8aa7-e0c26e3ff467",
+  "sportsClass": {
+    "name": "Tennis Normal K01", "subjectId": 1, "coachId": 9,
+    "maxCapacity": 15, "startDate": "2026-11-02", "classType": "Normal", "totalSessions": 12
+  },
+  "roomId": 1, "daysOfWeek": [1, 3, 5], "startTime": "06:00", "endTime": "07:30"
+}
+```
+ID chỉ minh họa: lấy Subject/Coach/Room thực tế cùng center; Coach có specialization Active liên kết đúng Subject. Cùng requestId/body trả cùng Class; body khác trả 409 `IDEMPOTENCY_CONFLICT`. Class, 12 buổi và mã idempotency commit cùng transaction; xung đột rollback toàn bộ.
+
+Không thêm Draft: POST Normal kiểu cũ trả Closed để chuẩn bị lịch, generate đủ 12 rồi PUT Class sang Open. Generate đã có lịch trả `SCHEDULE_ALREADY_EXISTS`, không append thêm 12 buổi. Publish/enroll kiểm tra đủ 12 Session tương lai thực tế, không chỉ tin ngày Class từ client. Backend giữ sĩ số Normal tối đa 15 và 12 buổi cố định.
+
+### 12.2. Lịch cá nhân và lịch trước mua
+- GET `/api/sessions`: ép memberId/coachId theo người đăng nhập; staff có MANAGE_CLASSES/REGISTER_MEMBER xem trong center. Không dùng để đọc lịch người khác.
+- GET `/api/sessions/{id}` kiểm tra owner/phân công/center.
+- GET `/api/sessions/catalog/{classId}`: người đã đăng nhập xem lịch Normal Open/Ongoing trước mua. Trả `{id,sessionDate,startTime,endTime,coachName,roomName}`; không có Member/subscription, không cung cấp Advanced private.
+- EnrollmentResponse dùng `id`, có `amount`, `expiresAt` cho đơn Pending. Ngày giờ LocalDateTime không chứa offset, được diễn giải theo Asia/Ho_Chi_Minh (UTC+7); FE phải dùng múi giờ này khi đếm ngược.
+- Xem gói cá nhân bằng GET `/api/members/{memberId}/subscriptions` hoặc `/packages`; không có GET `/api/member-packages/me`.
+
+### 12.3. Danh mục và validation
+- SubjectRequest có `outdoor: true/false`, bắt buộc khi tạo môn; SubjectResponse.outdoor có thể null với dữ liệu cũ chưa phân loại. Không suy loại môn từ tên/slug. Môn chưa phân loại không được xếp lịch.
+- Có lịch Scheduled tương lai thì chưa đổi loại môn hoặc capacity/facilityType của phòng; xử lý lịch trước, không tự dời hàng loạt.
+- DELETE Subject còn Class/Specialization trả 409 `SUBJECT_IN_USE`; FK bảo vệ cả liên kết phát sinh đồng thời.
+- Package nhận Normal/Advanced và totalCredit dương. Chưa chọn giá 0đ hoặc credit dùng chung nhiều môn.
+- Coach API dùng `id`, `name`, `avatarUrl`, `specializations`, `email`, `phone`, thêm `bio`, `certification`, `status`. Contact chỉ hiện theo MANAGE_USERS. Book/generate/substitute kiểm Coach Active, cùng center, đúng môn qua specialization.subjectId.
+
+### 12.4. Tiền, credit, điểm danh và lịch sử
+- Cash: POST `/api/invoices/{id}/confirm-cash`, cần role RECEPTIONIST và MANAGE_INVOICES; lưu người/giờ thu. Chưa mở thêm quyền thu Cash cho Manager.
+- Giữ cấu hình holding hiện tại, chưa chọn lại 5/15 phút; deadline được kiểm khi xác nhận, job giải phóng suất chạy mỗi 60 giây.
+- VNPay hợp lệ về sau khi đơn không còn payable vẫn được ghi Paid, `reconciliationRequired=true`; không tự kích hoạt suất/gói đã giải phóng. Callback lặp không cấp quyền lần hai. Hóa đơn cần đối soát không dùng để tự re-activate gói qua API đổi status. Quy trình Manager xếp lại lịch/hoàn tiền còn chờ chốt.
+- InvoiceResponse thêm `reconciliationRequired`. Đổi status/gia hạn không nạp lại credit đã dùng. Cancel hoàn về subscription gốc còn Active/hạn, không chọn gói khác; dữ liệu mất liên kết/vượt trần bị từ chối.
+- Normal không hỗ trợ báo vắng/hủy enrollment, kể cả staff. Hủy Invoice Pending có route riêng trước khi thu tiền.
+- HLV 1:1/thay thế được kiểm theo Session.coach và bookedMember. Staff chỉ hỗ trợ điểm danh, không ghi nhận xét chuyên môn.
+- Finalization chuyển Session Completed; Normal đủ 12 buổi chốt thì Enrollment Completed. Advanced chỉ Completed khi credit bằng 0 và không còn ca Scheduled chưa chốt; 0 credit đang giữ cho lịch tương lai chưa phải học xong.
+- `scms.booking-block.enabled=false` tắt khóa 7 ngày, vẫn ghi vắng/tiêu thụ buổi; giữ code và test chế tài.
+- Toggle ngăn tạo khóa tự động mới; không tự xóa bookingBlockedUntil đã có. Manager vẫn dùng route gỡ khóa hiện có khi cần.
+- Không xóa/dời ca đã kết thúc/finalized; không hủy thẳng ca có quyền học đã trả tiền qua update-status để tránh mất quyền. Dùng reschedule; chính sách hủy sự cố khác còn chờ quyết định.
+
+Mã mới (400): CLASS_NOT_READY, NORMAL_SESSION_COUNT, SCHEDULE_ALREADY_EXISTS, COACH_INACTIVE, COACH_SUBJECT_MISMATCH, SUBJECT_FACILITY_REQUIRED, SUBSCRIPTION_LINK_REQUIRED, CREDIT_LIMIT_EXCEEDED, SESSION_HISTORY_IMMUTABLE, INCIDENT_POLICY_REQUIRED. Các xung đột (409): IDEMPOTENCY_CONFLICT, SUBJECT_IN_USE, ROOM_CONFLICT, COACH_CONFLICT, SUBSTITUTE_COACH_CONFLICT. FE vẫn cần fallback message/status với lỗi chưa có code.
+
+Tạo Member tại quầy có packageId: backend tạo subscription và Invoice Cash Pending, không cấp quyền học ngay. Staff tra Invoice theo memberId rồi confirm-cash sau khi nhận đủ tiền. MemberResponse.membershipStatus là pending và totalSpent không cộng đơn chưa thu. Tổng đã thu lấy từ Invoice Paid.amount đã chốt, không lấy giá package hiện tại.

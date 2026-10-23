@@ -23,13 +23,13 @@ class LoginAttemptServiceTest {
         user.setStatus("Active");
         when(users.findByEmailIgnoreCaseForUpdate(user.getEmail())).thenReturn(Optional.of(user));
         when(users.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        LoginAttemptService service = new LoginAttemptService(users, audit);
+        LoginAttemptService service = new LoginAttemptService(java.time.Clock.fixed(java.time.Instant.parse("2026-10-23T01:00:00Z"), java.time.ZoneId.of("Asia/Ho_Chi_Minh")), users, audit);
 
         for (int attempt = 0; attempt < 5; attempt++) service.recordFailure(user.getEmail());
 
         assertEquals(0, user.getFailedLoginAttempts());
         assertNotNull(user.getLockedUntil());
-        assertTrue(user.getLockedUntil().isAfter(LocalDateTime.now().plusMinutes(14)));
+        assertEquals(LocalDateTime.of(2026,10,23,8,15),user.getLockedUntil());
         verify(audit).log(null, "TEMPORARY_ACCOUNT_LOCK", "USER", 25,
                 "Account temporarily locked after repeated failed login attempts");
     }

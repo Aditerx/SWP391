@@ -15,6 +15,13 @@ import java.util.List;
 @RequiredArgsConstructor
 public class SportsClassController {
     private final SportsClassService service;
+    private final NormalClassCreationService normalClassCreationService;
+
+    @PostMapping("/normal-with-sessions")
+    @PreAuthorize("hasAuthority('MANAGE_CLASSES')")
+    public ResponseEntity<SportsClassResponse> createNormal(@Valid @RequestBody NormalClassCreationRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(normalClassCreationService.create(request));
+    }
 
     @GetMapping
     public ResponseEntity<List<SportsClassResponse>> findAll() {

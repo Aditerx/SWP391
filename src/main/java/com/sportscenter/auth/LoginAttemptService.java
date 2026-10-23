@@ -12,6 +12,7 @@ import java.time.LocalDateTime;
 @Service
 @RequiredArgsConstructor
 public class LoginAttemptService {
+    private final java.time.Clock clock;
     private static final int MAX_ATTEMPTS = 5;
     private static final int LOCK_MINUTES = 15;
 
@@ -21,7 +22,7 @@ public class LoginAttemptService {
     @Transactional(readOnly = true)
     public boolean isTemporarilyLocked(String email) {
         return userRepository.findByEmailIgnoreCase(email)
-                .map(user -> user.getLockedUntil() != null && user.getLockedUntil().isAfter(LocalDateTime.now()))
+                .map(user -> user.getLockedUntil() != null && user.getLockedUntil().isAfter(LocalDateTime.now(clock)))
                 .orElse(false);
     }
 
@@ -32,7 +33,7 @@ public class LoginAttemptService {
                 return;
             }
 
-            LocalDateTime now = LocalDateTime.now();
+            LocalDateTime now = LocalDateTime.now(clock);
             if (user.getLockedUntil() != null && user.getLockedUntil().isAfter(now)) {
                 return;
             }

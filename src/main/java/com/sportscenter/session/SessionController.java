@@ -30,14 +30,19 @@ public class SessionController {
             @RequestParam(required = false) Integer memberId,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
-            @RequestParam(required = false) String status) {
-        return ResponseEntity.ok(sessionService.findAll(classId, coachId, roomId, memberId, startDate, endDate, status));
+            @RequestParam(required = false) String status, Authentication authentication) {
+        return ResponseEntity.ok(sessionService.findAll(classId, coachId, roomId, memberId, startDate, endDate, status, authentication));
     }
 
     @GetMapping("/time-slots")
     public ResponseEntity<List<TimeSlotResponse>> getTimeSlots(
             @RequestParam(required = false) Boolean isOutdoor) {
         return ResponseEntity.ok(sessionService.getTimeSlots(isOutdoor));
+    }
+
+    @GetMapping("/catalog/{classId}")
+    public ResponseEntity<List<CatalogSessionResponse>> publicTimetable(@PathVariable Integer classId) {
+        return ResponseEntity.ok(sessionService.publicTimetable(classId));
     }
 
     @GetMapping("/coaches/{coachId}/available-slots")
@@ -50,12 +55,12 @@ public class SessionController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<SessionResponse> findById(@PathVariable Integer id) {
-        return ResponseEntity.ok(sessionService.findById(id));
+    public ResponseEntity<SessionResponse> findById(@PathVariable Integer id, Authentication authentication) {
+        return ResponseEntity.ok(sessionService.findById(id, authentication));
     }
 
     @PostMapping("/book-private")
-    @PreAuthorize("hasAnyRole('MEMBER', 'ADMIN', 'MANAGER')")
+    @PreAuthorize("hasRole('MEMBER') or hasAuthority('REGISTER_MEMBER') or hasAuthority('MANAGE_CLASSES')")
     public ResponseEntity<SessionResponse> bookPrivate(
             @Valid @RequestBody PrivateBookingRequest request,
             Authentication authentication) {
@@ -64,7 +69,7 @@ public class SessionController {
     }
 
     @PostMapping("/{sessionId}/cancel-private")
-    @PreAuthorize("hasAnyRole('MEMBER', 'ADMIN', 'MANAGER')")
+    @PreAuthorize("hasRole('MEMBER') or hasAuthority('REGISTER_MEMBER') or hasAuthority('MANAGE_CLASSES')")
     public ResponseEntity<SessionResponse> cancelPrivate(
             @PathVariable Integer sessionId,
             Authentication authentication) {

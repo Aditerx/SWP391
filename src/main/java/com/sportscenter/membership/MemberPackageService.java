@@ -21,11 +21,13 @@ import java.util.List;
 @Service
 @RequiredArgsConstructor
 public class MemberPackageService {
+    private final java.time.Clock clock;
     private final MemberPackageRepository memberPackageRepository;
     private final MembershipPackageRepository membershipPackageRepository;
     private final UserRepository userRepository;
     private final AuditService auditService;
     private final InvoiceService invoiceService;
+    private final com.sportscenter.session.ScheduleWriteLock scheduleWriteLock;
 
     @Transactional(readOnly = true)
     public List<MemberPackageResponse> findAll() {
@@ -61,13 +63,14 @@ public class MemberPackageService {
     public SubscriptionOrderResponse subscribe(Integer memberId, MemberPackageRequest request, String clientIp) {
         User memberUser = userRepository.findById(memberId)
                 .orElseThrow(() -> new ResourceNotFoundException("Member user not found: " + memberId));
+        scheduleWriteLock.acquire(memberUser.getCenterId());
 
         MembershipPackage pkg = membershipPackageRepository.findById(request.packageId())
                 .orElseThrow(() -> new ResourceNotFoundException("Membership package not found: " + request.packageId()));
 
         if (!"Active".equalsIgnoreCase(pkg.getStatus())) throw new BusinessException("Cannot subscribe to an Inactive membership package");
         String method = request.paymentMethod() == null || request.paymentMethod().isBlank() ? "Cash" : request.paymentMethod();
-        LocalDate startDate = LocalDate.now(ZoneId.of("Asia/Ho_Chi_Minh"));
+        LocalDate startDate = LocalDate.now(clock);
         int days = pkg.isAdvanced()
                 ? (pkg.getDurationDays() != null ? pkg.getDurationDays() : 45)
                 : (pkg.getDurationDays() != null ? pkg.getDurationDays() : 30);
@@ -102,18 +105,15 @@ public class MemberPackageService {
 
     @Transactional
     public MemberPackageResponse updateStatus(Integer subscriptionId, String status) {
-        MemberPackage mp = memberPackageRepository.findById(subscriptionId)
+        scheduleWriteLock.acquire(memberPackageRepository.findCenterIdById(subscriptionId).orElseThrow(() -> new ResourceNotFoundException("Subscription center not found")));
+        MemberPackage mp = memberPackageRepository.findByIdForUpdate(subscriptionId)
                 .orElseThrow(() -> new ResourceNotFoundException("Member package subscription not found: " + subscriptionId));
 
         String normalizedStatus = normalizeStatus(status);
         String previousStatus = mp.getStatus();
         if (!"Active".equalsIgnoreCase(previousStatus) && "Active".equals(normalizedStatus)) {
             invoiceService.requirePaidSubscription(subscriptionId);
-            if (mp.getMembershipPackage() != null && mp.getMembershipPackage().isAdvanced()
-                    && (mp.getRemainingCredit() == null || mp.getRemainingCredit() == 0)) {
-                int credits = mp.getMembershipPackage().getTotalCredit() != null ? mp.getMembershipPackage().getTotalCredit() : 12;
-                mp.setRemainingCredit(credits);
-            }
+            // Only the first successful payment grants credits. Reactivation never replenishes them.
         }
         if ("Cancelled".equals(normalizedStatus) || "Expired".equals(normalizedStatus)) {
             invoiceService.cancelPendingSubscriptionPayment(subscriptionId);
@@ -134,11 +134,12 @@ public class MemberPackageService {
         if (request.extendDays() == null || request.extendDays() <= 0) {
             throw new BusinessException("Số ngày gia hạn phải lớn hơn 0");
         }
+        scheduleWriteLock.acquire(memberPackageRepository.findCenterIdById(subscriptionId).orElseThrow(() -> new ResourceNotFoundException("Subscription center not found")));
 
         MemberPackage mp = memberPackageRepository.findByIdForUpdate(subscriptionId)
                 .orElseThrow(() -> new ResourceNotFoundException("Member package subscription not found: " + subscriptionId));
 
-        LocalDate today = LocalDate.now(ZoneId.of("Asia/Ho_Chi_Minh"));
+        LocalDate today = LocalDate.now(clock);
         LocalDate currentEnd = mp.getEndDate() != null ? mp.getEndDate() : today;
         LocalDate newEnd = currentEnd.plusDays(request.extendDays());
         int oldValidity = mp.getValidityDays() != null ? mp.getValidityDays() : 45;
@@ -164,16 +165,20 @@ public class MemberPackageService {
 
     @Transactional
     public int expireOutdatedPackages() {
-        LocalDate today = LocalDate.now(ZoneId.of("Asia/Ho_Chi_Minh"));
-        List<MemberPackage> outdated = memberPackageRepository.findExpiredActivePackages(today);
-        for (MemberPackage mp : outdated) {
+        LocalDate today = LocalDate.now(clock);
+        List<Integer> outdated = memberPackageRepository.findExpiredActivePackageIds(today);
+        int expiredCount = 0;
+        for (Integer candidate : outdated) {
+            MemberPackage mp = memberPackageRepository.findByIdForUpdate(candidate).orElse(null);
+            if (mp == null || !"Active".equals(mp.getStatus()) || mp.getEndDate() == null || !mp.getEndDate().isBefore(today)) continue;
             mp.setStatus("Expired");
             mp.setRemainingCredit(0);
             memberPackageRepository.save(mp);
+            expiredCount++;
             auditService.log(null, "EXPIRE_MEMBER_PACKAGE", "MEMBER_PACKAGE", mp.getSubscriptionId(),
                     "Package expired past " + mp.getEndDate() + ". Remaining credits wiped.");
         }
-        return outdated.size();
+        return expiredCount;
     }
 
     private String normalizeStatus(String status) {

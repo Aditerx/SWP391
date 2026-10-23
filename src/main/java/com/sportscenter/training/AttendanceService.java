@@ -49,6 +49,7 @@ public class AttendanceService {
             LocalDateTime endDate,
             Authentication authentication
     ) {
+        if (authentication == null || !authentication.isAuthenticated()) throw new AccessDeniedException("Authentication required");
         Integer resolvedMemberId = memberId;
         boolean memberRole = authentication != null && authentication.getAuthorities().stream()
                 .anyMatch(authority -> "ROLE_MEMBER".equals(authority.getAuthority()));
@@ -61,8 +62,12 @@ public class AttendanceService {
             resolvedMemberId = currentUser.getId();
         }
         final Integer effectiveMemberId = resolvedMemberId;
+        User actor = userRepository.findByEmailIgnoreCase(authentication.getName()).orElseThrow(() -> new AccessDeniedException("Account not found"));
+        boolean coachRole = authentication.getAuthorities().stream().anyMatch(a -> "ROLE_COACH".equals(a.getAuthority()));
         List<Attendance> all = attendanceRepository.findAllWithDetails();
         return all.stream()
+                .filter(a -> a.getMember() != null && java.util.Objects.equals(actor.getCenterId(), a.getMember().getCenterId()))
+                .filter(a -> !coachRole || a.getSession() != null && actor.getId().equals(assignedCoachId(a.getSession())))
                 .filter(a -> sessionId == null || (a.getSession() != null && sessionId.equals(a.getSession().getId())))
                 .filter(a -> effectiveMemberId == null || (a.getMember() != null && effectiveMemberId.equals(a.getMember().getId())))
                 .filter(a -> recordedBy == null || (a.getRecordedBy() != null && recordedBy.equals(a.getRecordedBy().getId())))
@@ -122,14 +127,13 @@ public class AttendanceService {
                 .orElseThrow(() -> new ResourceNotFoundException("Authenticated user not found"));
         Attendance att = attendanceRepository.findById(request.attendanceId())
                 .orElseThrow(() -> new ResourceNotFoundException("Attendance record not found: " + request.attendanceId()));
+        if (att.getMember() != null && !java.util.Objects.equals(actor.getCenterId(), att.getMember().getCenterId())) throw new AccessDeniedException("Attendance belongs to another center");
 
         if (request.reason() == null || request.reason().isBlank()) {
             throw new BusinessException("A reason is required for attendance correction");
         }
         if (actor.getRole() != null && ("Coach".equalsIgnoreCase(actor.getRole().getName()) || "ROLE_COACH".equalsIgnoreCase(actor.getRole().getName()))) {
-            if (att.getSession() == null || att.getSession().getSportsClass() == null
-                    || att.getSession().getSportsClass().getCoach() == null
-                    || !actor.getId().equals(att.getSession().getSportsClass().getCoach().getId())) {
+            if (att.getSession() == null || !actor.getId().equals(assignedCoachId(att.getSession()))) {
                 throw new AccessDeniedException("Coaches may only correct attendance for their own classes");
             }
         }
@@ -165,6 +169,9 @@ public class AttendanceService {
                 .orElseThrow(() -> new ResourceNotFoundException("Authenticated member not found"));
         Session session = sessionRepository.findById(sessionId)
                 .orElseThrow(() -> new ResourceNotFoundException("Session not found: " + sessionId));
+        if (session.getSportsClass().isNormal()) {
+            throw new BusinessException("NORMAL_CLASS_NON_CANCELLABLE: Normal classes do not support absence requests");
+        }
         if (member.getCenterId() != null && session.getSportsClass().getCenterId() != null
                 && !member.getCenterId().equals(session.getSportsClass().getCenterId())) {
             throw new AccessDeniedException("Members may only request absence for sessions in their center");
@@ -240,6 +247,9 @@ public class AttendanceService {
         if (sessionId != null) {
             Session session = sessionRepository.findById(sessionId)
                     .orElseThrow(() -> new ResourceNotFoundException("Session not found: " + sessionId));
+            if (recorder.getRole() != null && "Coach".equalsIgnoreCase(recorder.getRole().getName()) && !recorder.getId().equals(assignedCoachId(session))) {
+                throw new AccessDeniedException("Coach may only check in assigned sessions");
+            }
             Integer classId = session.getSportsClass().getId();
             if (session.getBookedMember() != null) {
                 if (!session.getBookedMember().getId().equals(memberId)) {
@@ -287,5 +297,10 @@ public class AttendanceService {
         if ("Excused".equalsIgnoreCase(state) || "excused".equalsIgnoreCase(state)) return "Excused";
         if ("CheckedIn".equalsIgnoreCase(state) || "checked_in".equalsIgnoreCase(state)) return "CheckedIn";
         return "Present";
+    }
+
+    private Integer assignedCoachId(Session session) {
+        return session.getCoach() != null ? session.getCoach().getId()
+                : session.getSportsClass() != null && session.getSportsClass().getCoach() != null ? session.getSportsClass().getCoach().getId() : null;
     }
 }

@@ -30,6 +30,8 @@ import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class InvoiceServiceTest {
+    @Mock private com.sportscenter.session.ScheduleWriteLock scheduleWriteLock;
+    @org.mockito.Spy private java.time.Clock clock = java.time.Clock.system(java.time.ZoneId.of("Asia/Ho_Chi_Minh"));
     @Mock InvoiceRepository invoiceRepository;
     @Mock UserRepository userRepository;
     @Mock MembershipPackageRepository membershipPackageRepository;
@@ -41,6 +43,10 @@ class InvoiceServiceTest {
     @Mock VnPayGateway vnPayGateway;
     @InjectMocks InvoiceService invoiceService;
 
+    @org.junit.jupiter.api.BeforeEach void centerFixtures() {
+        lenient().when(invoiceRepository.findCenterIdById(anyInt())).thenReturn(Optional.of(1));
+        lenient().when(invoiceRepository.findCenterIdByCode(anyString())).thenReturn(Optional.of(1));
+    }
     @Test
     void createPackageOrderUsesPackagePriceAndPendingStatus() {
         User member = new User(); member.setId(7);
@@ -84,7 +90,7 @@ class InvoiceServiceTest {
         User member = new User(); member.setId(7);
         MembershipPackage pkg = new MembershipPackage(); pkg.setDurationDays(30);
         MemberPackage subscription = new MemberPackage(); subscription.setMember(member); subscription.setMembershipPackage(pkg);
-        subscription.setStatus("Pending"); subscription.setStartDate(LocalDate.now()); subscription.setEndDate(LocalDate.now().plusDays(30));
+        subscription.setStatus("Pending"); subscription.setStartDate(LocalDate.now(clock)); subscription.setEndDate(LocalDate.now(clock).plusDays(30));
         Invoice invoice = new Invoice(); invoice.setInvoiceId(22); invoice.setInvoiceCode("INV-2026-000022");
         invoice.setMember(member); invoice.setSubscription(subscription); invoice.setPaymentMethod("Cash"); invoice.setPaymentStatus("Pending");
         var auth = new UsernamePasswordAuthenticationToken("desk@example.com", "n/a", List.of(new SimpleGrantedAuthority("ROLE_RECEPTIONIST")));
@@ -166,40 +172,53 @@ class InvoiceServiceTest {
     }
 
     @Test
-    void expiredVnPayInvoiceKeepsClassSeatUntilVerifiedCallback() {
+    void expiredVnPayInvoiceReleasesClassSeat() {
         User member = new User(); member.setId(9);
         com.sportscenter.sportclass.SportsClass sportsClass = new com.sportscenter.sportclass.SportsClass(); sportsClass.setId(4); sportsClass.setMaxCapacity(1);
         Invoice invoice = new Invoice(); invoice.setInvoiceId(24); invoice.setMember(member); invoice.setSportsClass(sportsClass);
-        invoice.setPaymentMethod("VNPay"); invoice.setPaymentStatus("Pending"); invoice.setExpiresAt(java.time.LocalDateTime.now().minusMinutes(1));
+        invoice.setPaymentMethod("VNPay"); invoice.setPaymentStatus("Pending"); invoice.setExpiresAt(java.time.LocalDateTime.now(clock).minusMinutes(1));
         when(invoiceRepository.findByIdForUpdate(24)).thenReturn(Optional.of(invoice));
 
         assertTrue(invoiceService.expireInvoice(24));
 
         assertEquals("Expired", invoice.getPaymentStatus());
-        verifyNoInteractions(enrollmentRepository);
+        verify(enrollmentRepository).findByMemberIdAndSportsClassId(9, 4);
     }
 
     @Test
-    void lateSuccessfulVnPayCallbackRegistersClassUsingReservedSeat() {
+    void lateSuccessfulVnPayCallbackPreservesMoneyWithoutActivatingReleasedSeat() {
         User member = new User(); member.setId(9);
         com.sportscenter.sportclass.SportsClass sportsClass = new com.sportscenter.sportclass.SportsClass(); sportsClass.setId(4); sportsClass.setMaxCapacity(1);
         com.sportscenter.enrollment.ClassEnrollment enrollment = new com.sportscenter.enrollment.ClassEnrollment(); enrollment.setStatus("Pending");
         Invoice invoice = new Invoice(); invoice.setInvoiceId(25); invoice.setInvoiceCode("INV-2026-000025"); invoice.setMember(member);
         invoice.setSportsClass(sportsClass); invoice.setPaymentMethod("VNPay"); invoice.setPaymentStatus("Expired");
-        invoice.setExpiresAt(java.time.LocalDateTime.now().minusMinutes(2)); invoice.setAmount(new BigDecimal("100.00"));
+        invoice.setExpiresAt(java.time.LocalDateTime.now(clock).minusMinutes(2)); invoice.setAmount(new BigDecimal("100.00"));
         Map<String, String> params = Map.of("vnp_TxnRef", "INV-2026-000025", "vnp_Amount", "10000",
                 "vnp_ResponseCode", "00", "vnp_TransactionStatus", "00", "vnp_TransactionNo", "gateway-class");
         when(vnPayGateway.isValid(params)).thenReturn(true);
         when(invoiceRepository.findByInvoiceCodeForUpdate("INV-2026-000025")).thenReturn(Optional.of(invoice));
-        when(sportsClassRepository.findByIdForUpdate(4)).thenReturn(Optional.of(sportsClass));
-        when(enrollmentRepository.countBySportsClassIdAndStatusIn(4, List.of("Registered", "Pending"))).thenReturn(1L);
         when(enrollmentRepository.findByMemberIdAndSportsClassId(9, 4)).thenReturn(Optional.of(enrollment));
 
         var result = invoiceService.processVnpayResult(params);
 
         assertEquals("00", result.code());
         assertEquals("Paid", invoice.getPaymentStatus());
-        assertEquals("Registered", enrollment.getStatus());
-        verify(auditService).log(isNull(), eq("PAID_AFTER_EXPIRY"), eq("invoices"), eq(25), anyString());
+        assertEquals("Cancelled", enrollment.getStatus());
+        verify(auditService).log(isNull(), eq("PAYMENT_RECONCILIATION_REQUIRED"), eq("invoices"), eq(25), anyString());
+    }
+
+    @Test void lateCallbackForOldOrderCannotCancelNewPendingReservation() {
+        User member = new User(); member.setId(9);
+        var sportsClass = new com.sportscenter.sportclass.SportsClass(); sportsClass.setId(4);
+        var invoice = new Invoice(); invoice.setInvoiceId(30); invoice.setInvoiceCode("OLD-ORDER");
+        invoice.setMember(member); invoice.setSportsClass(sportsClass); invoice.setAmount(new BigDecimal("100.00"));
+        invoice.setPaymentMethod("VNPay"); invoice.setPaymentStatus("Expired");
+        var params = Map.of("vnp_TxnRef","OLD-ORDER","vnp_Amount","10000","vnp_ResponseCode","00","vnp_TransactionStatus","00");
+        when(vnPayGateway.isValid(params)).thenReturn(true);
+        when(invoiceRepository.findByInvoiceCodeForUpdate("OLD-ORDER")).thenReturn(Optional.of(invoice));
+        when(invoiceRepository.existsByMemberIdAndSportsClassIdAndPaymentStatusAndInvoiceIdNot(9,4,"Pending",30)).thenReturn(true);
+        assertEquals("00",invoiceService.processVnpayResult(params).code());
+        assertTrue(invoice.isReconciliationRequired());
+        verifyNoInteractions(enrollmentRepository);
     }
 }

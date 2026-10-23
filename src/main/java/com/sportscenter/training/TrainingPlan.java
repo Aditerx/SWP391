@@ -49,5 +49,5 @@ public class TrainingPlan {
     private LocalDate endDate;
 
     @Column(name = "created_at", nullable = false)
-    private LocalDateTime createdAt = LocalDateTime.now();
+    private LocalDateTime createdAt;
 }

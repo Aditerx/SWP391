@@ -36,10 +36,4 @@ public class SystemLog {
     @Column(name = "timestamp")
     private LocalDateTime createdAt;
 
-    @PrePersist
-    void prePersist() {
-        if (createdAt == null) {
-            createdAt = LocalDateTime.now();
-        }
-    }
 }

@@ -25,6 +25,8 @@ import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class MemberPackageServiceTest {
+    @Mock private com.sportscenter.session.ScheduleWriteLock scheduleWriteLock;
+    @org.mockito.Spy private java.time.Clock clock = java.time.Clock.system(java.time.ZoneId.of("Asia/Ho_Chi_Minh"));
 
     @Mock
     private MemberPackageRepository memberPackageRepository;
@@ -49,8 +51,9 @@ class MemberPackageServiceTest {
 
     @BeforeEach
     void setUp() {
+        lenient().when(memberPackageRepository.findCenterIdById(anyInt())).thenReturn(Optional.of(1));
         sampleMember = new User();
-        sampleMember.setId(15);
+        sampleMember.setId(15); sampleMember.setCenterId(1);
         sampleMember.setEmail("member15@example.com");
 
         advancedPackage = new MembershipPackage();
@@ -78,7 +81,7 @@ class MemberPackageServiceTest {
 
         InvoiceOrderResponse fakeOrder = new InvoiceOrderResponse(
                 55, "INV-2026-000055", new BigDecimal("3000000"), "VNPay", "Pending",
-                LocalDateTime.now().plusMinutes(5), "http://payment.url");
+                LocalDateTime.now(clock).plusMinutes(5), "http://payment.url");
         when(invoiceService.createPackageOrder(eq(sampleMember), eq(advancedPackage), eq("VNPay"), any(), anyString()))
                 .thenReturn(fakeOrder);
 
@@ -89,6 +92,16 @@ class MemberPackageServiceTest {
         assertEquals("Pending", response.status());
     }
 
+    @Test void reactivationDoesNotReplenishSpentCredits() {
+        var sub = new MemberPackage(); sub.setSubscriptionId(77); sub.setStatus("Expired"); sub.setRemainingCredit(0);
+        sub.setMembershipPackage(advancedPackage); sub.setMember(sampleMember);
+        when(memberPackageRepository.findByIdForUpdate(77)).thenReturn(Optional.of(sub));
+        when(memberPackageRepository.save(sub)).thenReturn(sub);
+        memberPackageService.updateStatus(77,"Active");
+        verify(invoiceService).requirePaidSubscription(77);
+        assertEquals(0,sub.getRemainingCredit());
+    }
+
     @Test
     @DisplayName("expireOutdatedPackages: Wipes remaining credits to 0 and marks status Expired")
     void expireOutdatedPackages_WipesCreditsAndSetsExpired() {
@@ -96,17 +109,19 @@ class MemberPackageServiceTest {
         outdated1.setSubscriptionId(201);
         outdated1.setStatus("Active");
         outdated1.setRemainingCredit(5);
-        outdated1.setEndDate(LocalDate.now().minusDays(1));
+        outdated1.setEndDate(LocalDate.now(clock).minusDays(1));
 
         MemberPackage outdated2 = new MemberPackage();
         outdated2.setSubscriptionId(202);
         outdated2.setStatus("Active");
         outdated2.setRemainingCredit(2);
-        outdated2.setEndDate(LocalDate.now().minusDays(3));
+        outdated2.setEndDate(LocalDate.now(clock).minusDays(3));
 
-        when(memberPackageRepository.findExpiredActivePackages(any(LocalDate.class)))
-                .thenReturn(List.of(outdated1, outdated2));
+        when(memberPackageRepository.findExpiredActivePackageIds(any(LocalDate.class)))
+                .thenReturn(List.of(201, 202));
 
+        when(memberPackageRepository.findByIdForUpdate(201)).thenReturn(Optional.of(outdated1));
+        when(memberPackageRepository.findByIdForUpdate(202)).thenReturn(Optional.of(outdated2));
         int expiredCount = memberPackageService.expireOutdatedPackages();
 
         assertEquals(2, expiredCount);
@@ -117,6 +132,16 @@ class MemberPackageServiceTest {
 
         verify(memberPackageRepository, times(2)).save(any(MemberPackage.class));
         verify(auditService, times(2)).log(isNull(), eq("EXPIRE_MEMBER_PACKAGE"), eq("MEMBER_PACKAGE"), anyInt(), anyString());
+    }
+
+    @Test void expiryWorkerRechecksLockedPackageAfterAConcurrentExtension() {
+        var extended = new MemberPackage(); extended.setSubscriptionId(201); extended.setStatus("Active");
+        extended.setEndDate(LocalDate.now(clock).plusDays(10)); extended.setRemainingCredit(5);
+        when(memberPackageRepository.findExpiredActivePackageIds(any())).thenReturn(List.of(201));
+        when(memberPackageRepository.findByIdForUpdate(201)).thenReturn(Optional.of(extended));
+        assertEquals(0,memberPackageService.expireOutdatedPackages());
+        assertEquals("Active",extended.getStatus()); assertEquals(5,extended.getRemainingCredit());
+        verify(memberPackageRepository,never()).save(any());
     }
 }
 

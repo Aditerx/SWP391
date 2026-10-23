@@ -62,11 +62,11 @@ class TrainingResultServiceTest {
         lenient().when(clock.instant()).thenReturn(Instant.parse("2026-10-16T03:00:00Z"));
         lenient().when(clock.getZone()).thenReturn(ZoneId.of("Asia/Ho_Chi_Minh"));
         sampleCoach = new User();
-        sampleCoach.setId(2);
+        sampleCoach.setId(2); sampleCoach.setCenterId(1);
         sampleCoach.setFullName("Trần Thị Hương");
 
         sampleMember = new User();
-        sampleMember.setId(7);
+        sampleMember.setId(7); sampleMember.setCenterId(1);
         sampleMember.setFullName("Hoàng Thị Oanh");
 
         sampleSession = new Session();

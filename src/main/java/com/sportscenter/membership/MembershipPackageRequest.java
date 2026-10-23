@@ -13,8 +13,8 @@ public record MembershipPackageRequest(
         @NotNull @DecimalMin("0.0") BigDecimal price,
         String benefits,
         String status,
-        String packageType,
-        Integer totalCredit) {
+        @jakarta.validation.constraints.Pattern(regexp = "(?i)Normal|Advanced") String packageType,
+        @Positive Integer totalCredit) {
 
     public MembershipPackageRequest(String name, Integer durationDays, BigDecimal price, String benefits, String status) {
         this(name, durationDays, price, benefits, status, "Normal", 12);

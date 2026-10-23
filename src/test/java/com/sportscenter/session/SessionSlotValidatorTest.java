@@ -176,26 +176,26 @@ class SessionSlotValidatorTest {
     void testIsOutdoor_Subject() {
         Subject tennis = new Subject();
         tennis.setSlug("quan-vot-tennis");
-        tennis.setName("Quần vợt (Tennis)");
+        tennis.setOutdoor(true); tennis.setName("Quần vợt (Tennis)");
 
         Subject boiLoi = new Subject();
-        boiLoi.setSlug("boi-loi");
+        boiLoi.setOutdoor(true); boiLoi.setSlug("boi-loi");
         boiLoi.setName("Bơi lội");
 
         Subject banCung = new Subject();
-        banCung.setSlug("ban-cung");
+        banCung.setOutdoor(true); banCung.setSlug("ban-cung");
         banCung.setName("Bắn cung");
 
         Subject bongDa = new Subject();
-        bongDa.setSlug("bong-da");
+        bongDa.setOutdoor(true); bongDa.setSlug("bong-da");
         bongDa.setName("Bóng đá");
 
         Subject cauLong = new Subject();
-        cauLong.setSlug("cau-long");
+        cauLong.setOutdoor(false); cauLong.setSlug("cau-long");
         cauLong.setName("Cầu lông");
 
         Subject pickleball = new Subject();
-        pickleball.setSlug("pickleball");
+        pickleball.setOutdoor(false); pickleball.setSlug("pickleball");
         pickleball.setName("Pickleball");
 
         SportsClass tennisClass = new SportsClass();

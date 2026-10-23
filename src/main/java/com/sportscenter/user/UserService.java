@@ -30,6 +30,7 @@ import java.util.regex.Pattern;
 @Service
 @RequiredArgsConstructor
 public class UserService {
+    private final java.time.Clock clock;
     private static final Pattern PASSWORD_POLICY = Pattern.compile("^(?=.*[A-Za-z])(?=.*\\d).{8,}$");
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
@@ -317,7 +318,7 @@ public class UserService {
             if (!memberRepository.existsById(user.getId())) {
                 Member member = new Member();
                 member.setUser(user);
-                member.setJoinDate(LocalDate.now());
+                member.setJoinDate(LocalDate.now(clock));
                 memberRepository.save(member);
             }
         }

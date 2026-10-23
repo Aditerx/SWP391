@@ -1,0 +1,13 @@
+Bộ Tài Khoản Demo (Mật khẩu: Scms@2026)
+
+Quản lý: manager@scms.com
+Lễ tân: receptionist@scms.com (và thu.reception@scms.com)
+HLV đại diện: coach@scms.com (Nguyễn Văn Hùng)
+HLV 9 môn: coach.football@scms.com, coach.tennis@scms.com, coach.swimming@scms.com, coach.archery@scms.com, coach.badminton@scms.com, coach.tabletennis@scms.com, coach.basketball@scms.com, coach.volleyball@scms.com, coach.pickleball@scms.com (kèm tài khoản số 2 dự phòng cho mỗi môn: coach.<môn>2@scms.com).
+
+Hội viên:
+member@scms.com: Có sẵn 12 Credit / 45 ngày (demo ngay đặt lịch 1:1).
+member.normal@scms.com: Đã vào lớp Cầu lông 12 buổi cố định (demo chặn nút hủy).
+member.new@scms.com: Tài khoản mới, có hóa đơn giữ chỗ 5 phút (demo thanh toán VNPay).
+member.expired@scms.com: Gói đã hết hạn (demo thông báo & gia hạn).
+Admin: admin@scms.com

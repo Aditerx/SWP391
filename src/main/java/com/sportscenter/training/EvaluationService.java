@@ -18,6 +18,7 @@ import java.util.List;
 @Service
 @RequiredArgsConstructor
 public class EvaluationService {
+    private final java.time.Clock clock;
     private final EvaluationRepository evaluationRepository;
     private final UserRepository userRepository;
     private final AuditService auditService;
@@ -88,7 +89,7 @@ public class EvaluationService {
         Evaluation ev = new Evaluation();
         ev.setMember(member);
         ev.setCoach(coach);
-        ev.setEvaluationDate(request.evaluationDate() != null ? request.evaluationDate() : LocalDate.now());
+        ev.setEvaluationDate(request.evaluationDate() != null ? request.evaluationDate() : LocalDate.now(clock));
         ev.setComment(request.comment());
         ev.setProgressScore(request.progressScore());
 

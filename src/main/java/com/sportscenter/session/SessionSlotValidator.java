@@ -11,10 +11,10 @@ import java.time.LocalTime;
 public class SessionSlotValidator {
 
     public static final String OUTDOOR_HEAT_RESTRICTION_MSG =
-            "Chính sách chống sốc nhiệt/nắng gắt: %s (%s - %s) bị khóa đối với sân tập hoặc môn học ngoài trời (Outdoor).";
+            "OUTDOOR_HEAT_BLOCK: Chính sách chống sốc nhiệt/nắng gắt: %s (%s - %s) bị khóa đối với sân tập hoặc môn học ngoài trời (Outdoor).";
 
     public static final String INVALID_SLOT_MSG =
-            "Khung giờ học (%s - %s) không hợp lệ. SCMS chỉ vận hành theo 7 ca học chuẩn 90 phút/ca: " +
+            "INVALID_TIME_SLOT: Khung giờ học (%s - %s) không hợp lệ. SCMS chỉ vận hành theo 7 ca học chuẩn 90 phút/ca: " +
                     "Ca 1 (06:00-07:30), Ca 2 (07:45-09:15), Ca 3 (09:30-11:00), " +
                     "Ca 4 (13:00-14:30), Ca 5 (14:45-16:15), Ca 6 (16:30-18:00), Ca 7 (18:15-19:45).";
 
@@ -55,6 +55,9 @@ public class SessionSlotValidator {
      * Kiểm tra xem sân bãi hoặc bộ môn của lớp có thuộc loại ngoài trời (Outdoor) hay không.
      */
     public boolean isOutdoor(SportsClass sportsClass, Room room) {
+        if (sportsClass != null && sportsClass.getSubject() != null && sportsClass.getSubject().getOutdoor() == null) {
+            throw new BusinessException("SUBJECT_FACILITY_REQUIRED: Configure the subject indoor/outdoor policy before scheduling");
+        }
         if (room != null && room.isOutdoor()) {
             return true;
         }

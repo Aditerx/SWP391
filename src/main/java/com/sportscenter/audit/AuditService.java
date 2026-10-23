@@ -8,6 +8,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 public class AuditService {
+    private final java.time.Clock clock;
     private final SystemLogRepository repository;
 
     @Transactional(propagation = Propagation.MANDATORY)
@@ -18,6 +19,7 @@ public class AuditService {
         log.setTargetEntity(targetEntity);
         log.setTargetId(targetId);
         log.setDetail(detail);
+        log.setCreatedAt(java.time.LocalDateTime.now(clock));
         repository.save(log);
     }
 }

@@ -11,6 +11,10 @@ import java.util.List;
 import java.util.Optional;
 
 public interface MemberPackageRepository extends JpaRepository<MemberPackage, Integer> {
+    @Query("select mp.member.centerId from MemberPackage mp where mp.subscriptionId = :id")
+    Optional<Integer> findCenterIdById(@Param("id") Integer id);
+    @Query("select mp.subscriptionId from MemberPackage mp where mp.status = 'Active' and mp.endDate < :today")
+    List<Integer> findExpiredActivePackageIds(@Param("today") LocalDate today);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT mp FROM MemberPackage mp WHERE mp.subscriptionId = :id")

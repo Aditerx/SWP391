@@ -19,6 +19,7 @@ import java.util.List;
 @Service
 @RequiredArgsConstructor
 public class TrainingPlanService {
+    private final java.time.Clock clock;
     private final TrainingPlanRepository trainingPlanRepository;
     private final UserRepository userRepository;
     private final SportsClassRepository sportsClassRepository;
@@ -111,7 +112,7 @@ public class TrainingPlanService {
         plan.setGoal(request.goal());
         plan.setStartDate(request.startDate());
         plan.setEndDate(request.endDate());
-        plan.setCreatedAt(LocalDateTime.now());
+        plan.setCreatedAt(LocalDateTime.now(clock));
 
         TrainingPlan saved = trainingPlanRepository.save(plan);
 

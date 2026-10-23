@@ -26,6 +26,7 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class ReportService {
+    private final java.time.Clock clock;
     private final UserRepository userRepository;
     private final MemberRepository memberRepository;
     private final SportsClassRepository sportsClassRepository;
@@ -49,10 +50,10 @@ public class ReportService {
 
         List<MemberPackage> allSubs = memberPackageRepository.findAll();
         long activeSubscriptions = allSubs.stream()
-                .filter(s -> "Active".equalsIgnoreCase(s.getStatus()) && (s.getEndDate() == null || !s.getEndDate().isBefore(LocalDate.now())))
+                .filter(s -> "Active".equalsIgnoreCase(s.getStatus()) && (s.getEndDate() == null || !s.getEndDate().isBefore(LocalDate.now(clock))))
                 .count();
 
-        long todaySessions = sessionRepository.findBySessionDateBetween(LocalDate.now(), LocalDate.now()).size();
+        long todaySessions = sessionRepository.findBySessionDateBetween(LocalDate.now(clock), LocalDate.now(clock)).size();
 
         return new DashboardResponse(
                 userRepository.count(),
@@ -125,11 +126,6 @@ public class ReportService {
             timeline.add(new RevenueReportResponse.RevenueTimelineItem(period, sum, list.size()));
         });
 
-        // If timeline is empty, fill default monthly view
-        if (timeline.isEmpty()) {
-            timeline.add(new RevenueReportResponse.RevenueTimelineItem("2026-09", totalRevenue, totalCount));
-        }
-
         return new RevenueReportResponse(
                 totalRevenue,
                 totalCount,
@@ -147,7 +143,7 @@ public class ReportService {
 
         List<MemberPackage> allSubs = memberPackageRepository.findAll();
         Set<Integer> activeMemberIds = allSubs.stream()
-                .filter(s -> "Active".equalsIgnoreCase(s.getStatus()) && (s.getEndDate() == null || !s.getEndDate().isBefore(LocalDate.now())))
+                .filter(s -> "Active".equalsIgnoreCase(s.getStatus()) && (s.getEndDate() == null || !s.getEndDate().isBefore(LocalDate.now(clock))))
                 .map(s -> s.getMember() != null ? s.getMember().getId() : null)
                 .filter(Objects::nonNull)
                 .collect(Collectors.toSet());
