@@ -10,6 +10,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -44,6 +45,7 @@ public class AuthController {
     private final SessionRegistry sessionRegistry;
     private final PasswordResetService passwordResetService;
     private final RegistrationService registrationService;
+    private final PasswordEncoder passwordEncoder;
 
     @PostMapping("/login")
     public ResponseEntity<LoginResponse> login(@Valid @RequestBody LoginRequest request,
@@ -59,6 +61,11 @@ public class AuthController {
             authentication = authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(email, request.password()));
         } catch (AuthenticationException exception) {
+            User pending = userRepository.findByEmailIgnoreCase(email).orElse(null);
+            if (pending != null && "Pending".equalsIgnoreCase(pending.getStatus())
+                    && passwordEncoder.matches(request.password(), pending.getPasswordHash())) {
+                throw new com.sportscenter.common.exception.BusinessException("REGISTRATION_PENDING: Tài khoản đang chờ xác thực email.");
+            }
             loginAttemptService.recordFailure(email);
             throw new BadCredentialsException("Login failed or account is temporarily locked");
         }

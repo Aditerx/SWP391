@@ -16,3 +16,9 @@ services:
         sync: false
       - key: DB_PASSWORD
         sync: false
+      - key: MAIL_USERNAME
+        sync: false
+      - key: MAIL_APP_PASSWORD
+        sync: false
+      - key: REGISTRATION_DEMO_OTP
+        sync: false

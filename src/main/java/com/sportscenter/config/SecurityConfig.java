@@ -44,10 +44,6 @@ public class SecurityConfig {
         return email -> {
             User user = repository.findForAuthentication(email)
                     .orElseThrow(() -> new UsernameNotFoundException("User not found"));
-            if (!"Active".equalsIgnoreCase(user.getStatus())) {
-                throw new UsernameNotFoundException("User is not active");
-            }
-
             List<GrantedAuthority> authorities = new ArrayList<>();
             if (user.getRole() != null) {
                 String roleName = user.getRole().getName();
@@ -64,6 +60,7 @@ public class SecurityConfig {
                     .withUsername(user.getEmail())
                     .password(user.getPasswordHash())
                     .authorities(authorities)
+                    .disabled(!"Active".equalsIgnoreCase(user.getStatus()))
                     .build();
         };
     }

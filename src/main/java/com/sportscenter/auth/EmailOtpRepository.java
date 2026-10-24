@@ -12,6 +12,8 @@ import java.util.Optional;
 public interface EmailOtpRepository extends JpaRepository<EmailOtp, Integer> {
     long countByEmailIgnoreCaseAndPurposeAndCreatedAtAfter(String email, String purpose, LocalDateTime since);
 
+    Optional<EmailOtp> findFirstByEmailIgnoreCaseAndPurposeOrderByCreatedAtDesc(String email, String purpose);
+
     Optional<EmailOtp> findFirstByEmailIgnoreCaseAndPurposeAndUsedFalseOrderByCreatedAtDesc(String email, String purpose);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)

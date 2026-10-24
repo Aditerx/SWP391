@@ -35,10 +35,13 @@ Khi tạo mới một **Web Service** trên Render Dashboard, cấu hình các b
 | `VNPAY_RETURN_URL` | `https://<ten-backend-domain>/api/payments/vnpay/return` | Có |
 | `FRONTEND_PAYMENT_RESULT_URL` | `https://<ten-fe-domain>/payment-result` | Có |
 | `FRONTEND_URL` | `https://<ten-fe-domain>` (Dùng để cấp phép CORS) | Có |
-| `SPRING_MAIL_HOST` | `smtp.gmail.com` *(Cấu hình sau deploy khi làm thông báo)* | Tùy chọn |
-| `SPRING_MAIL_PORT` | `587` | Tùy chọn |
-| `SPRING_MAIL_USERNAME` | `<gmail-cua-trung-tam>` | Tùy chọn |
-| `SPRING_MAIL_PASSWORD` | `<gmail-app-password>` | Tùy chọn |
+| `MAIL_USERNAME` | `<gmail-cua-trung-tam>` | Bắt buộc để gửi OTP |
+| `MAIL_APP_PASSWORD` | `<gmail-app-password-16-ky-tu>` | Bắt buộc để gửi OTP |
+| `REGISTRATION_DEMO_OTP` | Để trống; chỉ đặt mã cố định trong môi trường demo | Tùy chọn |
+
+`application.properties` đọc đúng hai biến Gmail `MAIL_USERNAME` và `MAIL_APP_PASSWORD`; các tên cũ `SPRING_MAIL_USERNAME` và `SPRING_MAIL_PASSWORD` không được đọc và không nên cấu hình. Host mặc định `smtp.gmail.com`, cổng `587`; SMTP có timeout 8 giây. Profile `demo` vẫn hoạt động và cũng chỉ bật OTP cố định khi đặt tường minh `REGISTRATION_DEMO_OTP`. Chế độ demo chỉ dùng cho đăng ký, không dùng cho quên/đặt lại mật khẩu.
+
+Tạo Gmail App Password: bật xác minh 2 bước cho tài khoản Gmail, sau đó tạo App Password 16 ký tự. Không dùng mật khẩu Gmail thông thường. Trên Render, đặt `MAIL_USERNAME` và `MAIL_APP_PASSWORD` trong Environment; không ghi bí mật vào repo. Sau deploy, kiểm tra đăng ký bằng địa chỉ email kiểm thử và xác nhận nhận email OTP. Lỗi gửi mail được ghi log không kèm OTP hay thông tin xác thực; người dùng có thể yêu cầu gửi lại.
 
 ---
 

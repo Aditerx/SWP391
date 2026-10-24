@@ -35,6 +35,15 @@
   * Body: `{ "email": "a@example.com", "otp": "123456", "newPassword": "NewPassword123" }`
 * **Đăng xuất:** `POST /api/auth/logout`
 
+#### Quy tắc đăng ký OTP
+
+- Đăng ký mới trả `200` với `{ "message": "..." }`. Tài khoản Pending đăng ký lại chỉ phát OTP mới, giữ nguyên thông tin hiện có và trả `{ "message": "Tài khoản đang chờ xác thực; mã OTP mới đã được gửi.", "code": "REGISTRATION_PENDING" }`.
+- Email Active bị từ chối với `400 { "code": "EMAIL_ALREADY_REGISTERED", "message": "..." }`.
+- Đăng nhập Pending: mật khẩu đúng trả `400` với `REGISTRATION_PENDING`; mật khẩu sai vẫn trả `401 Invalid email or password`.
+- OTP có hiệu lực 10 phút, tối đa 5 lần nhập sai, dùng một lần. Hết lượt phải yêu cầu OTP mới. Demo OTP chỉ bật bằng `REGISTRATION_DEMO_OTP`; chỉ áp dụng đăng ký.
+- Gửi lại OTP tối đa 3 OTP trong một giờ và cách lần phát trước tối thiểu 60 giây. Lỗi `OTP_RESEND_LIMIT` hoặc `OTP_RESEND_TOO_SOON`; lỗi chờ gồm số giây còn lại trong `message` (ví dụ `OTP_RESEND_TOO_SOON: 42`). FE nên đếm ngược 60 giây trước khi bật nút gửi lại.
+- Các lỗi xác thực OTP: `OTP_INVALID`, `OTP_EXPIRED`, `OTP_ATTEMPTS_EXCEEDED`. `forgot-password` luôn trả phản hồi chung dù email có tồn tại hay không.
+
 ---
 
 ## 2. BẢNG GIÁ CHUẨN 9 BỘ MÔN THỂ THAO & HAI DÒNG SẢN PHẨM (ĐỐI CHIẾU MEMBER.PDF)

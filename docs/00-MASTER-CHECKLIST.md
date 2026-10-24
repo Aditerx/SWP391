@@ -108,6 +108,12 @@ Tài liệu này là chốt chặn quản lý tiến độ tổng thể và lị
 
 ## 📜 PHẦN II: LỊCH SỬ HOÀN THÀNH (HISTORY)
 
+### [23/10/2026] — Hoàn thiện đăng ký OTP qua Gmail (backend)
+- Đã hoàn thiện luồng OTP đăng ký: Pending, giới hạn resend/attempt, demo OTP bật tường minh, mail AFTER_COMMIT và lỗi xác thực phân biệt.
+- Đã đồng bộ cấu hình Gmail và tài liệu deploy/API; schema hiện đủ cột nên không tạo migration 06.
+- Baseline trước sửa: 193 tests run (178 passed, 15 skipped, 0 failed). Sau sửa: 198 tests run (183 passed, 15 skipped, 0 failed).
+- Việc chờ xác nhận thủ công: Gmail App Password, biến môi trường Render và gửi thử email thật.
+
 ### [Đợt 22/10/2026] — Giai đoạn 8: Thông Báo Trong Ứng Dụng
 * **Trạng thái:** Code và kiểm thử Backend hoàn tất; cần xác nhận migration trên PostgreSQL mới và có dữ liệu cũ.
 * **Thay đổi:** Mở rộng schema notification tương thích ngược, API cá nhân, 13 loại event, job nhắc lịch và gói sắp hết hạn; FE không thay đổi.
