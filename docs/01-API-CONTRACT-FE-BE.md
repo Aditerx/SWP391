@@ -1060,3 +1060,5 @@ Phase 1 bàn giao catalog/đăng ký theo môn-Coach, time policy, mua/thanh to�
 Demo qua API/PG local thực và FE hiện hành khi có; callback local có chữ ký vẫn ghi LOCAL INTEGRATION, không gọi VNPay live. Chuẩn nghiệm thu/bằng chứng tại 04 mục 40.6 và docs 02 mục 9.9, chưa có kết quả mới trong lượt plan.
 
 Rà bàn giao 27/10: 04 mục 40.8–40.9 có checklist D01/D09 chi tiết cho đồng đội, phạm vi file/điều cấm/test/acceptance; BE chính cập nhật contract thật sau merge. Baseline hiện có đã clean test/PG riêng đạt theo docs 02 mục 9.10 và artifact review, chưa phải D01/D09 đã code hoặc API mục tiêu khả dụng. .env DB test mới không chia sẻ qua Git; kiểm kết nối không tương đương nghiệm thu schema/flow.
+
+Baseline đã push tai `9097197`; lần kiểm Supabase .env sau push chưa kết nối được (pooler tenant/user not found, direct JDBC UnknownHostException). Chưa có schema/API hoặc FE integration verified trên DB mới; kết quả/điều kiện thử lại ở docs 02 mục 9.11. Không dùng baseline local xanh để hứa môi trường mới đã chạy đúng.

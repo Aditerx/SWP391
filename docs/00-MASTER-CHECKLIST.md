@@ -14,7 +14,8 @@ Tài liệu này là chốt chặn quản lý tiến độ tổng thể và lị
 **Lưu ý:** Các dấu hoàn thành của các đợt trước là lịch sử triển khai, không phải xác nhận hệ thống đã đạt toàn bộ yêu cầu. Kết quả test xanh hiện tại chưa chứng minh tuân thủ hai PDF.
 
 ### Checklist tích hợp còn lại
-- [ ] Chuẩn bị mốc bàn giao/ownership theo [04-DEBUG-NOTE.md mục 40](04-DEBUG-NOTE.md): giữ dirty tree/old-docs, baseline có quyết định hiện tại, mỗi người checkout riêng, migration/central docs một chủ. Chưa commit/branch/code/deploy trong lượt plan.
+- [x] Rà/push mốc bàn giao tai `9097197`, AGENTS/checklist/ownership theo [04-DEBUG-NOTE.md mục 40](04-DEBUG-NOTE.md). Baseline clean test 223/204 pass/19 skip/0 lỗi, PG riêng 14 pass; chứng cứ docs 02 mục 9.10. Đây chưa phải triển khai feature mới/deploy.
+- [ ] Kết nối DB test Supabase mới: đã thử .env sau push, pooler tenant/user not found; direct JDBC UnknownHostException. Chờ cấu hình Session pooler đúng project; không SQL/migration/seed. Chi tiết docs 02 mục 9.11, chưa xác nhận schema hoặc FE/API trên môi trường mới.
 - [ ] Gói đồng đội T ~15%: D01 hồ sơ Member + D09 Coach directory, contract/tests/evidence thật, hai commit chức năng; merge sớm/chạy lại kiểm trên nhánh tích hợp. Phạm vi/prompt ở 40.3/40.7; chưa thực hiện.
 - [ ] Phase 1 ~40%: catalog/giá → đăng ký môn/Coach/năng lực → hạn skip → mua/Cash/VNPay/ghi nhận quyền; gộp T và demo API/PG thật. Cổng P1 ở 40.4/40.6; chưa code/test, chưa coi P1 là release đầy đủ.
 - [ ] Phase 2 ~45%, sau P1: booking/dời/hủy/báo vắng → sự cố/Holiday/expiry → attendance/QR/bù báo muộn → hoàn/sửa Cash → report/quyền/FE E2E. Thứ tự và nghiệm thu ở 40.5/40.6; không dùng test/probe lịch sử làm bằng chứng mới.
@@ -28,6 +29,12 @@ Tài liệu này là chốt chặn quản lý tiến độ tổng thể và lị
 ---
 
 ## 📜 PHẦN II: LỊCH SỬ HOÀN THÀNH (HISTORY)
+
+### [27/10/2026] Đã push baseline, kiểm Supabase sau push chưa thành công
+
+- Origin/tai đã nhận `9097197` (F-06/F-07 d210f50, archive/source c7ad9f6, docs/checklist/evidence 9097197), remote SHA khớp local. .env không track; các file Owner chuyển archive giữ nguyên nội dung. Không triển khai core mới/Render.
+- Đã thử JDBC không Spring/jobs trên .env mới: pooler XX000 tenant/user not found; direct theo ảnh 08001/UnknownHostException, Windows DNS có AAAA. Không SQL hoặc thay .env/DB; chưa chứng nhận TLS/schema/flow thành công. Đã hỏi Owner đúng Session pooler để cập nhật host/username, không yêu cầu password.
+- Ghi thất bại/pending và checker/JSON đã bỏ secret trong artifacts/review-2026-10-27 và docs 02 mục 9.11. Cập nhật kết quả này bằng commit tài liệu tiếp theo; kết quả local tests vẫn giữ đúng phạm vi, không fake pass DB mới.
 
 ### [27/10/2026] Rà checklist đồng đội, code hiện có và chạy kiểm thật trước push
 

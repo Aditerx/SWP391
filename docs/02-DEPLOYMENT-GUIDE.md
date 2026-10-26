@@ -342,3 +342,15 @@ Owner yêu cầu review hướng dẫn/code, commit/push tai rồi kiểm kết 
 - Schema gốc và bản database/ đồng nhất. File tài liệu Owner đã chuyển old-docs khớp hash nội dung (khác newline được chuẩn hóa), không phục hồi/đọc lại lịch sử nghiệp vụ. .env gitignored/untracked, scan candidate không phát hiện password .env hiện tại/private key/token thuộc các mẫu đã kiểm.
 
 Bằng chứng: [verification.json](../artifacts/review-2026-10-27/verification.json) và [test-summary.txt](../artifacts/review-2026-10-27/test-summary.txt), có command/hash/giới hạn. Đây là local JPA/MockMvc/PG, không phải FE browser/HTTP Render/VNPay live và chưa chứng nhận tính năng mới. Kiểm kết nối DB Supabase mới sẽ ghi tiếp sau push theo yêu cầu Owner, không boot Spring/job hoặc chạy migration.
+
+### 9.11. Push tai và thử Supabase sau push — 27/10/2026
+
+Baseline đã push tới origin/tai `9097197` và đối chiếu remote SHA khớp local. Bao gồm commit F-06/F-07 `d210f50`, archive/source handoff `c7ad9f6`, quyết định/phân công/checklist/bằng chứng `9097197`. Đây là commit repo, không xác nhận Render đã deploy bản này. .env ignored/không track, không push password. Bản cập nhật kết quả kết nối sẽ là commit tài liệu tiếp theo, lấy SHA cuối từ Git khi bàn giao.
+
+**Kết nối cấu hình .env chưa thành công:** JDBC 42.7.4 tới pooler `aws-0-ap-southeast-2.pooler.supabase.com:5432` trả SQLState XX000, `FATAL: (ENOTFOUND) tenant/user [REDACTED] not found`. Project ref trong username khớp ảnh, nhưng điều này chưa chứng minh host pooler đúng cho project. [Supabase hướng dẫn kết nối](https://supabase.com/docs/guides/database/connecting-to-postgres) nêu lỗi tenant/user not found khi pooler không ánh xạ được cặp host và username; chưa kết luận password sai và không tự đoán host/region khác.
+
+Đã thử direct hostname trong ảnh với user postgres, dùng password .env ở bộ nhớ và giữ nguyên file. JDBC trả 08001/UnknownHostException, kể cả khi chỉ định preferIPv6; Windows DNS trả được AAAA. Chưa đủ chứng cứ kết luận cụ thể cấu hình IPv6/network nào gây lỗi, chưa chứng minh kết nối trực tiếp hoạt động. Không có SQL nào được thực thi, chưa kiểm schema/TLS/read-only transaction thành công, không boot Spring/job/migration/seed.
+
+Cần Owner lấy đúng **Connect → Session pooler** của project mới, cập nhật DB_URL/DB_USERNAME trong .env rồi thử lại; không gửi password vào chat hoặc Git. Dùng nguyên host/index/region/port của panel, không ghép username project mới với pooler cũ theo suy đoán. Ảnh hiện có là direct connection nên chưa đủ xác nhận pooler hostname. Phạm vi lần thử tiếp vẫn chỉ SELECT/metadata/rollback.
+
+Bằng chứng đã bỏ secret: [configured pooler](../artifacts/review-2026-10-27/supabase-connection.json), [direct](../artifacts/review-2026-10-27/supabase-direct-diagnostic.json), [direct với JVM IPv6 flags](../artifacts/review-2026-10-27/supabase-direct-ipv6-diagnostic.json) và [checker JDBC](../artifacts/review-2026-10-27/CheckDb.java). Checker đọc .env tại runtime, không nhận password ở command line và redacts credentials trong lỗi; không thuộc source ứng dụng/không chạy job. Verification manifest ghi trạng thái fail/pending chính xác, không sửa thành pass để hoàn tất bàn giao.

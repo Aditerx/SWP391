@@ -1867,3 +1867,9 @@ Chỉ đánh dấu hoàn thành sau khi có đủ: code đúng D01/D09, không v
 Owner đã yêu cầu rà lời dặn/code/nội dung, commit và push branch tai, sau push thử kết nối cấu hình .env mới. Đây là ủy quyền commit/push baseline hiện có và kiểm kết nối chỉ đọc, chưa là lệnh triển khai D01/D09/Phase 1/2, chạy migration hoặc seed DB mới. .env được gitignore, không track/commit password. Ảnh là Supabase direct connection; .env hiện dùng session pooler port 5432 có project ref khớp ảnh, không coi khác hostname là khác project hoặc tự đổi .env.
 
 Kiểm kết nối bằng driver trực tiếp, không boot Spring/jobs: TLS, transaction read-only, SELECT đơn giản/metadata schema rồi rollback; không chạy DB prepare hoặc opt-in test live như phép ping. Kết quả và SHA push thực ghi ở docs 02 khi đã chạy. Test hiện tại là kiểm baseline, không chứng nhận feature mới đã code. Giữ thay đổi/old-docs đã có, không đọc lại tài liệu lịch sử để tái phân tích nghiệp vụ; kiểm move bằng hash. Ghi kết quả kiểm thật trước bàn giao, không giữ chữ “chưa test” như trạng thái hiện tại sau khi đã chạy.
+
+### 40.11. Kết quả bàn giao baseline và kết nối cần bổ sung cấu hình
+
+Đã bổ sung AGENTS checkpoint/checklist 40.8–40.9, review code F-06/F-07 sẵn có và chạy clean test 223/204 pass/19 skip/0 lỗi; PG riêng 14 tests ứng dụng pass cùng các guard migration/data snapshots. Không triển khai D01/D09/Phase 1/2 chỉ từ việc review. Đã push tai `9097197`, remote khớp, .env không track; code DB/archives/docs tách ba commit.
+
+Sau push đã thử đúng .env: pooler trả tenant/user not found (XX000); direct từ ảnh trả UnknownHostException qua JDBC dù Windows DNS có AAAA. Chưa kết nối/SQL/schema thành công, không đổi .env/DB. Đã hỏi Owner cập nhật đúng Session pooler host/username từ panel, không yêu cầu password; không đoán region hoặc tự sửa config. Kết quả/JSON/chứng cứ docs 02 mục 9.11 và artifacts/review-2026-10-27. Lượt ghi kết quả/push tài liệu sau baseline không làm test cũ trở thành test rule mới.

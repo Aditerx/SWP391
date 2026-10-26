@@ -68,5 +68,48 @@
     "live VNPay IPN",
     "SQL Server migration execution"
   ],
-  "supabase_connection": "To be checked read-only after push, per user request"
+  "supabase_connection": {
+    "tested_after_push": "90971974c6b75a7a798f179f286e73a3ae15b2af",
+    "configured_env": {
+      "success": false,
+      "host": "aws-0-ap-southeast-2.pooler.supabase.com",
+      "sql_state": "XX000",
+      "message": "FATAL: (ENOTFOUND) tenant/user [REDACTED] not found",
+      "error_types": [
+        "PSQLException"
+      ],
+      "elapsed_ms": 2201
+    },
+    "direct_diagnostic": {
+      "success": false,
+      "host": "db.zomadlfjncetjtgrcold.supabase.co",
+      "sql_state": "08001",
+      "message": "The connection attempt failed.",
+      "error_types": [
+        "PSQLException",
+        "UnknownHostException"
+      ],
+      "elapsed_ms": 3440
+    },
+    "direct_ipv6_flags_diagnostic": {
+      "success": false,
+      "host": "db.zomadlfjncetjtgrcold.supabase.co",
+      "sql_state": "08001",
+      "message": "The connection attempt failed.",
+      "error_types": [
+        "PSQLException",
+        "UnknownHostException"
+      ],
+      "elapsed_ms": 464
+    },
+    "windows_dns": "Direct hostname has AAAA response; JDBC still reports UnknownHostException",
+    "sql_executed": false,
+    "env_modified_by_agent": false,
+    "spring_or_jobs_started": false,
+    "schema_verified": false,
+    "status": "Blocked on matching Session pooler connection settings; user asked to update DB_URL/DB_USERNAME without sharing password",
+    "checker_source": "CheckDb.java",
+    "driver": "PostgreSQL JDBC 42.7.4",
+    "planned_sql": "SHOW transaction_read_only; SELECT 1 and database/schema/TLS metadata; rollback (not reached)"
+  }
 }
