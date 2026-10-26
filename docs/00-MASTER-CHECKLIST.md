@@ -15,7 +15,8 @@ Tài liệu này là chốt chặn quản lý tiến độ tổng thể và lị
 
 ### Checklist tích hợp còn lại
 - [x] Rà/push mốc bàn giao tai `9097197`, AGENTS/checklist/ownership theo [04-DEBUG-NOTE.md mục 40](04-DEBUG-NOTE.md). Baseline clean test 223/204 pass/19 skip/0 lỗi, PG riêng 14 pass; chứng cứ docs 02 mục 9.10. Đây chưa phải triển khai feature mới/deploy.
-- [ ] Kết nối DB test Supabase mới: đã thử .env sau push, pooler tenant/user not found; direct JDBC UnknownHostException. Chờ cấu hình Session pooler đúng project; không SQL/migration/seed. Chi tiết docs 02 mục 9.11, chưa xác nhận schema hoặc FE/API trên môi trường mới.
+- [x] Kết nối DB test Supabase mới: Owner chọn DB_PASSWORD hiện tại; đã chuẩn hóa DB_URL không nhúng credential, JDBC sslmode=require, SELECT trong transaction chỉ đọc và rollback thành công. Bằng chứng docs 02 mục 9.13; .env ignored/không commit.
+- [ ] DB Supabase mới chưa có schema SCMS: kiểm metadata thấy 0 bảng public, chưa có sessions.subscription_id. Chưa chạy migration/seed hoặc kiểm API/FE trên DB này; khởi tạo DB cần phạm vi triển khai riêng.
 - [ ] Gói đồng đội T ~15%: D01 hồ sơ Member + D09 Coach directory, contract/tests/evidence thật, hai commit chức năng; merge sớm/chạy lại kiểm trên nhánh tích hợp. Phạm vi/prompt ở 40.3/40.7; chưa thực hiện.
 - [ ] Phase 1 ~40%: catalog/giá → đăng ký môn/Coach/năng lực → hạn skip → mua/Cash/VNPay/ghi nhận quyền; gộp T và demo API/PG thật. Cổng P1 ở 40.4/40.6; chưa code/test, chưa coi P1 là release đầy đủ.
 - [ ] Phase 2 ~45%, sau P1: booking/dời/hủy/báo vắng → sự cố/Holiday/expiry → attendance/QR/bù báo muộn → hoàn/sửa Cash → report/quyền/FE E2E. Thứ tự và nghiệm thu ở 40.5/40.6; không dùng test/probe lịch sử làm bằng chứng mới.
@@ -29,6 +30,12 @@ Tài liệu này là chốt chặn quản lý tiến độ tổng thể và lị
 ---
 
 ## 📜 PHẦN II: LỊCH SỬ HOÀN THÀNH (HISTORY)
+
+### [27/10/2026] Kết nối Supabase mới thành công sau chuẩn hóa JDBC
+
+- Owner chọn dùng DB_PASSWORD hiện tại. Chỉ chuẩn hóa DB_URL thành JDBC tới Session pooler, bỏ credential nhúng; giữ nguyên DB_USERNAME/DB_PASSWORD, .env ignored/không track.
+- Driver JDBC 42.7.4 kết nối thành công, sslmode=require, SELECT 1=1, PostgreSQL 17.11, transaction_read_only=on và rollback hoàn tất. Public có 0 bảng; đây là kiểm kết nối/metadata, chưa phải schema SCMS hoặc nghiệm thu API/FE.
+- Không boot Spring/jobs, migration/seed hoặc ghi dữ liệu nghiệp vụ. Giữ các lỗi thử trước làm lịch sử, kết quả hiện tại tại docs 02 mục 9.13 và artifacts/review-2026-10-27/supabase-connection-normalized.json. Baseline tests vẫn đúng phạm vi cũ, không thành bằng chứng feature mới.
 
 ### [27/10/2026] Đã push baseline, kiểm Supabase sau push chưa thành công
 

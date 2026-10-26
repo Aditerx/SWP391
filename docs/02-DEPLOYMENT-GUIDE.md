@@ -354,3 +354,31 @@ Baseline đã push tới origin/tai `9097197` và đối chiếu remote SHA kh�
 Cần Owner lấy đúng **Connect → Session pooler** của project mới, cập nhật DB_URL/DB_USERNAME trong .env rồi thử lại; không gửi password vào chat hoặc Git. Dùng nguyên host/index/region/port của panel, không ghép username project mới với pooler cũ theo suy đoán. Ảnh hiện có là direct connection nên chưa đủ xác nhận pooler hostname. Phạm vi lần thử tiếp vẫn chỉ SELECT/metadata/rollback.
 
 Bằng chứng đã bỏ secret: [configured pooler](../artifacts/review-2026-10-27/supabase-connection.json), [direct](../artifacts/review-2026-10-27/supabase-direct-diagnostic.json), [direct với JVM IPv6 flags](../artifacts/review-2026-10-27/supabase-direct-ipv6-diagnostic.json) và [checker JDBC](../artifacts/review-2026-10-27/CheckDb.java). Checker đọc .env tại runtime, không nhận password ở command line và redacts credentials trong lỗi; không thuộc source ứng dụng/không chạy job. Verification manifest ghi trạng thái fail/pending chính xác, không sửa thành pass để hoàn tất bàn giao.
+
+### 9.12. Lịch sử thử lại sau khi Owner cập nhật .env — xung đột nguồn mật khẩu
+
+Owner báo đã cập nhật Session pooler. Host hiện là `aws-0-ap-northeast-2.pooler.supabase.com:5432`, Windows DNS mặc định/1.1.1.1 và Python đều phân giải được IPv4. JDBC ban đầu báo UnknownHostException; đọc nguyên nhân đã redacted xác định driver đang nhận cả userinfo làm hostname vì DB_URL có dạng URI chứa username/password. Không kết luận host mới lỗi DNS.
+
+Preflight phát hiện username trong URL khớp DB_USERNAME, nhưng password trong URL khác DB_PASSWORD (chỉ so sánh trong bộ nhớ, không ghi giá trị). Đã dừng trước sửa cấu hình/chọn nguồn, hỏi Owner dùng DB_PASSWORD hay password trong DB_URL hoặc tự đồng bộ. Chưa thay .env, chưa kết nối/schema thành công, chưa SQL/migration/job.
+
+Format Spring/JDBC cần dùng với các property riêng theo source và [pgJDBC](https://jdbc.postgresql.org/documentation/use/):
+
+```properties
+DB_URL=jdbc:postgresql://<session-pooler-host>:5432/postgres?sslmode=require
+DB_USERNAME=postgres.<project-ref>
+DB_PASSWORD=<password-confirmed-by-owner>
+```
+
+Checker đã thêm preflight từ chối URL nhúng userinfo và báo conflict bằng boolean, tránh báo lỗi DNS gây nhầm hoặc in credential vào stack. Kết quả ở [config check](../artifacts/review-2026-10-27/supabase-connection-config-check.json) và [JDBC retry](../artifacts/review-2026-10-27/supabase-connection-retry.json). Các kết quả 9.11 là lịch sử cấu hình trước; không dùng làm kết luận tình trạng host mới.
+
+### 9.13. Kết nối thành công theo nguồn Owner chọn — 27/10/2026
+
+Owner xác nhận **dùng DB_PASSWORD hiện tại**. Đã sửa duy nhất DB_URL trong .env thành `jdbc:postgresql://aws-0-ap-northeast-2.pooler.supabase.com:5432/postgres?sslmode=require`, bỏ user/password nhúng trong URL; giữ nguyên DB_USERNAME và DB_PASSWORD. .env vẫn ignored/không track, không đưa credential vào Git hoặc command line. Các kết quả lỗi 9.11–9.12 là lịch sử trước chuẩn hóa, không phải blocker hiện tại.
+
+Checker JDBC 42.7.4 đã chạy thực, exit 0: kết nối Session pooler thành công, SELECT 1 trả 1, database postgres/schema public, PostgreSQL 17.11. SHOW transaction_read_only trả on; chỉ đọc metadata và rollback, đóng kết nối hoàn tất trước in success. Không boot Spring/jobs, chạy migration/seed hoặc ghi dữ liệu nghiệp vụ.
+
+JDBC dùng **client_sslmode=require**. Field **postgres_backend_tls=false** lấy từ pg_stat_ssl mô tả kết nối ở PostgreSQL phía sau pooler; không dùng field này để kết luận đường JDBC từ máy tới pooler không mã hóa. sslmode=require yêu cầu mã hóa nhưng không xác minh chứng thư như verify-full; phạm vi các field theo [pgJDBC](https://jdbc.postgresql.org/documentation/use/) và [PostgreSQL pg_stat_ssl](https://www.postgresql.org/docs/17/monitoring-stats.html#MONITORING-PG-STAT-SSL-VIEW).
+
+Metadata thấy **0 bảng BASE TABLE trong schema public**, sessions.subscription_id chưa có. Chưa khởi tạo schema SCMS, kiểm API/FE, VNPay hoặc deploy trên DB mới. Việc chuẩn bị schema/fixture là bước triển khai riêng, không chạy ngầm từ yêu cầu kiểm kết nối.
+
+Bằng chứng hiện tại: [kết quả JDBC chỉ đọc](../artifacts/review-2026-10-27/supabase-connection-normalized.json), [manifest](../artifacts/review-2026-10-27/verification.json) và [checker](../artifacts/review-2026-10-27/CheckDb.java). Chạy lại từ root workspace bằng Java 17 với PostgreSQL JDBC 42.7.4 trong Maven cache, source launcher trỏ tới checker; checker tự đọc .env, không cần truyền password. Kết quả clean test/PG local tại 9.10 giữ nguyên phạm vi baseline; cập nhật này chỉ thay checker/bằng chứng/tài liệu và cấu hình local ignored, chưa sửa source ứng dụng.

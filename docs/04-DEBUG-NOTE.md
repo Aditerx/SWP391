@@ -37,7 +37,9 @@ Giữ Clock Asia/Ho_Chi_Minh, Invoice.amount bất biến, Paid mới kích ho�
 
 ### 0.3. Điểm tiếp tục, bằng chứng và phần còn mở
 
-**Phân công đề xuất 27/10 tại mục 40:** T ~15% (D01 + D09, file ownership riêng), Phase 1 ~40% (catalog/đăng ký/mua–thanh toán/quyền), Phase 2 ~45% (dùng quyền/lịch/sự cố/attendance/đối soát/report). Có prompt gửi đồng đội 40.7 và chuẩn evidence 40.6. Chưa tạo nhánh/commit hoặc bắt đầu coding/deploy; đây là bước tổ chức thực hiện, không thay business rule.
+**Phân công đề xuất 27/10 tại mục 40:** T ~15% (D01 + D09, file ownership riêng), Phase 1 ~40% (catalog/đăng ký/mua–thanh toán/quyền), Phase 2 ~45% (dùng quyền/lịch/sự cố/attendance/đối soát/report). Có prompt gửi đồng đội 40.7 và chuẩn evidence 40.6. Owner đã yêu cầu review/commit/push baseline lên tai; chưa bắt đầu coding các feature trong phân công hoặc deploy, không thay business rule.
+
+**Bàn giao mới nhất:** baseline đã push `9097197`, cập nhật chẩn đoán `7c29607`; clean test 223/204 pass/19 skip/0 lỗi, PG local riêng 14 tests pass (docs 02 mục 9.10). Owner chọn DB_PASSWORD hiện tại, đã chuẩn hóa DB_URL local ignored và kết nối Supabase chỉ đọc/rollback thành công; public có 0 bảng, chưa có schema SCMS. Chưa migration/seed/boot Spring/jobs/API/FE trên DB mới; bằng chứng docs 02 mục 9.13. Không hỏi lại nguồn password hoặc yêu cầu gửi secret.
 
 **Cập nhật 27/10:** đã đi qua D09–D19 và chốt phần báo cáo tiền tại 39.3; các ghi chú “còn D10–D19/chờ chọn” ở checkpoint/đoạn phân tích cũ là lịch sử, đối chiếu quyết định cuối trong bảng 0.2. Vẫn đang plan, chưa sửa BE/DB/deploy. D09 còn cần tái hiện/sửa/test theo 20.6; chưa đánh dấu mọi chi tiết triển khai/nghiệm thu hoàn tất. Khi chuẩn bị code cần gom backlog theo phụ thuộc và đồng bộ tài liệu/policy cũ với quyết định mới, không hỏi lại các lựa chọn đã chốt.
 
@@ -48,7 +50,7 @@ Giữ Clock Asia/Ho_Chi_Minh, Invoice.amount bất biến, Paid mới kích ho�
 
 ### 0.4. Trạng thái workspace và quy tắc tiếp nối
 
-Checkpoint: branch tai, HEAD 8e95759 (workspace, không phải SHA Render). Có nhiều thay đổi/untracked; session mới phải kiểm git status/diff. Không reset/checkout mất thay đổi hoặc khôi phục tài liệu Owner đã chuyển old-docs. Schema/migration 07/test PostgreSQL là việc F-06/F-07 trước đó; docs 04 hiện untracked, cần đưa vào commit khi có yêu cầu commit.
+Checkpoint ban đầu là tai/8e95759 với nhiều thay đổi/untracked; Owner sau đó đã yêu cầu review/commit/push. Baseline đã được commit/push tới 9097197, cập nhật chẩn đoán tới 7c29607; SHA mới nhất phải lấy từ git log/status, không phải SHA Render. Session mới vẫn kiểm git status/diff, không reset/checkout mất thay đổi hoặc khôi phục tài liệu Owner đã chuyển old-docs. Schema/migration 07/test PostgreSQL thuộc F-06/F-07, docs 04 hiện đã track; chưa triển khai D01/D09/Phase 1/2.
 
 D01–D08 mới sửa docs/đọc source/kiểm kê read-only, chưa áp SQL dọn giá, chưa sửa code nghiệp vụ mới hoặc deploy. Không dùng test xanh cũ làm bằng chứng cho thay đổi chưa code. Sau sửa BE bắt buộc .\mvnw.cmd clean test; kiểm DB/FE/live đúng môi trường được phép. Sandbox không tự tách DB thật. Có thể đọc .env tại workspace khi cần, không cần Owner dán lại secret.
 
@@ -1868,8 +1870,14 @@ Owner đã yêu cầu rà lời dặn/code/nội dung, commit và push branch ta
 
 Kiểm kết nối bằng driver trực tiếp, không boot Spring/jobs: TLS, transaction read-only, SELECT đơn giản/metadata schema rồi rollback; không chạy DB prepare hoặc opt-in test live như phép ping. Kết quả và SHA push thực ghi ở docs 02 khi đã chạy. Test hiện tại là kiểm baseline, không chứng nhận feature mới đã code. Giữ thay đổi/old-docs đã có, không đọc lại tài liệu lịch sử để tái phân tích nghiệp vụ; kiểm move bằng hash. Ghi kết quả kiểm thật trước bàn giao, không giữ chữ “chưa test” như trạng thái hiện tại sau khi đã chạy.
 
-### 40.11. Kết quả bàn giao baseline và kết nối cần bổ sung cấu hình
+### 40.11. Kết quả bàn giao baseline và lịch sử kiểm kết nối
 
 Đã bổ sung AGENTS checkpoint/checklist 40.8–40.9, review code F-06/F-07 sẵn có và chạy clean test 223/204 pass/19 skip/0 lỗi; PG riêng 14 tests ứng dụng pass cùng các guard migration/data snapshots. Không triển khai D01/D09/Phase 1/2 chỉ từ việc review. Đã push tai `9097197`, remote khớp, .env không track; code DB/archives/docs tách ba commit.
 
 Sau push đã thử đúng .env: pooler trả tenant/user not found (XX000); direct từ ảnh trả UnknownHostException qua JDBC dù Windows DNS có AAAA. Chưa kết nối/SQL/schema thành công, không đổi .env/DB. Đã hỏi Owner cập nhật đúng Session pooler host/username từ panel, không yêu cầu password; không đoán region hoặc tự sửa config. Kết quả/JSON/chứng cứ docs 02 mục 9.11 và artifacts/review-2026-10-27. Lượt ghi kết quả/push tài liệu sau baseline không làm test cũ trở thành test rule mới.
+
+Thử lại sau Owner cập nhật .env: host pooler mới phân giải DNS được; URL đang nhúng user/password kiểu URI, và password đó khác DB_PASSWORD. Đã hỏi chọn nguồn trước chuẩn hóa JDBC, không tự chọn password hoặc đổi file. Checker có preflight báo cấu hình/boolean thay vì để credential thành hostname; docs 02 mục 9.12 và JSON retry/config-check ghi đúng lỗi hiện tại. Chưa SQL/schema thành công; kết quả lỗi pooler cũ giữ làm lịch sử.
+
+**Kết quả cuối:** Owner chọn dùng DB_PASSWORD hiện tại. Đã sửa duy nhất DB_URL local ignored thành JDBC Session pooler không nhúng credential, giữ nguyên DB_USERNAME/DB_PASSWORD. Kiểm JDBC thực thành công: sslmode=require, SELECT 1=1, PostgreSQL 17.11, transaction_read_only=on, rollback/đóng kết nối hoàn tất. Public có 0 bảng, chưa có sessions.subscription_id/schema SCMS; chưa migration/seed hoặc kiểm API/FE trên DB mới. Lỗi và câu “chưa kết nối” ở các đoạn trước là lịch sử, không hỏi lại nguồn password.
+
+Bằng chứng JSON hiện tại và nhãn SSL đúng phạm vi tại docs 02 mục 9.13; pg_stat_ssl là kết nối phía PostgreSQL sau pooler, không đo đường JDBC tới pooler. Các lượt kiểm đều không boot Spring/jobs hay ghi dữ liệu nghiệp vụ. Baseline clean test/PG giữ nguyên kết quả đã chạy; lượt chuẩn hóa chỉ thay .env ignored, checker và docs/evidence, chưa triển khai feature hoặc deploy.
