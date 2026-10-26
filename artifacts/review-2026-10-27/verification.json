@@ -1,0 +1,72 @@
+{
+  "review_date": "2026-10-27",
+  "timezone": "Asia/Ho_Chi_Minh",
+  "base_commit": "8e957593b865b1172814c2622578c5f7f1e5656a",
+  "scope": "Existing F06/F07 baseline and documentation handoff review; D01-D19 target features not implemented",
+  "maven": {
+    "command": ".\\mvnw.cmd clean test",
+    "tests": 223,
+    "passed": 204,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 19,
+    "build": "SUCCESS",
+    "skipped_groups": [
+      "DemoDataPreparationTest",
+      "LiveCashDemoTest",
+      "LiveReadOnlyAuditTest",
+      "SessionSchemaPostgresTest opt-in"
+    ]
+  },
+  "postgres": {
+    "command": "python scripts/test-session-subscription-postgres.py --container scms-f0607-review-20261027",
+    "container": "scms-f0607-review-20261027",
+    "server_version": "17.11",
+    "databases": [
+      "scms_f0607_fresh",
+      "scms_f0607_upgrade"
+    ],
+    "application_tests_per_database": 7,
+    "application_tests_passed": 14,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "sql_checks": [
+      "fresh and upgrade schema",
+      "repeat migration",
+      "equivalent renamed FK/index",
+      "NOT VALID validation",
+      "orphan rollback",
+      "index-name collision rollback",
+      "incompatible cascading FK rejection",
+      "business-data snapshots unchanged"
+    ],
+    "evidence_type": "Isolated local PostgreSQL and Spring/MockMvc, not Render HTTP or live VNPay"
+  },
+  "security": {
+    "env_ignored": true,
+    "env_tracked": false,
+    "current_env_secret_match_scan": "no matches in candidate files",
+    "private_key_and_common_token_scan": "no findings",
+    "moved_docs": "content preserved by byte/newline-normalized hash comparison; no business-history reread"
+  },
+  "working_tree_file_sha256": {
+    "database/migrations/07_session_subscription_postgres.sql": "c39249682d50fa27a96f53ea5115d2ac8a96cf56c316f61a6082cbd4d48a05dd",
+    "schema_postgres.sql": "0c6ed30e891cbcb11c1d103a6d67de124cf57f41a9e05dbf3b9ca0c4f6e8e8c0",
+    "database/schema_postgres.sql": "0c6ed30e891cbcb11c1d103a6d67de124cf57f41a9e05dbf3b9ca0c4f6e8e8c0",
+    "scripts/test-session-subscription-postgres.py": "42991840a67822adbb025fcaa9b23500507885275c8a84f2ac98736375830355",
+    "src/test/java/com/sportscenter/session/SessionSchemaPostgresTest.java": "40b1199f9d6b6e9e6279506e5f28cb5db3a914d16c1b26d3547320c494f8556a"
+  },
+  "log_sha256": {
+    "maven": "339dc9fa0df20620025757635e695c5cdf27e35e26beb1fc9ce20e4197095739",
+    "postgres": "358dee165018502fe118abb96261ab04f00776891a4a9483e57744f3f2018748"
+  },
+  "not_verified": [
+    "new D01-D19 business features",
+    "FE current source/browser",
+    "Render deployed SHA and DB",
+    "live VNPay IPN",
+    "SQL Server migration execution"
+  ],
+  "supabase_connection": "To be checked read-only after push, per user request"
+}

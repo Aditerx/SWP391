@@ -2,6 +2,8 @@
 
 Tài liệu này là chốt chặn bắt buộc cho tất cả các AI Agents và Lập trình viên khi tham gia phát triển dự án SCMS (Sports Center Management System).
 
+> **Checkpoint bàn giao 27/10/2026:** dự án đang chốt plan, chưa triển khai các rule mới. Quyết định Owner mới nhất trong `docs/04-DEBUG-NOTE.md` mục 0 và các mục “đã chốt” có hiệu lực hơn mô tả business cũ bên dưới khi chuẩn bị sửa. Cụ thể: Coach chính tạo Advanced (D04); hủy Advanced >=12h (D05); 45 ngày sử dụng skip TT nghỉ/đóng và chống bù trùng (D12, thay 1080 giờ liên tục); attendance mới Present/Absent trong giờ buổi (D15); Normal chỉ được bù có hồ sơ khi buổi thực sự không tổ chức do TT (D14/D15), không mở hủy/báo vắng vì Member. Đây là rule mục tiêu, không phải code đã chạy. Gói đồng đội chỉ D01/D09, phạm vi và checklist bắt buộc tại mục 40.3/40.8–40.9; test cũ lệch rule phải giải trình trước sửa expected. Các kết quả test nêu trong tài liệu cũ là lịch sử, không phải chỉ tiêu số lượng cố định.
+
 ---
 
 ## 1. THÔNG TIN CÔNG NGHỆ & MÔI TRƯỜNG VẬN HÀNH

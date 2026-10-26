@@ -1,0 +1,12 @@
+MAVEN BASELINE
+[WARNING] Tests run: 223, Failures: 0, Errors: 0, Skipped: 19
+[INFO] BUILD SUCCESS
+[INFO] Total time:  02:07 min
+
+ISOLATED POSTGRESQL
+PASS scms_f0607_fresh: schema, repeat, renamed definitions, orphan/collision rollback, data unchanged
+[INFO] Tests run: 7, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 43.84 s -- in com.sportscenter.session.SessionSchemaPostgresTest
+[INFO] BUILD SUCCESS
+PASS scms_f0607_upgrade: schema, repeat, renamed definitions, orphan/collision rollback, data unchanged
+[INFO] Tests run: 7, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 42.71 s -- in com.sportscenter.session.SessionSchemaPostgresTest
+[INFO] BUILD SUCCESS
