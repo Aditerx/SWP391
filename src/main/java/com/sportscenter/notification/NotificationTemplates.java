@@ -20,6 +20,8 @@ public final class NotificationTemplates {
 
     public static String title(NotificationType type) {
         return switch (type) {
+            case CHAT_MEMBER_MESSAGE -> "New member support message";
+            case CHAT_STAFF_REPLY -> "New support reply";
             case ENROLLMENT_CONFIRMED -> "Ghi danh lớp học thành công";
             case PRIVATE_BOOKING_CONFIRMED -> "Đặt buổi học thành công";
             case PRIVATE_BOOKING_CANCELLED -> "Buổi học đã được hủy";

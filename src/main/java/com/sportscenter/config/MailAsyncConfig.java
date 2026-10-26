@@ -20,4 +20,5 @@ public class MailAsyncConfig {
         executor.initialize();
         return executor;
     }
+
 }

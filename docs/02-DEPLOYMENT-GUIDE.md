@@ -107,7 +107,7 @@ Khi thực hiện thanh toán trên cổng VNPay Sandbox, nhập thông tin th�
 * **Kích thước Connection Pool (HikariCP):**
   * Trên Render gói Free/Starter, thiết lập `maximum-pool-size=5` (đã được cấu hình trong `application.properties`) để tránh cạn kiệt connection pool của Supabase.
 * **Migration Database:**
-* Chạy migration theo thứ tự trên DB mới. Với DB hiện có, đảm bảo migration `04_migration_member_flow_v2.sql` và `05_migration_notifications.sql` đã được thực thi trong SQL Editor của Supabase trước khi start server.
+* Chạy migration theo thứ tự trên DB mới. Với DB hiện có, đảm bảo các migration `04_migration_member_flow_v2.sql`, `05_migration_notifications.sql` và `06_migration_chat.sql` đã được thực thi trong SQL Editor của Supabase trước khi start server.
 
 ---
 

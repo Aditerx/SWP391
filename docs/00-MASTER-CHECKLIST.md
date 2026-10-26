@@ -162,3 +162,18 @@ Tài liệu này là chốt chặn quản lý tiến độ tổng thể và lị
 
 ### [Đợt 20/10/2026] — Giai đoạn 1: Chuẩn Hóa CSDL & Migration Flow V2
 * **Trạng thái:** Hoàn tất 100%. File migration: `database/migrations/04_migration_member_flow_v2.sql`.
+
+## Giai đoạn 9: Chat hỗ trợ Member – Receptionist (Backend)
+- [x] Tạo migration 06 idempotent cho conversation, messages, read state và quyền `CHAT_AS_MEMBER` / `HANDLE_CHAT`; đồng bộ schema PostgreSQL.
+- [x] Triển khai API member, inbox staff, pagination cursor, read state theo từng user, claim/release/close/reopen, rate limit và idempotency.
+- [x] Kiểm tra quyền staff ở controller và service; Member chỉ truy cập conversation của mình; Coach bị từ chối.
+- [x] Phát message event AFTER_COMMIT; tái sử dụng notification event/listener, dedupe theo message; thêm `ChatResponder` extension và escalation.
+- [x] Bổ sung test service/controller, cập nhật API contract, database README và migration deploy guide.
+- [x] Baseline `mvnw test`: 198 run, 183 passed, 15 skipped, 0 failed. Sau thay đổi `mvnw clean test`: 224 run, 209 passed, 15 skipped, 0 failed.
+
+### [24/10/2026] — Giai đoạn 9: Chat hỗ trợ Member – Receptionist
+- **Trạng thái:** Backend, migration, contract và test đã cập nhật; không thay đổi FE, không tạo commit.
+- **Tái sử dụng:** Session auth, dynamic permissions, audit log, `Clock`, notification AFTER_COMMIT và `dedupe_key`.
+- **Bổ sung:** `chat_conversations`, `chat_messages`, `chat_read_state`, chat API, two chat permissions, post-commit responder/notification listeners, escalation.
+- **Database:** Migration `06_migration_chat.sql` là additive/idempotent; chưa chạy trên PostgreSQL thật nếu môi trường không cung cấp DB.
+- **Kiểm thử:** `mvnw clean test` — 224 run, 209 passed, 15 skipped, 0 failures/errors.

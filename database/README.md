@@ -15,7 +15,8 @@ database/
 │   ├── 02_migration_class_feedback.sql
 │   ├── 03_migration_payment.sql
 │   ├── 04_migration_member_flow_v2.sql
-│   └── 05_migration_notifications.sql   # Mở rộng thông báo tương thích ngược
+│   ├── 05_migration_notifications.sql   # Mở rộng thông báo tương thích ngược
+│   └── 06_migration_chat.sql            # Chat hỗ trợ member và nhân viên
 └── archive/                           # Lưu trữ lịch sử (Không dùng trong môi trường live)
     ├── legacy_mssql_20260926.sql           # Schema cũ thời kỳ MS SQL Server
     ├── legacy_postgres_backup_20261003.sql # Bản backup Postgres ngày 03/10/2026
@@ -26,12 +27,12 @@ database/
 
 ## 2. Hướng Dẫn Chạy Migration Mới Nhất Trên Supabase
 
-Chạy migration theo thứ tự trên DB mới. DB đã áp dụng migration 01–04 chỉ cần chạy migration 05.
+Chạy migration theo thứ tự trên DB mới. DB đã áp dụng migration 01–05 chỉ cần chạy migration 06.
 
 ### File cần chạy trên Supabase SQL Editor:
-👉 `database/migrations/05_migration_notifications.sql`
+👉 `database/migrations/06_migration_chat.sql`
 
-Migration 05 chỉ thêm cột và index vào `notifications` / `notification_recipients`; không xóa, đổi tên hay ghi đè dữ liệu cũ. Loại thông báo nghiệp vụ được lưu ở `notification_type` để giữ nguyên CHECK constraint và cột `type` legacy. Trạng thái đọc của người nhận nằm ở `notification_recipients`.
+Migration 06 tạo các bảng chat và hai quyền `CHAT_AS_MEMBER`, `HANDLE_CHAT`; không xóa, đổi tên hay ghi đè dữ liệu cũ. Migration an toàn khi chạy lại. `HANDLE_CHAT` chỉ được gán mặc định cho Receptionist và CenterManager; Coach không có quyền.
 
 ### Các nội dung cập nhật trong file 04:
 1. **`subjects`**: Thêm cột `normal_price`, `advanced_price` và seed bảng giá chuẩn 9 môn thể thao theo trang 7 `Member.pdf`.
