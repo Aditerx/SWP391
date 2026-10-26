@@ -1,0 +1,50 @@
+[SCMS FE → BE] XÁC NHẬN CẤU HÌNH VNPAY SANDBOX, CHÍNH SÁCH GHI DỮ LIỆU VÀ MÔI TRƯỜNG KIỂM THỬ
+
+## Bối cảnh
+
+Theo Owner xác nhận, hệ thống hiện dùng VNPay Sandbox. Tuy nhiên, FE chưa có bằng chứng xác nhận cấu hình Sandbox này đang được áp dụng trên đúng service Render đang chạy, hoặc các request đăng ký thử nghiệm có ghi dữ liệu vào DB Supabase mà Render sử dụng hay không.
+
+Sandbox giúp tránh giao dịch tiền thật, nhưng không tự ngăn việc tạo dữ liệu như đơn đăng ký, hóa đơn hoặc giao dịch chờ thanh toán trên DB.
+
+## Hiện trạng FE và kiểm thử
+
+- `isDirectSubscriptionLocked` hiện trả về `false` vô điều kiện. Khi chạy API mode, nút đăng ký gói trên giao diện Member không bị khóa; FE có thể gửi request tạo đơn đăng ký và hóa đơn liên quan tới Render.
+- FE2 đang FAIL tại `test/fe2_membership_payment_test.mjs:1278`, vì test yêu cầu khóa mutation khi kết nối Render nhưng helper hiện trả `false`.
+- FE chưa tự thay đổi helper hoặc test vì cần chốt chính sách trước.
+- Trong các lần probe gần đây, `GET /api/sessions` và `GET /api/reports/dashboard` trả `200`. Việc này chưa xác nhận SHA đang chạy trên Render hoặc DB Render đang sử dụng.
+- FE chưa có staging/DB cô lập để chạy luồng ghi dữ liệu: Manager tạo lớp → Member đăng ký → Coach xem lịch được phân công.
+
+## Nhờ BE xác nhận
+
+### 1. Cấu hình thanh toán trên Render
+
+- Render hiện có đang dùng VNPay Sandbox không?
+- Có thể xác nhận mà không gửi credential, secret hoặc thông tin nhạy cảm.
+- Khi thanh toán Sandbox, luồng callback tạo những bản ghi nào?
+
+### 2. Ảnh hưởng của request đăng ký trên DB
+
+- `POST /api/members/me/subscriptions` có tạo subscription/order hoặc invoice trên DB mà Render đang kết nối không?
+- Đơn/hóa đơn chờ thanh toán có được giữ lại sau khi giao dịch Sandbox kết thúc không?
+- Việc kiểm thử bằng tài khoản Member trên Render có được phép không?
+
+### 3. Bảo vệ phía Backend
+
+- Backend có cơ chế server-side để chặn mutation tài chính trên môi trường live khi chưa được phép không?
+- Nếu có, cơ chế áp dụng cho những endpoint nào và điều kiện mở là gì?
+
+### 4. Môi trường E2E đặt lớp
+
+- Vui lòng cung cấp staging hoặc DB thử nghiệm tách khỏi dữ liệu live.
+- Cần có tài khoản fixture riêng cho Manager, Member và Coach; dữ liệu môn học, phòng và Coach phù hợp; cùng cách reset/dọn dữ liệu sau test.
+- FE sẽ dùng môi trường đó để kiểm tra luồng tạo lớp Normal → Member đăng ký → Coach xem ca đã phân công và quyền truy cập dữ liệu.
+
+### 5. Migration và phiên bản đang chạy
+
+- Vui lòng xác nhận DB Supabase mà Owner đã chạy migration có phải DB Render hiện đang sử dụng không.
+- Ở lần đối chiếu trước, repo GitHub `Aditerx/SWP391` trên `main` chưa có `database/migrations/07_session_subscription_postgres.sql` và hai schema đồng bộ với migration này. Nhờ BE xác nhận trạng thái hiện tại; nếu chưa push, vui lòng cập nhật repo và gửi commit SHA.
+- Cung cấp SHA đang chạy trên Render để FE đối chiếu phiên bản triển khai.
+
+## Chính sách tạm thời phía FE
+
+Trong khi chờ xác nhận, FE đề nghị không gửi request ghi nghiệp vụ lên Render. Sandbox không đảm bảo DB không phát sinh dữ liệu thử nghiệm. Sau khi BE xác nhận cấu hình, chính sách ghi dữ liệu và môi trường E2E, Owner sẽ chốt có giữ khóa đăng ký trên Render hay mở luồng online; khi đó FE mới đồng bộ helper và bộ test FE2.
