@@ -40,6 +40,7 @@ public class EnrollmentController {
         return ResponseEntity.ok(enrollmentService.findByMemberId(memberId, authentication.getName()));
     }
 
+    @org.springframework.web.bind.annotation.ResponseStatus(org.springframework.http.HttpStatus.CREATED)
     @PostMapping("/classes/{classId}/enroll")
     @PreAuthorize("hasAnyAuthority('REGISTER_MEMBER', 'MANAGE_CLASSES') or hasRole('MEMBER')")
     public ResponseEntity<EnrollmentResponse> enrollInClass(
@@ -54,6 +55,7 @@ public class EnrollmentController {
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
+    @org.springframework.web.bind.annotation.ResponseStatus(org.springframework.http.HttpStatus.CREATED)
     @PostMapping("/enrollments")
     @PreAuthorize("hasAnyAuthority('REGISTER_MEMBER', 'MANAGE_CLASSES') or hasRole('MEMBER')")
     public ResponseEntity<EnrollmentResponse> createEnrollment(

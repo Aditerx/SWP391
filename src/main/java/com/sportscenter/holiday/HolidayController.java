@@ -40,6 +40,7 @@ public class HolidayController {
         return ResponseEntity.ok(holidayImpactService.confirm(new HolidayImpactService.Change(id,null,null,null,active),token,auth));
     }
 
+    @org.springframework.web.bind.annotation.ResponseStatus(org.springframework.http.HttpStatus.CREATED)
     @PostMapping
     @PreAuthorize("hasAnyRole('CENTERMANAGER','ADMIN') and hasAuthority('MANAGE_CLASSES')")
     public ResponseEntity<HolidayResponse> create(@Valid @RequestBody HolidayRequest request,

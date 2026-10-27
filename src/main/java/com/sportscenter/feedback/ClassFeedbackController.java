@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.*;
 public class ClassFeedbackController {
     private final ClassFeedbackService feedbackService;
 
+    @org.springframework.web.bind.annotation.ResponseStatus(org.springframework.http.HttpStatus.CREATED)
     @PostMapping("/api/classes/{classId}/feedback")
     @PreAuthorize("hasRole('MEMBER')")
     public ResponseEntity<ClassFeedbackResponse> create(

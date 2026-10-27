@@ -92,6 +92,7 @@ public class AuthController {
         return ResponseEntity.ok(toResponse(user, authentication));
     }
 
+    @org.springframework.web.bind.annotation.ResponseStatus(org.springframework.http.HttpStatus.NO_CONTENT)
     @PostMapping("/change-password")
     public ResponseEntity<Void> changePassword(@Valid @RequestBody ChangePasswordRequest request,
                                                Authentication authentication,
@@ -115,6 +116,7 @@ public class AuthController {
         return ResponseEntity.noContent().build();
     }
 
+    @org.springframework.web.bind.annotation.ResponseStatus(org.springframework.http.HttpStatus.NO_CONTENT)
     @PostMapping("/logout")
     public ResponseEntity<Void> logout(HttpServletRequest request) {
         SecurityContextHolder.clearContext();
@@ -136,6 +138,7 @@ public class AuthController {
         return ResponseEntity.ok(registrationService.register(request));
     }
 
+    @org.springframework.web.bind.annotation.ResponseStatus(org.springframework.http.HttpStatus.NO_CONTENT)
     @PostMapping("/verify-registration")
     public ResponseEntity<Void> verifyRegistration(@Valid @RequestBody VerifyRegistrationRequest request) {
         registrationService.verify(request);
@@ -148,6 +151,7 @@ public class AuthController {
         return ResponseEntity.ok(new OtpMessageResponse("Nếu thông tin hợp lệ, mã xác thực sẽ được gửi đến hộp thư."));
     }
 
+    @org.springframework.web.bind.annotation.ResponseStatus(org.springframework.http.HttpStatus.NO_CONTENT)
     @PostMapping("/reset-password")
     public ResponseEntity<Void> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
         passwordResetService.reset(request);

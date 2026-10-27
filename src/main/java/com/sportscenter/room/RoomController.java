@@ -20,6 +20,7 @@ public class RoomController {
         return ResponseEntity.ok(service.findAll());
     }
 
+    @org.springframework.web.bind.annotation.ResponseStatus(org.springframework.http.HttpStatus.CREATED)
     @PostMapping
     @PreAuthorize("hasAuthority('MANAGE_CLASSES')")
     public ResponseEntity<RoomResponse> create(@Valid @RequestBody RoomRequest request) {

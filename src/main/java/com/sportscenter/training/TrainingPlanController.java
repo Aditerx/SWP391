@@ -33,6 +33,7 @@ public class TrainingPlanController {
         return ResponseEntity.ok(trainingPlanService.findById(id, authentication));
     }
 
+    @org.springframework.web.bind.annotation.ResponseStatus(org.springframework.http.HttpStatus.CREATED)
     @PostMapping
     @PreAuthorize("hasAnyAuthority('MANAGE_TRAINING_PLAN', 'MANAGE_CLASSES')")
     public ResponseEntity<TrainingPlanResponse> createPlan(@Valid @RequestBody TrainingPlanRequest request) {
@@ -48,6 +49,7 @@ public class TrainingPlanController {
         return ResponseEntity.ok(trainingPlanService.updatePlan(id, request));
     }
 
+    @org.springframework.web.bind.annotation.ResponseStatus(org.springframework.http.HttpStatus.NO_CONTENT)
     @DeleteMapping("/{id}")
     @PreAuthorize("hasAnyAuthority('MANAGE_TRAINING_PLAN', 'MANAGE_CLASSES')")
     public ResponseEntity<Void> deletePlan(@PathVariable Integer id) {

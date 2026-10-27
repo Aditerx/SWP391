@@ -20,6 +20,7 @@ public class MembershipPackageController {
         return ResponseEntity.ok(service.findAll());
     }
 
+    @org.springframework.web.bind.annotation.ResponseStatus(org.springframework.http.HttpStatus.CREATED)
     @PostMapping
     @PreAuthorize("hasAuthority('MANAGE_PACKAGES')")
     public ResponseEntity<MembershipPackageResponse> create(

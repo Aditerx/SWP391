@@ -55,8 +55,20 @@ for file in sorted((ROOT/'src/main/java').rglob('*Controller.java')):
         signature=re.search(r'\bpublic\s+[\w.<>,?\[\]\s]+?\s+(\w+)\s*\(',text[end:])
         if not signature:continue
         method_start=end+signature.start(); method_name=signature.group(1)
+        _,params_end=annotation(text,end+signature.end()-1)
+        # Controller method bodies used here have ordinary Java block formatting.
+        # Read through the next mapping only; status evidence is explicit ResponseEntity calls.
+        next_mapping=re.search(r'@(Get|Post|Put|Patch|Delete|Request)Mapping\b',text[params_end:])
+        body=text[params_end:params_end+next_mapping.start()] if next_mapping else text[params_end:]
+        codes=[]
+        if re.search(r'ResponseEntity\.status\((?:HttpStatus\.)?CREATED\)|ResponseEntity\.status\(201\)',body):codes.append(201)
+        if 'ResponseEntity.noContent()' in body:codes.append(204)
+        if 'ResponseEntity.ok(' in body or not codes:codes.append(200)
         previous_end=max(text.rfind('}',cls.end(),start),cls.end())
-        auths=re.findall(r'@PreAuthorize\("([^"\n]*)"\)',text[previous_end+1:method_start])
+        method_annotations=text[previous_end+1:method_start]
+        auths=re.findall(r'@PreAuthorize\("([^"\n]*)"\)',method_annotations)
+        declared=re.search(r'@ResponseStatus\(\s*(?:value\s*=\s*)?(?:HttpStatus\.)?(\w+)',method_annotations)
+        if declared and codes==[200]:codes=[{'CREATED':201,'NO_CONTENT':204,'OK':200}.get(declared.group(1),200)]
         expression=auths[-1] if auths else class_auth[-1] if class_auth else None
         verbs=[m.group(1).upper()]
         if m.group(1)=='Request':verbs=re.findall(r'RequestMethod\.(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)',args)
@@ -67,7 +79,8 @@ for file in sorted((ROOT/'src/main/java').rglob('*Controller.java')):
                     key=(verb,canonical(path))
                     if key in handlers:raise ValueError('Duplicate source route '+str(key))
                     handlers[key]={'file':file.relative_to(ROOT).as_posix(),'line':text.count('\n',0,start)+1,
-                        'controller':cls.group(1),'method':method_name,'authorizationExpression':expression,'path':path}
+                        'controller':cls.group(1),'method':method_name,'authorizationExpression':expression,'path':path,
+                        'successStatusesExplicitInController':sorted(set(codes))}
 
 def public(method,path):
     return path=='/api/health' or (method=='GET' and path.startswith('/api/public/')) or \
@@ -189,6 +202,7 @@ for n,op in enumerate(operations,1):
     lines += [f"### {n}. {op['method']} {op['path']}",'',f"- operationId: `{op['operationId']}`; Dxx: {','.join(op['decisionIds']) or 'baseline ngoài quyết định Dxx trực tiếp'}.",
         '- Authentication: '+('Public theo SecurityConfig.' if op['publicAtSecurityFilter'] else 'Session JSESSIONID bắt buộc.'),
         '- Controller permission: `'+((h or {}).get('authorizationExpression') or 'không có annotation riêng; vẫn chịu SecurityConfig/service guards')+'`.',
+        '- Success status đọc từ controller: '+str((h or {}).get('successStatusesExplicitInController',[]))+'; đối chiếu thêm exchange thực tế (OpenAPI có thể chỉ suy mặc định200).',
         f"- Handler: `{h['file']}:{h['line']}` → `{h['method']}`." if h else '- Handler: UNMATCHED, cần kiểm thủ công.',
         '- Request body: '+body_description(op['requestBody'])+('; required' if (op['requestBody'] or {}).get('required') else '; optional/no body')+'.',
         '- Responses do OpenAPI khai báo: '+', '.join(code+' '+body_description(v) for code,v in op['publishedResponses'].items())+'.',
@@ -219,6 +233,9 @@ summary={'checkedAtUtc':dt.datetime.now(dt.timezone.utc).isoformat(),'sourceComm
     'operationsWithLocalExchanges':sum(bool(x['localExchangeIndexes']) for x in operations),
     'renderAnonymousGetChecks':len(results),'renderAnonymousGetPassed':sum(x['pass'] for x in results),
     'renderAuthenticatedBusinessOperationsTested':0,'productionMutationsExecuted':False,
+    'publishedSuccessStatusGaps':[{'method':x['method'],'path':x['path'],'controller':x['sourceHandler']['successStatusesExplicitInController'],
+        'openApi':list(x['publishedResponses'])} for x in operations if x['sourceHandler'] and
+        any(str(code) not in x['publishedResponses'] for code in x['sourceHandler']['successStatusesExplicitInController'])],
     'limits':['Controller parser is static; service ownership/center/locking checks need separate policy review/tests',
               'Anonymous GET guards and OpenAPI do not prove full role matrix, error mapping, concurrency, callbacks or business outcomes',
               'P1.5/D01/D09/FE integration remain excluded; no production session credentials were supplied or guessed'],

@@ -25,6 +25,7 @@ public class SubjectController {
         return ResponseEntity.ok(service.findById(id));
     }
 
+    @org.springframework.web.bind.annotation.ResponseStatus(org.springframework.http.HttpStatus.CREATED)
     @PostMapping
     @PreAuthorize("hasAuthority('MANAGE_CLASSES')")
     public ResponseEntity<SubjectResponse> create(@Valid @RequestBody SubjectRequest request) {
@@ -38,6 +39,7 @@ public class SubjectController {
         return ResponseEntity.ok(service.update(id, request));
     }
 
+    @org.springframework.web.bind.annotation.ResponseStatus(org.springframework.http.HttpStatus.NO_CONTENT)
     @DeleteMapping("/{id}")
     @PreAuthorize("hasAuthority('MANAGE_CLASSES')")
     public ResponseEntity<Void> delete(@PathVariable Integer id) {
