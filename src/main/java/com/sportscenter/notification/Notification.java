@@ -29,7 +29,7 @@ public class Notification {
     @Column(name = "related_type", length = 40)
     private String relatedType;
     @Column(name = "related_id")
-    private Integer relatedId;
+    private Long relatedId;
     @Column(name = "dedupe_key", length = 180)
     private String dedupeKey;
     @Column(name = "is_read", nullable = false)

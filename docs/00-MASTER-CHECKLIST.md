@@ -11,15 +11,20 @@ Tài liệu này là chốt chặn quản lý tiến độ tổng thể và lị
 - [x] D01–D19 đã chốt tại docs 04; rule mới ghi đè mô tả cũ. Owner yêu cầu tiếp tục P1.0–P1.4 và BE P2, double-check/demo/tài liệu/push branch/merge main.
 - [x] Source hai phase đã triển khai, clean test và 9 HTTP workflow PostgreSQL local pass. Chi tiết nhóm hoàn tất chuyển HISTORY bên dưới; source chốt13a62ee clean292/273pass/19skip/0lỗi và PG HTTP9/9pass; evidence docs02 mục10.
 - [x] Chốt source13a62ee, push feat/advanced-phases199bbf9; merge main86d0076 bằng commit155968d (không conflict,tree bằng feature), kiểm lại clean292/273pass/19skip/0lỗi +PG HTTP9/9. Evidence/demo/tài liệu đã bàn giao. Main remote được đối chiếu khi push; không đồng nghĩa đã nghiệm thu Render.
-- [x] Owner phê duyệt riêng bundle28635081…; production đã khởi tạo trước merge:46bảng/9môn/0account hoặc giao dịch. Postflight read-only đủ cột; docs02 mục10/evidence production-release.json. Chưa tài khoản thật/live gateway/deploy verification.
+- [x] Đã đính chính DB theo username Owner: bootstrap28635081… là **test1a3dfdd7…**. Production188f6765… được duyệt riêng bundle01e31ca6…; backup mã hóa/restore/local proof rồi nâng cấp50bảng/9môn, giữ dữ liệu gốc7bảng. Chi tiết HISTORY/docs02 mục10.9.
 - [ ] **Để lại theo Owner:** P1.5/gói T D01 hồ sơ Member + D09 Coach directory/FE. Giữ scope/checklist 04 mục 40.3/40.8–40.9. SMTP/OTP/chat/notifications đã merge là việc khác.
-- [ ] Render sau push765339c đã kiểm đúng>=5phút:Swagger/OpenAPI149paths/API mới có,17/19pass;health503DOWN,catalog18môn so với.env9. Chưa nghiệm thu production;Ownerđãxácnhậnmain/DBsync;CItrốngđãsửavàmain8b5f5dcCIpass,táikiểmsau5phút vẫn17/19;OwnerđãxácnhậnHealthCheckPath/api/healthvàLive;APIidentityđọcđược08227b8,nhưngpooltargethash188f6765…khác.env1a3dfdd7…;19/22checks pass.CầnkiểmtênbiếnSpringdatasourceoverride,khôngtựsửaDBkhác. Evidence docs02 mục10.6.
+- [ ] Render sau nâng cấp đúng production188f6765…: Swagger/OpenAPI149paths, đúng9môn, target và Live08227b8 khớp;21/22checks pass, aggregatehealth503 còn cần chẩn đoán component. Owner dùng health path/api/health (pong). Sẽ push/merge health component status, đợi5phút và kiểm lại; không công bố production đạt trước cổng này.
 - [ ] Nghiệm thu FE hiện hành bằng browser/CORS/cookie, VNPay IPN qua gateway sandbox thật và deploy SHA/health. Local HTTP không thay cổng này.
 - [ ] SQL Server runtime và smoke vận hành tài khoản thật chưa chạy; migrations MSSQL được bàn giao với giới hạn rõ.
 
 ---
 
 ## 📜 PHẦN II: LỊCH SỬ HOÀN THÀNH (HISTORY)
+
+### [27/10/2026] Đính chính target và nâng cấp production có dữ liệu
+
+Owner cập nhật .env đồng bộ Render, chọn DB_USERNAME production: hash188f6765… khớp Live; DB1a3dfdd7… bootstrap trước là test. Production ban đầu39bảng/18môn/30users/6invoices/5subscriptions/2sessions/2enrollments, thiếu8cột checkpoint. Đã backup public mã hóa DPAPI, restore và kiểm bundle trên clone local; replay/FK-reference guard rollback pass. Owner duyệt đúng bundle01e31ca6…; đã commit transaction và postflight50bảng/9môn, giữ nguyên mọi giá trị cột gốc của7bảng nghiệp vụ tại commit. Không reset/seed, không đoán entitlement legacy. Render21/22checks pass sau upgrade;health503 đang xử lý. Full clean303run/277pass/26skip/0lỗi; cổng mapping clone và Render sau deploy được ghi tiếp ở docs02 mục10.9.
+
 
 ### [27/10/2026] Tự nhận diện Live commit và pool DB, không cần Owner lấy SHA
 
@@ -815,3 +820,5 @@ Cả hai hướng đều cần quyết định rõ Q-02/03/05/06/07. Chưa áp d
 - **Bổ sung:** `chat_conversations`, `chat_messages`, `chat_read_state`, chat API, two chat permissions, post-commit responder/notification listeners, escalation.
 - **Database:** Migration `06_migration_chat.sql` là additive/idempotent; chưa chạy trên PostgreSQL thật nếu môi trường không cung cấp DB.
 - **Kiểm thử:** `mvnw clean test` — 224 run, 209 passed, 15 skipped, 0 failures/errors.
+
+Chốt source sau sửa Long: **clean test304run/277pass/27skip/0failure-error**, XML đối chiếu log; clone opt-in **2/2pass**. Count303 trước đó là lịch sử trước khi thêm regression int64. Các test communication6case opt-in sẽ chạy fresh+upgrade từ committed checkout; không dùng skip làm bằng chứng đã kiểm. CI/Live sau push được ghi riêng.

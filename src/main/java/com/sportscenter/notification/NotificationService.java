@@ -51,7 +51,7 @@ public class NotificationService {
             notification.setType(legacyType);
             notification.setNotificationType(event.type().name());
             notification.setRelatedType(event.relatedType());
-            notification.setRelatedId(event.relatedId());
+            notification.setRelatedId(event.relatedId() == null ? null : event.relatedId().longValue());
             notification.setCreatedAt(LocalDateTime.now(clock));
             notification = repository.save(notification);
         }

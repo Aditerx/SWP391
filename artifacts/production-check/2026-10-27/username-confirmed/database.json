@@ -1,0 +1,85 @@
+{
+  "targetFingerprint": "188f67654d48aa11c970703f2cdaefc79290f1173a7dedaf93547e74bc6b1048",
+  "database": {
+    "readOnly": "on",
+    "subjects": [
+      {
+        "id": 1,
+        "slug": null
+      },
+      {
+        "id": 2,
+        "slug": null
+      },
+      {
+        "id": 3,
+        "slug": null
+      },
+      {
+        "id": 4,
+        "slug": null
+      },
+      {
+        "id": 5,
+        "slug": null
+      },
+      {
+        "id": 6,
+        "slug": null
+      },
+      {
+        "id": 7,
+        "slug": null
+      },
+      {
+        "id": 8,
+        "slug": null
+      },
+      {
+        "id": 9,
+        "slug": null
+      },
+      {
+        "id": 19,
+        "slug": "quan-vot-tennis"
+      },
+      {
+        "id": 20,
+        "slug": "boi-loi"
+      },
+      {
+        "id": 21,
+        "slug": "pickleball"
+      },
+      {
+        "id": 22,
+        "slug": "ban-cung"
+      },
+      {
+        "id": 23,
+        "slug": "bong-ro"
+      },
+      {
+        "id": 24,
+        "slug": "bong-da"
+      },
+      {
+        "id": 25,
+        "slug": "bong-chuyen"
+      },
+      {
+        "id": 26,
+        "slug": "cau-long"
+      },
+      {
+        "id": 27,
+        "slug": "bong-ban"
+      }
+    ],
+    "users": 30,
+    "invoices": 6,
+    "subscriptions": 5,
+    "sessions": 2
+  },
+  "rolledBack": true
+}

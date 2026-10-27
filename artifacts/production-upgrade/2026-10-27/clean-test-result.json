@@ -1,0 +1,16 @@
+{
+  "command": ".\\mvnw.cmd clean test",
+  "isolatedCheckout": "D:/Projects/SWP391-remaining-verification",
+  "envPresent": false,
+  "result": "PASS",
+  "tests": 304,
+  "failures": 0,
+  "errors": 0,
+  "skipped": 27,
+  "passed": 277,
+  "reports": 53,
+  "logSha256": "e7c252eca994e1673f5ffe91f685efe6baadb5e81a36f8bf85225f70dc64f694",
+  "sourceFiles": "source-files.json",
+  "optionalCloneValidation": "schema-validation-result.json",
+  "skipExplanation": "19 baseline live/data/PG opt-ins + 6 communication PG cases + 2 upgraded-clone validation cases; clone cases executed separately 2/2"
+}
