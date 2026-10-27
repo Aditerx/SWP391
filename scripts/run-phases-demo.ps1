@@ -10,8 +10,13 @@ $db = "scms_phases_demo_$stamp"
 Push-Location $repo
 try {
     $source = (git rev-parse HEAD).Trim()
+    # Windows PowerShell treats Git's ordinary progress on stderr as an error record.
+    # Check the native exit code; keep real worktree failures fatal.
+    $ErrorActionPreference = 'Continue'
     git worktree add --detach $checkout $source
-    if ($LASTEXITCODE) { throw 'Could not create isolated committed checkout' }
+    $worktreeExit = $LASTEXITCODE
+    $ErrorActionPreference = 'Stop'
+    if ($worktreeExit) { throw 'Could not create isolated committed checkout' }
     Push-Location $checkout
     try {
         if (Test-Path .env) { throw 'Demo checkout must not contain .env' }
