@@ -654,6 +654,10 @@ CREATE TABLE IF NOT EXISTS notifications (
     content         TEXT,
     type            VARCHAR(20) NOT NULL DEFAULT 'Other'
         CHECK (type IN ('Schedule', 'Payment', 'System', 'Promotion', 'Other')),
+    notification_type VARCHAR(40),
+    related_type    VARCHAR(40),
+    related_id      INT,
+    dedupe_key      VARCHAR(180),
     is_read         BOOLEAN NOT NULL DEFAULT FALSE,
     created_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_noti_user   FOREIGN KEY (user_id)   REFERENCES users(user_id) ON DELETE CASCADE,
@@ -661,21 +665,73 @@ CREATE TABLE IF NOT EXISTS notifications (
 );
 
 CREATE INDEX IF NOT EXISTS idx_noti_user ON notifications(user_id);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_notifications_dedupe_key
+    ON notifications (dedupe_key) WHERE dedupe_key IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_notifications_created_at
+    ON notifications (created_at DESC, notification_id DESC);
 
 CREATE TABLE IF NOT EXISTS notification_recipients (
     notification_id INT NOT NULL,
     user_id         INT NOT NULL,
     is_read         BOOLEAN NOT NULL DEFAULT FALSE,
     read_at         TIMESTAMP NULL,
+    created_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT pk_notification_recipients PRIMARY KEY (notification_id, user_id),
     CONSTRAINT fk_nr_notification FOREIGN KEY (notification_id) REFERENCES notifications(notification_id) ON DELETE CASCADE,
     CONSTRAINT fk_nr_user         FOREIGN KEY (user_id)         REFERENCES users(user_id)
 );
 
 CREATE INDEX IF NOT EXISTS idx_nr_user ON notification_recipients(user_id);
+CREATE INDEX IF NOT EXISTS idx_notification_recipients_feed
+    ON notification_recipients (user_id, is_read, created_at DESC);
 
 -- =====================================================================
--- 10. AI CONSULTATIONS
+-- 10. SUPPORT CHAT
+-- =====================================================================
+
+CREATE TABLE IF NOT EXISTS chat_conversations (
+    id SERIAL PRIMARY KEY,
+    member_user_id INT NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+    status VARCHAR(16) NOT NULL DEFAULT 'OPEN' CHECK (status IN ('OPEN','CLOSED')),
+    assigned_staff_user_id INT NULL REFERENCES users(user_id) ON DELETE SET NULL,
+    handler_type VARCHAR(16) NOT NULL DEFAULT 'STAFF' CHECK (handler_type IN ('STAFF','AI')),
+    subject VARCHAR(200) NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    last_message_at TIMESTAMP NULL,
+    closed_at TIMESTAMP NULL
+);
+CREATE INDEX IF NOT EXISTS idx_chat_conversations_member ON chat_conversations(member_user_id);
+CREATE INDEX IF NOT EXISTS idx_chat_conversations_inbox ON chat_conversations(status,last_message_at DESC,id DESC);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_chat_conversations_member_open
+    ON chat_conversations(member_user_id) WHERE status='OPEN';
+
+CREATE TABLE IF NOT EXISTS chat_messages (
+    id SERIAL PRIMARY KEY,
+    conversation_id INT NOT NULL REFERENCES chat_conversations(id) ON DELETE CASCADE,
+    sender_type VARCHAR(16) NOT NULL CHECK (sender_type IN ('MEMBER','STAFF','AI','SYSTEM')),
+    sender_user_id INT NULL REFERENCES users(user_id) ON DELETE SET NULL,
+    content TEXT NOT NULL,
+    content_type VARCHAR(16) NOT NULL DEFAULT 'TEXT',
+    metadata TEXT NULL,
+    client_message_id VARCHAR(100) NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_chat_messages_conversation ON chat_messages(conversation_id);
+CREATE INDEX IF NOT EXISTS idx_chat_messages_cursor ON chat_messages(conversation_id,id);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_chat_message_client_id
+    ON chat_messages(conversation_id,sender_user_id,client_message_id) WHERE client_message_id IS NOT NULL;
+
+CREATE TABLE IF NOT EXISTS chat_read_state (
+    conversation_id INT NOT NULL REFERENCES chat_conversations(id) ON DELETE CASCADE,
+    user_id INT NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+    last_read_message_id INT NULL REFERENCES chat_messages(id) ON DELETE SET NULL,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY(conversation_id,user_id)
+);
+
+-- =====================================================================
+-- 11. AI CONSULTATIONS
 -- =====================================================================
 
 CREATE TABLE IF NOT EXISTS ai_consultations (
@@ -846,6 +902,8 @@ INSERT INTO permissions (permission_name, description) VALUES
 ('MANAGE_SUBSCRIPTIONS', 'Dang ky va gia han goi tap'),
 ('MANAGE_PERMISSIONS',   'Chi quan tri vien duoc cau hinh ma tran phan quyen'),
 ('MANAGE_INVOICES',      'Quan ly va xem hoa don cua cac thanh vien'),
+('CHAT_AS_MEMBER',       'Member may access their own support chat'),
+('HANDLE_CHAT',          'Receptionist and CenterManager may handle support chats'),
 ('LOCK_SUBJECTS',        'Khoa hoac mo mon hoc'),
 ('MANAGE_SPECIALIZATIONS', 'Quan ly chuyen mon huan luyen vien')
 ON CONFLICT (permission_name) DO NOTHING;
@@ -862,6 +920,7 @@ FROM (VALUES
     ('CenterManager', 'HANDLE_SUPPORT'),
     ('CenterManager', 'VIEW_AUDIT_LOG'),
     ('CenterManager', 'MANAGE_INVOICES'),
+    ('CenterManager', 'HANDLE_CHAT'),
     ('Coach', 'MANAGE_TRAINING_PLAN'),
     ('Coach', 'RECORD_RESULT'),
     ('Receptionist', 'RECORD_RESULT'),
@@ -870,6 +929,8 @@ FROM (VALUES
     ('Receptionist', 'REGISTER_MEMBER'),
     ('Receptionist', 'MANAGE_SUBSCRIPTIONS'),
     ('Receptionist', 'MANAGE_INVOICES'),
+    ('Receptionist', 'HANDLE_CHAT'),
+    ('Member', 'CHAT_AS_MEMBER'),
     ('Admin', 'MANAGE_USERS'),
     ('Admin', 'VIEW_REPORTS'),
     ('Admin', 'VIEW_AUDIT_LOG'),

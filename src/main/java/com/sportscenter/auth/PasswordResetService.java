@@ -14,13 +14,18 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.security.SecureRandom;
 import java.time.LocalDateTime;
+import java.time.Clock;
+import java.time.Duration;
+import org.springframework.context.ApplicationEventPublisher;
 import java.util.List;
 import java.util.regex.Pattern;
 
 @Service
 @RequiredArgsConstructor
 public class PasswordResetService {
-    private final java.time.Clock clock;
+    private static final int MAX_OTP_ATTEMPTS = 5;
+    private static final int MAX_RESENDS_PER_HOUR = 3;
+    private static final long RESEND_WAIT_SECONDS = 60;
     public static final String GENERIC_FORGOT_MESSAGE =
             "Nếu email hợp lệ, hướng dẫn đặt lại mật khẩu sẽ được gửi đến hộp thư.";
     private static final String PURPOSE = "RESET_PASSWORD";
@@ -34,6 +39,8 @@ public class PasswordResetService {
     private final AuditService auditService;
     private final SessionRegistry sessionRegistry;
     private final UserDetailsService userDetailsService;
+    private final Clock clock;
+    private final ApplicationEventPublisher events;
 
     @Transactional
     public void requestReset(String rawEmail) {
@@ -51,7 +58,22 @@ public class PasswordResetService {
         }
         String otp = generateOtp();
         storeOtp(email, user, otp, PURPOSE);
-        emailService.sendOtpEmail(email, otp, PURPOSE);
+        events.publishEvent(new OtpMailEvent(email, otp, PURPOSE));
+    }
+
+    @Transactional
+    public void resend(String rawEmail) {
+        String email = normalize(rawEmail);
+        LocalDateTime now = LocalDateTime.now(clock);
+        var latest = otpRepository.findFirstByEmailIgnoreCaseAndPurposeOrderByCreatedAtDesc(email, PURPOSE).orElse(null);
+        if (latest != null && latest.getCreatedAt() != null) {
+            long elapsed = Duration.between(latest.getCreatedAt(), now).getSeconds();
+            if (elapsed < RESEND_WAIT_SECONDS)
+                throw new BusinessException("OTP_RESEND_TOO_SOON: " + (RESEND_WAIT_SECONDS - Math.max(0, elapsed)));
+        }
+        if (otpRepository.countByEmailIgnoreCaseAndPurposeAndCreatedAtAfter(email, PURPOSE, now.minusHours(1)) >= MAX_RESENDS_PER_HOUR)
+            throw new BusinessException("OTP_RESEND_LIMIT: Đã đạt giới hạn gửi OTP trong giờ này.");
+        requestReset(rawEmail);
     }
 
     @Transactional(noRollbackFor = BusinessException.class)
@@ -62,16 +84,23 @@ public class PasswordResetService {
         if (otp == null || otp.getUser() == null) {
             throw new BusinessException("OTP is invalid or expired");
         }
-        if (otp.getExpiresAt().isBefore(LocalDateTime.now(clock))) {
+        if (!otp.getExpiresAt().isAfter(LocalDateTime.now(clock))) {
             otp.setUsed(true);
             otpRepository.save(otp);
             throw new BusinessException("OTP is invalid or expired");
         }
+        if (otp.getAttempts() >= MAX_OTP_ATTEMPTS) {
+            otp.setUsed(true);
+            otpRepository.save(otp);
+            throw new BusinessException("OTP_ATTEMPTS_EXCEEDED: Vui lòng yêu cầu mã OTP mới.");
+        }
         if (!passwordEncoder.matches(request.otp(), otp.getOtpHash())) {
             otp.setAttempts(otp.getAttempts() + 1);
-            if (otp.getAttempts() >= 3) otp.setUsed(true);
+            if (otp.getAttempts() >= MAX_OTP_ATTEMPTS) otp.setUsed(true);
             otpRepository.save(otp);
-            throw new BusinessException("OTP is invalid or expired");
+            throw new BusinessException(otp.isUsed()
+                    ? "OTP_ATTEMPTS_EXCEEDED: Vui lòng yêu cầu mã OTP mới."
+                    : "OTP_INVALID: Mã OTP không hợp lệ.");
         }
 
         User user = otp.getUser();

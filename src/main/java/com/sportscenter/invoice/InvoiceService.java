@@ -7,6 +7,9 @@ import com.sportscenter.enrollment.ClassEnrollment;
 import com.sportscenter.enrollment.ClassEnrollmentRepository;
 import com.sportscenter.membership.MemberPackage;
 import com.sportscenter.membership.MemberPackageRepository;
+import com.sportscenter.notification.NotificationEvent;
+import com.sportscenter.notification.NotificationTemplates;
+import com.sportscenter.notification.NotificationType;
 import com.sportscenter.membership.MembershipPackage;
 import com.sportscenter.membership.MembershipPackageRepository;
 import com.sportscenter.sportclass.SportsClass;
@@ -15,6 +18,7 @@ import com.sportscenter.user.User;
 import com.sportscenter.user.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,6 +26,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.Clock;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
@@ -41,6 +46,7 @@ public class InvoiceService {
     private final PaymentProperties paymentProperties;
     private final VnPayGateway vnPayGateway;
     private final com.sportscenter.session.ScheduleWriteLock scheduleWriteLock;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional(readOnly = true)
     public List<InvoiceResponse> findAll(Integer memberId, Integer packageId, Integer receptionistId,
@@ -228,6 +234,10 @@ public class InvoiceService {
         invoice.setPaymentStatus("Expired");
         expireLinked(invoice);
         auditService.log(null, "EXPIRE_INVOICE", "invoices", invoice.getInvoiceId(), "Pending invoice expired");
+        eventPublisher.publishEvent(NotificationTemplates.event(NotificationType.PAYMENT_EXPIRED,
+                List.of(invoice.getMember().getId()),
+                NotificationTemplates.paymentExpired(invoice.getInvoiceCode()),
+                "INVOICE", invoice.getInvoiceId(), "PAYMENT_EXPIRED:" + invoice.getInvoiceId()));
         return true;
     }
 
@@ -240,6 +250,16 @@ public class InvoiceService {
         invoice.setPaymentDate(LocalDateTime.now(clock));
         if (invoice.getSubscription() != null) activateSubscription(invoice.getSubscription());
         if (invoice.getSportsClass() != null) activateClassEnrollment(invoice);
+        eventPublisher.publishEvent(NotificationTemplates.event(NotificationType.PAYMENT_SUCCESS,
+                List.of(invoice.getMember().getId()),
+                NotificationTemplates.paymentSuccess(invoice.getInvoiceCode()),
+                "INVOICE", invoice.getInvoiceId(), "PAYMENT_SUCCESS:" + invoice.getInvoiceId()));
+        if (invoice.getSportsClass() != null && !invoice.getSportsClass().isAdvanced()) {
+            eventPublisher.publishEvent(NotificationTemplates.event(NotificationType.ENROLLMENT_CONFIRMED,
+                    List.of(invoice.getMember().getId()),
+                    NotificationTemplates.enrollmentConfirmed(invoice.getSportsClass().getName()),
+                    "CLASS", invoice.getSportsClass().getId(), "ENROLLMENT_CONFIRMED:" + invoice.getInvoiceId()));
+        }
         auditService.log(receptionist != null ? receptionist.getId() : null,
                 paidAfterExpiry ? "PAID_AFTER_EXPIRY" : "PROCESS_PAYMENT", "invoices", invoice.getInvoiceId(),
                 "Invoice " + invoice.getInvoiceCode() + " paid by " + invoice.getPaymentMethod());

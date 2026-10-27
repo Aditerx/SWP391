@@ -39,4 +39,9 @@ public interface MemberPackageRepository extends JpaRepository<MemberPackage, In
 
     @Query("SELECT mp FROM MemberPackage mp WHERE mp.status = 'Active' AND mp.endDate < :today")
     List<MemberPackage> findExpiredActivePackages(@Param("today") LocalDate today);
+
+    @Query("SELECT mp FROM MemberPackage mp JOIN FETCH mp.member m JOIN FETCH mp.membershipPackage p " +
+            "WHERE mp.status = 'Active' AND p.packageType = 'Advanced' AND mp.endDate BETWEEN :fromDate AND :toDate")
+    List<MemberPackage> findActiveAdvancedExpiringBetween(@Param("fromDate") LocalDate fromDate,
+                                                          @Param("toDate") LocalDate toDate);
 }

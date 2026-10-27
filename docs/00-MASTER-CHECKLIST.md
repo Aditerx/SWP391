@@ -14,10 +14,11 @@ Tài liệu này là chốt chặn quản lý tiến độ tổng thể và lị
 **Lưu ý:** Các dấu hoàn thành của các đợt trước là lịch sử triển khai, không phải xác nhận hệ thống đã đạt toàn bộ yêu cầu. Kết quả test xanh hiện tại chưa chứng minh tuân thủ hai PDF.
 
 ### Checklist tích hợp còn lại
+- [x] Xử lý merge SMTP/OTP đăng ký, chatbox và thông báo từ `3309b02` vào tai nền `fc00c64`: 8 file conflict đã ghép, giữ guards/locks/lifecycle; clean test 269 run/250 pass/19 skip/0 lỗi. Chứng cứ docs 02 mục 9.14; không phải hoàn thành D01/D09 hoặc hai phase.
 - [x] Rà/push mốc bàn giao tai `9097197`, AGENTS/checklist/ownership theo [04-DEBUG-NOTE.md mục 40](04-DEBUG-NOTE.md). Baseline clean test 223/204 pass/19 skip/0 lỗi, PG riêng 14 pass; chứng cứ docs 02 mục 9.10. Đây chưa phải triển khai feature mới/deploy.
 - [x] Kết nối DB test Supabase mới: Owner chọn DB_PASSWORD hiện tại; đã chuẩn hóa DB_URL không nhúng credential, JDBC sslmode=require, SELECT trong transaction chỉ đọc và rollback thành công. Bằng chứng docs 02 mục 9.13; .env ignored/không commit.
 - [ ] DB Supabase mới chưa có schema SCMS: kiểm metadata thấy 0 bảng public, chưa có sessions.subscription_id. Chưa chạy migration/seed hoặc kiểm API/FE trên DB này; khởi tạo DB cần phạm vi triển khai riêng.
-- [ ] Gói đồng đội T ~15%: D01 hồ sơ Member + D09 Coach directory, contract/tests/evidence thật, hai commit chức năng; merge sớm/chạy lại kiểm trên nhánh tích hợp. Phạm vi/prompt ở 40.3/40.7; chưa thực hiện.
+- [ ] Gói T dự kiến ~15%: D01 hồ sơ Member + D09 Coach directory, contract/tests/evidence thật, hai commit chức năng; chưa thực hiện. Owner làm rõ đồng đội hiện làm SMTP/OTP đăng ký, chatbox cơ bản và thông báo, không phải gói T. Phạm vi/prompt T giữ ở 40.3/40.7; cập nhật bàn giao ở 40.12, hai phase tiếp tục session sau.
 - [ ] Phase 1 ~40%: catalog/giá → đăng ký môn/Coach/năng lực → hạn skip → mua/Cash/VNPay/ghi nhận quyền; gộp T và demo API/PG thật. Cổng P1 ở 40.4/40.6; chưa code/test, chưa coi P1 là release đầy đủ.
 - [ ] Phase 2 ~45%, sau P1: booking/dời/hủy/báo vắng → sự cố/Holiday/expiry → attendance/QR/bù báo muộn → hoàn/sửa Cash → report/quyền/FE E2E. Thứ tự và nghiệm thu ở 40.5/40.6; không dùng test/probe lịch sử làm bằng chứng mới.
 - [ ] Báo cáo sau triển khai phải có đủ tiền đã thu/đã hoàn/thu ròng theo 04 mục 39.3; FE quyết định trình bày. Công bố field/DTO/compatibility totalRevenue thật, kiểm hoàn khác kỳ/đã duyệt chưa hoàn/Cash ghi nhầm và quyền D18; chưa API mới khả dụng.
@@ -30,6 +31,13 @@ Tài liệu này là chốt chặn quản lý tiến độ tổng thể và lị
 ---
 
 ## 📜 PHẦN II: LỊCH SỬ HOÀN THÀNH (HISTORY)
+
+### [27/10/2026] Xử lý conflict nhánh SMTP/OTP, chatbox và thông báo
+
+- Owner làm rõ phạm vi đồng đội là SMTP/OTP đăng ký, chatbox cơ bản và thông báo; D01/D09 vừa phân chưa làm. Giữ backlog/hai phase, tiếp tục session sau theo docs 04 mục 40.12.
+- Ghép 8 file conflict của merge `fc00c64` + `3309b02`; giữ Clock, locking, kiểm quyền, lifecycle Completed và toggle chế tài. Sửa import ZoneId và Clock trùng do auto-merge, đồng bộ hai schema PostgreSQL ở mức file và giữ API contract cũ + phần OTP/notification/chat mới.
+- Chạy `.\mvnw.cmd clean test`: 269 run, 250 pass, 19 skip, 0 failure/error, BUILD SUCCESS. Không đổi expected để làm xanh. Kết quả nhánh đồng đội 193/198/224 phía dưới là lịch sử, không phải kết quả tích hợp này.
+- Chưa SMTP delivery thật, migration 05 notification/06 chat trên PostgreSQL, FE browser, VNPay live hoặc deploy. Không sửa .env/old-docs hoặc chạy mutation DB cloud; bằng chứng tại artifacts/merge-2026-10-27 và docs 02 mục 9.14.
 
 ### [27/10/2026] Kết nối Supabase mới thành công sau chuẩn hóa JDBC
 
@@ -553,6 +561,16 @@ Theo yêu cầu người dùng: xử lý phần không cần quyết định, bu
 - [x] Bổ sung Unit Test cho: Slot Validator 7 ca chuẩn & Outdoor Heat Policy (26 tests).
 - [x] Chạy kiểm tra hồi quy: `.\mvnw.cmd test` đảm bảo 100% tests pass (178 tests run, 163 passed, 15 skipped, 0 fail).
 
+### Giai đoạn 8: Thông Báo Trong Ứng Dụng
+- [x] Mở rộng tương thích ngược `notifications` và `notification_recipients`; giữ dữ liệu và luồng legacy.
+- [x] API danh sách, lọc, đếm chưa đọc, đánh dấu một/tất cả đã đọc; giới hạn theo user đăng nhập.
+- [x] Event listener chạy AFTER_COMMIT trong transaction riêng; lỗi lưu thông báo không ảnh hưởng nghiệp vụ chính.
+- [x] Tích hợp 13 loại sự kiện, job nhắc lịch 24 giờ và job gói 1:1 sắp hết hạn.
+- [x] Bổ sung test service, controller/role, listener và job với Clock cố định.
+- [x] Cập nhật hợp đồng API và hướng dẫn migration.
+- [x] Chạy hồi quy `.\mvnw.cmd clean test`: 193 tests run, 178 passed, 15 skipped, 0 failed.
+- [ ] Chạy migration 05 trên PostgreSQL DB sạch và DB có notifications legacy để xác nhận thực tế.
+
 ---
 
 
@@ -711,6 +729,18 @@ Theo AGENTS 2.9, dừng ở bước lựa chọn quy tắc khi hai nguồn xung 
 
 Cả hai hướng đều cần quyết định rõ Q-02/03/05/06/07. Chưa áp dụng hướng nào. Trước khi bàn giao triển khai tiếp, cần kiểm thử tích hợp DB: tranh suất cuối, hai gói tranh Coach/phòng, hết hạn và tiền về muộn, Cash/callback lặp, owner/assignment, ngày ca ngoài hạn, no-show/hoàn credit và lifecycle Completed. Không kết luận hệ thống đã sẵn sàng chỉ từ 163 unit tests pass.
 
+### [23/10/2026] — Hoàn thiện đăng ký OTP qua Gmail (backend)
+- Đã hoàn thiện luồng OTP đăng ký: Pending, giới hạn resend/attempt, demo OTP bật tường minh, mail AFTER_COMMIT và lỗi xác thực phân biệt.
+- Đã đồng bộ cấu hình Gmail và tài liệu deploy/API; schema hiện đủ cột nên không tạo migration 06.
+- Baseline trước sửa: 193 tests run (178 passed, 15 skipped, 0 failed). Sau sửa: 198 tests run (183 passed, 15 skipped, 0 failed).
+- Việc chờ xác nhận thủ công: Gmail App Password, biến môi trường Render và gửi thử email thật.
+
+### [Đợt 22/10/2026] — Giai đoạn 8: Thông Báo Trong Ứng Dụng
+* **Trạng thái:** Code và kiểm thử Backend hoàn tất; cần xác nhận migration trên PostgreSQL mới và có dữ liệu cũ.
+* **Thay đổi:** Mở rộng schema notification tương thích ngược, API cá nhân, 13 loại event, job nhắc lịch và gói sắp hết hạn; FE không thay đổi.
+* **Kiểm thử:** 193 tests run, 178 passed, 15 skipped, 0 failed, 0 errors (`.\mvnw.cmd clean test`).
+* **DB:** Migration được rà cú pháp/idempotence; chưa chạy trên PostgreSQL vì môi trường hiện tại không có `psql`, Docker hay kết nối DB được cấp.
+
 ### [Đợt 20/10/2026] — Chuẩn Hóa DTOs Danh Mục & Hoàn Thiện Hợp Đồng API Frontend (Sẵn Sàng Giai Đoạn 6)
 * **Trạng thái:** Hoàn tất 100%, 178 tests run (163 passed, 15 skipped, 0 fail, 0 error).
 * **Các hạng mục đã hoàn thiện:**
@@ -753,3 +783,18 @@ Cả hai hướng đều cần quyết định rõ Q-02/03/05/06/07. Chưa áp d
 
 ### [Đợt 20/10/2026] — Giai đoạn 1: Chuẩn Hóa CSDL & Migration Flow V2
 * **Trạng thái:** Hoàn tất 100%. File migration: `database/migrations/04_migration_member_flow_v2.sql`.
+
+## Giai đoạn 9: Chat hỗ trợ Member – Receptionist (Backend)
+- [x] Tạo migration 06 idempotent cho conversation, messages, read state và quyền `CHAT_AS_MEMBER` / `HANDLE_CHAT`; đồng bộ schema PostgreSQL.
+- [x] Triển khai API member, inbox staff, pagination cursor, read state theo từng user, claim/release/close/reopen, rate limit và idempotency.
+- [x] Kiểm tra quyền staff ở controller và service; Member chỉ truy cập conversation của mình; Coach bị từ chối.
+- [x] Phát message event AFTER_COMMIT; tái sử dụng notification event/listener, dedupe theo message; thêm `ChatResponder` extension và escalation.
+- [x] Bổ sung test service/controller, cập nhật API contract, database README và migration deploy guide.
+- [x] Baseline `mvnw test`: 198 run, 183 passed, 15 skipped, 0 failed. Sau thay đổi `mvnw clean test`: 224 run, 209 passed, 15 skipped, 0 failed.
+
+### [24/10/2026] — Giai đoạn 9: Chat hỗ trợ Member – Receptionist
+- **Trạng thái:** Backend, migration, contract và test đã cập nhật; không thay đổi FE, không tạo commit.
+- **Tái sử dụng:** Session auth, dynamic permissions, audit log, `Clock`, notification AFTER_COMMIT và `dedupe_key`.
+- **Bổ sung:** `chat_conversations`, `chat_messages`, `chat_read_state`, chat API, two chat permissions, post-commit responder/notification listeners, escalation.
+- **Database:** Migration `06_migration_chat.sql` là additive/idempotent; chưa chạy trên PostgreSQL thật nếu môi trường không cung cấp DB.
+- **Kiểm thử:** `mvnw clean test` — 224 run, 209 passed, 15 skipped, 0 failures/errors.

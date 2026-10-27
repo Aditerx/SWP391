@@ -1,0 +1,8 @@
+Command: .\mvnw.cmd clean test
+Merge parents: fc00c6499547a2873da6787326d508140e24b0fd + 3309b0271326fc634dbe54abfb552ad9571bb613
+[WARNING] Tests run: 269, Failures: 0, Errors: 0, Skipped: 19
+[INFO] BUILD SUCCESS
+[INFO] Total time:  01:13 min
+[INFO] Finished at: 2026-10-27T07:18:53+07:00
+XML aggregate: {"tests": 269, "failures": 0, "errors": 0, "skipped": 19, "passed": 250}
+Local unit/MockMvc/H2 only; cloud/migration/SMTP delivery not verified.

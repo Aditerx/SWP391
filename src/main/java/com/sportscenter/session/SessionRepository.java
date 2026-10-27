@@ -125,6 +125,12 @@ public interface SessionRepository extends JpaRepository<Session, Integer> {
 
     List<Session> findBySessionDateBetween(LocalDate startDate, LocalDate endDate);
 
+    @Query("SELECT s FROM Session s JOIN FETCH s.sportsClass c LEFT JOIN FETCH c.subject " +
+            "LEFT JOIN FETCH c.coach LEFT JOIN FETCH s.coach LEFT JOIN FETCH s.bookedMember " +
+            "JOIN FETCH s.room r WHERE s.status = 'Scheduled' AND s.sessionDate BETWEEN :startDate AND :endDate")
+    List<Session> findScheduledBetweenDates(@Param("startDate") LocalDate startDate,
+                                           @Param("endDate") LocalDate endDate);
+
     long countBySessionDate(LocalDate sessionDate);
 
     @Query("SELECT s FROM Session s WHERE s.sportsClass.id = :classId AND s.status <> 'Cancelled' " +

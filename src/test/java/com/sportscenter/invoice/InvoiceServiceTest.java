@@ -17,6 +17,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.context.ApplicationEventPublisher;
+import java.time.Clock;
+import java.time.ZoneId;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -31,7 +34,6 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class InvoiceServiceTest {
     @Mock private com.sportscenter.session.ScheduleWriteLock scheduleWriteLock;
-    @org.mockito.Spy private java.time.Clock clock = java.time.Clock.system(java.time.ZoneId.of("Asia/Ho_Chi_Minh"));
     @Mock InvoiceRepository invoiceRepository;
     @Mock UserRepository userRepository;
     @Mock MembershipPackageRepository membershipPackageRepository;
@@ -41,6 +43,8 @@ class InvoiceServiceTest {
     @Mock AuditService auditService;
     @Mock PaymentProperties paymentProperties;
     @Mock VnPayGateway vnPayGateway;
+    @Mock ApplicationEventPublisher eventPublisher;
+    @org.mockito.Spy Clock clock = Clock.system(ZoneId.of("Asia/Ho_Chi_Minh"));
     @InjectMocks InvoiceService invoiceService;
 
     @org.junit.jupiter.api.BeforeEach void centerFixtures() {

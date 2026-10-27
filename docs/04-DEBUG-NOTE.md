@@ -39,6 +39,8 @@ Giữ Clock Asia/Ho_Chi_Minh, Invoice.amount bất biến, Paid mới kích ho�
 
 **Phân công đề xuất 27/10 tại mục 40:** T ~15% (D01 + D09, file ownership riêng), Phase 1 ~40% (catalog/đăng ký/mua–thanh toán/quyền), Phase 2 ~45% (dùng quyền/lịch/sự cố/attendance/đối soát/report). Có prompt gửi đồng đội 40.7 và chuẩn evidence 40.6. Owner đã yêu cầu review/commit/push baseline lên tai; chưa bắt đầu coding các feature trong phân công hoặc deploy, không thay business rule.
 
+**Làm rõ mới nhất của Owner:** đồng đội làm SMTP cho OTP đăng ký email, chatbox cơ bản và thông báo; gói D01/D09 vừa đề xuất chưa làm. Lượt hiện tại xử lý merge nhánh đồng đội `3309b02` vào tai từ `fc00c64`, không triển khai hai phase. Session sau đọc 40.12 và git status/log trước tiếp tục; không suy OTP/chat/notification đã có nghĩa D01/D09 hoặc P1/P2 hoàn tất.
+
 **Bàn giao mới nhất:** baseline đã push `9097197`, cập nhật chẩn đoán `7c29607`; clean test 223/204 pass/19 skip/0 lỗi, PG local riêng 14 tests pass (docs 02 mục 9.10). Owner chọn DB_PASSWORD hiện tại, đã chuẩn hóa DB_URL local ignored và kết nối Supabase chỉ đọc/rollback thành công; public có 0 bảng, chưa có schema SCMS. Chưa migration/seed/boot Spring/jobs/API/FE trên DB mới; bằng chứng docs 02 mục 9.13. Không hỏi lại nguồn password hoặc yêu cầu gửi secret.
 
 **Cập nhật 27/10:** đã đi qua D09–D19 và chốt phần báo cáo tiền tại 39.3; các ghi chú “còn D10–D19/chờ chọn” ở checkpoint/đoạn phân tích cũ là lịch sử, đối chiếu quyết định cuối trong bảng 0.2. Vẫn đang plan, chưa sửa BE/DB/deploy. D09 còn cần tái hiện/sửa/test theo 20.6; chưa đánh dấu mọi chi tiết triển khai/nghiệm thu hoàn tất. Khi chuẩn bị code cần gom backlog theo phụ thuộc và đồng bộ tài liệu/policy cũ với quyết định mới, không hỏi lại các lựa chọn đã chốt.
@@ -68,6 +70,7 @@ Workspace D:\Projects\SWP391. Chúng ta là phía BE của SCMS.
 Kế thừa D01–D08 đã chốt, không hỏi lại. Hiện đang phân tích/chốt và chuẩn bị sửa, chưa tự triển khai tất cả hoặc chạy mutation DB/deploy.
 Tiếp tục D09: log đã xác nhận LazyInitializationException Specialization#5/no Session; chính chúng ta xử lý BE, không chờ BE khác. Đọc source và lập bước tái hiện/sửa/kiểm thử; phân biệt lỗi đã có log với URI/frame còn cần kiểm. Không yêu cầu gửi lại log 20.5.
 Kiểm git status/diff, giữ thay đổi workspace/old-docs. Phân tích tuần tự phần còn mở, hỏi khi có mâu thuẫn/nghiệp vụ mới; triển khai theo phạm vi tôi yêu cầu. Sau sửa BE chạy .\mvnw.cmd clean test. Cập nhật docs 01 API thật/handoff FE, docs 02 migration/deploy/bằng chứng, docs 04 quyết định, docs 00 tiến độ. API dự kiến không được coi là đã chạy.
+Owner đã làm rõ: đồng đội làm SMTP/OTP đăng ký, chatbox cơ bản và thông báo; gói D01/D09 vừa phân chưa làm. Đọc thêm mục 40.12 về xử lý merge và trạng thái kiểm. Hai phase chỉ tiếp tục trong session sau theo phạm vi Owner yêu cầu, không coi việc merge feature của đồng đội là đã triển khai phase.
 ```
 
 Ngày mở: 25/10/2026. Trạng thái: **D01 đã chốt phương án; D02 đã chốt 9 môn/18 giá, giữ ID 19–27/xóa bản dư và phạm vi đối soát fixture; D03-a đã chốt mô hình mua, Owner đồng ý hướng D03-b và bỏ nhập lịch rảnh, D03-c đã chốt 1080 giờ từ Paid cùng cơ chế thông tin hạn; D04-a chốt A (Coach chính tạo, Manager hỗ trợ, xác nhận trao đổi). Handoff BE tại 11.16/12.4, FE tại API contract mục 14; D05-a đã chốt hủy Advanced >=12 giờ hoàn một credit, D05-b đã chốt A (báo vắng riêng, điểm danh thực tế), D06-a đã chốt A (Manager ghi nhận đồng ý), D06-b đã chốt A ngoại lệ notice khi dời do trung tâm, D07-a đã chốt A kèm UI/UX chung tạo–dời ca, D07-b đã chốt A Manager duyệt bất khả kháng sát giờ, D07-c đã chốt chỉ bỏ dấu khi Dời ca thật sự đổi ngày/giờ, D08-a đã chốt B gia hạn toàn gói theo thời gian ảnh hưởng, D08-b đã chốt bù gián đoạn thực tế và Manager duyệt thêm đủ ca bù, D08-c đã chốt phục hồi credit thu hồi có căn cứ, D08-d đã chốt Chờ khắc phục/duyệt sau, D09 log đã xác nhận lỗi lazy Specialization, cần kiểm gắn endpoint/tái hiện khi sửa; chưa triển khai**.
@@ -1741,6 +1744,8 @@ Khi code phải công bố tên field/DTO chính xác, nghĩa/kỳ lọc và com
 
 ## 40. Phân công ba phần và hai phase chính — đề xuất 27/10/2026
 
+> **Cập nhật Owner sau phân công:** gói T bên dưới là đề xuất chưa được thực hiện; công việc đồng đội thực tế là SMTP/OTP đăng ký, chatbox cơ bản và thông báo. Giữ phạm vi D01/D09 và hai phase như backlog, không đánh dấu hoàn tất do merge các feature khác. Trạng thái merge/kiểm/bàn giao mới nhất tại 40.12.
+
 ### 40.1. Mục tiêu, tỷ trọng và nguyên tắc thực hiện
 
 Owner yêu cầu giao đồng đội phần nhỏ khoảng 10–20%, ít va chạm/ngoài flow chính; phần còn lại làm hai phase tuần tự, gộp phụ thuộc và kiểm liên tục, demo thật/có bằng chứng. Phân công dưới đây là đề xuất triển khai, không thay business rule hoặc cho phép tự chạy code/DB/deploy trong lượt lập plan. Không gọi 19 mã D là 19 khối bằng nhau.
@@ -1881,3 +1886,13 @@ Thử lại sau Owner cập nhật .env: host pooler mới phân giải DNS đư
 **Kết quả cuối:** Owner chọn dùng DB_PASSWORD hiện tại. Đã sửa duy nhất DB_URL local ignored thành JDBC Session pooler không nhúng credential, giữ nguyên DB_USERNAME/DB_PASSWORD. Kiểm JDBC thực thành công: sslmode=require, SELECT 1=1, PostgreSQL 17.11, transaction_read_only=on, rollback/đóng kết nối hoàn tất. Public có 0 bảng, chưa có sessions.subscription_id/schema SCMS; chưa migration/seed hoặc kiểm API/FE trên DB mới. Lỗi và câu “chưa kết nối” ở các đoạn trước là lịch sử, không hỏi lại nguồn password.
 
 Bằng chứng JSON hiện tại và nhãn SSL đúng phạm vi tại docs 02 mục 9.13; pg_stat_ssl là kết nối phía PostgreSQL sau pooler, không đo đường JDBC tới pooler. Các lượt kiểm đều không boot Spring/jobs hay ghi dữ liệu nghiệp vụ. Baseline clean test/PG giữ nguyên kết quả đã chạy; lượt chuẩn hóa chỉ thay .env ignored, checker và docs/evidence, chưa triển khai feature hoặc deploy.
+
+### 40.12. Checkpoint sau xử lý conflict — tiếp tục hai phase ở session sau
+
+**Owner làm rõ:** đồng đội làm SMTP gửi OTP đăng ký email, chatbox cơ bản và thông báo; gói T D01/D09 vừa đề xuất chưa được làm. Không đánh dấu T hoàn thành hoặc dùng merge này làm nghiệm thu hai phase. D01/D09 vẫn là backlog với phạm vi/checklist đã ghi; không hỏi lại D01–D19 đã chốt.
+
+**Merge hiện tại:** tai nền `fc00c64` + nhánh đồng đội `3309b02`. Đã ghép 8 file conflict (API contract, hai service OTP, InvoiceService, MemberPackageService, SessionService, AttendanceFinalizationProcessor, BusinessGapAuditTest). Giữ guards/Clock/locks/lifecycle/toggle của tai và event/hooks/OTP của nhánh đồng đội; sửa import ZoneId, Clock trùng trong ba test, constructor fixture, thứ tự mục API và đồng bộ hai schema ở mức file. Không chọn nguyên ours/theirs để làm mất một bên, không thay expected để xanh.
+
+**Bằng chứng tích hợp:** `.\mvnw.cmd clean test` 269 run/250 pass/19 skip/0 failure-error, BUILD SUCCESS; XML đối chiếu log, artifact tại artifacts/merge-2026-10-27 và docs 02 mục 9.14. Hai lượt compile/testCompile trước fail do ghép import/Clock đã sửa. Đây là local unit/MockMvc/H2 của source hợp nhất, chưa SMTP delivery thật, migration notification/chat trên PostgreSQL, API/FE cloud hay deploy. Giữ .env/old-docs; DB Supabase mới đã kiểm kết nối trước đó nhưng public còn trống, chưa tự init/seed.
+
+**Session sau:** đọc AGENTS → docs 00 active → mục 0/40.12 → kế hoạch 40.3–40.6 và bằng chứng docs 02; kiểm git status/log lấy SHA thực. Trước bắt đầu P1 kiểm baseline hợp nhất, D01/D09 chưa làm và các dependency/migration/fixture; tiếp tục từng nhóm P1 rồi P2, kiểm liên tục đúng cổng. Không sửa FE_Project-main lỗi thời để coi FE hiện hành đã tích hợp; các file FE/dist có sẵn trong nhánh đồng đội được giữ nhưng chưa build/browser verified. Lượt này kết thúc ở xử lý merge/bàn giao, chưa thực hiện hai phase.

@@ -29,6 +29,7 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.time.*;
 import java.util.Collections;
@@ -71,6 +72,9 @@ class PrivateSessionServiceTest {
 
     @Mock
     private SubjectRepository subjectRepository;
+
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
 
     @Spy
     private SessionSlotValidator sessionSlotValidator = new SessionSlotValidator();

@@ -35,10 +35,13 @@ Khi tạo mới một **Web Service** trên Render Dashboard, cấu hình các b
 | `VNPAY_RETURN_URL` | `https://<ten-backend-domain>/api/payments/vnpay/return` | Có |
 | `FRONTEND_PAYMENT_RESULT_URL` | `https://<ten-fe-domain>/payment-result` | Có |
 | `FRONTEND_URL` | `https://<ten-fe-domain>` (Dùng để cấp phép CORS) | Có |
-| `SPRING_MAIL_HOST` | `smtp.gmail.com` *(Cấu hình sau deploy khi làm thông báo)* | Tùy chọn |
-| `SPRING_MAIL_PORT` | `587` | Tùy chọn |
-| `SPRING_MAIL_USERNAME` | `<gmail-cua-trung-tam>` | Tùy chọn |
-| `SPRING_MAIL_PASSWORD` | `<gmail-app-password>` | Tùy chọn |
+| `MAIL_USERNAME` | `<gmail-cua-trung-tam>` | Bắt buộc để gửi OTP |
+| `MAIL_APP_PASSWORD` | `<gmail-app-password-16-ky-tu>` | Bắt buộc để gửi OTP |
+| `REGISTRATION_DEMO_OTP` | Để trống; chỉ đặt mã cố định trong môi trường demo | Tùy chọn |
+
+`application.properties` đọc đúng hai biến Gmail `MAIL_USERNAME` và `MAIL_APP_PASSWORD`; các tên cũ `SPRING_MAIL_USERNAME` và `SPRING_MAIL_PASSWORD` không được đọc và không nên cấu hình. Host mặc định `smtp.gmail.com`, cổng `587`; SMTP có timeout 8 giây. Profile `demo` vẫn hoạt động và cũng chỉ bật OTP cố định khi đặt tường minh `REGISTRATION_DEMO_OTP`. Chế độ demo chỉ dùng cho đăng ký, không dùng cho quên/đặt lại mật khẩu.
+
+Tạo Gmail App Password: bật xác minh 2 bước cho tài khoản Gmail, sau đó tạo App Password 16 ký tự. Không dùng mật khẩu Gmail thông thường. Trên Render, đặt `MAIL_USERNAME` và `MAIL_APP_PASSWORD` trong Environment; không ghi bí mật vào repo. Sau deploy, kiểm tra đăng ký bằng địa chỉ email kiểm thử và xác nhận nhận email OTP. Lỗi gửi mail được ghi log không kèm OTP hay thông tin xác thực; người dùng có thể yêu cầu gửi lại.
 
 ---
 
@@ -105,7 +108,7 @@ Khi thực hiện thanh toán trên cổng VNPay Sandbox, nhập thông tin th�
 * **Kích thước Connection Pool (HikariCP):**
   * Trên Render gói Free/Starter, thiết lập `maximum-pool-size=5` (đã được cấu hình trong `application.properties`) để tránh cạn kiệt connection pool của Supabase.
 * **Migration Database:**
-  * File migration `database/migrations/04_migration_member_flow_v2.sql` phải được thực thi trong SQL Editor của Supabase trước khi start server.
+  * Đối chiếu theo đầy đủ tên file và trạng thái DB: `04_migration_member_flow_v2.sql`, `05_migration_notifications.sql`, `06_migration_chat.sql`, `06_schedule_safety_postgres.sql`, `07_session_subscription_postgres.sql`. Hai file prefix 06 là hai nội dung khác nhau; chat không thay schedule safety hoặc migration 07. Đây là hướng dẫn trước triển khai, không xác nhận đã chạy. DB mới đang trống cần kế hoạch khởi tạo schema/fixture riêng, không chỉ chạy migration nâng cấp.
 
 ---
 
@@ -382,3 +385,13 @@ JDBC dùng **client_sslmode=require**. Field **postgres_backend_tls=false** lấ
 Metadata thấy **0 bảng BASE TABLE trong schema public**, sessions.subscription_id chưa có. Chưa khởi tạo schema SCMS, kiểm API/FE, VNPay hoặc deploy trên DB mới. Việc chuẩn bị schema/fixture là bước triển khai riêng, không chạy ngầm từ yêu cầu kiểm kết nối.
 
 Bằng chứng hiện tại: [kết quả JDBC chỉ đọc](../artifacts/review-2026-10-27/supabase-connection-normalized.json), [manifest](../artifacts/review-2026-10-27/verification.json) và [checker](../artifacts/review-2026-10-27/CheckDb.java). Chạy lại từ root workspace bằng Java 17 với PostgreSQL JDBC 42.7.4 trong Maven cache, source launcher trỏ tới checker; checker tự đọc .env, không cần truyền password. Kết quả clean test/PG local tại 9.10 giữ nguyên phạm vi baseline; cập nhật này chỉ thay checker/bằng chứng/tài liệu và cấu hình local ignored, chưa sửa source ứng dụng.
+
+### 9.14. Tích hợp nhánh SMTP/OTP, chatbox và thông báo — 27/10/2026
+
+Owner yêu cầu xử lý conflict trước khi tiếp tục hai phase trong session sau. Merge nền tai `fc00c64` với `3309b02` có 8 file conflict: contract API, RegistrationService, PasswordResetService, InvoiceService, MemberPackageService, SessionService, AttendanceFinalizationProcessor và BusinessGapAuditTest. Giữ Clock Asia/Ho_Chi_Minh, ScheduleWriteLock/row locks, kiểm quyền, lifecycle Completed và toggle booking-block; ghép thêm event publisher/hooks, OTP async AFTER_COMMIT của nhánh đồng đội. Không triển khai các policy D01–D19 còn ở backlog từ thao tác merge này.
+
+Kiểm build phát hiện thêm import ZoneId bị mất và Clock trùng ở ba test do auto-merge; đã sửa phần ghép/fixture, không đổi assertions hoặc expected nghiệp vụ. Hai schema PostgreSQL root/database đã đồng bộ phần notification/chat ở mức file, API giữ mục 12–14 cũ và thêm mục 15–16 cho notification/chat. File docs/FEATURES-NOTIFICATION-OTP-CHAT.md của đồng đội được giữ làm mô tả source, không coi ví dụ là evidence live.
+
+**Kiểm thực tế sau sửa:** `.\mvnw.cmd clean test` BUILD SUCCESS, **269 tests / 250 pass / 19 skip / 0 failure-error**. XML Surefire được cộng và đối chiếu summary log; 19 skip thuộc các nhóm opt-in live/demo/prepare và PostgreSQL chuyên biệt. Hai lượt trước thất bại compile (ZoneId) và testCompile (Clock trùng) đã được sửa; không xóa tests để xanh. [Manifest merge](../artifacts/merge-2026-10-27/verification.json) và [test summary](../artifacts/merge-2026-10-27/test-summary.txt) ghi parents, phạm vi, suite/count/hash/giới hạn.
+
+Lượt này không đổi .env, không gửi email/OTP thật, không chạy migration/seed trên Supabase hoặc deploy. Các migration notification/chat chưa được kiểm thực thi PostgreSQL trong lượt merge; 14 tests PG ở 9.10 là baseline trước merge, không dùng thay cho nghiệm thu các migration mới. Còn SMTP delivery, DB migration/permission, API HTTP login thật/FE và cloud cần nghiệm thu riêng. D01/D09 chưa làm; checklist/hai phase và prompt tiếp nối tại docs 04 mục 40.12.

@@ -13,6 +13,9 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
+import org.springframework.context.ApplicationEventPublisher;
+import java.time.Clock;
+import java.time.ZoneId;
 
 import java.time.LocalDate;
 import java.util.Optional;
@@ -24,7 +27,6 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class MemberPackageExtensionTest {
     @Mock private com.sportscenter.session.ScheduleWriteLock scheduleWriteLock;
-    @org.mockito.Spy private java.time.Clock clock = java.time.Clock.system(java.time.ZoneId.of("Asia/Ho_Chi_Minh"));
 
     @Mock
     private MemberPackageRepository memberPackageRepository;
@@ -34,6 +36,12 @@ class MemberPackageExtensionTest {
 
     @Mock
     private AuditService auditService;
+
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
+
+    @org.mockito.Spy
+    private Clock clock = Clock.system(ZoneId.of("Asia/Ho_Chi_Minh"));
 
     @InjectMocks
     private MemberPackageService memberPackageService;

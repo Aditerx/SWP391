@@ -19,7 +19,7 @@ class BusinessGapAuditTest {
     @Test void cancelledSubscriptionRequiresPaidInvoiceBeforeReactivation() {
         var packages=mock(MemberPackageRepository.class);
         var invoices=mock(InvoiceService.class);
-        var service=new MemberPackageService(Clock.system(java.time.ZoneId.of("Asia/Ho_Chi_Minh")),packages,mock(MembershipPackageRepository.class),mock(UserRepository.class),mock(AuditService.class),invoices,mock(com.sportscenter.session.ScheduleWriteLock.class));
+        var service=new MemberPackageService(Clock.system(java.time.ZoneId.of("Asia/Ho_Chi_Minh")),packages,mock(MembershipPackageRepository.class),mock(UserRepository.class),mock(AuditService.class),invoices,mock(com.sportscenter.session.ScheduleWriteLock.class),mock(org.springframework.context.ApplicationEventPublisher.class));
         var mp=new MemberPackage(); mp.setSubscriptionId(9); mp.setStatus("Cancelled");
         // Supply DTO relations only; there is deliberately no Paid invoice.
         var user=new User(); user.setId(7); var pkg=new MembershipPackage(); pkg.setId(2);
@@ -33,7 +33,7 @@ class BusinessGapAuditTest {
     @Test void memberIdAndOtherInvoiceFiltersAreAppliedTogether() {
         var repo=mock(InvoiceRepository.class);
         var service=new InvoiceService(Clock.system(java.time.ZoneId.of("Asia/Ho_Chi_Minh")),repo,mock(UserRepository.class),mock(MembershipPackageRepository.class),mock(MemberPackageRepository.class),
-            mock(SportsClassRepository.class),mock(ClassEnrollmentRepository.class),mock(AuditService.class),mock(PaymentProperties.class),mock(VnPayGateway.class),mock(com.sportscenter.session.ScheduleWriteLock.class));
+            mock(SportsClassRepository.class),mock(ClassEnrollmentRepository.class),mock(AuditService.class),mock(PaymentProperties.class),mock(VnPayGateway.class),mock(com.sportscenter.session.ScheduleWriteLock.class),mock(org.springframework.context.ApplicationEventPublisher.class));
         service.findAll(7,null,null,"Pending","Cash","INV-",null,null,null);
         verify(repo).searchInvoices(7,null,null,"Pending","Cash","INV-",null,null);
     }

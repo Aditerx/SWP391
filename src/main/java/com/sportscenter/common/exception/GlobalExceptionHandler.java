@@ -1,7 +1,9 @@
 package com.sportscenter.common.exception;
 
 import com.sportscenter.feedback.ClassFeedbackConflictException;
+import com.sportscenter.chat.ChatException;
 import com.sportscenter.invoice.InvoiceConflictException;
+import com.sportscenter.notification.NotificationNotFoundException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -25,6 +27,27 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(ResourceNotFoundException.class)
     ResponseEntity<Map<String, Object>> notFound(ResourceNotFoundException ex) {
         return error(HttpStatus.NOT_FOUND, ex.getMessage());
+    }
+
+    @ExceptionHandler(ChatException.class)
+    ResponseEntity<Map<String, Object>> chat(ChatException ex) {
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("code", ex.getCode());
+        body.put("message", ex.getMessage());
+        ResponseEntity.BodyBuilder response = ResponseEntity.status(ex.getStatus());
+        if (ex.getRetryAfterSeconds() != null) {
+            body.put("retryAfterSeconds", ex.getRetryAfterSeconds());
+            response.header("Retry-After", String.valueOf(ex.getRetryAfterSeconds()));
+        }
+        return response.body(body);
+    }
+
+    @ExceptionHandler(NotificationNotFoundException.class)
+    ResponseEntity<Map<String, Object>> notificationNotFound(NotificationNotFoundException ex) {
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("code", "NOTIFICATION_NOT_FOUND");
+        body.put("message", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(body);
     }
 
     @ExceptionHandler(BusinessException.class)

@@ -38,6 +38,15 @@
   * Body: `{ "email": "a@example.com", "otp": "123456", "newPassword": "NewPassword123" }`
 * **Đăng xuất:** `POST /api/auth/logout`
 
+#### Quy tắc đăng ký OTP
+
+- Đăng ký mới trả `200` với `{ "message": "..." }`. Tài khoản Pending đăng ký lại chỉ phát OTP mới, giữ nguyên thông tin hiện có và trả `{ "message": "Tài khoản đang chờ xác thực; mã OTP mới đã được gửi.", "code": "REGISTRATION_PENDING" }`.
+- Email Active bị từ chối với `400 { "code": "EMAIL_ALREADY_REGISTERED", "message": "..." }`.
+- Đăng nhập Pending: mật khẩu đúng trả `400` với `REGISTRATION_PENDING`; mật khẩu sai vẫn trả `401 Invalid email or password`.
+- OTP có hiệu lực 10 phút, tối đa 5 lần nhập sai, dùng một lần. Hết lượt phải yêu cầu OTP mới. Demo OTP chỉ bật bằng `REGISTRATION_DEMO_OTP`; chỉ áp dụng đăng ký.
+- Gửi lại OTP tối đa 3 OTP trong một giờ và cách lần phát trước tối thiểu 60 giây. Lỗi `OTP_RESEND_LIMIT` hoặc `OTP_RESEND_TOO_SOON`; lỗi chờ gồm số giây còn lại trong `message` (ví dụ `OTP_RESEND_TOO_SOON: 42`). FE nên đếm ngược 60 giây trước khi bật nút gửi lại.
+- Các lỗi xác thực OTP: `OTP_INVALID`, `OTP_EXPIRED`, `OTP_ATTEMPTS_EXCEEDED`. `forgot-password` luôn trả phản hồi chung dù email có tồn tại hay không.
+
 ### 1.3. Danh Sách Tài Khoản Demo Hệ Thống (Mật Khẩu Đồng Bộ: `Scms@2026`)
 Toàn bộ tài khoản mẫu đã được khởi tạo trong cơ sở dữ liệu (`schema_postgres.sql` / `schema_user_2310.sql`) với mật khẩu chuẩn hóa: **`Scms@2026`** (BCrypt: `$2a$10$QBctKpWoGbyJxKd43TNSPemf2xsDeVUugnAhEEfkZH6pLU8ncMqMi`).
 
@@ -835,6 +844,7 @@ Bảng đối chiếu mã lỗi để Frontend hiển thị thông báo (Toast /
 | `SUBSTITUTE_COACH_CONFLICT` | 409 | HLV thay thế được chỉ định bị trùng lịch dạy khác. | Toast lỗi: *"HLV thay thế đã có lịch dạy khác trong khung giờ này. Vui lòng chọn HLV khác."* |
 | `ROOM_HAS_FUTURE_SESSIONS` | 400 | Đổi trạng thái phòng sang Bảo trì/Đóng cửa khi còn ca học tương lai. | Toast lỗi: *"Phòng/Sân tập vẫn còn các buổi học đã xếp lịch trong tương lai. Vui lòng dời lịch các buổi học trước khi đóng sân."* |
 | `INVALID_TIME_SLOT` | 400 | Giờ bắt đầu / kết thúc gửi lên không khớp 7 ca học chuẩn. | Toast lỗi: *"Khung giờ học không hợp lệ. Vui lòng chọn đúng 1 trong 7 ca học chuẩn của trung tâm."* |
+| `NOTIFICATION_NOT_FOUND` | 404 | Thông báo không tồn tại hoặc không thuộc người đang đăng nhập. | Hiển thị thông báo đã bị xóa hoặc không còn khả dụng. |
 
 ## 12. CONTRACT AN TOÀN BỔ SUNG NGÀY 23/10/2026
 
@@ -1053,6 +1063,8 @@ Owner chốt tại 04 mục 39.3: BE trả đủ **tiền đã thu / tiền đã
 
 ### 14.17. Phân công và mốc bàn giao theo hai phase — kế hoạch
 
+> **Cập nhật Owner sau phân công:** đồng đội thực tế làm SMTP/OTP đăng ký, chatbox cơ bản và thông báo; gói D01/D09 vừa phân chưa làm. Hai phase tiếp tục session sau. Merge hiện tại giữ contract implementation, thêm OTP/notification/chat bên dưới; không coi D01/D09 hoặc API mục tiêu của mục 14 đã triển khai. Clean test tích hợp 269 run/250 pass/19 skip/0 lỗi; chưa SMTP thật/DB migration mới/FE verified, xem docs 02 mục 9.14 và docs 04 mục 40.12.
+
 Theo docs 04 mục 40: đồng đội nhận D01 profile tự phục vụ và D09 directory read-fix, sở hữu file giới hạn/commit riêng, BE chính giữ các flow/schema/docs trung tâm. Handoff T phải có JSON/error/test/evidence thật, BE chính cập nhật contract ở endpoint tương ứng sau xác minh/merge, không để hai nhánh sửa bốn docs cùng lúc.
 
 Phase 1 bàn giao catalog/đăng ký theo môn-Coach, time policy, mua/thanh toán/quyền và gói T. Phase 2 bàn giao booking/dời/hủy/báo vắng, sự cố/Holiday/attendance/đối soát/sửa Cash/report. Chưa hoàn thành phase phụ thuộc thì ghi pending, không giới thiệu tất cả API mục 14 là khả dụng. BE chính cung cấp source/deploy SHA/manifest/fixture đúng môi trường; FE dùng source hiện hành, không bản FE cũ. Ba chỉ số tiền đủ dữ liệu từ BE, layout do FE quyết.
@@ -1064,3 +1076,102 @@ Rà bàn giao 27/10: 04 mục 40.8–40.9 có checklist D01/D09 chi tiết cho �
 Baseline đã push tai `9097197`; lần kiểm Supabase .env sau push chưa kết nối được (pooler tenant/user not found, direct JDBC UnknownHostException). Chưa có schema/API hoặc FE integration verified trên DB mới; kết quả/điều kiện thử lại ở docs 02 mục 9.11. Không dùng baseline local xanh để hứa môi trường mới đã chạy đúng.
 
 **Trạng thái mới nhất 27/10:** Owner chọn DB_PASSWORD hiện tại, DB_URL đã chuẩn hóa JDBC và kiểm kết nối chỉ đọc/rollback thành công qua Session pooler (docs 02 mục 9.13). Metadata public có 0 bảng, chưa có schema SCMS; chưa khởi tạo/seed, chưa API/FE verified hoặc đổi endpoint/DTO. Các lỗi kết nối phía trên là lịch sử, không còn là trạng thái hiện tại. FE tiếp tục dùng contract implementation đã xác minh; không đổi base URL hoặc coi DB mới sẵn sàng chỉ từ kết quả ping.
+
+
+---
+
+## 15. THÔNG BÁO TRONG ỨNG DỤNG
+
+Tất cả endpoint yêu cầu đăng nhập và chỉ truy cập thông báo của user trong session. Member, Coach, Receptionist và Manager đều dùng được. Không có email, push hay WebSocket.
+
+### 15.1. Danh sách thông báo
+
+`GET /api/notifications/me?unreadOnly=false&type=SESSION_REMINDER&page=0&size=20`
+
+Query params:
+
+| Tên | Kiểu | Mặc định | Mô tả |
+|---|---|---:|---|
+| `unreadOnly` | boolean | `false` | Chỉ lấy thông báo chưa đọc khi `true`. |
+| `type` | enum | — | Lọc theo một `NotificationType`. |
+| `page` | integer | `0` | Trang, bắt đầu từ 0. |
+| `size` | integer | `20` | Số mục mỗi trang, tối đa 100. |
+
+Response là Spring `Page`:
+
+```json
+{
+  "content": [
+    {
+      "id": 101,
+      "type": "SESSION_RESCHEDULED",
+      "title": "Buổi học được dời lịch",
+      "message": "Buổi học Cầu lông đã được dời sang 28/10/2026, 07:45–09:15, Sân A2.",
+      "relatedType": "SESSION",
+      "relatedId": 5531,
+      "isRead": false,
+      "createdAt": "2026-10-22T09:15:00+07:00"
+    }
+  ],
+  "number": 0,
+  "size": 20,
+  "totalElements": 1,
+  "totalPages": 1
+}
+```
+
+### 15.2. Đếm và cập nhật trạng thái đọc
+
+| Method | Endpoint | Thành công |
+|---|---|---|
+| `GET` | `/api/notifications/me/unread-count` | `200 { "unreadCount": 3 }` |
+| `PATCH` | `/api/notifications/{id}/read` | `204 No Content` |
+| `PATCH` | `/api/notifications/me/read-all` | `204 No Content` |
+
+Thông báo không thuộc user hiện tại và ID không tồn tại đều trả `404` với mã `NOTIFICATION_NOT_FOUND`.
+
+### 15.3. Các loại thông báo
+
+| `NotificationType` | Ý nghĩa |
+|---|---|
+| `ENROLLMENT_CONFIRMED` | Thanh toán thành công và ghi danh lớp Normal. |
+| `PRIVATE_BOOKING_CONFIRMED` | Đặt lịch học 1:1 thành công. |
+| `PRIVATE_BOOKING_CANCELLED` | Hủy lịch 1:1; nội dung nêu trạng thái hoàn credit. |
+| `SESSION_RESCHEDULED` | Lịch buổi học được dời. |
+| `COACH_SUBSTITUTED` | HLV dạy buổi học được thay đổi. |
+| `PAYMENT_SUCCESS` | Hóa đơn đã thanh toán. |
+| `PAYMENT_EXPIRED` | Hóa đơn hết hạn giữ chỗ. |
+| `PACKAGE_EXTENDED` | Gói 1:1 được gia hạn. |
+| `PACKAGE_EXPIRING_SOON` | Gói 1:1 còn không quá 3 ngày. |
+| `PACKAGE_EXPIRED` | Gói 1:1 hết hạn. |
+| `CREDIT_LOW` | Số dư credit sau khi đặt buổi học còn không quá 2. |
+| `NO_SHOW_RECORDED` | Buổi vắng/no-show đã được chốt. |
+| `SESSION_REMINDER` | Nhắc lịch khoảng 24 giờ trước buổi học. |
+
+FE có thể poll `GET /api/notifications/me/unread-count` mỗi 30–60 giây để cập nhật badge. Module không dùng WebSocket. Các bản ghi legacy giữ nguyên nội dung và cột `type`; các loại nghiệp vụ mới lưu trong `notification_type` và được API trả dưới tên trường `type`.
+
+## 16. Chat hỗ trợ Member – Receptionist
+
+Toàn bộ API dùng session đăng nhập hiện tại. Member chỉ đọc/ghi conversation của chính mình; truy cập conversation khác trả `404 CHAT_CONVERSATION_NOT_FOUND`. Receptionist và CenterManager cần quyền `HANDLE_CHAT`; Coach bị từ chối. Tin nhắn là text thuần, tối đa 2000 ký tự sau trim; FE phải render bằng text để tránh XSS.
+
+| Method | Endpoint | Mô tả |
+|---|---|---|
+| `POST` | `/api/chat/conversations` | Member lấy conversation `OPEN` hoặc tạo mới; body tùy chọn `{"subject":"Payment question"}`. |
+| `GET` | `/api/chat/conversations/me/active` | Conversation đang mở của member; 404 `CHAT_ACTIVE_CONVERSATION_NOT_FOUND` nếu chưa có. |
+| `GET` | `/api/chat/me/unread-count` | Tổng số tin chưa đọc trong các conversation của member: `{"unreadCount":2}`. |
+| `GET` | `/api/chat/conversations/{id}/messages?afterId=0&limit=30` | Poll theo ID tăng dần; mặc định 30, giới hạn tối đa 50. |
+| `POST` | `/api/chat/conversations/{id}/messages` | Gửi `{ "content":"Hello", "clientMessageId":"uuid" }`; ID client tùy chọn để retry an toàn. |
+| `POST` | `/api/chat/conversations/{id}/read` | Đánh dấu đã đọc tới message mới nhất cho user hiện tại. |
+| `GET` | `/api/chat/conversations?status=OPEN&assigned=true&unreadOnly=false&page=0&size=30` | Hộp thư staff, mới hoạt động gần nhất trước; `assigned=true` lọc hội thoại của người đang xem, `false` lọc hội thoại chưa được nhận; mỗi hàng kèm last message và unread của staff đang xem. |
+| `POST` | `/api/chat/conversations/{id}/claim` / `/release` | Nhận hội thoại hoặc tự nhả hội thoại đã nhận. |
+| `PATCH` | `/api/chat/conversations/{id}/close` / `/reopen` | Đóng/mở lại hội thoại. Reopen trả 409 nếu member đã có hội thoại khác đang mở. |
+
+Message response gồm `id`, `conversationId`, `senderType`, `senderName`, `isMine`, `content`, `contentType`, `metadata`, `clientMessageId`, `createdAt`. Thời gian trả ISO-8601 cùng offset `+07:00`. Ví dụ: `{ "id":4021,"conversationId":88,"senderType":"STAFF","senderName":"Tran Thi Huong","isMine":false,"content":"Hello","createdAt":"2026-10-24T09:15:00+07:00" }`.
+
+Các mã lỗi chính: `CHAT_CONVERSATION_NOT_FOUND` (404), `CHAT_ACTIVE_CONVERSATION_NOT_FOUND` (404), `CHAT_CONVERSATION_CLOSED` (409), `CHAT_RATE_LIMITED` (429, tối đa 20 tin/phút/người; response có `retryAfterSeconds` và header `Retry-After`), `CHAT_MESSAGE_EMPTY`, `CHAT_MESSAGE_TOO_LONG`, `CHAT_ALREADY_CLAIMED`, `CHAT_NOT_ASSIGNED_TO_ACTOR`, `CHAT_OPEN_CONVERSATION_EXISTS`. FE nên poll message mỗi 3–5 giây khi cửa sổ chat mở, unread count mỗi 30–60 giây, và gửi `clientMessageId` cho mỗi tin.
+
+### Mở rộng chat AI
+
+`ChatService` chỉ xử lý nghiệp vụ; thêm bean `ChatResponder` với `supports(ChatConversation)` và `respond(conversation, N tin gần nhất, memberUserId)`. `ChatResponderDispatcher` chạy nền và gọi responder đầu tiên hỗ trợ conversation khi `handler_type=AI`; lỗi hoặc timeout không rollback hay chặn response của tin member. Reply được lưu `sender_type=AI`, `sender_user_id=NULL`, cùng metadata tùy chọn (quy ước đề nghị: `model`, `latencyMs`, `sources`). Không có responder AI hoặc lời gọi dịch vụ ngoài được bật mặc định. `escalateToStaff(conversationId, reason)` chuyển handler về `STAFF`, lưu SYSTEM message và phát notification tới assigned staff hoặc các receptionist Active trong cùng center.
+
+Chat notification types persisted in `notification_type`: `CHAT_MEMBER_MESSAGE` (member message or escalation to staff) and `CHAT_STAFF_REPLY` (staff/AI reply to member). Notifications are emitted only on that viewer's unread transition from zero to one; storage failures do not roll back the chat message.

@@ -12,6 +12,9 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
+import java.time.Clock;
+import java.time.ZoneId;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -26,7 +29,6 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class MemberPackageServiceTest {
     @Mock private com.sportscenter.session.ScheduleWriteLock scheduleWriteLock;
-    @org.mockito.Spy private java.time.Clock clock = java.time.Clock.system(java.time.ZoneId.of("Asia/Ho_Chi_Minh"));
 
     @Mock
     private MemberPackageRepository memberPackageRepository;
@@ -42,6 +44,12 @@ class MemberPackageServiceTest {
 
     @Mock
     private InvoiceService invoiceService;
+
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
+
+    @org.mockito.Spy
+    private Clock clock = Clock.system(ZoneId.of("Asia/Ho_Chi_Minh"));
 
     @InjectMocks
     private MemberPackageService memberPackageService;
