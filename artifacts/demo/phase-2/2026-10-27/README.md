@@ -1,6 +1,6 @@
 # Bàn giao và demo hai phase SCMS
 
-Phạm vi: P1.0–P1.4 và BE P2.1–P2.5; P1.5/gói T D01/D09/FE để lại theo Owner. Nền tai 0277b2f. Source BE chốt `13a62ee780be19dce62730b45b119e2f97f31def`: clean test292/273pass/19skip/0lỗi,PG HTTP9/9pass. [Trang demo](evidence/demo.html), [manifest](evidence/verification.json), [test summary](evidence/test-summary.txt), [HTTP trace](evidence/postgres-http.txt). Merge/main sẽ được ghi riêng sau kiểm bản merge. Contract: [docs 01](../../../../docs/01-API-CONTRACT-FE-BE.md); vận hành/migration: [docs 02 mục 10](../../../../docs/02-DEPLOYMENT-GUIDE.md#10-bàn-giao-hai-phase-và-demo-tái-lập--27102026).
+Phạm vi: P1.0–P1.4 và BE P2.1–P2.5; P1.5/gói T D01/D09/FE để lại theo Owner. Nền tai 0277b2f. Source BE chốt `13a62ee780be19dce62730b45b119e2f97f31def`: clean test292/273pass/19skip/0lỗi,PG HTTP9/9pass. [Trang demo](evidence/demo.html), [manifest](evidence/verification.json), [test summary](evidence/test-summary.txt), [HTTP trace](evidence/postgres-http.txt). Feature199bbf9 đã push;merge main86d0076→155968d đã kiểm lại clean292/273pass/19skip/0lỗi và PG HTTP9/9. Manifest hiện hành ghi merge155968d;commit đóng docs giữ nguyên BE. Contract: [docs 01](../../../../docs/01-API-CONTRACT-FE-BE.md); vận hành/migration: [docs 02 mục 10](../../../../docs/02-DEPLOYMENT-GUIDE.md#10-bàn-giao-hai-phase-và-demo-tái-lập--27102026).
 
 ## Chạy demo
 
@@ -51,3 +51,10 @@ Demo dùng fake Cash/refund và signed local VNPay protocol,không gateway live/
 - Final source đã kiểm Price/Paid/owner/center/locks/retry/12h/nanos/holiday union/expiry balance/QR/correction/Normal12/refund khác kỳ/Cash phụ thuộc/report quyền và các đường CRUD cũ. Invoice list center leak đã sửa;test filter cũ thêm actor fixture,giữ assertion filter.
 - Bản check9d8c07c từng fail1 do fixture auth null;13a62ee đã sửa fixture và rerun clean/PG thành công. Lỗi p2-test6 từng dùng source chưa đồng bộ vào worktree;rerun7 đã dùng source đúng. Failed logs giữ local,không được gắn nhãn pass.
 - Log raw/XML do runner tạo nằm local,không đóng gói vào Git vì có debug fixture/QR. Evidence công bố chỉ summary/case names/trace đã loại credential/cookie/QR/signature. scripts/build-phases-evidence.py có thể tái tạo manifest/demo từ output runner.
+
+## Mốc Git bàn giao
+
+- Baseline tai0277b2f;feature BE9d8c07c +fixture13a62ee;feature handoff đã push199bbf9.
+- Main nền86d0076,merge155968db6398e10689abbf07e1cf72fe0be3e61d,không conflict/toàn tree bằng feature.
+- Runner từ đúng mergecommit pass292run/273pass/19skip/0failure-error,PG9/9pass và migration guards. Evidence/source-tree ghi chính commit này.
+- Commit đóng gói sau merge chỉ docs/evidence/script LF;main head cuối tra git ls-remote.Giữ nguyên BE đã kiểm.Git push/merge không chứng nhận Render deploy hoặc tạo account Owner.

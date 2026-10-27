@@ -27,7 +27,7 @@ verification.update(postgresHttpTests=int(pg.get('tests')), suites=suites,
 trace = (run/'postgres-http/http-workflow.txt').read_text(encoding='utf-8')
 trace = re.sub(r'vnp_SecureHash=[^&\s"]*', 'vnp_SecureHash=[redacted]', trace)
 trace = '\n'.join(line.rstrip() for line in trace.splitlines())+'\n'
-(out/'postgres-http.txt').write_text(trace, encoding='utf-8')
+(out/'postgres-http.txt').write_text(trace, encoding='utf-8',newline='\n')
 summary = []
 for name in ('clean-test.log','postgres-http.log','postgres-prepare.log'):
     data = (run/name).read_bytes()
@@ -35,13 +35,13 @@ for name in ('clean-test.log','postgres-http.log','postgres-prepare.log'):
     text = data.decode('utf-16') if data.startswith(b'\xff\xfe') else data.decode('utf-8', errors='replace')
     summary.append(name+' SHA256 '+hashlib.sha256(data).hexdigest())
     summary.extend(line for line in text.splitlines() if re.match(r'^\[(?:INFO|WARNING)\] (?:Tests run:|BUILD SUCCESS|Total time:|Finished at:)', line))
-(out/'test-summary.txt').write_text('\n'.join(summary)+'\n',encoding='utf-8')
+(out/'test-summary.txt').write_text('\n'.join(summary)+'\n',encoding='utf-8',newline='\n')
 source = verification['sourceCommit']
 tree = subprocess.check_output(['git','ls-tree','-r',source,'--','src','database','schema_postgres.sql','pom.xml','scripts','audit'],text=True)
-(out/'source-tree.txt').write_text(tree,encoding='utf-8')
+(out/'source-tree.txt').write_text(tree,encoding='utf-8',newline='\n')
 verification['evidenceHashes'] = {name: hashlib.sha256((out/name).read_bytes()).hexdigest()
                                   for name in ('postgres-http.txt','test-summary.txt','source-tree.txt')}
-(out/'verification.json').write_text(json.dumps(verification,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
+(out/'verification.json').write_text(json.dumps(verification,ensure_ascii=False,indent=2)+'\n',encoding='utf-8',newline='\n')
 payload = json.dumps({'v': verification, 'trace': trace},ensure_ascii=False).replace('<','\\u003c')
 html = '''<!doctype html><html lang="vi"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>SCMS · Demo hai phase BE</title><style>
@@ -65,6 +65,6 @@ document.querySelector('#stats').innerHTML=[[v.tests-v.skipped,'tests pass'],[v.
 const lines=data.trace.trim().split('\\n'),search=document.querySelector('#search');function render(){const q=search.value.toLowerCase(),rows=lines.filter(x=>x.toLowerCase().includes(q));document.querySelector('#trace').textContent=rows.join('\\n');document.querySelector('#count').textContent=rows.length+' / '+lines.length+' thao tác';}search.oninput=render;
 for(const [label,q] of [['Tất cả',''],['Mua quyền','advanced-registrations'],['Thanh toán','vnpay'],['Lịch','/sessions/'],['Sự cố','center-incidents'],['Holiday','holidays'],['QR','attendances'],['Hoàn/sửa Cash','payment-resolutions'],['Báo cáo','reports']]){const b=document.createElement('button');b.textContent=label;b.onclick=()=>{search.value=q;render();};document.querySelector('#filters').append(b);}
 document.querySelector('#cases').textContent=v.postgresCases.map(x=>'PASS  '+x).join('\\n');render();</script></html>'''
-(out/'demo.html').write_text(html.replace('PAYLOAD',payload),encoding='utf-8')
+(out/'demo.html').write_text(html.replace('PAYLOAD',payload),encoding='utf-8',newline='\n')
 print(json.dumps({'sourceCommit':source,'tests':verification['tests'],'skipped':verification['skipped'],
                   'postgresHttpTests':int(pg.get('tests')),'output':str(out)}))

@@ -10,7 +10,7 @@ Tài liệu này là chốt chặn quản lý tiến độ tổng thể và lị
 
 - [x] D01–D19 đã chốt tại docs 04; rule mới ghi đè mô tả cũ. Owner yêu cầu tiếp tục P1.0–P1.4 và BE P2, double-check/demo/tài liệu/push branch/merge main.
 - [x] Source hai phase đã triển khai, clean test và 9 HTTP workflow PostgreSQL local pass. Chi tiết nhóm hoàn tất chuyển HISTORY bên dưới; source chốt13a62ee clean292/273pass/19skip/0lỗi và PG HTTP9/9pass; evidence docs02 mục10.
-- [ ] Chốt kiểm exact commit, bàn giao evidence và push branch/merge main (đang thực hiện, không đồng nghĩa deploy).
+- [x] Chốt source13a62ee, push feat/advanced-phases199bbf9; merge main86d0076 bằng commit155968d (không conflict,tree bằng feature), kiểm lại clean292/273pass/19skip/0lỗi +PG HTTP9/9. Evidence/demo/tài liệu đã bàn giao. Main remote được đối chiếu khi push; không đồng nghĩa đã nghiệm thu Render.
 - [x] Owner phê duyệt riêng bundle28635081…; production đã khởi tạo trước merge:46bảng/9môn/0account hoặc giao dịch. Postflight read-only đủ cột; docs02 mục10/evidence production-release.json. Chưa tài khoản thật/live gateway/deploy verification.
 - [ ] **Để lại theo Owner:** P1.5/gói T D01 hồ sơ Member + D09 Coach directory/FE. Giữ scope/checklist 04 mục 40.3/40.8–40.9. SMTP/OTP/chat/notifications đã merge là việc khác.
 - [ ] Nghiệm thu FE hiện hành bằng browser/CORS/cookie, VNPay IPN qua gateway sandbox thật và deploy SHA/health. Local HTTP không thay cổng này.
@@ -20,7 +20,7 @@ Tài liệu này là chốt chặn quản lý tiến độ tổng thể và lị
 
 ## 📜 PHẦN II: LỊCH SỬ HOÀN THÀNH (HISTORY)
 
-### [27/10/2026] Hai phase BE theo scope Owner — đang chốt bản bàn giao
+### [27/10/2026] Hoàn tất hai phase BE theo scope Owner và kiểm bản merge
 
 | Gói | Hoàn tất trong source và local verification |
 |---|---|
@@ -34,7 +34,7 @@ Tài liệu này là chốt chặn quản lý tiến độ tổng thể và lị
 | P2.4 | Note/receipt,refund ngoài SCMS có chứng cứ,approve chưa coi hoàn,CashCorrection hẹp Advanced chưa dùng/không booking/phụ thuộc |
 | P2.5 BE | Report theo người+lượt,đúng center/quyền,3 số thu/hoàn/ròng và tương thích gross totalRevenue;Coach403 |
 
-Chứng cứ: docs 02 mục 10 và artifacts/demo/phase-2/2026-10-27. Đã chạy clean test/9 HTTP H2/9 HTTP PG, PG nâng cấp snapshot/replay/FK rollback và bootstrap DB trống. Những lần fail đã đọc nguyên nhân và sửa sản phẩm/fixture; không xóa test để xanh. Exact commit cuối cần runner chạy lại sau commit; các số test trước đó là lịch sử từng source. P1.5/T/FE, gateway live, SMTP delivery và SQL Server runtime không đánh dấu hoàn tất.
+Chứng cứ: docs 02 mục 10 và artifacts/demo/phase-2/2026-10-27. Đã chạy clean test/9 HTTP H2/9 HTTP PG, PG nâng cấp snapshot/replay/FK rollback và bootstrap DB trống. Những lần fail đã đọc nguyên nhân và sửa sản phẩm/fixture; không xóa test để xanh. Đã chạy lại từ committed checkout13a62ee và merge155968d:292run/273pass/19skip/0lỗi,PG9/9pass. Artifact manifest/source-tree/test-summary/trace và demo.html ghi đúng merge commit. Các số trước là lịch sử từng source. P1.5/T/FE, gateway live, SMTP delivery và SQL Server runtime không đánh dấu hoàn tất.
 
 ### [27/10/2026] Xử lý conflict nhánh SMTP/OTP, chatbox và thông báo
 

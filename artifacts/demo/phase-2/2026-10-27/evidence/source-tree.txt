@@ -51,6 +51,7 @@
 100644 blob 6c38ce6c03b13d8f032f5ba7fd982aebd21d8d6a	database/schema_user_2310_run2.sql
 100644 blob 09e31b36070d81babf9193d5e561f737a916e298	pom.xml
 100644 blob a0002a000af7883c195513d6431b59777c138523	schema_postgres.sql
+100644 blob 8f814b47cbc07765d68de0b15c560d6a5bc13df8	scripts/build-phases-evidence.py
 100644 blob f2722c28be385f5294580d2b5a24949135eb370d	scripts/prepare-phases-release.py
 100644 blob ecd814e12450048398ff0e12b3765c9c76623cbc	scripts/run-phases-demo.ps1
 100644 blob b87148f66ed4548270edbcb91d2fef91d80d7c24	scripts/smoke-test-api.ps1

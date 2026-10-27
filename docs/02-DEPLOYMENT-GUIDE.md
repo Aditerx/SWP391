@@ -432,3 +432,11 @@ Sau bootstrap cần Owner provision tài khoản quản trị thật (email/pass
 ### 10.4. Vận hành và kiểm sau deploy
 
 Giữ ddl-auto=none; cấu hình Clock Asia/Ho_Chi_Minh, holding5 phút, booking-block default false, lobby-checkin default false. VNPay URLs đúng public HTTPS, Return đọc/IPN ghi; cookie/CORS FE domain chính xác. Không chạy opt-in live data/Cash tests trên production. Kiểm log schema mismatch, health/API danh mục trả9 giá đúng, quyền reports Coach403/Manager có quyền, Invoice ownership và luồng mua thật được phép riêng. Nếu code lỗi, quay về code đã tương thích schema bằng deploy trước; không drop cột/bảng hoặc xóa hồ sơ để rollback. Trường hợp legacy thiếu căn cứ cần đối soát, không backfill từ amount.
+
+### 10.5. Kiểm bản merge và đóng bàn giao
+
+Feature source13a62ee được runner kiểm clean292/273pass/19skip/0failure-error và PG HTTP9/9. Nhánh feat/advanced-phases đã push199bbf9. Đã merge từ origin/main86d0076 trong worktree riêng thành155968db6398e10689abbf07e1cf72fe0be3e61d,không conflict,toàn tree bằng feature. Runner chạy lại từ chính commit merge,không.env:clean292/273pass/19skip/0lỗi,PG HTTP9/9,migration replay/snapshots/catalog FK guard pass.
+
+Evidence hiện hành [verification.json](../artifacts/demo/phase-2/2026-10-27/evidence/verification.json), [test-summary](../artifacts/demo/phase-2/2026-10-27/evidence/test-summary.txt), [demo.html](../artifacts/demo/phase-2/2026-10-27/evidence/demo.html). Bộ đóng gói chỉ thay docs/evidence/script xuất newline LF để hash ổn định trên Windows;không đổi BE sau lượt kiểm merge. Đối chiếu remote cuối bằng `git ls-remote --heads origin main feat/advanced-phases`;SHA kiểm thử là merge155968d,bản docs cuối có thể là commit con và giữ nguyên source BE.
+
+.env không tracked,scan diff so với0277b2f không chứa giá trị secret production. Các communication tests/proof untracked ngoài scope được giữ nguyên,chưa stage. Demo viewer đã kiểm JS syntax,stats273pass/19skip,9case,bộ lọc và empty search;không gọi đó là FE browser/live E2E. Handoff15–20phút và lệnh tái lập tại artifact README.

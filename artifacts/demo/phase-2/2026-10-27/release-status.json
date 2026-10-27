@@ -1,0 +1,22 @@
+{
+  "baseline": "0277b2fffa384c91fcb0e39c364e2828326ae5fb",
+  "featurePushed": "199bbf9f4734a39f765b8d63eba5a5b7ee094923",
+  "mainBefore": "86d00765a574e1193c6b0042176acf7b26ca14ce",
+  "testedMergeCommit": "155968db6398e10689abbf07e1cf72fe0be3e61d",
+  "mergeTreeEqualsFeature": true,
+  "tests": 292,
+  "passed": 273,
+  "skipped": 19,
+  "failures": 0,
+  "errors": 0,
+  "postgresHttpTests": 9,
+  "productionSchemaCommitted": true,
+  "productionAccountsCreated": 0,
+  "productionBusinessRowsCreated": 0,
+  "excluded": [
+    "P1.5",
+    "T/D01/D09",
+    "FE integration"
+  ],
+  "renderDeploymentVerified": false
+}
