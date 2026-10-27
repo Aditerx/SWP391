@@ -13,13 +13,17 @@ Tài liệu này là chốt chặn quản lý tiến độ tổng thể và lị
 - [x] Chốt source13a62ee, push feat/advanced-phases199bbf9; merge main86d0076 bằng commit155968d (không conflict,tree bằng feature), kiểm lại clean292/273pass/19skip/0lỗi +PG HTTP9/9. Evidence/demo/tài liệu đã bàn giao. Main remote được đối chiếu khi push; không đồng nghĩa đã nghiệm thu Render.
 - [x] Owner phê duyệt riêng bundle28635081…; production đã khởi tạo trước merge:46bảng/9môn/0account hoặc giao dịch. Postflight read-only đủ cột; docs02 mục10/evidence production-release.json. Chưa tài khoản thật/live gateway/deploy verification.
 - [ ] **Để lại theo Owner:** P1.5/gói T D01 hồ sơ Member + D09 Coach directory/FE. Giữ scope/checklist 04 mục 40.3/40.8–40.9. SMTP/OTP/chat/notifications đã merge là việc khác.
-- [ ] Render sau push765339c đã kiểm đúng>=5phút:Swagger/OpenAPI149paths/API mới có,17/19pass;health503DOWN,catalog18môn so với.env9. Chưa nghiệm thu production;chờ xác nhậnbranch/DBruntime trong dashboard,không tự sửa DB khác. Evidence docs02 mục10.6.
+- [ ] Render sau push765339c đã kiểm đúng>=5phút:Swagger/OpenAPI149paths/API mới có,17/19pass;health503DOWN,catalog18môn so với.env9. Chưa nghiệm thu production;Ownerđãxácnhậnmain/DBsync;CItrốngđãsửavàmain8b5f5dcCIpass,táikiểmsau5phút vẫn17/19;cầnLiveSHA/latestdeploystatus/HealthCheckPath,khôngtựsửaDBkhác. Evidence docs02 mục10.6.
 - [ ] Nghiệm thu FE hiện hành bằng browser/CORS/cookie, VNPay IPN qua gateway sandbox thật và deploy SHA/health. Local HTTP không thay cổng này.
 - [ ] SQL Server runtime và smoke vận hành tài khoản thật chưa chạy; migrations MSSQL được bàn giao với giới hạn rõ.
 
 ---
 
 ## 📜 PHẦN II: LỊCH SỬ HOÀN THÀNH (HISTORY)
+
+### [27/10/2026] Sửa CI trống và tái kiểm sau Owner xác nhận main/DB
+
+Phát hiệnworkflowCI0byte,run765339cfailure0jobs. Đã sửaJava17cleanverify/pinSHA/contentsread,branch729d8e4 vàmain8b5f5dc đềuCIpass. Không đổiBE/schema. Push17:02:54,tái kiểm17:08:04 (>=310s):OpenAPI149paths,17/19checks pass,cònhealth503/catalog18vsDB9.Chưa kếtluậnnguyênnhânruntime;đã hỏiLiveSHA/deploystatus/healthpath,khônghỏisecret.Giới hạnSMTPRenderFreecầnđốichiếuplan/logs.Docs02mục10.7 vàartifactafter-ci-repair.
 
 ### [27/10/2026] Commit/merge phần kiểm communication còn sót
 

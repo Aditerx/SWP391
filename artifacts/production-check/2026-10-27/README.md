@@ -14,3 +14,13 @@
 Browser không kết nối trong phiên và webreader không mở đượcURL;không ghi là đã browser-render/screenshot verified. HTTPđã kiểm đúng Swagger/assets/config/OpenAPI thay vì chỉ trangHTML.
 
 Kết quả được commit với `[skip render]` vì chỉ đóng report/audit;không thay code ứng dụng hoặc schema đã kiểm.
+
+## Sau xác nhận main/DB của Owner — sửa lỗi CI và kiểm lại
+
+Owner xác nhận branchmain/đãsyncDB.Tái kiểm no-cache vẫn18/health503;local.env khôngduplicateDBkeys hoặcOSoverride.Phát hiệnCI.yml0byte,GitHubrun40479537371 failure0jobs;[evidence](ci-invalid-workflow.json). Đã sửaworkflowJava17cleanverify/leastprivilege/pinnedactions,branchfix/backend-ci729d8e4 [CIpass](ci-repair-success.json),merge main8b5f5dc [mainCIpass](main-ci-success.json). Không thay src/main/schema.
+
+Push main17:02:54 UTC+7,lượt [sau sửa CI](after-ci-repair.json) bắt đầu17:08:04 (310.68s saupush):**17/19pass**,OpenAPI149paths vàfields mới có;health503DOWN,catalog18 vẫncòn.CIinvalid là lỗiđãsửa,không đượccoi là đãgiải quyết runtime/DBmismatch.
+
+Đã hỏiOwnerLiveSHA/latestdeploy status/HealthCheckPath;chưa có thông tin này.Phiên không cóRenderconnector/APIcredential hoặcbrowserkết nối đểtựđọc dashboard.Không hỏi lạiDBpassword/không thayenv/schema.Chưa nghiệmthu production.
+
+Repo khai báoRenderFree/Gmail587;[RenderFree docs](https://render.com/docs/free) xác nhậnSMTP25/465/587 bịchặn trênFree.Nếu service thực tế dùngFree,SMTPcần paid instance hoặc kênh HTTPS phù hợp;chưa thay provider haykhẳngđịnh đây làhealthcomponent đanghỏng khi logschưacó.Render có thểgiữinstance cũ khi deploymới khôngquahealthcheck theo [Renderhealthdocs](https://render.com/docs/health-checks);đây vẫn làgiảthuyết chờLiveSHA/logs,không thay đổihealthcheckđểcheDOWN.
