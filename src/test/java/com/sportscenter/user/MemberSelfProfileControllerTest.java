@@ -17,6 +17,13 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Primary;
+import org.springframework.context.annotation.Import;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneId;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -43,7 +50,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 })
 @AutoConfigureMockMvc
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
+@Import(MemberSelfProfileControllerTest.FixedTime.class)
 class MemberSelfProfileControllerTest {
+    @TestConfiguration static class FixedTime {
+        @Bean @Primary Clock testClock(){return Clock.fixed(Instant.parse("2026-10-27T01:00:00Z"),ZoneId.of("Asia/Ho_Chi_Minh"));}
+    }
     @Autowired MockMvc mvc;
     @Autowired UserRepository users;
     @SpyBean MemberRepository members;

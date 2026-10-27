@@ -26,6 +26,7 @@ public class MemberSelfProfileService {
     public MemberSelfProfileResponse get(String email) {
         User user = userRepository.findByEmailIgnoreCase(email)
                 .orElseThrow(() -> new ResourceNotFoundException("Authenticated user was not found"));
+        requireActiveMember(user);
         Member member = memberRepository.findById(user.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("Member profile was not found"));
         return MemberSelfProfileResponse.from(user, member);
@@ -33,9 +34,11 @@ public class MemberSelfProfileService {
 
     @Transactional
     public MemberSelfProfileResponse patch(String email, MemberSelfProfilePatch patch) {
-        User user = userRepository.findByEmailIgnoreCase(email)
+        // Serialize PATCH read-modify-write before loading either profile row.
+        User user = userRepository.findByEmailIgnoreCaseForUpdate(email)
                 .orElseThrow(() -> new ResourceNotFoundException("Authenticated user was not found"));
-        Member member = memberRepository.findById(user.getId())
+        requireActiveMember(user);
+        Member member = memberRepository.findByIdForUpdate(user.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("Member profile was not found"));
         Map<String, JsonNode> fields = patch.fields();
 
@@ -58,6 +61,13 @@ public class MemberSelfProfileService {
         }
         if (value.asText().length() > 100) throw invalid("NAME_TOO_LONG", "name must be at most 100 characters");
         return value.asText();
+    }
+
+    private void requireActiveMember(User user) {
+        if (!"Active".equalsIgnoreCase(user.getStatus()) || user.getRole() == null
+                || !"Member".equalsIgnoreCase(user.getRole().getName())) {
+            throw new org.springframework.security.access.AccessDeniedException("Active Member account required");
+        }
     }
 
     private String nullableText(String field, JsonNode value, int maxLength) {

@@ -41,6 +41,8 @@ import static org.junit.jupiter.api.Assertions.*;
         "spring.datasource.driver-class-name=org.h2.Driver", "spring.jpa.database-platform=org.hibernate.dialect.H2Dialect",
         "spring.jpa.hibernate.ddl-auto=create-drop", "spring.jpa.open-in-view=false", "spring.sql.init.mode=never",
         "vnpay.tmn-code=LOCALTEST", "vnpay.hash-secret=phase-workflow-test-secret", "payment.expire-minutes=5",
+        "spring.jpa.properties.hibernate.generate_statistics=true",
+        "logging.level.org.hibernate.engine.internal.StatisticalLoggingSessionEventListener=OFF",
         "logging.level.root=WARN", "debug=false"})
 @Import(PhaseWorkflowHttpTest.Config.class)
 @TestInstance(TestInstance.Lifecycle.PER_CLASS) @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
@@ -88,6 +90,7 @@ public class PhaseWorkflowHttpTest {
     @Autowired SessionRepository sessionRepository;
     @Autowired PasswordEncoder passwords;
     @Autowired ObjectMapper json;
+    @Autowired jakarta.persistence.EntityManagerFactory entityManagerFactory;
     @Autowired MutableClock clock;
     @LocalServerPort int port;
     int memberId,coachId,otherId,subjectId,roomId,invoiceId,subscriptionId,lateInvoiceId;
@@ -196,7 +199,7 @@ public class PhaseWorkflowHttpTest {
     String cancellationSql(){return "SELECT s.status,s.credit_returned,p.remaining_credit FROM sessions s JOIN member_packages p ON p.subscription_id=s.subscription_id WHERE s.session_id=?";}
     JsonNode safeRequest(Object body) {
         JsonNode result=json.valueToTree(body);
-        if(result.isObject())for(String key:List.of("code","password","otp","payload"))
+        if(result.isObject())for(String key:List.of("code","password","oldPassword","newPassword","otp","payload"))
             if(result.has(key))((com.fasterxml.jackson.databind.node.ObjectNode)result).put(key,"[redacted]");
         return result;
     }
@@ -674,14 +677,99 @@ public class PhaseWorkflowHttpTest {
         proof("OUTDOOR-HEAT-HTTP","D04,D12","Paid Tennis/Outdoor metadata; Coach published all 7 slots; dedicated Outdoor court","Slots 3/4 each 400 OUTDOOR_HEAT_BLOCK without deduction; slot 1 accepted 201 and consumes only 1 credit",rightsSql(),tennisSub);
     }
 
+    String profileSql(){return "SELECT u.user_id,u.full_name,u.email,u.phone,u.address,u.date_of_birth,u.gender,u.status,u.center_id,m.goal,m.health_note FROM users u JOIN members m ON m.user_id=u.user_id WHERE u.user_id=?";}
+    @Test @Order(18) void selfProfileUsesOnlyOwnerFieldsAndProtectsConcurrentPatches() throws Exception {
+        var initial=call(member,"GET","/api/members/me",null,200);assertEquals("phase.member",initial.path("name").asText());assertEquals(7,initial.size());
+        call(coach,"GET","/api/members/me",null,403);
+        var forged=new HashMap<String,Object>();forged.put("name","Profile updated");forged.put("phone","0901234567");forged.put("goal","Run");forged.put("memberId",otherId);forged.put("role","Admin");forged.put("centerId",2);forged.put("status","Inactive");forged.put("credit",999);forged.put("amount",1);
+        var result=call(member,"PATCH","/api/members/me",forged,200);assertEquals(7,result.size());assertEquals("Profile updated",result.path("name").asText());
+        assertEquals("phase.other",jdbc.queryForObject("SELECT full_name FROM users WHERE user_id=?",String.class,otherId));
+        assertEquals("Active",jdbc.queryForObject("SELECT status FROM users WHERE user_id=?",String.class,memberId));assertEquals(1,jdbc.queryForObject("SELECT center_id FROM users WHERE user_id=?",Integer.class,memberId));
+        assertEquals("Member",jdbc.queryForObject("SELECT r.role_name FROM users u JOIN roles r ON r.role_id=u.role_id WHERE u.user_id=?",String.class,memberId));
+        call(member,"GET","/api/members/"+otherId,null,403);
+        proof("PROFILE-OWNER-WHITELIST","D01","Verified Member A session; forged Member B/role/center/status/credit/amount in PATCH; Coach valid session","Only supplied editable fields change; exactly 7 response fields; owner remains Active/Member/center1 and Member B unchanged; Coach and other-owner admin route 403",profileSql(),memberId);
+        var clear=new HashMap<String,Object>();clear.put("phone",null);clear.put("address",null);clear.put("goal",null);clear.put("healthNote",null);
+        call(member,"PATCH","/api/members/me",clear,200);call(member,"PATCH","/api/members/me",Map.of(),200);
+        assertNull(jdbc.queryForObject("SELECT phone FROM users WHERE user_id=?",String.class,memberId));assertNull(jdbc.queryForObject("SELECT goal FROM members WHERE user_id=?",String.class,memberId));
+        call(member,"PATCH","/api/members/me",Map.of("goal","Temporary","dateOfBirth",LocalDate.now(clock).plusDays(1).toString()),400);
+        assertNull(jdbc.queryForObject("SELECT goal FROM members WHERE user_id=?",String.class,memberId));
+        assertEquals("FUTURE_DATE_OF_BIRTH",call(member,"PATCH","/api/members/me",Map.of("dateOfBirth",LocalDate.now(clock).plusDays(1).toString()),400).path("code").asText());
+        call(member,"PATCH","/api/members/me",Map.of("dateOfBirth",LocalDate.now(clock).toString()),200);
+        proof("PROFILE-NULL-DATE-ATOMIC","D01","Nullable fields cleared; absent keys retained; empty PATCH; date of birth today/tomorrow using business Clock","Cleared values persist; no-op leaves name; invalid future date 400 rolls back supplied goal; today accepted",profileSql(),memberId);
+        profilePatchRace();
+        assertEquals("Race phone",jdbc.queryForObject("SELECT phone FROM users WHERE user_id=?",String.class,memberId));
+        assertEquals("Race address",jdbc.queryForObject("SELECT address FROM users WHERE user_id=?",String.class,memberId));
+        proof("PROFILE-PATCH-RACE","D01","Two concurrent PATCH requests on distinct fields of same owner; PostgreSQL row held before releasing both waiting requests","Both 200; phone and address updates both survive commit; no lost update",profileSql(),memberId);
+        tx.executeWithoutResult(t->users.findById(otherId).orElseThrow().setFirstLogin(true));
+        assertEquals("PASSWORD_CHANGE_REQUIRED",call(other,"GET","/api/members/me",null,403).path("code").asText());
+        call(other,"POST","/api/auth/change-password",Map.of("oldPassword","LocalTest123!","newPassword","ChangedLocal123!"),204);
+        call(other,"GET","/api/auth/me",null,200);call(other,"GET","/api/members/me",null,200);
+        proof("PROFILE-FIRST-LOGIN","D01","Member B already authenticated; firstLogin flag set; changes password through existing allowed route","Profile 403 PASSWORD_CHANGE_REQUIRED before change; password route 204 then profile 200; global filter unchanged",profileSql(),otherId);
+        tx.executeWithoutResult(t->users.findById(memberId).orElseThrow().setStatus("Inactive"));
+        try {call(member,"GET","/api/members/me",null,403);call(member,"PATCH","/api/members/me",Map.of("name","Must not persist"),403);}
+        finally {tx.executeWithoutResult(t->users.findById(memberId).orElseThrow().setStatus("Active"));}
+        assertEquals("Profile updated",jdbc.queryForObject("SELECT full_name FROM users WHERE user_id=?",String.class,memberId));
+        proof("PROFILE-INACTIVE-SESSION","D01","Previously valid Member session after account is disabled in local fixture","Both GET/PATCH 403; account disable cannot be bypassed by old session; profile unchanged",profileSql(),memberId);
+    }
+    void profilePatchRace() throws Exception {
+        boolean pg=!System.getProperty("scms.phases.pg-url","").isBlank();
+        var pool=Executors.newFixedThreadPool(2);var ready=new CountDownLatch(2);var start=new CountDownLatch(1);
+        try(var blocker=Objects.requireNonNull(jdbc.getDataSource()).getConnection()) {
+            if(pg){blocker.setAutoCommit(false);try(var s=blocker.prepareStatement("SELECT user_id FROM users WHERE user_id=? FOR UPDATE")){s.setInt(1,memberId);s.executeQuery().close();}}
+            var a=pool.submit(()->{ready.countDown();assertTrue(start.await(10,TimeUnit.SECONDS));return call(member,"PATCH","/api/members/me",Map.of("phone","Race phone"),200);});
+            var b=pool.submit(()->{ready.countDown();assertTrue(start.await(10,TimeUnit.SECONDS));return call(member,"PATCH","/api/members/me",Map.of("address","Race address"),200);});
+            assertTrue(ready.await(10,TimeUnit.SECONDS));start.countDown();
+            if(pg){long until=System.nanoTime()+TimeUnit.SECONDS.toNanos(10);int waiting=0;while(System.nanoTime()<until){waiting=jdbc.queryForObject("SELECT count(*) FROM pg_stat_activity WHERE datname=current_database() AND wait_event_type='Lock'",Integer.class);if(waiting>=2)break;Thread.sleep(20);}blocker.commit();assertTrue(waiting>=2,"Both requests must wait on the controlled PostgreSQL lock");}
+            a.get(30,TimeUnit.SECONDS);b.get(30,TimeUnit.SECONDS);
+        } finally {start.countDown();pool.shutdownNow();}
+    }
+
+    @Test @Order(19) void directoryRealSessionsRespectScopeContactsAndConstantQueries() throws Exception {
+        int[] ids=tx.execute(t->{
+            if(jdbc.queryForObject("SELECT count(*) FROM centers WHERE center_id=2",Integer.class)==0){if(System.getProperty("scms.phases.pg-url","").isBlank())jdbc.update("INSERT INTO centers(center_id) VALUES(2)");else jdbc.update("INSERT INTO centers(center_id,center_name) VALUES(2,'Directory center 2')");}
+            var coachRole=roles.findAll().stream().filter(r->"Coach".equals(r.getName())).findFirst().orElseThrow();
+            User empty=user("phase.directoryempty",coachRole);Coach ec=new Coach();ec.setUser(empty);coaches.save(ec);
+            User outside=user("phase.directoryoutside",coachRole);outside.setCenterId(2);Coach oc=new Coach();oc.setUser(outside);coaches.save(oc);
+            Specialization extra=new Specialization();extra.setName("Directory extra");extra.setStatus("Active");extra.setSubject(subjects.findById(subjectId).orElseThrow());specs.save(extra);assignments.save(new CoachSpecialization(coaches.findById(coachId).orElseThrow(),extra));
+            User admin=user("phase.directoryadmin",role("Admin","MANAGE_USERS"));admin.setCenterId(null);
+            User contact=user("phase.directorycontact",role("CenterManager","MANAGE_USERS"));
+            if(System.getProperty("scms.phases.pg-url","").isBlank()){User missing=user("phase.directorymissing",roles.findAll().stream().filter(r->"Member".equals(r.getName())).findFirst().orElseThrow());missing.setCenterId(null);Member mp=new Member();mp.setUser(missing);mp.setJoinDate(LocalDate.now(clock));members.save(mp);}
+            return new int[]{empty.getId(),outside.getId(),extra.getId(),admin.getId(),contact.getId()};
+        });
+        var admin=login("phase.directoryadmin");var contact=login("phase.directorycontact");
+        var scoped=call(member,"GET","/api/coaches",null,200);
+        assertTrue(java.util.stream.StreamSupport.stream(scoped.spliterator(),false).noneMatch(c->c.path("id").asInt()==ids[1]));
+        assertTrue(java.util.stream.StreamSupport.stream(scoped.spliterator(),false).filter(c->c.path("id").asInt()==ids[0]).findFirst().orElseThrow().path("specializations").isEmpty());
+        for(var c:scoped)assertTrue(c.path("email").isNull());
+        var filtered=call(member,"GET","/api/coaches?specializationId="+ids[2]+"&keyword=%20DiReCtOrY%20extra%20",null,200);assertEquals(1,filtered.size());assertEquals(coachId,filtered.get(0).path("id").asInt());assertEquals(2,filtered.get(0).path("specializations").size());
+        assertEquals(0,call(member,"GET","/api/coaches?keyword=missing-directory-name",null,200).size());
+        var global=call(admin,"GET","/api/coaches",null,200);assertTrue(java.util.stream.StreamSupport.stream(global.spliterator(),false).anyMatch(c->c.path("id").asInt()==ids[1]));
+        for(var c:call(contact,"GET","/api/coaches",null,200))assertFalse(c.path("email").isNull());
+        if(System.getProperty("scms.phases.pg-url","").isBlank())call(login("phase.directorymissing"),"GET","/api/coaches",null,400);
+        proof("DIRECTORY-SCOPE-CONTACT","D09","Actual HTTP sessions: Member, Manager+MANAGE_USERS, Admin with null center; empty Coach and two specializations; invalid missing-center Member exists only in H2 (PostgreSQL guard rejects fixture)","Member sees only own center with contact null; combined filter keeps complete specialization set; empty Coach []; unmatched filter []; Admin sees both centers on PostgreSQL; MANAGE_USERS reveals contact; missing-center 400 is H2-only","SELECT u.user_id,u.center_id FROM coaches c JOIN users u ON u.user_id=c.user_id ORDER BY u.user_id");
+        var statistics=Objects.requireNonNull(entityManagerFactory).unwrap(org.hibernate.SessionFactory.class).getStatistics();
+        statistics.clear();int before=call(member,"GET","/api/coaches",null,200).size();long queriesBefore=statistics.getPrepareStatementCount();
+        tx.executeWithoutResult(t->{for(int n=0;n<6;n++){User u=user("phase.directoryextra"+n,roles.findAll().stream().filter(r->"Coach".equals(r.getName())).findFirst().orElseThrow());Coach c=new Coach();c.setUser(u);coaches.save(c);}});
+        statistics.clear();assertEquals(before+6,call(member,"GET","/api/coaches",null,200).size());long queriesAfter=statistics.getPrepareStatementCount();assertEquals(queriesBefore,queriesAfter);
+        proof("DIRECTORY-NPLUS1","D09","Six additional same-center Coach profiles after first complete HTTP directory request; OSIV=false","No LazyInitializationException; prepared statement count stays constant as Coach count grows","SELECT count(*) AS coaches_in_center_1 FROM coaches c JOIN users u ON u.user_id=c.user_id WHERE u.center_id=1");
+        acceptance.get(acceptance.size()-1).put("statementCounts",Map.of("before",queriesBefore,"after",queriesAfter));
+        tx.executeWithoutResult(t->users.findById(ids[4]).orElseThrow().setStatus("Inactive"));
+        try {call(contact,"GET","/api/coaches",null,403);} finally {tx.executeWithoutResult(t->users.findById(ids[4]).orElseThrow().setStatus("Active"));}
+        proof("DIRECTORY-INACTIVE-SESSION","D09","Manager with MANAGE_USERS has an old session after local account is disabled","Directory 403, no contact disclosure through inactive session","SELECT user_id,status FROM users WHERE user_id=?",ids[4]);
+    }
+
     @Test @Order(99) void publishedOpenApiKeepsDistinctWorkflowDtosAndActualSuccessStatuses() throws Exception {
         var response=HttpClient.newHttpClient().send(HttpRequest.newBuilder(URI.create("http://127.0.0.1:"+port+"/v3/api-docs")).GET().build(),HttpResponse.BodyHandlers.ofString());
         assertEquals(200,response.statusCode());JsonNode spec=json.readTree(response.body());
+        String evidenceDir=System.getProperty("scms.evidence-dir","");if(!evidenceDir.isBlank()){Files.createDirectories(Path.of(evidenceDir));((com.fasterxml.jackson.databind.node.ObjectNode)spec).putArray("servers").addObject().put("url","https://scms-app-p1gy.onrender.com").put("description","Canonical FE server; schema generated locally");json.writerWithDefaultPrettyPrinter().writeValue(Path.of(evidenceDir).resolve("openapi.json").toFile(),spec);}
         Map<String,List<String>> fields=Map.of(
                 "AdvancedRegistrationRequest",List.of("subjectId","primaryCoachId","requestKey"),
                 "NormalMakeupRequest",List.of("date","startTime","endTime","roomId","coachId","reason"),
                 "CenterIncidentOpenRequest",List.of("sessionId","startedAt","reason","evidence","requestKey"),
                 "PaymentResolutionOpenRequest",List.of("invoiceId","type","reason"));
+        var profileFields=Set.of("name","phone","address","dateOfBirth","gender","goal","healthNote");
+        for(String schema:List.of("MemberSelfProfilePatch","MemberSelfProfileResponse")){Set<String> actual=new HashSet<>();spec.path("components").path("schemas").path(schema).path("properties").fieldNames().forEachRemaining(actual::add);assertEquals(profileFields,actual,schema);}
+        assertSchemaRef(spec,"/api/members/me","patch",true,"MemberSelfProfilePatch");
         for(var entry:fields.entrySet()) {
             Set<String> actual=new HashSet<>();spec.path("components").path("schemas").path(entry.getKey()).path("properties").fieldNames().forEachRemaining(actual::add);
             assertEquals(new HashSet<>(entry.getValue()),actual,entry.getKey());
@@ -711,10 +799,11 @@ public class PhaseWorkflowHttpTest {
         for(var exchange:exchanges) {
             int status=(int)exchange.get("actualStatus");if(status<200||status>=300)continue;
             String path=exchange.get("path").toString().split("\\?")[0];String method=exchange.get("method").toString().toLowerCase(Locale.ROOT);
-            JsonNode operation=null;
+            JsonNode operation=null;String matchedPath=null;
             for(var it=spec.path("paths").fields();it.hasNext();) {
                 var entry=it.next();
-                if(path.matches(entry.getKey().replaceAll("\\{[^}]+}","[^/]+"))&&entry.getValue().has(method)){operation=entry.getValue().get(method);break;}
+                if(path.matches(entry.getKey().replaceAll("\\{[^}]+}","[^/]+"))&&entry.getValue().has(method)
+                        &&(matchedPath==null||entry.getKey().chars().filter(c->c=='{').count()<matchedPath.chars().filter(c->c=='{').count())){operation=entry.getValue().get(method);matchedPath=entry.getKey();}
             }
             assertNotNull(operation,path);JsonNode result=operation.path("responses").path(String.valueOf(status));assertFalse(result.isMissingNode(),path+" status "+status);
             var input=operation.path("requestBody").path("content").elements();
@@ -774,6 +863,6 @@ public class PhaseWorkflowHttpTest {
         if(!dir.isBlank())json.writerWithDefaultPrettyPrinter().writeValue(Path.of(dir).resolve("openapi-contract-check.json").toFile(),openApiProof);
         if(!dir.isBlank())json.writerWithDefaultPrettyPrinter().writeValue(Path.of(dir).resolve("acceptance-cases.json").toFile(),acceptance);
         if(!dir.isBlank())json.writerWithDefaultPrettyPrinter().writeValue(Path.of(dir).resolve("actors.json").toFile(),
-                jdbc.queryForList("SELECT user_id,full_name,center_id,status FROM users ORDER BY user_id"));
+                jdbc.queryForList("SELECT user_id,email,full_name,center_id,status FROM users ORDER BY user_id"));
     }
 }

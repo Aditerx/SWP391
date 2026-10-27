@@ -17,12 +17,14 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class CoachDirectoryService {
+    private final com.sportscenter.common.ActorPolicy actors;
     private final CoachRepository coachRepository;
     private final CoachSpecializationRepository coachSpecializationRepository;
     private final CenterContext centerContext;
 
     @Transactional(readOnly = true)
     public List<CoachSummaryResponse> findAll(Integer specializationId, String keyword, Authentication authentication) {
+        actors.actor(authentication);
         Integer centerId = centerContext.currentCenterId();
         List<Coach> coaches = coachRepository.findAllWithUserByCenterId(centerId);
         if (coaches.isEmpty()) return List.of();

@@ -82,8 +82,11 @@ fixture_roles = {
     'phase.coach': 'Coach', 'phase.unassigned': 'Coach', 'phase.coach2': 'Coach', 'phase.multisubject': 'Coach',
     'phase.manager': 'CenterManager', 'phase.manager2': 'CenterManager',
     'phase.cashier': 'Receptionist', 'phase.cashier2': 'Receptionist', 'phase.noauthority': 'Admin',
+    'phase.directoryadmin': 'Admin', 'phase.directorycontact': 'CenterManager', 'phase.directorymissing': 'Member',
+    'phase.directoryempty': 'Coach', 'phase.directoryoutside': 'Coach',
+    **{'phase.directoryextra'+str(n): 'Coach' for n in range(6)},
 }
-fixture_actors = {row['full_name']: row for row in actor_rows}
+fixture_actors = {row['email'].removesuffix('@example.test'): row for row in actor_rows}
 session_checks = 0
 for e in exchanges:
     if e['path'] != '/api/auth/me':
@@ -125,7 +128,7 @@ if len({c['id'] for c in cases}) != len(cases):
 if any(c['status'] != 'PASS' for c in cases):
     raise SystemExit('Do not publish failed scenarios as accepted')
 
-scoped_decisions = ['D02', 'D03', 'D04', 'D05', 'D06', 'D07', 'D08', 'D10', 'D12', 'D13', 'D14', 'D15', 'D16', 'D17', 'D18']
+scoped_decisions = ['D01', 'D02', 'D03', 'D04', 'D05', 'D06', 'D07', 'D08', 'D09', 'D10', 'D12', 'D13', 'D14', 'D15', 'D16', 'D17', 'D18']
 gaps = [
     ('RENDER-AUTHENTICATED', 'BLOCKED', scoped_decisions, 'RENDER_NOT_PROBED',
      'Same API flows as local cases', 'Approved test accounts for Member/Coach/Receptionist/Manager in two centers, fixtures, mutation scope and post-commit read access are missing',
@@ -161,6 +164,10 @@ remaining = [dict(id=i, status=s, decisions=d, environment=e, apis=[api], actors
                   sourceCommit=source if e == environment else None) for i,s,d,e,api,f,x in gaps]
 qa_path = ROOT / 'artifacts/qa/latest.json'
 qa = load(qa_path)
+qa['results']['limits'] = [line for line in qa['results']['limits'] if 'P1.5/D01/D09/FE integration remain excluded' not in line]
+scope_limit = 'P1.5, package T beyond integrated D01/D09, and FE integration remain excluded; no production credentials were supplied or guessed'
+if scope_limit not in qa['results']['limits']:
+    qa['results']['limits'].append(scope_limit)
 now = dt.datetime.now(dt.timezone.utc).isoformat()
 qa['recordedAt'] = now
 qa['purpose'] = 'FE handoff readiness: fresh local authenticated HTTP and post-commit acceptance; retained cloud evidence is not rerun'
@@ -172,7 +179,7 @@ qa['results'].update(result='PARTIAL_LOCAL_PASS_LIVE_BLOCKED', sourceCommit=sour
 qa['local'].update(workflowCases=list(outcomes), exchanges=exchanges,
                    openApiRegression=load(raw / 'openapi-contract-check.json'), rawRunOnThisMachine=run.relative_to(ROOT).as_posix())
 qa['authenticatedAcceptance'] = dict(
-    recordedAtUtc=now, sourceCommit=source, backendChanged=False,
+    recordedAtUtc=now, sourceCommit=source, backendWorkingTreeMatchesRecordedCommit=True,
     testedWorkingTreeFiles={test_path.as_posix(): test_hash},
     environment=environment, clean=clean, postgres=pg_counts,
     databaseUrl=pg_url.get('value'), migrations=migration,
@@ -183,7 +190,7 @@ qa['authenticatedAcceptance'] = dict(
         method='Recorded auth/me userId/memberId compared with committed actor rows; role and required authorities compared with explicit fixture roles, not merely with login DTO'),
     stateVerification='Response completed before separate JdbcTemplate read; request transactions commit independently; assertions and SQL snapshots retained',
     raceMethod='Two ready worker threads released by one latch, real concurrent HTTP requests and PostgreSQL; finite fixture proves observed invariants, not every interleaving',
-    excluded=['P1.5', 'package T', 'D01', 'D09', 'FE integration'],
+    excluded=['P1.5', 'package T beyond integrated D01/D09', 'FE integration'],
     readiness='Contract/schema available for scoped BE handoff; full Render authenticated/FE acceptance remains open',
     setupAttempts=[dict(status='BLOCKED', reason='Initial new center fixture omitted required center_name; dependent workflow results not accepted'),
                    dict(status='BLOCKED', reason='Next last-seat fixture sent a non-UUID requestId; corrected fixture without changing expected business outcomes')],
@@ -191,6 +198,7 @@ qa['authenticatedAcceptance'] = dict(
             'Unit/H2 regression skips are not PASS; historical cloud/communication/clone records retain their original SHA and dates',
             'API errors/formats/nullability/ranges and every implemented baseline CRUD authorization combination are not exhaustively validated'])
 qa['ciAndDeployment']['evidenceKind'] = 'RETAINED_NOT_RERUN_BY_AUTHENTICATED_ACCEPTANCE'
+qa['openApi']['sha256'] = hashlib.sha256((ROOT / 'artifacts/fe-handoff/openapi.json').read_bytes()).hexdigest()
 candidate = run / 'qa-candidate.json'
 candidate.write_text(json.dumps(qa, ensure_ascii=False, indent=2)+'\n', encoding='utf-8', newline='\n')
 audit = subprocess.run(['python', str(ROOT / 'scripts/audit-fe-contract.py'), '--qa', str(candidate)],
@@ -205,6 +213,8 @@ qa['wireCompatibility'].update(result=wire['result'], checkedAtUtc=wire['checked
 qa['results'].update(positiveExchangesChecked=wire['positiveRecordedExchanges'],
                     bodyCompatibilityChecks=wire['bodyTypePropertyChecks'], wireIssues=len(wire['wireIssues']))
 spec = load(ROOT / 'artifacts/fe-handoff/openapi.json')
+qa['results'].update(paths=len(spec['paths']), schemas=len(spec['components']['schemas']),
+                     operations=sum(m in {'get','post','put','patch','delete','head','options'} for item in spec['paths'].values() for m in item))
 covered = set()
 for e in exchanges:
     for path, item in spec['paths'].items():
