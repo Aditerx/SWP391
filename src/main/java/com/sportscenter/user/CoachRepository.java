@@ -9,4 +9,8 @@ import java.util.List;
 public interface CoachRepository extends JpaRepository<Coach, Integer> {
     @Query("SELECT c FROM Coach c JOIN FETCH c.user u JOIN FETCH u.role r")
     List<Coach> findAllWithUser();
+
+    @Query("SELECT c FROM Coach c JOIN FETCH c.user u JOIN FETCH u.role r " +
+            "WHERE (:centerId IS NULL OR u.centerId = :centerId)")
+    List<Coach> findAllWithUserByCenterId(@Param("centerId") Integer centerId);
 }
