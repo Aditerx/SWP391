@@ -2,6 +2,8 @@
 
 Phạm vi: P1.0–P1.4 và BE P2.1–P2.5; P1.5/gói T D01/D09/FE để lại theo Owner. Nền tai 0277b2f. Source BE chốt `13a62ee780be19dce62730b45b119e2f97f31def`: clean test292/273pass/19skip/0lỗi,PG HTTP9/9pass. [Trang demo](evidence/demo.html), [manifest](evidence/verification.json), [test summary](evidence/test-summary.txt), [HTTP trace](evidence/postgres-http.txt). Feature199bbf9 đã push;merge main86d0076→155968d đã kiểm lại clean292/273pass/19skip/0lỗi và PG HTTP9/9. Manifest hiện hành ghi merge155968d;commit đóng docs giữ nguyên BE. Contract: [docs 01](../../../../docs/01-API-CONTRACT-FE-BE.md); vận hành/migration: [docs 02 mục 10](../../../../docs/02-DEPLOYMENT-GUIDE.md#10-bàn-giao-hai-phase-và-demo-tái-lập--27102026).
 
+> Đính chính target theo Owner: các artifact tên production-release/production-postflight và bundle empty-schema trong thư mục này đã chạy trên **DB test1a3dfdd7…**. Production thực188f6765… có dữ liệu sẵn, được nâng cấp riêng có phê duyệt; xem [handoff production](../../../production-upgrade/2026-10-27/README.md). Giữ nguyên artifact/hash lịch sử.
+
 ## Chạy demo
 
 Docker Desktop/PostgreSQL17 container scms-phases-20261027 đang chạy, bind 127.0.0.1:55440, local-only password scms-local-only. Java17/Python3/PowerShell sẵn có:

@@ -1,0 +1,237 @@
+{
+  "targetFingerprint": "188f67654d48aa11c970703f2cdaefc79290f1173a7dedaf93547e74bc6b1048",
+  "remoteWrites": false,
+  "backupEncrypted": true,
+  "backupFile": "artifacts/private-backups/production-188f67654d48-20261027_204720.dump.dpapi",
+  "encryptedBackupSha256": "7051a1df60af89c7a9a27e8d04f08147f46a2ed67610cacaf6ae37bf645dde6a",
+  "backupRestoreVerified": true,
+  "localProofDatabase": "scms_phases_upgrade_20261027_204720",
+  "bundleSha256": "01e31ca6a8606b47d321fd61a6860076c68317d3490f3b529cf42414a80db8d7",
+  "sources": [
+    {
+      "path": "database/migrations/05_migration_notifications.sql",
+      "normalizedLfSha256": "8dd2543db0920fd549721fcd0da84a53976114a61e04555fa969133cf55444b4"
+    },
+    {
+      "path": "database/migrations/06_migration_chat.sql",
+      "normalizedLfSha256": "89e45b88c52666ce1f1d9f9e4aecc8e55d65cd880d21346e80d1e632982fc28a"
+    },
+    {
+      "path": "database/migrations/06_schedule_safety_postgres.sql",
+      "normalizedLfSha256": "3f13d1c54d770f96ac18d58a05f5a6e97fa610b490299fcf3a6b2d48748c2187"
+    },
+    {
+      "path": "database/migrations/07_session_subscription_postgres.sql",
+      "normalizedLfSha256": "c39249682d50fa27a96f53ea5115d2ac8a96cf56c316f61a6082cbd4d48a05dd"
+    },
+    {
+      "path": "database/migrations/08_advanced_entitlements_postgres.sql",
+      "normalizedLfSha256": "e39ff49a59d4688dda943326966ad75351cd198a25414648230a9bbe2c22bd55"
+    },
+    {
+      "path": "database/migrations/09_approved_catalog_postgres.sql",
+      "normalizedLfSha256": "a4935100af5099d6146d57511e8ca2376cda9f2e46e7b26af7dd1a2522229f46"
+    },
+    {
+      "path": "database/migrations/10_session_incidents_postgres.sql",
+      "normalizedLfSha256": "9bedbb2e9079fd8316fac23c1160c4821a4a8dd47c9902f97dbd49d0acf4b712"
+    },
+    {
+      "path": "database/migrations/11_holiday_history_postgres.sql",
+      "normalizedLfSha256": "5102fd37f627c33405aa830e0482b2c93c2da31bdf64ff643bb97ed97d0198c7"
+    },
+    {
+      "path": "database/migrations/12_payment_resolutions_postgres.sql",
+      "normalizedLfSha256": "12e6e4709595b442035ef623efb3ec3b500820a2489dad378244e30a8cade6f0"
+    }
+  ],
+  "beforeCounts": {
+    "users": 30,
+    "invoices": 6,
+    "member_packages": 5,
+    "class_enrollments": 2,
+    "classes": 15,
+    "sessions": 2,
+    "membership_packages": 6
+  },
+  "beforeCatalog": [
+    {
+      "slug": null,
+      "status": "Active",
+      "outdoor": null,
+      "subject_id": 1,
+      "normal_price": 0.0,
+      "subject_name": "Cầu lông",
+      "advanced_price": 0.0
+    },
+    {
+      "slug": null,
+      "status": "Active",
+      "outdoor": null,
+      "subject_id": 2,
+      "normal_price": 0.0,
+      "subject_name": "Pickleball",
+      "advanced_price": 0.0
+    },
+    {
+      "slug": null,
+      "status": "Active",
+      "outdoor": null,
+      "subject_id": 3,
+      "normal_price": 0.0,
+      "subject_name": "Bóng bàn",
+      "advanced_price": 0.0
+    },
+    {
+      "slug": null,
+      "status": "Active",
+      "outdoor": null,
+      "subject_id": 4,
+      "normal_price": 0.0,
+      "subject_name": "Bắn cung",
+      "advanced_price": 0.0
+    },
+    {
+      "slug": null,
+      "status": "Active",
+      "outdoor": null,
+      "subject_id": 5,
+      "normal_price": 0.0,
+      "subject_name": "Bóng rổ",
+      "advanced_price": 0.0
+    },
+    {
+      "slug": null,
+      "status": "Active",
+      "outdoor": null,
+      "subject_id": 6,
+      "normal_price": 0.0,
+      "subject_name": "Bóng chuyền",
+      "advanced_price": 0.0
+    },
+    {
+      "slug": null,
+      "status": "Active",
+      "outdoor": null,
+      "subject_id": 7,
+      "normal_price": 0.0,
+      "subject_name": "Bắn súng",
+      "advanced_price": 0.0
+    },
+    {
+      "slug": null,
+      "status": "Active",
+      "outdoor": null,
+      "subject_id": 8,
+      "normal_price": 0.0,
+      "subject_name": "Bóng đá",
+      "advanced_price": 0.0
+    },
+    {
+      "slug": null,
+      "status": "Active",
+      "outdoor": null,
+      "subject_id": 9,
+      "normal_price": 0.0,
+      "subject_name": "Quần vợt",
+      "advanced_price": 0.0
+    },
+    {
+      "slug": "quan-vot-tennis",
+      "status": "Active",
+      "outdoor": true,
+      "subject_id": 19,
+      "normal_price": 1500000.0,
+      "subject_name": "Quần vợt (Tennis)",
+      "advanced_price": 10000000.0
+    },
+    {
+      "slug": "boi-loi",
+      "status": "Active",
+      "outdoor": true,
+      "subject_id": 20,
+      "normal_price": 1200000.0,
+      "subject_name": "Bơi lội",
+      "advanced_price": 9000000.0
+    },
+    {
+      "slug": "pickleball",
+      "status": "Active",
+      "outdoor": false,
+      "subject_id": 21,
+      "normal_price": 1100000.0,
+      "subject_name": "Pickleball",
+      "advanced_price": 8500000.0
+    },
+    {
+      "slug": "ban-cung",
+      "status": "Active",
+      "outdoor": true,
+      "subject_id": 22,
+      "normal_price": 1400000.0,
+      "subject_name": "Bắn cung",
+      "advanced_price": 9500000.0
+    },
+    {
+      "slug": "bong-ro",
+      "status": "Active",
+      "outdoor": false,
+      "subject_id": 23,
+      "normal_price": 1000000.0,
+      "subject_name": "Bóng rổ",
+      "advanced_price": 8000000.0
+    },
+    {
+      "slug": "bong-da",
+      "status": "Active",
+      "outdoor": true,
+      "subject_id": 24,
+      "normal_price": 900000.0,
+      "subject_name": "Bóng đá",
+      "advanced_price": 8000000.0
+    },
+    {
+      "slug": "bong-chuyen",
+      "status": "Active",
+      "outdoor": false,
+      "subject_id": 25,
+      "normal_price": 900000.0,
+      "subject_name": "Bóng chuyền",
+      "advanced_price": 7000000.0
+    },
+    {
+      "slug": "cau-long",
+      "status": "Active",
+      "outdoor": false,
+      "subject_id": 26,
+      "normal_price": 900000.0,
+      "subject_name": "Cầu lông",
+      "advanced_price": 7500000.0
+    },
+    {
+      "slug": "bong-ban",
+      "status": "Active",
+      "outdoor": false,
+      "subject_id": 27,
+      "normal_price": 800000.0,
+      "subject_name": "Bóng bàn",
+      "advanced_price": 6500000.0
+    }
+  ],
+  "originalRowDigests": {
+    "users": "ed86323db9f2cefb858416d87032859b",
+    "invoices": "9fd65f291f73175e182b6a0a0ec789ac",
+    "member_packages": "888571012baca09c7a17997c9f384f4e",
+    "class_enrollments": "ee3236300fa6f79a2b117191a71cea4e",
+    "classes": "9598680cac7001006230299e368c7878",
+    "sessions": "dbe3e22e954be6737f30c30724dabfcd",
+    "membership_packages": "664ebfb12b04ef8fe511aa4f7809c158"
+  },
+  "status": "LOCAL_PROOF_PASS",
+  "originalRowsPreserved": true,
+  "sourceMigrationsReplay": true,
+  "bundleReplayRefused": true,
+  "referencedCatalogRefusedAndRolledBack": true,
+  "guardDatabase": "scms_phases_upgrade_20261027_204720_guard",
+  "afterCatalogCount": 9
+}

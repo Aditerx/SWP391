@@ -797,3 +797,7 @@ Chat notification types persisted in `notification_type`: `CHAT_MEMBER_MESSAGE` 
 ## 17. Nhận diện runtime tại health — bổ sung vận hành 27/10
 
 `GET /api/health` vẫnpublic vàtrảstatusUP/messagepong (keep-alive,khôngchứngnhậnDB/SMTPhealthy). Thêm `diagnosticsVersion:"1"`, `buildCommit` từRENDER_GIT_COMMIT(hayunknown),`databaseTargetFingerprint` SHA256 của targetHikari đangdùng (hayunavailable). Chỉexposehash/commit,khôngURL/username/password/exception;không mởkếtnốiDBtronghealthping.HeaderCache-Control:no-store. Mãbăm dùngcùngthuậttoánJDBCpreflight đểso target,khôngthaykiểmdữliệu/migration/schemahoặcaggregatehealth. NếuRenderchưa cófieldmới,instanceLivechưađượckiểmchứnglàbảnsourcechẩnđoánmới.
+
+`GET /actuator/health` là health tổng: trả200 nếu UP,503 khi DOWN; expose tên thành phần và status (ví dụ db/mail/diskSpace), giữ show-details=never nên không có exception/URL/credential. /api/health tiếp tục là liveness/identity và không thay cổng health tổng.
+
+Notification `relatedId` được đọc/trả dưới dạng JSON integer int64 (Java Long), tương thích cột legacy BIGINT và không cắt về32bit; ID nghiệp vụ hiện tại vẫn được tạo từ nguồn có kiểu Integer. Không đổi endpoint/payload field.

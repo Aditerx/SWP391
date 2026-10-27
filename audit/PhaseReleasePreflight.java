@@ -12,10 +12,19 @@ public class PhaseReleasePreflight {
             Properties env=new Properties();
             for(String line:Files.readAllLines(Path.of(".env"))){int at=line.indexOf('=');if(at>0&&!line.stripLeading().startsWith("#"))env.setProperty(line.substring(0,at).trim(),line.substring(at+1).trim());}
             String url=env.getProperty("DB_URL","");
-            if(!url.startsWith("jdbc:postgresql://")||!url.contains("sslmode=require"))throw new IllegalArgumentException("Production JDBC with required TLS expected");
-            URI target=URI.create(url.substring(5));if(target.getUserInfo()!=null)throw new IllegalArgumentException("Embedded credentials are unsupported");
+            if(!url.startsWith("jdbc:postgresql://"))throw new IllegalArgumentException("Configured PostgreSQL JDBC expected");
+            URI target=URI.create(url.substring(5));
+            // Enforce TLS in the client without rewriting the owner's .env URL.
+            if(target.getRawQuery()!=null)for(String part:target.getRawQuery().split("&")){
+                String[] pair=part.split("=",2);
+                if(java.net.URLDecoder.decode(pair[0],java.nio.charset.StandardCharsets.UTF_8).equals("sslmode")){
+                    String mode=pair.length>1?java.net.URLDecoder.decode(pair[1],java.nio.charset.StandardCharsets.UTF_8):"";
+                    if(!Set.of("require","verify-ca","verify-full").contains(mode))throw new IllegalArgumentException("Read-only checker requires TLS");
+                }
+            }
+            if(target.getUserInfo()!=null)throw new IllegalArgumentException("Embedded credentials are unsupported");
             String fingerprint=HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest((target.getHost()+":"+target.getPort()+"/"+target.getPath()+"|"+env.getProperty("DB_USERNAME")).getBytes(java.nio.charset.StandardCharsets.UTF_8)));
-            Properties jdbc=new Properties();jdbc.setProperty("user",env.getProperty("DB_USERNAME"));jdbc.setProperty("password",env.getProperty("DB_PASSWORD"));jdbc.setProperty("connectTimeout","10");jdbc.setProperty("socketTimeout","15");
+            Properties jdbc=new Properties();jdbc.setProperty("sslmode","require");jdbc.setProperty("user",env.getProperty("DB_USERNAME"));jdbc.setProperty("password",env.getProperty("DB_PASSWORD"));jdbc.setProperty("connectTimeout","10");jdbc.setProperty("socketTimeout","15");
             DriverManager.setLoginTimeout(10);
             try(Connection c=DriverManager.getConnection(url,jdbc)){
                 c.setReadOnly(true);c.setAutoCommit(false);

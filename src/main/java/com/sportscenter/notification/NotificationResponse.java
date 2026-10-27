@@ -9,7 +9,7 @@ public record NotificationResponse(
         String title,
         String message,
         String relatedType,
-        Integer relatedId,
+        Long relatedId,
         boolean isRead,
         OffsetDateTime createdAt) {
     static NotificationResponse from(Notification notification, boolean isRead) {

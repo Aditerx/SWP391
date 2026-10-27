@@ -87,7 +87,7 @@ public interface NotificationRepository extends JpaRepository<Notification, Inte
         String getTitle();
         String getMessage();
         String getRelatedType();
-        Integer getRelatedId();
+        Long getRelatedId();
         boolean getIsRead();
         LocalDateTime getCreatedAt();
     }

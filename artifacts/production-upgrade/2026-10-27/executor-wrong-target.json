@@ -1,0 +1,7 @@
+{
+  "committed": false,
+  "rolledBack": false,
+  "errorType": "IllegalArgumentException",
+  "sqlState": "",
+  "credentialsOmitted": true
+}
