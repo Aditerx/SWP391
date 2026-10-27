@@ -1,0 +1,18 @@
+{
+  "baseCommit": "5ff69f6ea616268d1ca699c1b5edfe8eec6e46b6",
+  "sourceState": "Working tree HealthCheckController + RuntimeIdentity + RuntimeIdentityTest; exact files subsequently committed",
+  "command": ".\\mvnw.cmd clean test",
+  "tests": 302,
+  "failures": 0,
+  "errors": 0,
+  "skipped": 25,
+  "passed": 277,
+  "rawLogSha256": "31d0e87da01b81531fc57d82b3a3df1f3e3a1b57d6e726a754cb2b4b2a6fbf1e",
+  "identityCases": [
+    "Effective pool target wins over DB_URL placeholder",
+    "No connection opened by identity or ping",
+    "Embedded credentials and invalid commit never echoed",
+    "Unavailable pool metadata does not break ping"
+  ],
+  "productionDbWrites": false
+}
