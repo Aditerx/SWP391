@@ -185,6 +185,10 @@ public class PhaseWorkflowHttpTest {
         assertEquals(new BigDecimal("3000000.00"),jdbc.queryForObject("SELECT amount FROM invoices WHERE invoice_id=?",BigDecimal.class,invoiceId));
         assertEquals(12,jdbc.queryForObject("SELECT remaining_credit FROM member_packages WHERE subscription_id=?",Integer.class,subscriptionId));
         assertEquals(LocalDateTime.of(2026,12,12,8,0),jdbc.queryForObject("SELECT expires_at FROM member_packages WHERE subscription_id=?",LocalDateTime.class,subscriptionId));
+        var rights=call(member,"GET","/api/members/"+memberId+"/subscriptions",null,200).get(0);
+        assertEquals("Active",rights.get("status").asText());assertEquals(12,rights.get("remainingCredit").asInt());
+        assertEquals(3000000,rights.get("price").asInt());assertEquals("2026-12-12T08:00:00",rights.get("expiresAt").asText());
+        call(other,"GET","/api/members/"+memberId+"/subscriptions",null,403);
     }
     @Test @Order(2) void returnCannotPayAndSignedIpnReplaysOnlyOnce() throws Exception {
         var order=requestOrder("online-one","VNPay",member);int iid=order.get("invoiceId").asInt();int sid=order.get("subscriptionId").asInt();
@@ -204,6 +208,8 @@ public class PhaseWorkflowHttpTest {
         assertTrue(jdbc.queryForObject("SELECT reconciliation_required FROM invoices WHERE invoice_id=?",Boolean.class,iid));
         assertEquals(0,jdbc.queryForObject("SELECT remaining_credit FROM member_packages WHERE subscription_id=?",Integer.class,sid));
         assertEquals("Cancelled",jdbc.queryForObject("SELECT status FROM member_packages WHERE subscription_id=?",String.class,sid));
+        var lateReadback=call(member,"GET","/api/members/me/invoices/"+iid,null,200);
+        assertEquals("Paid",lateReadback.get("paymentStatus").asText());assertTrue(lateReadback.get("reconciliationRequired").asBoolean());
         // A verified, on-time receipt must survive a business failure without granting unusable rights.
         var unavailable=requestOrder("on-time-unavailable","VNPay",member);
         jdbc.update("UPDATE subjects SET status='Inactive' WHERE subject_id=?",subjectId);
@@ -223,6 +229,7 @@ public class PhaseWorkflowHttpTest {
         var created=call(coach,"POST","/api/sessions/book-private",payload,201);int id=created.get("id").asInt();
         assertEquals(id,call(coach,"POST","/api/sessions/book-private",payload,201).get("id").asInt());
         assertEquals(11,credit());
+        assertEquals(11,call(member,"GET","/api/members/"+memberId+"/subscriptions",null,200).get(0).get("remainingCredit").asInt());
         assertEquals(1,jdbc.queryForObject("SELECT count(*) FROM notifications WHERE dedupe_key=?",Integer.class,"PRIVATE_BOOKING_CONFIRMED:"+id));
         call(manager,"PATCH","/api/sessions/"+id+"/status",Map.of("status","Completed"),400);
         call(manager,"PATCH","/api/subscriptions/"+subscriptionId+"/status",Map.of("status","Expired"),400);
@@ -231,6 +238,7 @@ public class PhaseWorkflowHttpTest {
         call(member,"POST","/api/sessions/"+id+"/cancel-private",null,200);
         call(member,"POST","/api/sessions/"+id+"/cancel-private",null,400);
         assertEquals(12,credit());
+        assertEquals(12,call(member,"GET","/api/members/"+memberId+"/subscriptions",null,200).get(0).get("remainingCredit").asInt());
         var next=call(coach,"POST","/api/sessions/book-private",booking("notice-session",LocalDate.of(2026,10,28),"07:45","09:15"),201);
         scheduledId=next.get("id").asInt();
         clock.current=LocalDateTime.of(2026,10,28,0,0).atZone(clock.getZone()).toInstant();
