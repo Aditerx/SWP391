@@ -9,6 +9,8 @@ p = argparse.ArgumentParser(description=__doc__)
 p.add_argument('--base-url', default='https://scms-app-p1gy.onrender.com')
 p.add_argument('--output', required=True)
 p.add_argument('--source-commit', default='unknown')
+p.add_argument('--require-runtime-identity', action='store_true')
+p.add_argument('--expected-db-fingerprint', help='Non-secret target digest produced by the JDBC preflight')
 p.add_argument('--pushed-at-utc', required=True, help='ISO timestamp; refuse to check before five minutes after this push')
 a = p.parse_args()
 base = a.base_url.rstrip('/')
@@ -48,6 +50,14 @@ report['assertions']['healthUp'] = status == 200 and isinstance(health,dict) and
 report['health'] = health
 status, _, ping = get('/api/health')
 report['assertions']['applicationUp'] = status == 200 and isinstance(ping,dict) and ping.get('status') == 'UP'
+if isinstance(ping,dict):
+    report['runtimeIdentity'] = {k:ping.get(k) for k in ('diagnosticsVersion','buildCommit','databaseTargetFingerprint')}
+if a.require_runtime_identity:
+    identity = report.get('runtimeIdentity',{})
+    report['assertions']['runtimeIdentityAvailable'] = identity.get('diagnosticsVersion') == '1'
+    report['assertions']['runtimeCommitMatchesPush'] = identity.get('buildCommit') == a.source_commit
+if a.expected_db_fingerprint:
+    report['assertions']['databaseTargetMatchesExpected'] = report.get('runtimeIdentity',{}).get('databaseTargetFingerprint') == a.expected_db_fingerprint
 status, html, _ = get('/swagger-ui/index.html')
 report['assertions']['swaggerHtml'] = status == 200 and 'swagger-ui' in html
 for asset in ('swagger-ui.css','swagger-ui-bundle.js','swagger-initializer.js'):
