@@ -1,1 +1,0 @@
-{"success":false,"host":"db.zomadlfjncetjtgrcold.supabase.co","sql_state":"08001","message":"The connection attempt failed.","error_types":["PSQLException","UnknownHostException"],"elapsed_ms":3440}

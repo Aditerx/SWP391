@@ -1,24 +1,17 @@
-"""Inventory every published operation against Java routes and produce a read-only Render GET audit.
-Never loads .env, logs in, sends mail, calls a callback, or executes a production mutation.
-"""
+"""Offline verification of the one FE schema and retained QA record. No network, login, DB or document generation."""
 from pathlib import Path
-import argparse, concurrent.futures, datetime as dt, hashlib, json, re, subprocess, time
-from urllib.request import Request, urlopen
-from urllib.error import HTTPError, URLError
-
+import argparse,datetime as dt,hashlib,json,re,subprocess
 ROOT=Path(__file__).resolve().parents[1]
-BASE='https://scms-app-p1gy.onrender.com'
 METHODS={'get','post','put','patch','delete','head','options'}
 p=argparse.ArgumentParser(description=__doc__)
-p.add_argument('--output',default='artifacts/fe-handoff/2026-10-27')
-p.add_argument('--probe-get',action='store_true',help='Anonymous GET only; no callback endpoints')
-p.add_argument('--exchanges',help='Sanitized local HTTP exchange JSON from the committed demo runner')
-a=p.parse_args(); OUT=(ROOT/a.output).resolve(); OUT.mkdir(parents=True,exist_ok=True)
-spec=json.loads((OUT/'render-openapi.json').read_text(encoding='utf-8'))
-
-def save(name,value):
-    (OUT/name).write_text(json.dumps(value,ensure_ascii=False,indent=2)+'\n',encoding='utf-8',newline='\n')
-
+p.add_argument('--openapi',default='artifacts/fe-handoff/openapi.json')
+p.add_argument('--qa',default='artifacts/qa/latest.json')
+p.add_argument('--output',help='Optional single JSON result; default prints only')
+a=p.parse_args()
+openapi_path=(ROOT/a.openapi).resolve();qa_path=(ROOT/a.qa).resolve()
+spec=json.loads(openapi_path.read_text(encoding='utf-8-sig'))
+qa=json.loads(qa_path.read_text(encoding='utf-8-sig'))
+exchanges=qa['local']['exchanges']
 def canonical(path): return re.sub(r'\{[^}]+\}','{}',path.rstrip('/'))
 
 def annotation(text,start):
@@ -82,164 +75,55 @@ for file in sorted((ROOT/'src/main/java').rglob('*Controller.java')):
                         'controller':cls.group(1),'method':method_name,'authorizationExpression':expression,'path':path,
                         'successStatusesExplicitInController':sorted(set(codes))}
 
-def public(method,path):
-    return path=='/api/health' or (method=='GET' and path.startswith('/api/public/')) or \
-        (method=='GET' and path in ('/api/payments/vnpay/ipn','/api/payments/vnpay/return')) or \
-        (method=='POST' and path in ('/api/auth/login','/api/auth/logout','/api/auth/forgot-password',
-         '/api/auth/reset-password','/api/auth/register','/api/auth/verify-registration','/api/auth/resend-otp'))
+issues=[];nullable=set();positive=0;body_checks=0
+def check(value,schema,where,operation):
+    if '$ref' in schema:return check(value,spec['components']['schemas'][schema['$ref'].split('/')[-1]],where,operation)
+    if value is None:nullable.add((operation,where));return
+    expected=schema.get('type')
+    types={'object':isinstance(value,dict),'array':isinstance(value,list),'string':isinstance(value,str),
+           'boolean':isinstance(value,bool),'integer':isinstance(value,int) and not isinstance(value,bool),
+           'number':isinstance(value,(int,float)) and not isinstance(value,bool)}
+    if expected and not types.get(expected,True):issues.append([operation,where,expected,type(value).__name__]);return
+    if isinstance(value,dict):
+        properties=schema.get('properties',{})
+        for key,item in value.items():
+            if key in properties:check(item,properties[key],where+'.'+key,operation)
+            elif 'additionalProperties' not in schema:issues.append([operation,where+'.'+key,'undeclared property',''])
+    if isinstance(value,list):
+        for item in value:check(item,schema.get('items',{}),where+'[]',operation)
 
-def decision_ids(path):
-    if path.startswith('/api/advanced-registrations') or 'admission-capacity' in path or 'work-schedule' in path:return ['D03']
-    if path.startswith('/api/center-incidents'):return ['D06','D08','D12','D14','D15']
-    if path.startswith('/api/payment-resolutions'):return ['D10','D16']
-    if path.startswith('/api/holidays'):return ['D12','D14']
-    if '/book-private' in path:return ['D03','D04','D12']
-    if '/cancel-private' in path or '/absence' in path:return ['D05']
-    if '/reschedule' in path:return ['D06','D07','D08']
-    if '/substitute-coach' in path:return ['D06']
-    if path.startswith('/api/attendance') or path.startswith('/api/training-results'):return ['D15','D17']
-    if path.startswith('/api/reports'):return ['D13','D18','D19']
-    if '/invoices' in path or '/vnpay/' in path:return ['D03','D10','D16']
-    if 'subscription' in path or 'member-packages' in path:return ['D03','D08','D12','D13']
-    if path=='/api/coaches':return ['D09']
-    if '/subjects' in path:return ['D02']
-    if path.startswith('/api/classes') or path.startswith('/api/enrollments') or path.startswith('/api/sessions'):return ['D03','D12','D14','D15']
-    return []
+for e in exchanges:
+    if not 200<=e['actualStatus']<300:continue
+    path=e['path'].split('?')[0];method=e['method'].lower()
+    matches=[(p,item[method]) for p,item in spec['paths'].items() if method in item
+             and re.fullmatch(re.sub(r'\{[^}]+\}',r'[^/]+',p),path)]
+    if not matches:issues.append([e['method']+' '+path,'operation','missing','']);continue
+    template,operation=sorted(matches,key=lambda kv:kv[0].count('{'))[0];label=e['method']+' '+template;positive+=1
+    response=operation.get('responses',{}).get(str(e['actualStatus']))
+    if response is None:issues.append([label,'status',e['actualStatus'],'not published']);continue
+    for side,value,node in [('request',e['requestBody'],operation.get('requestBody',{})),('response',e['responseBody'],response)]:
+        contents=node.get('content',{})
+        if contents:body_checks+=1;check(value,next(iter(contents.values())).get('schema',{}),side,label)
 
-contract=(ROOT/'docs/01-API-CONTRACT-FE-BE.md').read_text(encoding='utf-8')
-mentions={canonical(x.rstrip('.')) for x in re.findall(r'/api/[\w/{}/.:-]+',contract)}
-operations=[]
-for path,item in spec['paths'].items():
-    for method,op in item.items():
-        if method not in METHODS:continue
-        verb=method.upper(); handler=handlers.get((verb,canonical(path)))
-        operations.append({'method':verb,'path':path,'operationId':op.get('operationId'),'tags':op.get('tags',[]),
-            'publicAtSecurityFilter':public(verb,path),'sourceHandler':handler,
-            'decisionIds':decision_ids(path),'contractPathExplicitlyMentioned':canonical(path) in mentions,
-            'parameters':op.get('parameters',[]),'requestBody':op.get('requestBody'),
-            'publishedResponses':op.get('responses',{}),'localExchangeIndexes':[],
-            'renderBusinessVerified':False,'renderAnonymousGet':None})
-operations.sort(key=lambda x:(x['path'],x['method']))
-missing_source=[x['method']+' '+x['path'] for x in operations if not x['sourceHandler']]
-extra_source=[verb+' '+data['path'] for (verb,path),data in handlers.items()
-              if not any(x['method']==verb and canonical(x['path'])==path for x in operations)]
 
-def match_operation(method,url):
-    path=url.split('?')[0]
-    matches=[x for x in operations if x['method']==method and re.fullmatch(re.sub(r'\{[^}]+\}',r'[^/]+',x['path']),path)]
-    return sorted(matches,key=lambda x:x['path'].count('{'))[0] if matches else None
-
-if a.exchanges:
-    raw=json.loads(Path(a.exchanges).read_text(encoding='utf-8-sig'))
-    # Local callback signatures/payment links are evidence, never publish an executable signature.
-    text=json.dumps(raw,ensure_ascii=False)
-    text=re.sub(r'vnp_SecureHash=[^&"\\]*','vnp_SecureHash=[redacted]',text)
-    exchanges=json.loads(text);save('http-exchanges.json',exchanges)
-    for index,e in enumerate(exchanges):
-        op=match_operation(e['method'],e['path'])
-        if op:op['localExchangeIndexes'].append(index)
-
-def get_probe(op):
-    route=re.sub(r'\{[^}]+\}','1',op['path']);start=time.monotonic()
-    record={'method':'GET','pathTemplate':op['path'],'pathRequested':route,'authenticated':False}
-    # No cookie jar, credentials, authorization, user data query, or environment file.
-    for attempt in range(2):
-        try:
-            with urlopen(Request(BASE+route,headers={'User-Agent':'SCMS-ReadOnly-Contract-Audit/1.0'}),timeout=20) as r:
-                status,body=r.status,r.read()
-        except HTTPError as e:status,body=e.code,e.read()
-        except (OSError,URLError,TimeoutError) as e:status,body=0,type(e).__name__.encode()
-        if status not in (0,502,504):break
-    record.update(status=status,attempts=attempt+1,durationSeconds=round(time.monotonic()-start,3),bodySha256=hashlib.sha256(body).hexdigest())
-    record['expected']='200 public catalog/identity' if op['publicAtSecurityFilter'] else '401/403 only; authorization gate, not business correctness'
-    record['pass']=status==200 if op['publicAtSecurityFilter'] else status in (401,403)
-    if op['publicAtSecurityFilter']:
-        try:
-            parsed=json.loads(body)
-            record['responseBody']=parsed
-        except ValueError:pass
-    # A mistakenly open protected endpoint must not cause production PII to be saved.
-    return record
-
-if a.probe_get:
-    candidates=[x for x in operations if x['method']=='GET' and '/api/payments/vnpay/' not in x['path']]
-    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
-        results=list(pool.map(get_probe,candidates))
-    save('render-get-checks.json',{'checkedAtUtc':dt.datetime.now(dt.timezone.utc).isoformat(),
-        'baseUrl':BASE,'envRead':False,'authenticated':False,'method':'GET only, callbacks excluded',
-        'businessMutationsExecuted':False,'productionBodyPolicy':'Public catalog/identity only; protected bodies hashed, never published',
-        'checks':results,'passed':sum(x['pass'] for x in results),'total':len(results)})
-elif (OUT/'render-get-checks.json').exists():results=json.loads((OUT/'render-get-checks.json').read_text(encoding='utf-8'))['checks']
-else:results=[]
-for probe in results:
-    op=next(x for x in operations if x['method']=='GET' and x['path']==probe['pathTemplate'])
-    op['renderAnonymousGet']={k:probe[k] for k in ('status','pass','expected')}
-
-schemas=spec.get('components',{}).get('schemas',{})
-def typename(s):
-    if not s:return 'unspecified'
-    if '$ref' in s:return s['$ref'].split('/')[-1]
-    if s.get('type')=='array':return 'array<'+typename(s.get('items',{}))+'>'
-    if 'additionalProperties' in s:return 'object/map'
-    return s.get('type','object')+('('+s['format']+')' if s.get('format') else '')
-def escape(s):return str(s).replace('|','\\|').replace('\n',' ')
-def body_description(value):
-    return ', '.join(k+': '+typename(v.get('schema',{})) for k,v in (value or {}).get('content',{}).items()) or 'no body schema'
-
-lines=['# Danh mục toàn bộ API Render và nguồn đối chiếu','',
-    'Sinh từ snapshot OpenAPI và controller đang checkout. Schema/route khớp không chứng nhận nghiệp vụ.',
-    'GET anonymous 401/403 chỉ chứng minh cổng đăng nhập. Không có phiên đăng nhập hoặc mutation production trong đợt audit này.',
-    'Phạm vi role/owner/center còn có kiểm tra trong service; biểu thức annotation bên dưới không thay toàn bộ policy.',
-    'Schema request/response đầy đủ: [schemas.md](schemas.md); mẫu HTTP thật local: [http-exchanges.json](http-exchanges.json).','',
-    '| # | Method | Path | Dxx | Local HTTP exchanges | Render anonymous GET |',
-    '|---|---|---|---|---|---|']
-for n,op in enumerate(operations,1):
-    probe=op['renderAnonymousGet'];label=str(probe['status']) if probe else 'chưa gọi'
-    lines.append(f"| {n} | {op['method']} | `{op['path']}` | {','.join(op['decisionIds']) or 'baseline'} | {len(op['localExchangeIndexes'])} | {label} |")
-lines+=['','## Chi tiết từng thao tác','']
-for n,op in enumerate(operations,1):
-    h=op['sourceHandler']
-    lines += [f"### {n}. {op['method']} {op['path']}",'',f"- operationId: `{op['operationId']}`; Dxx: {','.join(op['decisionIds']) or 'baseline ngoài quyết định Dxx trực tiếp'}.",
-        '- Authentication: '+('Public theo SecurityConfig.' if op['publicAtSecurityFilter'] else 'Session JSESSIONID bắt buộc.'),
-        '- Controller permission: `'+((h or {}).get('authorizationExpression') or 'không có annotation riêng; vẫn chịu SecurityConfig/service guards')+'`.',
-        '- Success status đọc từ controller: '+str((h or {}).get('successStatusesExplicitInController',[]))+'; đối chiếu thêm exchange thực tế (OpenAPI có thể chỉ suy mặc định200).',
-        f"- Handler: `{h['file']}:{h['line']}` → `{h['method']}`." if h else '- Handler: UNMATCHED, cần kiểm thủ công.',
-        '- Request body: '+body_description(op['requestBody'])+('; required' if (op['requestBody'] or {}).get('required') else '; optional/no body')+'.',
-        '- Responses do OpenAPI khai báo: '+', '.join(code+' '+body_description(v) for code,v in op['publishedResponses'].items())+'.',
-        '- Local HTTP exchange indexes (0-based): '+(', '.join(map(str,op['localExchangeIndexes'])) or 'chưa có trong demo9case')+'.',
-        '- Render: '+(f"anonymous GET {op['renderAnonymousGet']['status']}; {op['renderAnonymousGet']['expected']}" if op['renderAnonymousGet'] else 'chưa gọi thao tác này trong đợt audit; không suy từ Swagger')+'.','']
-    if op['parameters']:
-        lines+=['| Parameter | In | Required | Type | Default / enum |','|---|---|---|---|---|']
-        for v in op['parameters']:
-            schema=v.get('schema',{})
-            lines.append('| '+ ' | '.join(map(escape,[v.get('name'),v.get('in'),v.get('required',False),typename(schema),schema.get('enum',schema.get('default',''))]))+' |')
-        lines+=['']
-(OUT/'api-inventory.md').write_text('\n'.join(lines).rstrip()+'\n',encoding='utf-8',newline='\n')
-lines=['# Schema request/response từ OpenAPI Live','',
-       'Đây là schema công bố, không phải response đã gọi. Required/nullable lấy nguyên snapshot; nullable không khai báo không có nghĩa response thực không thể null. Đối chiếu thêm DTO/trace trong contract chính.','']
-for name,schema in sorted(schemas.items()):
-    lines += ['## '+name,'','| Field | Type | Required in OpenAPI | Constraints / enum |','|---|---|---|---|']
-    for field,value in schema.get('properties',{}).items():
-        rules={k:v for k,v in value.items() if k not in ('type','format','$ref','items','properties','description')}
-        lines.append('| '+' | '.join(map(escape,[field,typename(value),field in schema.get('required',[]),json.dumps(rules,ensure_ascii=False) if rules else '']))+' |')
-    if not schema.get('properties'):lines.append('| (schema) | '+escape(typename(schema))+' | | '+escape(json.dumps(schema,ensure_ascii=False))+' |')
-    lines+=['']
-(OUT/'schemas.md').write_text('\n'.join(lines).rstrip()+'\n',encoding='utf-8',newline='\n')
-summary={'checkedAtUtc':dt.datetime.now(dt.timezone.utc).isoformat(),'sourceCommit':subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip(),
-    'renderIdentity':json.loads((OUT/'render-identity.json').read_text(encoding='utf-8')),
-    'paths':len(spec['paths']),'operations':len(operations),'schemas':len(schemas),'sourceHandlersMatched':len(operations)-len(missing_source),
-    'missingSource':missing_source,'extraSource':extra_source,
-    'contractPathsExplicitlyMentioned':sum(x['contractPathExplicitlyMentioned'] for x in operations),
-    'operationsWithLocalExchanges':sum(bool(x['localExchangeIndexes']) for x in operations),
-    'renderAnonymousGetChecks':len(results),'renderAnonymousGetPassed':sum(x['pass'] for x in results),
-    'renderAuthenticatedBusinessOperationsTested':0,'productionMutationsExecuted':False,
-    'publishedSuccessStatusGaps':[{'method':x['method'],'path':x['path'],'controller':x['sourceHandler']['successStatusesExplicitInController'],
-        'openApi':list(x['publishedResponses'])} for x in operations if x['sourceHandler'] and
-        any(str(code) not in x['publishedResponses'] for code in x['sourceHandler']['successStatusesExplicitInController'])],
-    'limits':['Controller parser is static; service ownership/center/locking checks need separate policy review/tests',
-              'Anonymous GET guards and OpenAPI do not prove full role matrix, error mapping, concurrency, callbacks or business outcomes',
-              'P1.5/D01/D09/FE integration remain excluded; no production session credentials were supplied or guessed'],
-    'openApiSha256':hashlib.sha256((OUT/'render-openapi.json').read_bytes()).hexdigest()}
-save('api-inventory.json',operations);save('audit-summary.json',summary)
-print(json.dumps(summary,ensure_ascii=False))
-if missing_source or extra_source:raise SystemExit(2)
+operations=[(m.upper(),canonical(path)) for path,item in spec['paths'].items() for m in item if m in METHODS]
+missing=[m+' '+path for m,path in operations if (m,path) not in handlers]
+extra=[m+' '+h['path'] for (m,path),h in handlers.items() if (m,path) not in operations]
+reference=qa['results']['sourceCommit']
+backend_match=subprocess.run(['git','diff','--quiet',reference,'--','src/main','pom.xml','database'],cwd=ROOT).returncode==0
+schema_hash=hashlib.sha256(openapi_path.read_bytes()).hexdigest()
+hash_match=schema_hash==qa['openApi']['sha256']
+result={'result':'PASS' if not issues and not missing and not extra and hash_match and backend_match else 'REVIEW_REQUIRED',
+        'mode':'OFFLINE_RETAINED_EVIDENCE_CHECK','checkedAtUtc':dt.datetime.now(dt.timezone.utc).isoformat(),
+        'backendTestsExecuted':False,'liveProbePerformed':False,'evidenceSourceCommit':reference,
+        'retainedBackendTreeMatchesSource':backend_match,'openApiHashMatchesRecord':hash_match,
+        'operations':len(operations),'sourceRoutesMatched':len(operations)-len(missing),'missingSourceRoutes':missing,'extraSourceRoutes':extra,
+        'positiveRecordedExchanges':positive,'bodyTypePropertyChecks':body_checks,'wireIssues':sorted(set(tuple(x) for x in issues)),
+        'limits':['Static route parser, not a complete Java or authorization analysis',
+                  'Compatibility covers recorded positive status/basic types/properties; nullability/required/format/range/negative errors need separate tests',
+                  'This does not rerun business tests or certify the current production state']}
+if a.output:
+    output=(ROOT/a.output).resolve();output.parent.mkdir(parents=True,exist_ok=True)
+    output.write_text(json.dumps(result,ensure_ascii=False,indent=2)+'\n',encoding='utf-8',newline='\n')
+print(json.dumps(result,ensure_ascii=False))
+raise SystemExit(0 if result['result']=='PASS' else 2)

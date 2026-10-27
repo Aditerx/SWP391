@@ -23,7 +23,7 @@ SOURCE_ROOT = Path(__file__).resolve().parents[1]
 ROOT = SOURCE_ROOT
 RUN = dt.datetime.now(dt.timezone(dt.timedelta(hours=7))).strftime("%Y%m%d-%H%M%S") + "-" + uuid.uuid4().hex[:6]
 CONTAINER = "scms-communication-proof-" + RUN
-EVIDENCE = SOURCE_ROOT / "artifacts" / "communication-proof" / RUN
+EVIDENCE = SOURCE_ROOT / "artifacts" / "runs" / "communication" / RUN
 LOGS = Path(tempfile.mkdtemp(prefix="scms-communication-"))
 LEGACY_SCHEMA = "fc00c6499547a2873da6787326d508140e24b0fd:database/schema_postgres.sql"
 EVIDENCE.mkdir(parents=True)

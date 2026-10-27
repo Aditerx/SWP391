@@ -2,7 +2,7 @@ param([string]$OutputDirectory)
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path $PSScriptRoot -Parent
 $stamp = Get-Date -Format 'yyyyMMdd_HHmmss'
-if (!$OutputDirectory) { $OutputDirectory = Join-Path $repo "artifacts/demo/runs/$stamp" }
+if (!$OutputDirectory) { $OutputDirectory = Join-Path $repo "artifacts/runs/phases/$stamp" }
 $outputPath = [IO.Path]::GetFullPath($OutputDirectory)
 New-Item -ItemType Directory -Path $outputPath -Force | Out-Null
 $checkout = Join-Path ([IO.Path]::GetTempPath()) "scms-phases-$stamp"

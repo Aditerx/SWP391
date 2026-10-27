@@ -1,4 +1,4 @@
-# Keep reviewable release bundles and evidence byte-stable across Windows checkouts.
-artifacts/demo/** text eol=lf
-artifacts/production-upgrade/** text eol=lf
+# Keep the one FE schema, QA record and approved release byte-stable across Windows checkouts.
 artifacts/fe-handoff/** text eol=lf
+artifacts/qa/** text eol=lf
+artifacts/releases/** text eol=lf

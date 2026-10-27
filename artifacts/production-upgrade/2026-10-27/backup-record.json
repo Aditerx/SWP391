@@ -1,9 +1,0 @@
-{
-  "targetFingerprint": "188f67654d48aa11c970703f2cdaefc79290f1173a7dedaf93547e74bc6b1048",
-  "remoteWrites": false,
-  "backupEncrypted": true,
-  "backupFile": "artifacts/private-backups/production-188f67654d48-20261027_204720.dump.dpapi",
-  "cipherSha256": "7051a1df60af89c7a9a27e8d04f08147f46a2ed67610cacaf6ae37bf645dde6a",
-  "dpapiRoundtripVerified": true,
-  "publicSchemaOnly": true
-}

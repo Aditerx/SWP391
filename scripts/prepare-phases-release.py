@@ -1,9 +1,9 @@
 """Generate a reviewable, atomic empty-schema PostgreSQL release. Does not connect to a database."""
 from pathlib import Path
-import argparse,hashlib,json,re
+import argparse,hashlib,json,re,datetime as dt
 root=Path(__file__).resolve().parents[1]
 p=argparse.ArgumentParser(description=__doc__)
-p.add_argument('--output',default='artifacts/demo/phase-2/2026-10-27/release')
+p.add_argument('--output',default='artifacts/runs/empty-schema/'+dt.datetime.now(dt.timezone.utc).strftime('%Y%m%d_%H%M%S'))
 args=p.parse_args();out=(root/args.output).resolve();out.mkdir(parents=True,exist_ok=True)
 files=['database/bootstrap/scms_structure_postgres.sql']+['database/migrations/'+n for n in [
     '06_schedule_safety_postgres.sql','07_session_subscription_postgres.sql','08_advanced_entitlements_postgres.sql',

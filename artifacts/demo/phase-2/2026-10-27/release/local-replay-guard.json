@@ -1,6 +1,0 @@
-{
-  "committed": false,
-  "errorType": "PSQLException",
-  "sqlState": "P0001",
-  "credentialsOmitted": true
-}

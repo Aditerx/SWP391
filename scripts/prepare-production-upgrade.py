@@ -9,7 +9,7 @@ ROOT = Path(__file__).resolve().parents[1]
 CONTAINER = 'scms-phases-20261027'
 STAMP = dt.datetime.now(dt.timezone(dt.timedelta(hours=7))).strftime('%Y%m%d_%H%M%S')
 PRIVATE = ROOT/'artifacts/private-backups'
-OUT = ROOT/'artifacts/production-upgrade/2026-10-27'
+OUT = ROOT/'artifacts/runs/production-upgrade'/STAMP
 PRIVATE.mkdir(parents=True, exist_ok=True); OUT.mkdir(parents=True, exist_ok=True)
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument('--target-fingerprint')
