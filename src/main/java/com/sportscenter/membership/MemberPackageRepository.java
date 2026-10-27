@@ -11,6 +11,10 @@ import java.util.List;
 import java.util.Optional;
 
 public interface MemberPackageRepository extends JpaRepository<MemberPackage, Integer> {
+    List<MemberPackage> findByPrimaryCoachId(Integer coachId);
+    List<MemberPackage> findByMemberCenterId(Integer centerId);
+    @Query("select mp.subscriptionId from MemberPackage mp where mp.status = 'Active' and ((mp.expiresAt is not null and mp.expiresAt <= :now) or (mp.expiresAt is null and mp.endDate < :today))")
+    List<Integer> findDueForExpiry(@Param("now") java.time.LocalDateTime now, @Param("today") LocalDate today);
     @Query("select mp.member.centerId from MemberPackage mp where mp.subscriptionId = :id")
     Optional<Integer> findCenterIdById(@Param("id") Integer id);
     @Query("select mp.subscriptionId from MemberPackage mp where mp.status = 'Active' and mp.endDate < :today")
@@ -22,19 +26,19 @@ public interface MemberPackageRepository extends JpaRepository<MemberPackage, In
 
     @Query("SELECT mp FROM MemberPackage mp " +
            "JOIN FETCH mp.member u " +
-           "JOIN FETCH mp.membershipPackage p " +
+           "LEFT JOIN FETCH mp.membershipPackage p " +
            "WHERE u.id = :memberId")
     List<MemberPackage> findByMemberId(@Param("memberId") Integer memberId);
 
     @Query("SELECT mp FROM MemberPackage mp " +
            "JOIN FETCH mp.member u " +
-           "JOIN FETCH mp.membershipPackage p " +
+           "LEFT JOIN FETCH mp.membershipPackage p " +
            "WHERE u.id = :memberId AND mp.status = :status")
     List<MemberPackage> findByMemberIdAndStatus(@Param("memberId") Integer memberId, @Param("status") String status);
 
     @Query("SELECT mp FROM MemberPackage mp " +
            "JOIN FETCH mp.member u " +
-           "JOIN FETCH mp.membershipPackage p")
+           "LEFT JOIN FETCH mp.membershipPackage p")
     List<MemberPackage> findAllWithDetails();
 
     @Query("SELECT mp FROM MemberPackage mp WHERE mp.status = 'Active' AND mp.endDate < :today")

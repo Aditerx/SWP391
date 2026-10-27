@@ -41,6 +41,10 @@ import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class SessionIncidentServiceTest {
+    @org.mockito.Mock com.sportscenter.membership.CoachCapacityService phaseCapacity;
+    @org.mockito.Mock com.sportscenter.session.SessionChangeRepository phaseChanges;
+    @org.mockito.Mock com.sportscenter.session.SessionAbsenceService phaseAbsence;
+    @org.mockito.Mock com.sportscenter.session.CenterIncidentService phaseIncidents;
 
     @Mock
     private SessionRepository sessionRepository;
@@ -116,13 +120,15 @@ class SessionIncidentServiceTest {
         lenient().when(sessionRepository.findByIdForUpdate(anyInt())).thenAnswer(call -> sessionRepository.findByIdWithDetails(call.getArgument(0)));
 
         Role managerRole = new Role();
-        managerRole.setName("Manager");
+        managerRole.setName("CenterManager");
         managerUser = new User();
         managerUser.setId(1);
         managerUser.setEmail("manager@sportscenter.com");
         managerUser.setFullName("Quản Lý Trung Tâm");
         managerUser.setRole(managerRole);
-        managerAuth = new UsernamePasswordAuthenticationToken(managerUser.getEmail(), null);
+        managerUser.setStatus("Active");managerUser.setCenterId(1);
+        managerAuth = new UsernamePasswordAuthenticationToken(managerUser.getEmail(), "n/a",List.of(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_CENTERMANAGER")));
+        lenient().when(userRepository.findByEmailIgnoreCase(managerUser.getEmail())).thenReturn(Optional.of(managerUser));
 
         Role coachRole = new Role();
         coachRole.setName("Coach");
@@ -193,7 +199,7 @@ class SessionIncidentServiceTest {
         subscription.setEndDate(LocalDate.of(2026, 11, 20));
         subscription.setValidityDays(45);
         subscription.setRemainingCredit(8);
-        subscription.setStatus("Active");
+        subscription.setStatus("Active");subscription.setSubject(indoorSubject);subscription.setPrimaryCoach(coach1);subscription.setActivatedAt(java.time.LocalDateTime.of(2026,10,20,0,0));subscription.setExpiresAt(java.time.LocalDateTime.of(2026,11,20,20,0));
 
         advancedClass = new SportsClass();
         advancedClass.setId(202);
@@ -222,7 +228,7 @@ class SessionIncidentServiceTest {
         when(sessionRepository.findByIdWithDetails(normalSession.getId())).thenReturn(Optional.of(normalSession));
         when(sessionRepository.save(any(Session.class))).thenAnswer(i -> i.getArgument(0));
 
-        SessionRescheduleRequest request = new SessionRescheduleRequest(
+        SessionRescheduleRequest request = move(
                 LocalDate.of(2026, 10, 24),
                 LocalTime.of(7, 45),
                 LocalTime.of(9, 15),
@@ -251,7 +257,7 @@ class SessionIncidentServiceTest {
         when(sessionRepository.save(any(Session.class))).thenAnswer(i -> i.getArgument(0));
 
         LocalDate newDateBeyondEnd = LocalDate.of(2026, 11, 25); // Class endDate là 2026-11-20
-        SessionRescheduleRequest request = new SessionRescheduleRequest(
+        SessionRescheduleRequest request = move(
                 newDateBeyondEnd,
                 LocalTime.of(6, 0),
                 LocalTime.of(7, 30),
@@ -268,54 +274,24 @@ class SessionIncidentServiceTest {
 
     @Test
     @DisplayName("Sự cố trung tâm dời buổi 1:1 vượt quá hạn 45 ngày của gói -> Tự động gia hạn endDate & validityDays")
-    void rescheduleSession_PrivateSession_BeyondPackageEndDate_AutoExtendsPackage() {
-        when(userRepository.findByEmailIgnoreCase(managerUser.getEmail())).thenReturn(Optional.of(managerUser));
+    void rescheduleSession_PrivateSession_BeyondPackageEndDate_RequiresApprovedRecovery() {
         when(sessionRepository.findByIdWithDetails(privateSession.getId())).thenReturn(Optional.of(privateSession));
         when(memberPackageRepository.findByIdForUpdate(subscription.getSubscriptionId())).thenReturn(Optional.of(subscription));
-        when(sessionRepository.save(any(Session.class))).thenAnswer(i -> i.getArgument(0));
-
-        LocalDate newDateBeyondPackage = LocalDate.of(2026, 11, 30); // subscription endDate hiện tại là 2026-11-20
-        SessionRescheduleRequest request = new SessionRescheduleRequest(
-                newDateBeyondPackage,
-                LocalTime.of(7, 45),
-                LocalTime.of(9, 15),
-                null,
-                "Bảo trì hệ thống ánh sáng trung tâm kéo dài",
-                null
-        );
-
-        sessionService.rescheduleSession(privateSession.getId(), request, managerAuth);
-
-        assertEquals(newDateBeyondPackage, subscription.getEndDate());
-        assertTrue(subscription.getValidityDays() > 45);
-        verify(memberPackageRepository).save(subscription);
-        verify(auditService).log(eq(managerUser.getId()), eq("INCIDENT_EXTEND_PACKAGE_VALIDITY"), eq("MEMBER_PACKAGE"), eq(501),
-                contains("Dời lịch buổi học vượt hạn"));
+        var request=move(LocalDate.of(2026,11,30),LocalTime.of(7,45),LocalTime.of(9,15),null,"Actual incident",null);
+        assertThrows(BusinessException.class,()->sessionService.rescheduleSession(privateSession.getId(),request,managerAuth));
+        assertEquals(LocalDate.of(2026,11,20),subscription.getEndDate());
+        verify(phaseIncidents).approveMakeupEnd(eq(1),eq(subscription),eq(LocalDate.of(2026,11,30).atTime(9,15)),anyString(),eq(managerUser));
+        verify(sessionRepository,never()).save(any());
     }
 
     @Test
     @DisplayName("Manager dời buổi 1:1 kèm gia hạn thêm ngày (extendValidityDays)")
-    void rescheduleSession_PrivateSession_ExplicitExtendValidityDays() {
-        when(userRepository.findByEmailIgnoreCase(managerUser.getEmail())).thenReturn(Optional.of(managerUser));
+    void rescheduleSession_PrivateSession_ExplicitExtendValidityDaysIsRejected() {
         when(sessionRepository.findByIdWithDetails(privateSession.getId())).thenReturn(Optional.of(privateSession));
-        when(memberPackageRepository.findByIdForUpdate(subscription.getSubscriptionId())).thenReturn(Optional.of(subscription));
-        when(sessionRepository.save(any(Session.class))).thenAnswer(i -> i.getArgument(0));
-
-        LocalDate rescheduleDate = LocalDate.of(2026, 10, 28);
-        SessionRescheduleRequest request = new SessionRescheduleRequest(
-                rescheduleDate,
-                LocalTime.of(7, 45),
-                LocalTime.of(9, 15),
-                null,
-                "Bù thêm 7 ngày hạn sử dụng cho học viên do sự cố",
-                7 // Gia hạn thêm 7 ngày
-        );
-
-        sessionService.rescheduleSession(privateSession.getId(), request, managerAuth);
-
-        assertEquals(LocalDate.of(2026, 11, 27), subscription.getEndDate()); // 2026-11-20 + 7
-        assertEquals(52, subscription.getValidityDays()); // 45 + 7
-        verify(memberPackageRepository).save(subscription);
+        var request=move(LocalDate.of(2026,10,28),LocalTime.of(7,45),LocalTime.of(9,15),null,"Actual incident",7);
+        assertTrue(assertThrows(BusinessException.class,()->sessionService.rescheduleSession(privateSession.getId(),request,managerAuth)).getMessage().startsWith("USE_INCIDENT_RECOVERY:"));
+        assertEquals(LocalDate.of(2026,11,20),subscription.getEndDate());
+        verify(sessionRepository,never()).save(any());
     }
 
     @Test
@@ -323,7 +299,7 @@ class SessionIncidentServiceTest {
     void rescheduleSession_DateInPast_ThrowsException() {
         when(sessionRepository.findByIdWithDetails(normalSession.getId())).thenReturn(Optional.of(normalSession));
 
-        SessionRescheduleRequest request = new SessionRescheduleRequest(
+        SessionRescheduleRequest request = move(
                 LocalDate.of(2026, 10, 19), // Trước mốc today 2026-10-20
                 LocalTime.of(6, 0),
                 LocalTime.of(7, 30),
@@ -342,7 +318,7 @@ class SessionIncidentServiceTest {
         when(sessionRepository.findByIdWithDetails(normalSession.getId())).thenReturn(Optional.of(normalSession));
         when(holidayRepository.existsByHolidayDateAndIsActiveTrue(LocalDate.of(2026, 11, 2))).thenReturn(true);
 
-        SessionRescheduleRequest request = new SessionRescheduleRequest(
+        SessionRescheduleRequest request = move(
                 LocalDate.of(2026, 11, 2),
                 LocalTime.of(6, 0),
                 LocalTime.of(7, 30),
@@ -362,7 +338,7 @@ class SessionIncidentServiceTest {
         when(sessionRepository.findRoomConflicts(eq(room1.getId()), any(), any(), any(), eq(normalSession.getId())))
                 .thenReturn(List.of(new Session()));
 
-        SessionRescheduleRequest request = new SessionRescheduleRequest(
+        SessionRescheduleRequest request = move(
                 LocalDate.of(2026, 10, 24),
                 LocalTime.of(6, 0),
                 LocalTime.of(7, 30),
@@ -382,7 +358,7 @@ class SessionIncidentServiceTest {
         when(sessionRepository.findCoachConflicts(eq(coach1.getId()), any(), any(), any(), eq(normalSession.getId())))
                 .thenReturn(List.of(new Session()));
 
-        SessionRescheduleRequest request = new SessionRescheduleRequest(
+        SessionRescheduleRequest request = move(
                 LocalDate.of(2026, 10, 24),
                 LocalTime.of(6, 0),
                 LocalTime.of(7, 30),
@@ -401,7 +377,7 @@ class SessionIncidentServiceTest {
         normalSession.setStatus("Completed");
         when(sessionRepository.findByIdWithDetails(normalSession.getId())).thenReturn(Optional.of(normalSession));
 
-        SessionRescheduleRequest request = new SessionRescheduleRequest(
+        SessionRescheduleRequest request = move(
                 LocalDate.of(2026, 10, 24),
                 LocalTime.of(6, 0),
                 LocalTime.of(7, 30),
@@ -424,7 +400,7 @@ class SessionIncidentServiceTest {
                 .thenReturn(List.of());
         when(sessionRepository.save(any(Session.class))).thenAnswer(i -> i.getArgument(0));
 
-        SubstituteCoachRequest request = new SubstituteCoachRequest(coach2.getId(), "HLV Nguyễn Văn A nghỉ ốm đột xuất");
+        SubstituteCoachRequest request = substitute(coach2.getId(), "HLV Nguyễn Văn A nghỉ ốm đột xuất");
 
         SessionResponse response = sessionService.substituteCoach(normalSession.getId(), request, managerAuth);
 
@@ -444,7 +420,7 @@ class SessionIncidentServiceTest {
         when(sessionRepository.findCoachConflicts(eq(coach2.getId()), any(), any(), any(), eq(normalSession.getId())))
                 .thenReturn(List.of(new Session()));
 
-        SubstituteCoachRequest request = new SubstituteCoachRequest(coach2.getId(), "HLV bận");
+        SubstituteCoachRequest request = substitute(coach2.getId(), "HLV bận");
 
         assertThrows(BusinessException.class, () ->
                 sessionService.substituteCoach(normalSession.getId(), request, managerAuth));
@@ -462,9 +438,15 @@ class SessionIncidentServiceTest {
         when(sessionRepository.findByIdWithDetails(normalSession.getId())).thenReturn(Optional.of(normalSession));
         when(userRepository.findById(99)).thenReturn(Optional.of(nonCoach));
 
-        SubstituteCoachRequest request = new SubstituteCoachRequest(99, "Gán nhầm");
+        SubstituteCoachRequest request = substitute(99, "Gán nhầm");
 
         assertThrows(BusinessException.class, () ->
                 sessionService.substituteCoach(normalSession.getId(), request, managerAuth));
+    }
+    private SessionRescheduleRequest move(LocalDate date,LocalTime start,LocalTime end,Integer room,String reason,Integer days) {
+        return new SessionRescheduleRequest(date,start,end,room,reason,days,"CENTER_INCIDENT",true,java.util.UUID.randomUUID().toString(),1,"Minimum extension for the agreed makeup slot");
+    }
+    private SubstituteCoachRequest substitute(Integer id,String reason) {
+        return new SubstituteCoachRequest(id,reason,true,java.util.UUID.randomUUID().toString(),1);
     }
 }

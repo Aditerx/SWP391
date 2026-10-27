@@ -53,6 +53,10 @@ public class SessionService {
     private final com.sportscenter.user.MemberRepository memberRepository;
     private final com.sportscenter.specialization.CoachSpecializationRepository coachSpecializationRepository;
     private final ApplicationEventPublisher eventPublisher;
+    private final com.sportscenter.membership.CoachCapacityService coachCapacityService;
+    private final SessionChangeRepository sessionChangeRepository;
+    private final SessionAbsenceService sessionAbsenceService;
+    private final CenterIncidentService centerIncidentService;
 
     @Transactional(readOnly = true)
     public List<SessionResponse> findAll(Integer classId, Integer coachId, Integer roomId, Integer memberId,
@@ -221,19 +225,24 @@ public class SessionService {
         MemberPackage subscription = memberPackageRepository.findByIdForUpdate(request.subscriptionId())
                 .orElseThrow(() -> new ResourceNotFoundException("Gói hội viên không tồn tại: " + request.subscriptionId()));
 
-        boolean isMemberRole = authentication.getAuthorities().stream()
-                .anyMatch(a -> "ROLE_MEMBER".equals(a.getAuthority()))
-                || (currentUser.getRole() != null && "Member".equalsIgnoreCase(currentUser.getRole().getName()));
-
-        if (isMemberRole && !subscription.getMember().getId().equals(currentUser.getId())) {
-            throw new AccessDeniedException("Hội viên chỉ được đặt lịch bằng gói hội viên của chính mình");
+        com.sportscenter.common.ActorPolicy.center(currentUser,centerId);
+        requirePrimaryCoachOrManager(currentUser,subscription,request.supportReason());
+        if (!request.agreementConfirmed()) throw new BusinessException("AGREEMENT_REQUIRED: Confirm the agreed member/coach schedule");
+        com.sportscenter.membership.AdvancedRegistrationService.requireKey(request.requestKey());
+        var previous=sessionRepository.findByMemberPackageSubscriptionIdAndBookingKey(subscription.getSubscriptionId(),request.requestKey());
+        if(previous.isPresent()) {
+            Session old=previous.get();
+            if(!java.util.Objects.equals(old.getBookingHash(),requestHash(request.toString())))
+                throw new com.sportscenter.common.exception.BusinessConflictException("IDEMPOTENCY_CONFLICT: Booking key already has a different schedule");
+            return SessionResponse.from(old,"Cancelled".equals(old.getStatus())?0:1);
         }
+        if(request.incidentId()!=null)centerIncidentService.approveMakeupEnd(request.incidentId(),subscription,request.sessionDate().atTime(request.endTime()),request.extraValidityReason(),currentUser);
 
         if (!"Active".equalsIgnoreCase(subscription.getStatus())) {
             throw new BusinessException("Gói hội viên chưa được kích hoạt hoặc đã hết hiệu lực.");
         }
 
-        if (subscription.getMembershipPackage() == null || !subscription.getMembershipPackage().isAdvanced()) {
+        if (!subscription.isAdvanced()) {
             throw new BusinessException("Chỉ có thể đặt lịch 1:1 bằng gói hội viên Advanced (12 credit).");
         }
 
@@ -241,14 +250,10 @@ public class SessionService {
             throw new BusinessException("OUT_OF_CREDIT: Gói học 1:1 đã hết tín chỉ (Credit = 0). Vui lòng mua thêm gói.");
         }
 
-        LocalDate today = LocalDate.now(clock);
-        if (subscription.getEndDate() != null && today.isAfter(subscription.getEndDate())) {
-            throw new BusinessException("ADVANCED_PACKAGE_EXPIRED: Gói học 1:1 đã hết hạn sử dụng 45 ngày.");
-        }
-        if ((subscription.getStartDate() != null && request.sessionDate().isBefore(subscription.getStartDate()))
-                || subscription.getEndDate() == null || request.sessionDate().isAfter(subscription.getEndDate())) {
-            throw new BusinessException("ADVANCED_PACKAGE_EXPIRED: Session date must be within the subscription validity period");
-        }
+        if (!com.sportscenter.membership.EntitlementTimePolicy.validThrough(subscription,request.sessionDate().atTime(request.endTime()))
+                || subscription.getExpiresAt()==null || !subscription.getExpiresAt().isAfter(LocalDateTime.now(clock)))
+            throw new BusinessException("ADVANCED_PACKAGE_EXPIRED: Session must end within the exact entitlement deadline");
+        if(!subscription.getPrimaryCoach().getId().equals(request.coachId()))throw new BusinessException("PRIMARY_COACH_REQUIRED: Initial booking must use the Primary Coach");
         if (!"Active".equalsIgnoreCase(subscription.getMember().getStatus())) {
             throw new BusinessException("MEMBER_NOT_ACTIVE: member account is not active");
         }
@@ -295,6 +300,9 @@ public class SessionService {
         sessionSlotValidator.validateSession(sportsClass, room, request.startTime(), request.endTime());
         validateRoomAndCapacity(room, sportsClass);
         validateCoach(coach, sportsClass);
+        if(subscription.getSubject()==null||sportsClass.getSubject()==null||!subscription.getSubject().getId().equals(sportsClass.getSubject().getId()))
+            throw new BusinessException("SUBSCRIPTION_SUBJECT_MISMATCH: Credit is usable only for the registered subject");
+        coachCapacityService.requireWorking(coach.getId(),request.sessionDate(),request.startTime());
         if (!subscription.getMember().getCenterId().equals(sportsClass.getCenterId())
                 || !subscription.getMember().getCenterId().equals(room.getCenterId())) {
             throw new AccessDeniedException("Booking resources must belong to the member's center");
@@ -333,9 +341,10 @@ public class SessionService {
         session.setEndTime(request.endTime());
         session.setStatus("Scheduled");
         session.setAttendanceFinalized(false);
+        session.setBookingKey(request.requestKey());session.setBookingHash(requestHash(request.toString()));session.setCreatedBy(currentUser.getId());session.setAgreementConfirmedAt(now);session.setSupportReason(request.supportReason());
 
         Session saved = sessionRepository.save(session);
-        auditService.log(subscription.getMember().getId(), "BOOK_PRIVATE_SESSION", "SESSION", saved.getId(),
+        auditService.log(currentUser.getId(), "BOOK_PRIVATE_SESSION", "SESSION", saved.getId(),
                 "Booked 1:1 session with coach " + coach.getFullName() + ". Remaining credit: " + subscription.getRemainingCredit());
 
         publish(NotificationType.PRIVATE_BOOKING_CONFIRMED,
@@ -367,7 +376,8 @@ public class SessionService {
         }
 
         if ("Cancelled".equalsIgnoreCase(session.getStatus())) {
-            throw new BusinessException("Buổi học này đã bị hủy trước đó.");
+            if(session.getBookedMember()==null||!session.getBookedMember().getId().equals(currentUser.getId()))throw new AccessDeniedException("Booked Member required");
+            throw new BusinessException("SESSION_ALREADY_CANCELLED: Original credit has already been returned");
         }
         if ("Completed".equalsIgnoreCase(session.getStatus())) {
             throw new BusinessException("Buổi học đã hoàn thành, không thể hủy.");
@@ -380,11 +390,14 @@ public class SessionService {
         if (isMemberRole && (session.getBookedMember() == null || !session.getBookedMember().getId().equals(currentUser.getId()))) {
             throw new AccessDeniedException("Hội viên chỉ được hủy ca học của chính mình.");
         }
+        if(!isMemberRole)throw new AccessDeniedException("Member cancellation only; staff use the center incident workflow");
+        com.sportscenter.common.ActorPolicy.center(currentUser,session.getSportsClass().getCenterId());
+        if(session.isAttendanceFinalized()||session.isCenterInvalidated())throw new BusinessException("SESSION_HISTORY_IMMUTABLE: Finalized sessions cannot be cancelled");
 
         LocalDateTime now = LocalDateTime.now(clock);
         LocalDateTime sessionStart = LocalDateTime.of(session.getSessionDate(), session.getStartTime());
-        if (sessionStart.isBefore(now.plusHours(24))) {
-            throw new BusinessException("CANCEL_TOO_LATE: Không thể hủy lịch khi còn dưới 24 tiếng. Buổi học sẽ bị tiêu thụ nếu không tham gia.");
+        if (sessionStart.isBefore(now.plusHours(12))) {
+            throw new BusinessException("CANCEL_TOO_LATE: Cancellation requires at least 12 hours notice");
         }
 
         session.setStatus("Cancelled");
@@ -397,19 +410,21 @@ public class SessionService {
         if (sub == null || session.getBookedMember() == null || !sub.getMember().getId().equals(session.getBookedMember().getId())) {
             throw new BusinessException("SUBSCRIPTION_LINK_REQUIRED: Cannot refund credit without the original subscription");
         }
-        if (!"Active".equals(sub.getStatus()) || sub.getEndDate() == null || sub.getEndDate().isBefore(LocalDate.now(clock))) {
+        if (!"Active".equals(sub.getStatus()) || sub.getExpiresAt() == null || !sub.getExpiresAt().isAfter(now)) {
             throw new BusinessException("ADVANCED_PACKAGE_EXPIRED: Expired entitlements cannot be refunded as new credit");
         }
         if (sub != null) {
-            int limit = sub.getMembershipPackage() != null && sub.getMembershipPackage().getTotalCredit() != null ? sub.getMembershipPackage().getTotalCredit() : 12;
+            int limit = 12;
+            if(session.isCreditReturned())throw new BusinessException("CREDIT_ALREADY_RETURNED: Original credit already returned");
             if (sub.getRemainingCredit() != null && sub.getRemainingCredit() >= limit) throw new BusinessException("CREDIT_LIMIT_EXCEEDED: Credit refund exceeds the original entitlement");
             sub.setRemainingCredit((sub.getRemainingCredit() != null ? sub.getRemainingCredit() : 0) + 1);
             memberPackageRepository.save(sub);
         }
+        session.setCreditReturned(true);
 
         Session saved = sessionRepository.save(session);
         auditService.log(currentUser.getId(), "CANCEL_PRIVATE_SESSION", "SESSION", saved.getId(),
-                "Cancelled 1:1 session >= 24h. Refunded 1 credit. Remaining: " + (sub != null ? sub.getRemainingCredit() : "N/A"));
+                "Cancelled 1:1 session >= 12h. Refunded original credit. Remaining: " + sub.getRemainingCredit());
         List<Integer> recipients = new ArrayList<>();
         if (session.getBookedMember() != null) recipients.add(session.getBookedMember().getId());
         User coach = assignedCoach(session);
@@ -430,6 +445,7 @@ public class SessionService {
         scheduleWriteLock.acquire(sportsClassRepository.findCenterIdById(request.classId()).orElseThrow(() -> new ResourceNotFoundException("Class center not found")));
         SportsClass sportsClass = sportsClassRepository.findById(request.classId())
                 .orElseThrow(() -> new ResourceNotFoundException("Class not found: " + request.classId()));
+        if(sportsClass.isAdvanced())throw new BusinessException("USE_PRIVATE_BOOKING: Advanced sessions require an approved paid subscription and agreement");
         Room room = roomRepository.findById(request.roomId())
                 .orElseThrow(() -> new ResourceNotFoundException("Room not found: " + request.roomId()));
 
@@ -614,7 +630,8 @@ public class SessionService {
         Session session = sessionRepository.findByIdForUpdate(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Session not found: " + id));
         requireMutableSession(session);
-        if (session.getBookedMember() != null) throw new BusinessException("USE_INCIDENT_ENDPOINT: Use reschedule for a booked private session");
+        if (session.isPrivateSession() || "Open".equals(session.getSportsClass().getStatus()) || classEnrollmentRepository.countBySportsClassIdAndStatusIn(session.getSportsClass().getId(),List.of("Registered","Pending"))>0)
+            throw new BusinessException("USE_INCIDENT_ENDPOINT: Published or booked sessions use the audited incident/reschedule workflow");
 
         SportsClass sportsClass = sportsClassRepository.findById(request.classId())
                 .orElseThrow(() -> new ResourceNotFoundException("Class not found: " + request.classId()));
@@ -655,6 +672,9 @@ public class SessionService {
         scheduleWriteLock.acquire(sessionRepository.findCenterIdById(id).orElseThrow(() -> new ResourceNotFoundException("Session center not found")));
         Session session = sessionRepository.findByIdForUpdate(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Session not found: " + id));
+        if(session.isPrivateSession())throw new BusinessException("USE_PRIVATE_SESSION_WORKFLOW: Private session status is managed by booking, cancellation, incidents and attendance");
+        if("Completed".equals(status))throw new BusinessException("FINALIZATION_REQUIRED: Session completion is managed by attendance finalization");
+        requireMutableSession(session);
         if ("Cancelled".equals(status) && (session.getBookedMember() != null
                 || classEnrollmentRepository.countBySportsClassIdAndStatusIn(session.getSportsClass().getId(), List.of("Registered", "Pending")) > 0)) {
             throw new BusinessException("INCIDENT_POLICY_REQUIRED: Direct cancellation must not discard a paid entitlement; use reschedule");
@@ -689,6 +709,31 @@ public class SessionService {
         Session session = sessionRepository.findByIdForUpdate(sessionId)
                 .orElseThrow(() -> new ResourceNotFoundException("Session not found: " + sessionId));
 
+        User actor=requireActor(authentication);
+        com.sportscenter.common.ActorPolicy.center(actor,session.getSportsClass().getCenterId());
+        com.sportscenter.common.ActorPolicy.reason(request.reason());
+        com.sportscenter.membership.AdvancedRegistrationService.requireKey(request.requestKey());
+        if(session.isPrivateSession()) {
+            if(session.getMemberPackage()==null)throw new BusinessException("SUBSCRIPTION_LINK_REQUIRED: Original entitlement required");
+            requirePrimaryCoachOrManager(actor,session.getMemberPackage(),request.reason());
+            if(!request.memberAgreed())throw new BusinessException("AGREEMENT_REQUIRED: Confirm agreement to this specific new schedule");
+        }else com.sportscenter.common.ActorPolicy.manager(actor);
+        if(replayedChange(session,request.requestKey(),request.toString()))return SessionResponse.from(session,session.isPrivateSession()?1:0);
+        String before=changeSnapshot(session);
+        LocalDateTime now=LocalDateTime.now(clock),oldSessionStart=session.getSessionDate().atTime(session.getStartTime()),newStart=request.newDate().atTime(request.newStartTime());
+        boolean centerCause="CENTER_INCIDENT".equals(request.cause());
+        if(centerCause){
+            com.sportscenter.common.ActorPolicy.manager(actor);centerIncidentService.requireForSession(request.incidentId(),session);
+            if(!oldSessionStart.isAfter(now)||!newStart.isAfter(now))throw new BusinessException("RESCHEDULE_WINDOW_CLOSED: Center rescheduling requires both sessions not yet started");
+        }else if("MEMBER_EMERGENCY".equals(request.cause())){
+            com.sportscenter.common.ActorPolicy.manager(actor);
+            if(!session.isPrivateSession()||!oldSessionStart.isAfter(now)||!oldSessionStart.isBefore(now.plusHours(12))||newStart.isBefore(now.plusHours(12)))
+                throw new BusinessException("RESCHEDULE_WINDOW_CLOSED: Emergency requires old session <12h and new session >=12h");
+        }else if("MEMBER_EARLY".equals(request.cause())){
+            if(!session.isPrivateSession()||oldSessionStart.isBefore(now.plusHours(12))||newStart.isBefore(now.plusHours(12)))throw new BusinessException("RESCHEDULE_WINDOW_CLOSED: Both sessions require at least 12h notice");
+        }else throw new BusinessException("INVALID_RESCHEDULE_CAUSE: Use MEMBER_EARLY, MEMBER_EMERGENCY, or CENTER_INCIDENT");
+        if(request.extendValidityDays()!=null&&request.extendValidityDays()!=0)throw new BusinessException("USE_INCIDENT_RECOVERY: Arbitrary day extension is not supported");
+
         if ("Completed".equalsIgnoreCase(session.getStatus())) {
             throw new BusinessException("Không thể dời buổi học đã hoàn thành.");
         }
@@ -717,6 +762,7 @@ public class SessionService {
         validateRoomAndCapacity(room, sportsClass);
 
         sessionSlotValidator.validateSession(sportsClass, room, request.newStartTime(), request.newEndTime());
+        if(session.isPrivateSession())coachCapacityService.requireWorking(coachId(session),request.newDate(),request.newStartTime());
 
         List<Session> roomConflicts = sessionRepository.findRoomConflicts(
                 room.getId(), request.newDate(), request.newStartTime(), request.newEndTime(), session.getId());
@@ -742,37 +788,15 @@ public class SessionService {
             }
         }
 
-        // Xử lý gói học 1:1 nếu dời vượt quá hạn 45 ngày hoặc có yêu cầu gia hạn
+        // A member move preserves the exact deadline. Only evidenced center recovery may extend it.
         if (session.isPrivateSession() && session.getMemberPackage() != null) {
             MemberPackage sub = memberPackageRepository.findByIdForUpdate(session.getMemberPackage().getSubscriptionId())
-                    .orElse(session.getMemberPackage());
-            LocalDate currentEnd = sub.getEndDate() != null ? sub.getEndDate() : LocalDate.now(clock);
-            LocalDate targetEnd = currentEnd;
-            boolean needExtend = false;
-
-            if (request.newDate().isAfter(currentEnd)) {
-                targetEnd = request.newDate();
-                needExtend = true;
-            }
-
-            if (request.extendValidityDays() != null && request.extendValidityDays() > 0) {
-                targetEnd = targetEnd.plusDays(request.extendValidityDays());
-                needExtend = true;
-            }
-
-            if (needExtend) {
-                long daysAdded = java.time.temporal.ChronoUnit.DAYS.between(currentEnd, targetEnd);
-                int oldValidity = sub.getValidityDays() != null ? sub.getValidityDays() : 45;
-                sub.setValidityDays(oldValidity + (int) daysAdded);
-                sub.setEndDate(targetEnd);
-                if ("Expired".equalsIgnoreCase(sub.getStatus())) {
-                    sub.setStatus("Active");
-                }
-                memberPackageRepository.save(sub);
-                auditService.log(actorId, "INCIDENT_EXTEND_PACKAGE_VALIDITY", "MEMBER_PACKAGE", sub.getSubscriptionId(),
-                        String.format("Dời lịch buổi học vượt hạn: Tự động gia hạn gói đến %s (+%d ngày). Lý do sự cố: %s",
-                                targetEnd, daysAdded, request.reason() != null ? request.reason() : "N/A"));
-            }
+                    .orElseThrow(() -> new BusinessException("SUBSCRIPTION_LINK_REQUIRED: Original entitlement required"));
+            LocalDateTime targetEnd=request.newDate().atTime(request.newEndTime());
+            if(centerCause && (sub.getExpiresAt()==null||targetEnd.isAfter(sub.getExpiresAt())||!"Active".equals(sub.getStatus())))
+                centerIncidentService.approveMakeupEnd(request.incidentId(),sub,targetEnd,request.extraValidityReason(),actor);
+            if(!"Active".equals(sub.getStatus())||!com.sportscenter.membership.EntitlementTimePolicy.validThrough(sub,targetEnd))
+                throw new BusinessException("ADVANCED_PACKAGE_EXPIRED: New session must end within the approved exact deadline");
         }
 
         // Xử lý kéo dài ngày kết thúc lớp học Normal nếu dời buổi học vượt quá endDate của lớp
@@ -791,6 +815,8 @@ public class SessionService {
         session.setEndTime(request.newEndTime());
         session.setRoom(room);
         session.setStatus("Scheduled");
+        if(!oldDate.equals(request.newDate())||!oldStart.equals(request.newStartTime())||!oldEnd.equals(request.newEndTime()))sessionAbsenceService.supersedeForTimeChange(session);
+        saveChange(session,request.requestKey(),request.toString(),actor,request.cause(),request.reason(),request.memberAgreed(),before);
         Session saved = sessionRepository.save(session);
 
         auditService.log(actorId, "INCIDENT_RESCHEDULE_SESSION", "SESSION", saved.getId(),
@@ -817,6 +843,13 @@ public class SessionService {
         scheduleWriteLock.acquire(sessionRepository.findCenterIdById(sessionId).orElseThrow(() -> new ResourceNotFoundException("Session center not found")));
         Session session = sessionRepository.findByIdForUpdate(sessionId)
                 .orElseThrow(() -> new ResourceNotFoundException("Session not found: " + sessionId));
+        User actor=requireActor(authentication);com.sportscenter.common.ActorPolicy.manager(actor);com.sportscenter.common.ActorPolicy.center(actor,session.getSportsClass().getCenterId());
+        com.sportscenter.common.ActorPolicy.reason(request.reason());com.sportscenter.membership.AdvancedRegistrationService.requireKey(request.requestKey());
+        if(session.isPrivateSession()&&!request.memberAgreed())throw new BusinessException("AGREEMENT_REQUIRED: Confirm agreement to this specific substitute Coach");
+        centerIncidentService.requireForSession(request.incidentId(),session);
+        if(replayedChange(session,request.requestKey(),request.toString()))return SessionResponse.from(session,session.isPrivateSession()?1:0);
+        String before=changeSnapshot(session);
+        if(!session.getSessionDate().atTime(session.getStartTime()).isAfter(LocalDateTime.now(clock)))throw new BusinessException("SESSION_HISTORY_IMMUTABLE: A started session cannot change Coach");
 
         if ("Completed".equalsIgnoreCase(session.getStatus())) {
             throw new BusinessException("Không thể đổi HLV cho buổi học đã hoàn thành.");
@@ -835,6 +868,7 @@ public class SessionService {
         }
 
         validateCoach(newCoach, session.getSportsClass());
+        if(session.isPrivateSession())coachCapacityService.requireWorking(newCoach.getId(),session.getSessionDate(),session.getStartTime());
         List<Session> coachConflicts = sessionRepository.findCoachConflicts(
                 newCoach.getId(), session.getSessionDate(), session.getStartTime(), session.getEndTime(), session.getId());
         if (!coachConflicts.isEmpty()) {
@@ -844,6 +878,7 @@ public class SessionService {
         User oldCoach = session.getCoach() != null ? session.getCoach() :
                 (session.getSportsClass() != null ? session.getSportsClass().getCoach() : null);
         session.setCoach(newCoach);
+        saveChange(session,request.requestKey(),request.toString(),actor,"CENTER_SUBSTITUTE",request.reason(),request.memberAgreed(),before);
         Session saved = sessionRepository.save(session);
 
         String oldCoachName = oldCoach != null ? oldCoach.getFullName() : "N/A";
@@ -871,6 +906,29 @@ public class SessionService {
         return userRepository.findByEmailIgnoreCase(authentication.getName())
                 .map(User::getId)
                 .orElse(null);
+    }
+
+    private void requirePrimaryCoachOrManager(User actor,MemberPackage sub,String supportReason) {
+        if(sub.getSubject()==null||sub.getPrimaryCoach()==null||sub.getActivatedAt()==null)
+            throw new BusinessException("ENTITLEMENT_RECONCILIATION_REQUIRED: Subject, Primary Coach and payment timestamp are required");
+        if(!"Active".equals(actor.getStatus()))throw new AccessDeniedException("Active account required");
+        if(com.sportscenter.common.ActorPolicy.role(actor,"Coach")&&actor.getId().equals(sub.getPrimaryCoach().getId()))return;
+        com.sportscenter.common.ActorPolicy.manager(actor);com.sportscenter.common.ActorPolicy.reason(supportReason);
+    }
+    private String requestHash(String payload) {
+        try{return java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(payload.getBytes(java.nio.charset.StandardCharsets.UTF_8)));}
+        catch(java.security.NoSuchAlgorithmException e){throw new IllegalStateException(e);}
+    }
+    private boolean replayedChange(Session s,String key,String payload) {
+        var prior=sessionChangeRepository.findBySessionIdAndRequestKey(s.getId(),key);
+        if(prior.isEmpty())return false;
+        if(!prior.get().getRequestHash().equals(requestHash(payload)))throw new com.sportscenter.common.exception.BusinessConflictException("IDEMPOTENCY_CONFLICT: Change key has different content");
+        return true;
+    }
+    private String changeSnapshot(Session s){return s.getSessionDate()+" "+s.getStartTime()+"-"+s.getEndTime()+";room="+s.getRoom().getId()+";coach="+coachId(s);}
+    private void saveChange(Session s,String key,String payload,User actor,String cause,String reason,boolean agreed,String before) {
+        SessionChange change=new SessionChange();change.setSession(s);change.setRequestKey(key);change.setRequestHash(requestHash(payload));change.setActorId(actor.getId());
+        change.setChangedAt(LocalDateTime.now(clock));change.setCause(cause);change.setReason(reason);change.setMemberAgreed(agreed);change.setBeforeData(before);change.setAfterData(changeSnapshot(s));sessionChangeRepository.save(change);
     }
 
     private User requireActor(Authentication authentication) {

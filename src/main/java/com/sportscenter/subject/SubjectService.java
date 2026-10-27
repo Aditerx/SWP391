@@ -18,6 +18,10 @@ public class SubjectService {
     private final com.sportscenter.sportclass.SportsClassRepository classes;
     private final com.sportscenter.specialization.SpecializationRepository specializations;
     private final java.time.Clock clock;
+    private static final java.util.Map<String,String> CATALOG = java.util.Map.of(
+            "quan-vot-tennis","Quần vợt (Tennis)", "boi-loi","Bơi lội", "pickleball","Pickleball",
+            "ban-cung","Bắn cung", "bong-ro","Bóng rổ", "bong-da","Bóng đá", "bong-chuyen","Bóng chuyền",
+            "cau-long","Cầu lông", "bong-ban","Bóng bàn");
 
     @Transactional(readOnly = true)
     public List<SubjectResponse> findAll() {
@@ -66,12 +70,26 @@ public class SubjectService {
     }
 
     private void apply(Subject subject, SubjectRequest request) {
+        String slug = request.slug() == null || request.slug().isBlank() ? slugify(request.name()) : slugify(request.slug());
+        if (!java.util.Objects.equals(CATALOG.get(slug),request.name()))
+            throw new com.sportscenter.common.exception.BusinessException("SUBJECT_NOT_IN_CATALOG: Only the nine approved subjects are supported");
+        if (subject.getId() != null && subject.getSlug() != null && !subject.getSlug().equals(slug))
+            throw new com.sportscenter.common.exception.BusinessException("SUBJECT_IDENTITY_IMMUTABLE: Subject identity cannot be renamed");
+        boolean outdoor = java.util.Set.of("quan-vot-tennis","boi-loi","ban-cung","bong-da").contains(slug);
+        if (request.outdoor() != null && request.outdoor() != outdoor)
+            throw new com.sportscenter.common.exception.BusinessException("SUBJECT_OUTDOOR_MISMATCH: Use the approved indoor/outdoor classification");
+        repository.findBySlug(slug).filter(s -> !java.util.Objects.equals(s.getId(),subject.getId())).ifPresent(s -> {
+            throw new com.sportscenter.common.exception.BusinessConflictException("SUBJECT_DUPLICATE: This subject already exists");
+        });
+        java.math.BigDecimal normal = request.normalPrice() != null ? request.normalPrice() : subject.getNormalPrice();
+        java.math.BigDecimal advanced = request.advancedPrice() != null ? request.advancedPrice() : subject.getAdvancedPrice();
+        if (normal == null || advanced == null || normal.signum() <= 0 || advanced.signum() <= 0)
+            throw new com.sportscenter.common.exception.BusinessException("INVALID_PRICE: Both catalog prices must be positive");
         subject.setName(request.name());
         subject.setDescription(request.description());
         if (request.status() != null) subject.setStatus(request.status());
         if (request.outdoor() != null) subject.setOutdoor(request.outdoor());
-        subject.setSlug(request.slug() == null || request.slug().isBlank()
-                ? slugify(request.name()) : slugify(request.slug()));
+        subject.setSlug(slug);
         if (request.normalPrice() != null) {
             subject.setNormalPrice(request.normalPrice());
         }
@@ -83,6 +101,7 @@ public class SubjectService {
     private String slugify(String value) {
         return Normalizer.normalize(value, Normalizer.Form.NFD)
                 .replaceAll("\\p{M}", "")
+                .replace('đ','d').replace('Đ','D')
                 .toLowerCase()
                 .replaceAll("[^a-z0-9]+", "-")
                 .replaceAll("^-|-$", "");

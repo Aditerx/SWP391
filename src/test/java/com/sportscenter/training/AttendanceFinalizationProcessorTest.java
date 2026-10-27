@@ -36,6 +36,9 @@ import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class AttendanceFinalizationProcessorTest {
+    @org.mockito.Mock com.sportscenter.session.ScheduleWriteLock scheduleWriteLock;
+    @org.junit.jupiter.api.BeforeEach void centerLockFixture(){lenient().when(sessionRepository.findCenterIdById(anyInt())).thenReturn(java.util.Optional.of(1));}
+
     @Mock SessionRepository sessionRepository;
     @Mock ClassEnrollmentRepository enrollmentRepository;
     @Mock AttendanceRepository attendanceRepository;
@@ -220,7 +223,7 @@ class AttendanceFinalizationProcessorTest {
         when(enrollmentRepository.findByClassIdWithDetails(12)).thenReturn(List.of(registered));
         when(attendanceRepository.findBySessionIdAndMemberId(90,31)).thenReturn(Optional.empty());
         when(attendanceRepository.save(any(Attendance.class))).thenAnswer(call -> call.getArgument(0));
-        when(sessionRepository.countBySportsClassIdAndStatusNot(12,"Cancelled")).thenReturn(12L);
+        when(sessionRepository.countBySportsClassIdAndCenterInvalidatedFalseAndStatusNot(12,"Cancelled")).thenReturn(12L);
         processor.process(90);
         assertEquals("Completed",registered.getStatus());
     }

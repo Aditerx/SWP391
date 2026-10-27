@@ -64,8 +64,8 @@ class MemberPackageExtensionTest {
 
         MembershipPackage mp = new MembershipPackage();
         mp.setId(2);
-        mp.setName("Gói 1:1 Tennis");
-        mp.setPackageType("Advanced");
+        mp.setName("Legacy non-Advanced membership");
+        mp.setPackageType("Normal");
 
         subscription = new MemberPackage();
         subscription.setSubscriptionId(101);
@@ -124,6 +124,12 @@ class MemberPackageExtensionTest {
 
         assertThrows(BusinessException.class, () ->
                 memberPackageService.extendValidity(101, request, managerAuth));
+    }
+    @Test void advancedExtensionCannotBypassIncidentRecovery() {
+        subscription.getMembershipPackage().setPackageType("Advanced");
+        when(memberPackageRepository.findByIdForUpdate(101)).thenReturn(Optional.of(subscription));
+        assertTrue(assertThrows(BusinessException.class,()->memberPackageService.extendValidity(101,new PackageExtensionRequest(15,"Unproven extension"),managerAuth)).getMessage().startsWith("USE_INCIDENT_RECOVERY:"));
+        assertEquals(6,subscription.getRemainingCredit());verify(memberPackageRepository,never()).save(any());
     }
 }
 

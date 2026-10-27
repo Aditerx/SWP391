@@ -12,6 +12,14 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 public interface SessionRepository extends JpaRepository<Session, Integer> {
+    boolean existsBySportsClassId(Integer id);
+    java.util.Optional<Session> findByMemberPackageSubscriptionIdAndBookingKey(Integer id,String key);
+    boolean existsByMemberPackageSubscriptionId(Integer id);
+    boolean existsByMakeupForId(Integer id);
+    java.util.Optional<Session> findByMakeupForId(Integer id);
+    List<Session> findByMemberPackageSubscriptionId(Integer id);
+    List<Session> findBySportsClassId(Integer id);
+    long countBySportsClassIdAndCenterInvalidatedFalseAndStatusNot(Integer id,String status);
     @Query("select s.sportsClass.centerId from Session s where s.id = :id")
     java.util.Optional<Integer> findCenterIdById(@Param("id") Integer id);
     long countBySportsClassIdAndStatusNot(Integer classId, String status);

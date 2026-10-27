@@ -2,6 +2,8 @@
 
 ## 0. ĐỌC ĐẦU TIÊN KHI MỞ SESSION MỚI — checkpoint phía BE
 
+> **Lượt tiếp tục 27/10:** Owner đã yêu cầu thực hiện P1.0–P1.4 và P2, để lại P1.5/gói T/FE; sau hoàn tất phải double-check, tự dựng demo, viết bàn giao/hướng dẫn, push branch và merge main. Code đang triển khai trong working tree; checkpoint tiến hành ở 40.13 ghi đè trạng thái “chỉ plan/merge” lịch sử bên dưới. Chưa được suy code chưa commit đã deploy hoặc DB production đã được khởi tạo.
+
 ### 0.1. Vai trò và thứ tự đọc
 
 **Chúng ta chính là phía Backend (Owner + coding agent).** “Handoff BE” trong các mục dưới là ghi chú triển khai nội bộ để chính chúng ta tiếp tục, không phải chuyển việc cho BE khác. Handoff ra ngoài là hợp đồng/bằng chứng để FE tích hợp.
@@ -1896,3 +1898,12 @@ Bằng chứng JSON hiện tại và nhãn SSL đúng phạm vi tại docs 02 m�
 **Bằng chứng tích hợp:** `.\mvnw.cmd clean test` 269 run/250 pass/19 skip/0 failure-error, BUILD SUCCESS; XML đối chiếu log, artifact tại artifacts/merge-2026-10-27 và docs 02 mục 9.14. Hai lượt compile/testCompile trước fail do ghép import/Clock đã sửa. Đây là local unit/MockMvc/H2 của source hợp nhất, chưa SMTP delivery thật, migration notification/chat trên PostgreSQL, API/FE cloud hay deploy. Giữ .env/old-docs; DB Supabase mới đã kiểm kết nối trước đó nhưng public còn trống, chưa tự init/seed.
 
 **Session sau:** đọc AGENTS → docs 00 active → mục 0/40.12 → kế hoạch 40.3–40.6 và bằng chứng docs 02; kiểm git status/log lấy SHA thực. Trước bắt đầu P1 kiểm baseline hợp nhất, D01/D09 chưa làm và các dependency/migration/fixture; tiếp tục từng nhóm P1 rồi P2, kiểm liên tục đúng cổng. Không sửa FE_Project-main lỗi thời để coi FE hiện hành đã tích hợp; các file FE/dist có sẵn trong nhánh đồng đội được giữ nhưng chưa build/browser verified. Lượt này kết thúc ở xử lý merge/bàn giao, chưa thực hiện hai phase.
+
+### 40.13. Tiếp tục hai phase theo yêu cầu mới của Owner — đang kiểm chứng
+
+- Phạm vi Owner xác nhận qua câu hỏi: làm P1.0–P1.4, toàn bộ BE P2, giữ P1.5/gói T D01/D09/FE ở backlog. Owner bổ sung yêu cầu double-check, thiết kế demo, viết tài liệu bàn giao/hướng dẫn, push branch rồi merge main. Không tự mở lại quyết định D01–D19.
+- Source nền `tai`/`0277b2f`; đã fetch thấy `origin/main` ở `86d0076` (merge PR #10 từ tai). Working tree có code của lượt này; các file communication test/proof untracked xuất hiện từ công việc khác phải giữ riêng, không tự stage vào commit phase.
+- P1 đã có clean test và ba luồng HTTP PostgreSQL thật local pass; artifacts/demo/phase-1/2026-10-27. P2 đã có chín luồng HTTP H2 thật và clean test pass, đang bổ sung double-check, kiểm lại PG/schema/release bundle và tài liệu. Count tests là chứng cứ từng lượt, không tiêu chí cố định. Bản cuối phải ghi lại đúng source sau commit/merge.
+- Build trong worktree `D:/Projects/SWP391-phase-verification` vì từng có Maven khác chạy clean cùng target ở workspace chính. Không copy .env vào worktree kiểm chứng. PostgreSQL local `scms-phases-20261027`, chỉ bind 127.0.0.1:55440; script test-phases-postgres.py không đọc .env.
+- Owner xác nhận DB Render là cấu hình ghi “production” trong .env. Preflight JDBC chỉ đọc thấy public có **0 bảng**, rollback hoàn tất; chưa migration/seed production. autoDeploy bật trong render.yaml nên cần trình tự schema → BE khi push/main. Đã chuẩn bị bootstrap cấu trúc/role/catalog không account hoặc giao dịch demo, migrations 06/07/08–12 và bundle kiểm tra hash/empty-schema guard; chưa tự coi đây là quyền ghi production.
+- Điểm còn làm: chạy PG demo toàn bộ, kiểm release SQL trên DB local rỗng, hoàn tất review các đường cập nhật cũ/credit/deadline/quyền, đồng bộ docs/AGENTS, tạo evidence/manifest sạch rồi commit/push và merge đúng main. Sandbox gateway live, trình duyệt FE và SQL Server runtime không được gọi là đã nghiệm thu từ H2/PG local.

@@ -68,4 +68,7 @@ public class Invoice {
 
     @Column(name = "gateway_transaction_ref", length = 100)
     private String gatewayTransactionRef;
+    @Column(name="cash_note",length=2000) private String cashNote;
+    @Column(name="cash_confirmation_reversed",nullable=false) private boolean cashConfirmationReversed;
+    @Column(name="resolution_status",length=30) private String resolutionStatus;
 }

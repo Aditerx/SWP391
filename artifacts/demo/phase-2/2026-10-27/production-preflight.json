@@ -1,0 +1,16 @@
+{
+  "targetFingerprint": "1a3dfdd756caa0178267fcac431f6eb8d8bbf585c30a0318823da1247464b13e",
+  "readOnly": "on",
+  "publicTableCount": 0,
+  "missingRequiredColumns": [
+    "member_packages.subject_id",
+    "member_packages.expires_at",
+    "member_packages.purchase_amount",
+    "sessions.booking_key",
+    "sessions.center_invalidated",
+    "holidays.actual_closed_until",
+    "invoices.cash_confirmation_reversed",
+    "class_enrollments.eligibility_subscription_id"
+  ],
+  "rolledBack": true
+}

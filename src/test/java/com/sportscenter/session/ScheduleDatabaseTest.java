@@ -36,7 +36,7 @@ import static org.junit.jupiter.api.Assertions.*;
 })
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Import({SessionService.class, SessionSlotValidator.class, ScheduleWriteLock.class,
-        NormalClassCreationService.class, SportsClassService.class, CenterContext.class, EnrollmentService.class, com.sportscenter.invoice.InvoiceService.class, ScheduleDatabaseTest.Config.class})
+        com.sportscenter.common.ActorPolicy.class, SessionAbsenceService.class, CenterIncidentService.class, EntitlementTimePolicy.class, NormalClassCreationService.class, SportsClassService.class, CenterContext.class, EnrollmentService.class, com.sportscenter.invoice.InvoiceService.class, ScheduleDatabaseTest.Config.class})
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class ScheduleDatabaseTest {
@@ -46,6 +46,7 @@ class ScheduleDatabaseTest {
         @Bean com.fasterxml.jackson.databind.ObjectMapper objectMapper() { return new com.fasterxml.jackson.databind.ObjectMapper().findAndRegisterModules(); }
     }
     @MockBean AuditService audit;
+    @MockBean CoachCapacityService capacity;
     @Autowired EnrollmentService enrollments;
     @Autowired com.sportscenter.enrollment.ClassEnrollmentRepository enrollmentRepository;
     @MockBean com.sportscenter.notification.NotificationService notifications;
@@ -103,13 +104,13 @@ class ScheduleDatabaseTest {
         var u = new User(); u.setEmail(email); u.setFullName(email); u.setRole(role); u.setCenterId(1); u.setStatus("Active"); u.setPasswordHash("unused-test-only"); return users.save(u);
     }
     MemberPackage subscription(User user, MembershipPackage pkg) {
-        var p = new MemberPackage(); p.setMember(user); p.setMembershipPackage(pkg); p.setStartDate(date.minusDays(3)); p.setEndDate(date.plusDays(40)); p.setRemainingCredit(12); p.setStatus("Active"); return subscriptions.save(p);
+        var p = new MemberPackage(); p.setMember(user); p.setMembershipPackage(pkg); p.setSubject(subject); p.setPrimaryCoach(coach); p.setActivatedAt(date.minusDays(3).atTime(8,0)); p.setExpiresAt(date.plusDays(40).atTime(8,0)); p.setStartDate(date.minusDays(3)); p.setEndDate(date.plusDays(40)); p.setRemainingCredit(12); p.setStatus("Active"); return subscriptions.save(p);
     }
     Authentication auth(User u, String authority) {
         return new UsernamePasswordAuthenticationToken(u.getEmail(), "", List.of(new SimpleGrantedAuthority(authority)));
     }
     PrivateBookingRequest booking(MemberPackage p) {
-        return new PrivateBookingRequest(p.getSubscriptionId(), coach.getId(), room.getId(), date, LocalTime.of(6,0), LocalTime.of(7,30), template.getId(), subject.getId());
+        return new PrivateBookingRequest(p.getSubscriptionId(), coach.getId(), room.getId(), date, LocalTime.of(6,0), LocalTime.of(7,30), template.getId(), subject.getId(),true,UUID.randomUUID().toString(),null,null,null);
     }
     @AfterEach void clearAuth() { SecurityContextHolder.clearContext(); }
 
@@ -136,7 +137,7 @@ class ScheduleDatabaseTest {
     }
     boolean attempt(MemberPackage p, User u, CountDownLatch latch) throws Exception {
         latch.await();
-        try { sessions.bookPrivateSession(booking(p), auth(u, "ROLE_MEMBER")); return true; }
+        try { sessions.bookPrivateSession(booking(p), auth(coach, "ROLE_COACH")); return true; }
         catch (com.sportscenter.common.exception.BusinessException expected) { return false; }
     }
 
@@ -149,7 +150,7 @@ class ScheduleDatabaseTest {
                 LocalTime from = hour == 6 ? LocalTime.of(6,0) : LocalTime.of(16,30);
                 futures.add(pool.submit(() -> {
                     start.await();
-                    return sessions.bookPrivateSession(new PrivateBookingRequest(sub.getSubscriptionId(), coach.getId(), room.getId(), date.plusDays(1), from, from.plusMinutes(90), template.getId(), subject.getId()), auth(memberA,"ROLE_MEMBER"));
+                    return sessions.bookPrivateSession(new PrivateBookingRequest(sub.getSubscriptionId(), coach.getId(), room.getId(), date.plusDays(1), from, from.plusMinutes(90), template.getId(), subject.getId(),true,UUID.randomUUID().toString(),null,null,null), auth(coach,"ROLE_COACH"));
                 }));
             }
             start.countDown();

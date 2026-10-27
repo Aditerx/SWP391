@@ -44,6 +44,9 @@ class InvoiceServiceTest {
     @Mock PaymentProperties paymentProperties;
     @Mock VnPayGateway vnPayGateway;
     @Mock ApplicationEventPublisher eventPublisher;
+    @Mock com.sportscenter.membership.CoachCapacityService coachCapacityService;
+    @Mock com.sportscenter.user.MemberRepository memberRepository;
+    @Mock com.sportscenter.membership.EntitlementTimePolicy entitlementTimePolicy;
     @org.mockito.Spy Clock clock = Clock.system(ZoneId.of("Asia/Ho_Chi_Minh"));
     @InjectMocks InvoiceService invoiceService;
 
@@ -53,7 +56,7 @@ class InvoiceServiceTest {
     }
     @Test
     void createPackageOrderUsesPackagePriceAndPendingStatus() {
-        User member = new User(); member.setId(7);
+        User member = new User(); member.setStatus("Active"); member.setId(7);
         MembershipPackage pkg = new MembershipPackage(); pkg.setId(2); pkg.setStatus("Active"); pkg.setPrice(new BigDecimal("250.00"));
         when(invoiceRepository.findByMemberId(7)).thenReturn(List.of());
         when(invoiceRepository.nextInvoiceCodeValue()).thenReturn(41L);
@@ -71,7 +74,7 @@ class InvoiceServiceTest {
 
     @Test
     void memberInvoiceListingIsScopedToAuthenticatedUser() {
-        User member = new User(); member.setId(7); member.setEmail("member@example.com");
+        User member = new User(); member.setStatus("Active"); member.setId(7); member.setEmail("member@example.com");
         var auth = new UsernamePasswordAuthenticationToken("member@example.com", "n/a", List.of(new SimpleGrantedAuthority("ROLE_MEMBER")));
         when(userRepository.findByEmailIgnoreCase("member@example.com")).thenReturn(Optional.of(member));
         assertTrue(invoiceService.findAll(null, null, null, null, null, null, null, null, auth).isEmpty());
@@ -79,8 +82,22 @@ class InvoiceServiceTest {
     }
 
     @Test
+    void staffInvoiceListDoesNotExposeAnotherCenter() {
+        User staff = new User(); staff.setId(5); staff.setCenterId(1);
+        User localMember = new User(); localMember.setId(7); localMember.setCenterId(1);
+        User remoteMember = new User(); remoteMember.setId(8); remoteMember.setCenterId(2);
+        Invoice local = new Invoice(); local.setInvoiceId(1); local.setMember(localMember);
+        Invoice remote = new Invoice(); remote.setInvoiceId(2); remote.setMember(remoteMember);
+        var auth = new UsernamePasswordAuthenticationToken("desk@example.com", "n/a", List.of(new SimpleGrantedAuthority("MANAGE_INVOICES")));
+        when(userRepository.findByEmailIgnoreCase("desk@example.com")).thenReturn(Optional.of(staff));
+        when(invoiceRepository.searchInvoices(null,null,null,null,null,null,null,null)).thenReturn(List.of(local,remote));
+        var result=invoiceService.findAll(null,null,null,null,null,null,null,null,auth);
+        assertEquals(1,result.size()); assertEquals(1,result.get(0).invoiceId());
+    }
+
+    @Test
     void memberCannotOverrideInvoiceScope() {
-        User member = new User(); member.setId(7); member.setEmail("member@example.com");
+        User member = new User(); member.setStatus("Active"); member.setId(7); member.setEmail("member@example.com");
         var auth = new UsernamePasswordAuthenticationToken("member@example.com", "n/a", List.of(new SimpleGrantedAuthority("ROLE_MEMBER")));
         when(userRepository.findByEmailIgnoreCase("member@example.com")).thenReturn(Optional.of(member));
         assertThrows(AccessDeniedException.class,
@@ -91,12 +108,12 @@ class InvoiceServiceTest {
     @Test
     void cashConfirmationActivatesSubscriptionAtomically() {
         User receptionist = new User(); receptionist.setId(5); receptionist.setEmail("desk@example.com");
-        User member = new User(); member.setId(7);
-        MembershipPackage pkg = new MembershipPackage(); pkg.setDurationDays(30);
+        User member = new User(); member.setStatus("Active"); member.setId(7);
+        MembershipPackage pkg = new MembershipPackage(); pkg.setDurationDays(30); pkg.setStatus("Active");
         MemberPackage subscription = new MemberPackage(); subscription.setMember(member); subscription.setMembershipPackage(pkg);
         subscription.setStatus("Pending"); subscription.setStartDate(LocalDate.now(clock)); subscription.setEndDate(LocalDate.now(clock).plusDays(30));
         Invoice invoice = new Invoice(); invoice.setInvoiceId(22); invoice.setInvoiceCode("INV-2026-000022");
-        invoice.setMember(member); invoice.setSubscription(subscription); invoice.setPaymentMethod("Cash"); invoice.setPaymentStatus("Pending");
+        invoice.setMember(member); invoice.setSubscription(subscription); invoice.setPaymentMethod("Cash"); invoice.setPaymentStatus("Pending"); invoice.setExpiresAt(java.time.LocalDateTime.now(clock).plusMinutes(5));
         var auth = new UsernamePasswordAuthenticationToken("desk@example.com", "n/a", List.of(new SimpleGrantedAuthority("ROLE_RECEPTIONIST")));
         when(userRepository.findByEmailIgnoreCase("desk@example.com")).thenReturn(Optional.of(receptionist));
         when(invoiceRepository.findByIdForUpdate(22)).thenReturn(Optional.of(invoice));
@@ -114,7 +131,7 @@ class InvoiceServiceTest {
     @Test
     void cashConfirmationActivatesAdvancedPackageWith12CreditsAnd45Days() {
         User receptionist = new User(); receptionist.setId(5); receptionist.setEmail("desk@example.com");
-        User member = new User(); member.setId(7);
+        User member = new User(); member.setStatus("Active"); member.setId(7);
         MembershipPackage pkg = new MembershipPackage();
         pkg.setPackageType("Advanced");
         pkg.setTotalCredit(12);
@@ -125,9 +142,11 @@ class InvoiceServiceTest {
         subscription.setStatus("Pending");
         subscription.setRemainingCredit(0);
         subscription.setValidityDays(45);
+        var subject = new com.sportscenter.subject.Subject(); subject.setId(1); subscription.setSubject(subject); var primary=new User();primary.setStatus("Active");primary.setCenterId(member.getCenterId());var role=new com.sportscenter.user.Role();role.setName("Coach");primary.setRole(role);subscription.setPrimaryCoach(primary);
+        doAnswer(call -> { var sub=(MemberPackage)call.getArgument(0); sub.setExpiresAt(sub.getActivatedAt().plusDays(45)); sub.setEndDate(sub.getExpiresAt().toLocalDate()); return null; }).when(entitlementTimePolicy).recalculate(subscription);
 
         Invoice invoice = new Invoice(); invoice.setInvoiceId(25); invoice.setInvoiceCode("INV-2026-000025");
-        invoice.setMember(member); invoice.setSubscription(subscription); invoice.setPaymentMethod("Cash"); invoice.setPaymentStatus("Pending");
+        invoice.setMember(member); invoice.setSubscription(subscription); invoice.setPaymentMethod("Cash"); invoice.setPaymentStatus("Pending"); invoice.setExpiresAt(java.time.LocalDateTime.now(clock).plusMinutes(5));
         var auth = new UsernamePasswordAuthenticationToken("desk@example.com", "n/a", List.of(new SimpleGrantedAuthority("ROLE_RECEPTIONIST")));
         when(userRepository.findByEmailIgnoreCase("desk@example.com")).thenReturn(Optional.of(receptionist));
         when(invoiceRepository.findByIdForUpdate(25)).thenReturn(Optional.of(invoice));
@@ -137,6 +156,7 @@ class InvoiceServiceTest {
         assertEquals("Paid", response.paymentStatus());
         assertEquals("Active", subscription.getStatus());
         assertEquals(12, subscription.getRemainingCredit());
+        assertEquals(invoice.getPaymentDate(),subscription.getActivatedAt());
         assertEquals(45, subscription.getValidityDays());
         assertNotNull(subscription.getStartDate());
         assertEquals(subscription.getStartDate().plusDays(45), subscription.getEndDate());
@@ -144,12 +164,12 @@ class InvoiceServiceTest {
 
     @Test
     void verifiedVnPayCallbackIsIdempotentAndActivatesPackage() {
-        User member = new User(); member.setId(7);
-        MembershipPackage pkg = new MembershipPackage(); pkg.setDurationDays(30);
+        User member = new User(); member.setStatus("Active"); member.setId(7);
+        MembershipPackage pkg = new MembershipPackage(); pkg.setDurationDays(30); pkg.setStatus("Active");
         MemberPackage subscription = new MemberPackage(); subscription.setMember(member); subscription.setMembershipPackage(pkg); subscription.setStatus("Pending");
         Invoice invoice = new Invoice(); invoice.setInvoiceId(23); invoice.setInvoiceCode("INV-2026-000023");
         invoice.setMember(member); invoice.setSubscription(subscription); invoice.setPaymentMethod("VNPay");
-        invoice.setPaymentStatus("Pending"); invoice.setAmount(new BigDecimal("500.00"));
+        invoice.setPaymentStatus("Pending"); invoice.setAmount(new BigDecimal("500.00")); invoice.setExpiresAt(java.time.LocalDateTime.now(clock).plusMinutes(5));
         Map<String, String> params = Map.of("vnp_TxnRef", "INV-2026-000023", "vnp_Amount", "50000",
                 "vnp_ResponseCode", "00", "vnp_TransactionStatus", "00", "vnp_TransactionNo", "gateway-1");
         when(vnPayGateway.isValid(params)).thenReturn(true);
@@ -177,7 +197,7 @@ class InvoiceServiceTest {
 
     @Test
     void expiredVnPayInvoiceReleasesClassSeat() {
-        User member = new User(); member.setId(9);
+        User member = new User(); member.setStatus("Active"); member.setId(9);
         com.sportscenter.sportclass.SportsClass sportsClass = new com.sportscenter.sportclass.SportsClass(); sportsClass.setId(4); sportsClass.setMaxCapacity(1);
         Invoice invoice = new Invoice(); invoice.setInvoiceId(24); invoice.setMember(member); invoice.setSportsClass(sportsClass);
         invoice.setPaymentMethod("VNPay"); invoice.setPaymentStatus("Pending"); invoice.setExpiresAt(java.time.LocalDateTime.now(clock).minusMinutes(1));
@@ -191,7 +211,7 @@ class InvoiceServiceTest {
 
     @Test
     void lateSuccessfulVnPayCallbackPreservesMoneyWithoutActivatingReleasedSeat() {
-        User member = new User(); member.setId(9);
+        User member = new User(); member.setStatus("Active"); member.setId(9);
         com.sportscenter.sportclass.SportsClass sportsClass = new com.sportscenter.sportclass.SportsClass(); sportsClass.setId(4); sportsClass.setMaxCapacity(1);
         com.sportscenter.enrollment.ClassEnrollment enrollment = new com.sportscenter.enrollment.ClassEnrollment(); enrollment.setStatus("Pending");
         Invoice invoice = new Invoice(); invoice.setInvoiceId(25); invoice.setInvoiceCode("INV-2026-000025"); invoice.setMember(member);
@@ -212,7 +232,7 @@ class InvoiceServiceTest {
     }
 
     @Test void lateCallbackForOldOrderCannotCancelNewPendingReservation() {
-        User member = new User(); member.setId(9);
+        User member = new User(); member.setStatus("Active"); member.setId(9);
         var sportsClass = new com.sportscenter.sportclass.SportsClass(); sportsClass.setId(4);
         var invoice = new Invoice(); invoice.setInvoiceId(30); invoice.setInvoiceCode("OLD-ORDER");
         invoice.setMember(member); invoice.setSportsClass(sportsClass); invoice.setAmount(new BigDecimal("100.00"));

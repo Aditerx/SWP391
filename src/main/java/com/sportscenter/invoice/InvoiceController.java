@@ -56,9 +56,13 @@ public class InvoiceController {
 
     @PostMapping("/api/invoices/{id}/confirm-cash")
     @PreAuthorize("hasAuthority('MANAGE_INVOICES') and hasRole('RECEPTIONIST')")
-    public InvoiceResponse confirmCash(@PathVariable Integer id, Authentication authentication) {
-        return invoiceService.confirmCash(id, authentication);
+    public InvoiceResponse confirmCash(@PathVariable Integer id,@RequestBody(required=false) CashNote note,Authentication authentication) {
+        return invoiceService.confirmCash(id,note==null?null:note.note(),authentication);
     }
+    public record CashNote(String note) { }
+    @GetMapping("/api/invoices/{id}/receipt")
+    @PreAuthorize("hasAuthority('MANAGE_INVOICES') or hasRole('MEMBER')")
+    public InvoiceResponse receipt(@PathVariable Integer id,Authentication auth){return invoiceService.receipt(id,auth);}
 
     @PostMapping("/api/invoices/{id}/cancel")
     @PreAuthorize("hasAuthority('MANAGE_INVOICES') or hasRole('MEMBER')")
@@ -83,7 +87,7 @@ public class InvoiceController {
 
     @GetMapping("/api/payments/vnpay/return")
     public RedirectView vnpayReturn(@RequestParam Map<String, String> params) {
-        InvoiceService.VnPayResult result = invoiceService.processVnpayResult(params);
+        InvoiceService.VnPayResult result = invoiceService.inspectVnpayReturn(params);
         String code = result.invoice() != null ? result.invoice().getInvoiceCode() : params.getOrDefault("vnp_TxnRef", "");
         RedirectView redirect = new RedirectView(paymentProperties.getFrontendResultUrl());
         redirect.setStatusCode(HttpStatus.FOUND);

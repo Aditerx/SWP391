@@ -108,8 +108,8 @@ public class EnrollmentService {
         }
         List<MemberPackage> activePackages = memberPackageRepository.findByMemberId(memberId).stream()
                 .filter(p -> "Active".equalsIgnoreCase(p.getStatus())
-                        && (p.getStartDate() == null || !p.getStartDate().isAfter(LocalDate.now(clock)))
-                        && (p.getEndDate() == null || !p.getEndDate().isBefore(LocalDate.now(clock))))
+                        && (p.isAdvanced() ? p.getActivatedAt()!=null&&p.getExpiresAt()!=null&&!p.getActivatedAt().isAfter(LocalDateTime.now(clock))&&p.getExpiresAt().isAfter(LocalDateTime.now(clock))
+                        : p.getStartDate()!=null&&p.getEndDate()!=null&&!p.getStartDate().isAfter(LocalDate.now(clock))&&!p.getEndDate().isBefore(LocalDate.now(clock))))
                 .toList();
         if (activePackages.isEmpty()) throw new BusinessException("PACKAGE_EXPIRED: member package is expired or inactive");
 
@@ -152,6 +152,7 @@ public class EnrollmentService {
             enrollment.setCancelReason(null);
         }
         enrollment.setEnrolledAt(LocalDateTime.now(clock));
+        enrollment.setEligibilitySubscription(activePackages.stream().max(java.util.Comparator.comparing(p->p.getExpiresAt()!=null?p.getExpiresAt():p.getEndDate().plusDays(1).atStartOfDay())).orElseThrow());
         if (shouldWaitlist) {
             enrollment.setStatus("Waitlisted");
             ClassEnrollment saved = enrollmentRepository.save(enrollment);

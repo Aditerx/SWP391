@@ -1,0 +1,44 @@
+{
+  "scope": "Empty-schema structure + roles/permissions + center + approved catalog; no demo accounts or transactions",
+  "transaction": "One atomic transaction; empty-public-schema guard; executor rechecks counts before commit",
+  "bootstrapAdmins": 0,
+  "demoAccounts": 0,
+  "paidInvoices": 0,
+  "activeSubscriptions": 0,
+  "sources": [
+    {
+      "path": "database/bootstrap/scms_structure_postgres.sql",
+      "sha256": "29e12bdda445f16b604be0a913c02a5ddbd5856a383641049ecf98c613446121"
+    },
+    {
+      "path": "database/migrations/06_schedule_safety_postgres.sql",
+      "sha256": "3f13d1c54d770f96ac18d58a05f5a6e97fa610b490299fcf3a6b2d48748c2187"
+    },
+    {
+      "path": "database/migrations/07_session_subscription_postgres.sql",
+      "sha256": "c39249682d50fa27a96f53ea5115d2ac8a96cf56c316f61a6082cbd4d48a05dd"
+    },
+    {
+      "path": "database/migrations/08_advanced_entitlements_postgres.sql",
+      "sha256": "e39ff49a59d4688dda943326966ad75351cd198a25414648230a9bbe2c22bd55"
+    },
+    {
+      "path": "database/migrations/09_approved_catalog_postgres.sql",
+      "sha256": "a4935100af5099d6146d57511e8ca2376cda9f2e46e7b26af7dd1a2522229f46"
+    },
+    {
+      "path": "database/migrations/10_session_incidents_postgres.sql",
+      "sha256": "9bedbb2e9079fd8316fac23c1160c4821a4a8dd47c9902f97dbd49d0acf4b712"
+    },
+    {
+      "path": "database/migrations/11_holiday_history_postgres.sql",
+      "sha256": "5102fd37f627c33405aa830e0482b2c93c2da31bdf64ff643bb97ed97d0198c7"
+    },
+    {
+      "path": "database/migrations/12_payment_resolutions_postgres.sql",
+      "sha256": "12e6e4709595b442035ef623efb3ec3b500820a2489dad378244e30a8cade6f0"
+    }
+  ],
+  "bundleSha256": "28635081e1724eb89ea82252fc1e468ca53805d347e4334d40ddf17a9c2866dc",
+  "productionExecuted": false
+}

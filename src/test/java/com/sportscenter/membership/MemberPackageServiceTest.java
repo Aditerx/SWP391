@@ -75,38 +75,24 @@ class MemberPackageServiceTest {
     }
 
     @Test
-    @DisplayName("subscribe: Subscribing to an Advanced package sets 45 validity days, 0 credit until paid")
-    void subscribe_AdvancedPackage_PendingStatusWithZeroCredit() {
-        MemberPackageRequest request = new MemberPackageRequest(10, null, null, false, "VNPay", null);
-
+    @DisplayName("D03: legacy Advanced purchase is blocked until subject/Coach acceptance")
+    void subscribeAdvancedRequiresApprovedRegistration() {
+        var request = new MemberPackageRequest(10, null, null, false, "VNPay", null);
         when(userRepository.findById(15)).thenReturn(Optional.of(sampleMember));
         when(membershipPackageRepository.findById(10)).thenReturn(Optional.of(advancedPackage));
-        when(memberPackageRepository.save(any(MemberPackage.class))).thenAnswer(invocation -> {
-            MemberPackage mp = invocation.getArgument(0);
-            mp.setSubscriptionId(101);
-            return mp;
-        });
-
-        InvoiceOrderResponse fakeOrder = new InvoiceOrderResponse(
-                55, "INV-2026-000055", new BigDecimal("3000000"), "VNPay", "Pending",
-                LocalDateTime.now(clock).plusMinutes(5), "http://payment.url");
-        when(invoiceService.createPackageOrder(eq(sampleMember), eq(advancedPackage), eq("VNPay"), any(), anyString()))
-                .thenReturn(fakeOrder);
-
-        SubscriptionOrderResponse response = memberPackageService.subscribe(15, request, "127.0.0.1");
-
-        assertNotNull(response);
-        assertEquals(101, response.subscriptionId());
-        assertEquals("Pending", response.status());
+        var ex = assertThrows(com.sportscenter.common.exception.BusinessException.class,
+                () -> memberPackageService.subscribe(15, request, "127.0.0.1"));
+        assertTrue(ex.getMessage().startsWith("USE_ADVANCED_REGISTRATION:"));
+        verifyNoInteractions(invoiceService);
+        verify(memberPackageRepository,never()).save(any());
     }
 
     @Test void reactivationDoesNotReplenishSpentCredits() {
         var sub = new MemberPackage(); sub.setSubscriptionId(77); sub.setStatus("Expired"); sub.setRemainingCredit(0);
         sub.setMembershipPackage(advancedPackage); sub.setMember(sampleMember);
         when(memberPackageRepository.findByIdForUpdate(77)).thenReturn(Optional.of(sub));
-        when(memberPackageRepository.save(sub)).thenReturn(sub);
-        memberPackageService.updateStatus(77,"Active");
-        verify(invoiceService).requirePaidSubscription(77);
+        assertTrue(assertThrows(com.sportscenter.common.exception.BusinessException.class,()->memberPackageService.updateStatus(77,"Active")).getMessage().startsWith("USE_INCIDENT_RECOVERY:"));
+        verifyNoInteractions(invoiceService);
         assertEquals(0,sub.getRemainingCredit());
     }
 
@@ -125,7 +111,7 @@ class MemberPackageServiceTest {
         outdated2.setRemainingCredit(2);
         outdated2.setEndDate(LocalDate.now(clock).minusDays(3));
 
-        when(memberPackageRepository.findExpiredActivePackageIds(any(LocalDate.class)))
+        when(memberPackageRepository.findDueForExpiry(any(LocalDateTime.class),any(LocalDate.class)))
                 .thenReturn(List.of(201, 202));
 
         when(memberPackageRepository.findByIdForUpdate(201)).thenReturn(Optional.of(outdated1));
@@ -145,7 +131,7 @@ class MemberPackageServiceTest {
     @Test void expiryWorkerRechecksLockedPackageAfterAConcurrentExtension() {
         var extended = new MemberPackage(); extended.setSubscriptionId(201); extended.setStatus("Active");
         extended.setEndDate(LocalDate.now(clock).plusDays(10)); extended.setRemainingCredit(5);
-        when(memberPackageRepository.findExpiredActivePackageIds(any())).thenReturn(List.of(201));
+        when(memberPackageRepository.findDueForExpiry(any(),any())).thenReturn(List.of(201));
         when(memberPackageRepository.findByIdForUpdate(201)).thenReturn(Optional.of(extended));
         assertEquals(0,memberPackageService.expireOutdatedPackages());
         assertEquals("Active",extended.getStatus()); assertEquals(5,extended.getRemainingCredit());

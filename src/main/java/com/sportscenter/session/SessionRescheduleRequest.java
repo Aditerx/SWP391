@@ -18,6 +18,15 @@ public record SessionRescheduleRequest(
 
         String reason,
 
-        Integer extendValidityDays
-) {}
+        Integer extendValidityDays,
+        String cause,
+        boolean memberAgreed,
+        String requestKey,
+        Integer incidentId,
+        String extraValidityReason
+) {
+    public SessionRescheduleRequest(LocalDate date,LocalTime start,LocalTime end,Integer room,String reason,Integer days){
+        this(date,start,end,room,reason,days,null,false,null,null,null);
+    }
+}
 

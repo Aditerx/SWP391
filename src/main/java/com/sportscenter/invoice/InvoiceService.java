@@ -47,15 +47,41 @@ public class InvoiceService {
     private final VnPayGateway vnPayGateway;
     private final com.sportscenter.session.ScheduleWriteLock scheduleWriteLock;
     private final ApplicationEventPublisher eventPublisher;
+    private final com.sportscenter.membership.EntitlementTimePolicy entitlementTimePolicy;
+    private final com.sportscenter.membership.CoachCapacityService coachCapacityService;
+    private final com.sportscenter.user.MemberRepository memberRepository;
+
+    @Transactional
+    public InvoiceOrderResponse createAdvancedOrder(MemberPackage subscription, String method, String clientIp) {
+        if (subscription.getSubject() == null || subscription.getPrimaryCoach() == null) throw new BusinessException("SUBJECT_COACH_REQUIRED: Approved registration required");
+        Invoice invoice = newInvoice(subscription.getMember(), subscription.getPurchaseAmount()!=null?subscription.getPurchaseAmount():subscription.getSubject().getAdvancedPrice(), method);
+        invoice.setSubscription(subscription);
+        return orderResponse(invoiceRepository.save(invoice), clientIp);
+    }
+
+    public InvoiceOrderResponse existingOrder(Invoice invoice, String clientIp) {
+        if (!"Pending".equals(invoice.getPaymentStatus()) || expired(invoice))
+            return new InvoiceOrderResponse(invoice.getInvoiceId(),invoice.getInvoiceCode(),invoice.getAmount(),invoice.getPaymentMethod(),invoice.getPaymentStatus(),invoice.getExpiresAt(),null);
+        return orderResponse(invoice,clientIp);
+    }
+
+    /** Browser Return verifies the protocol only. IPN is the sole payment writer. */
+    @Transactional(readOnly = true)
+    public VnPayResult inspectVnpayReturn(Map<String,String> params) {
+        if (!vnPayGateway.isValid(params)) return new VnPayResult("97", "Invalid signature", null);
+        Invoice invoice = invoiceRepository.findByInvoiceCode(params.get("vnp_TxnRef")).orElse(null);
+        return new VnPayResult(invoice == null ? "01" : "00", invoice == null ? "Order not found" : "Read invoice status through the authenticated API", invoice);
+    }
 
     @Transactional(readOnly = true)
     public List<InvoiceResponse> findAll(Integer memberId, Integer packageId, Integer receptionistId,
             String status, String method, String keyword, LocalDateTime startDate, LocalDateTime endDate,
             Authentication authentication) {
         Integer scopedMemberId = resolveMemberScope(authentication, memberId);
+        User actor = currentUser(authentication);
         List<Invoice> list = invoiceRepository.searchInvoices(scopedMemberId, packageId, receptionistId,
                 blankToNull(status), blankToNull(method), blankToNull(keyword), startDate, endDate);
-        return list.stream().map(InvoiceResponse::from).toList();
+        return list.stream().filter(i -> java.util.Objects.equals(actor.getCenterId(), i.getMember().getCenterId())).map(InvoiceResponse::from).toList();
     }
 
     @Transactional(readOnly = true)
@@ -79,10 +105,18 @@ public class InvoiceService {
         Invoice invoice = invoiceRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Invoice not found: " + id));
         Integer scopedMemberId = resolveMemberScope(authentication, null);
+        User actor=currentUser(authentication);
+        if(!java.util.Objects.equals(actor.getCenterId(),invoice.getMember().getCenterId()))throw new AccessDeniedException("Invoice belongs to another center");
         if (scopedMemberId != null && !scopedMemberId.equals(invoice.getMember().getId())) {
             throw new ResourceNotFoundException("Invoice not found: " + id);
         }
         return InvoiceResponse.from(invoice);
+    }
+    @Transactional(readOnly=true)
+    public InvoiceResponse receipt(Integer id,Authentication auth){
+        InvoiceResponse response=findById(id,auth);
+        if(!"Paid".equals(response.paymentStatus()))throw new InvoiceConflictException("A receipt is available after payment is recorded");
+        return response;
     }
 
     @Transactional
@@ -108,6 +142,7 @@ public class InvoiceService {
     }
 
     private Invoice newInvoice(User member, BigDecimal amount, String method) {
+        if (amount == null || amount.signum() <= 0) throw new BusinessException("INVALID_PRICE: A positive server catalog price is required");
         if (!"Cash".equalsIgnoreCase(method) && !"VNPay".equalsIgnoreCase(method)) {
             throw new BusinessException("Payment method must be Cash or VNPay");
         }
@@ -144,12 +179,21 @@ public class InvoiceService {
 
     @Transactional
     public InvoiceResponse confirmCash(Integer invoiceId, Authentication authentication) {
+        return confirmCash(invoiceId,null,authentication);
+    }
+    @Transactional
+    public InvoiceResponse confirmCash(Integer invoiceId,String note,Authentication authentication) {
+        if(note!=null&&note.length()>2000)throw new BusinessException("CASH_NOTE_TOO_LONG: At most 2000 characters");
         User receptionist = currentUser(authentication);
         scheduleWriteLock.acquire(receptionist.getCenterId());
         Invoice invoice = lockInvoice(invoiceId);
         if (!java.util.Objects.equals(receptionist.getCenterId(), invoice.getMember().getCenterId())) throw new AccessDeniedException("Invoice belongs to another center");
         if (!"Cash".equals(invoice.getPaymentMethod())) throw new InvoiceConflictException("Only Cash invoices can be confirmed at the counter");
         if (!"Pending".equals(invoice.getPaymentStatus()) || expired(invoice)) throw new InvoiceConflictException("Invoice is no longer payable");
+        String activationProblem=activationProblem(invoice);
+        if(activationProblem!=null)throw new InvoiceConflictException("Invoice requires reconciliation before Cash collection: "+activationProblem);
+        if(expired(invoice))throw new InvoiceConflictException("Invoice expired before Cash confirmation completed");
+        invoice.setCashNote(note);
         markPaidAndActivate(invoice, receptionist, false);
         return InvoiceResponse.from(invoice);
     }
@@ -198,7 +242,8 @@ public class InvoiceService {
 
         boolean success = "00".equals(params.get("vnp_ResponseCode")) && "00".equals(params.get("vnp_TransactionStatus"));
         if (success) {
-            boolean paidAfterExpiry = !"Pending".equals(invoice.getPaymentStatus()) || expired(invoice);
+            String activationProblem=!"Pending".equals(invoice.getPaymentStatus())||expired(invoice)?null:activationProblem(invoice);
+            boolean paidAfterExpiry = !"Pending".equals(invoice.getPaymentStatus()) || expired(invoice)||activationProblem!=null;
             invoice.setGatewayTransactionRef(params.get("vnp_TransactionNo"));
             if (paidAfterExpiry) {
                 // Preserve evidence of money received without selling a released seat again.
@@ -206,7 +251,7 @@ public class InvoiceService {
                 invoice.setReconciliationRequired(true);
                 invoice.setPaymentDate(LocalDateTime.now(clock));
                 cancelLinked(invoice);
-                auditService.log(null, "PAYMENT_RECONCILIATION_REQUIRED", "invoices", invoice.getInvoiceId(), "Verified payment received after reservation became unavailable");
+                auditService.log(null, "PAYMENT_RECONCILIATION_REQUIRED", "invoices", invoice.getInvoiceId(), "Verified money received without an available entitlement; "+activationProblem);
             } else markPaidAndActivate(invoice, null, false);
             return new VnPayResult("00", "Confirm Success", invoice);
         }
@@ -248,7 +293,10 @@ public class InvoiceService {
         if (receptionist != null) invoice.setReceptionist(receptionist);
         invoice.setPaymentStatus("Paid");
         invoice.setPaymentDate(LocalDateTime.now(clock));
-        if (invoice.getSubscription() != null) activateSubscription(invoice.getSubscription());
+        if (invoice.getSubscription() != null) {
+            invoice.getSubscription().setPurchaseAmount(invoice.getAmount());
+            activateSubscription(invoice.getSubscription(),invoice.getPaymentDate());
+        }
         if (invoice.getSportsClass() != null) activateClassEnrollment(invoice);
         eventPublisher.publishEvent(NotificationTemplates.event(NotificationType.PAYMENT_SUCCESS,
                 List.of(invoice.getMember().getId()),
@@ -265,16 +313,17 @@ public class InvoiceService {
                 "Invoice " + invoice.getInvoiceCode() + " paid by " + invoice.getPaymentMethod());
     }
 
-    private void activateSubscription(MemberPackage subscription) {
+    private void activateSubscription(MemberPackage subscription,LocalDateTime paidAt) {
         MembershipPackage pkg = subscription.getMembershipPackage();
-        LocalDate now = LocalDate.now(clock);
-        if (pkg != null && pkg.isAdvanced()) {
-            int days = (subscription.getValidityDays() != null && subscription.getValidityDays() > 0)
-                    ? subscription.getValidityDays()
-                    : (pkg.getDurationDays() != null ? pkg.getDurationDays() : 45);
-            int credits = (pkg.getTotalCredit() != null && pkg.getTotalCredit() > 0) ? pkg.getTotalCredit() : 12;
+        LocalDate now = paidAt.toLocalDate();
+        if (subscription.isAdvanced()) {
+            if (subscription.getSubject() == null || subscription.getPrimaryCoach() == null)
+                throw new BusinessException("ENTITLEMENT_RECONCILIATION_REQUIRED: Legacy Advanced order requires subject and Coach evidence");
+            int days = 45;
+            int credits = 12;
+            subscription.setActivatedAt(paidAt);
+            entitlementTimePolicy.recalculate(subscription);
             subscription.setStartDate(now);
-            subscription.setEndDate(now.plusDays(days));
             subscription.setRemainingCredit(credits);
             subscription.setValidityDays(days);
             subscription.setStatus("Active");
@@ -304,6 +353,32 @@ public class InvoiceService {
         ClassEnrollment enrollment = enrollmentRepository.findByMemberIdAndSportsClassId(invoice.getMember().getId(), lockedClass.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("Class enrollment not found"));
         enrollment.setStatus("Registered");
+    }
+    private String activationProblem(Invoice invoice){
+        if(!"Active".equalsIgnoreCase(invoice.getMember().getStatus()))return "Member account is inactive";
+        var profile=memberRepository.findById(invoice.getMember().getId());
+        if(profile.isPresent()&&profile.get().getBookingBlockedUntil()!=null&&profile.get().getBookingBlockedUntil().isAfter(LocalDateTime.now(clock)))return "Member booking is blocked";
+        MemberPackage sub=invoice.getSubscription();
+        if(sub!=null){
+            if(!"Pending".equals(sub.getStatus()))return "Subscription is no longer Pending";
+            if(sub.isAdvanced()){
+                if(sub.getSubject()==null||sub.getPrimaryCoach()==null)return "Legacy subject or Primary Coach evidence is missing";
+                User coach=sub.getPrimaryCoach();
+                if(!"Active".equalsIgnoreCase(sub.getSubject().getStatus())||!"Active".equalsIgnoreCase(coach.getStatus())||coach.getRole()==null||!"Coach".equalsIgnoreCase(coach.getRole().getName())||!java.util.Objects.equals(coach.getCenterId(),invoice.getMember().getCenterId()))return "Subject or Primary Coach is unavailable";
+                return coachCapacityService.activationProblem(coach);
+            }
+            if(sub.getMembershipPackage()==null||!"Active".equalsIgnoreCase(sub.getMembershipPackage().getStatus()))return "Membership package is unavailable";
+            return null;
+        }
+        if(invoice.getSportsClass()!=null){
+            SportsClass c=invoice.getSportsClass();
+            if(!"Open".equals(c.getStatus())&&!"Ongoing".equals(c.getStatus()))return "Class is no longer open";
+            var enrollment=enrollmentRepository.findByMemberIdAndSportsClassId(invoice.getMember().getId(),c.getId());
+            if(enrollment.isEmpty()||!"Pending".equals(enrollment.get().getStatus()))return "Enrollment is no longer Pending";
+            if(c.getMaxCapacity()!=null&&enrollmentRepository.countBySportsClassIdAndStatusIn(c.getId(),List.of("Registered","Pending"))>c.getMaxCapacity())return "Class capacity changed";
+            return null;
+        }
+        return "Entitlement link is missing";
     }
 
     private void cancelLinked(Invoice invoice) {
@@ -345,7 +420,7 @@ public class InvoiceService {
     }
     @Transactional(readOnly = true)
     public void requirePaidSubscription(Integer subscriptionId) {
-        if (!invoiceRepository.existsBySubscriptionSubscriptionIdAndPaymentStatusAndReconciliationRequiredFalse(subscriptionId, "Paid")) {
+        if (!invoiceRepository.existsBySubscriptionSubscriptionIdAndPaymentStatusAndReconciliationRequiredFalseAndCashConfirmationReversedFalse(subscriptionId, "Paid")) {
             throw new BusinessException("A subscription can only be activated after its invoice is Paid");
         }
     }
@@ -360,7 +435,7 @@ public class InvoiceService {
             }
         }
     }
-    private boolean expired(Invoice invoice) { return invoice.getExpiresAt() != null && !invoice.getExpiresAt().isAfter(LocalDateTime.now(clock)); }
+    private boolean expired(Invoice invoice) { return invoice.getExpiresAt() == null || !invoice.getExpiresAt().isAfter(LocalDateTime.now(clock)); }
     private User currentUser(Authentication authentication) {
         if (authentication == null) throw new AccessDeniedException("Authenticated user is required");
         return userRepository.findByEmailIgnoreCase(authentication.getName()).orElseThrow(() -> new AccessDeniedException("Authenticated user account was not found"));

@@ -38,11 +38,15 @@ public class AttendanceFinalizationProcessor {
     @org.springframework.beans.factory.annotation.Value("${scms.booking-block.enabled:false}")
     private boolean bookingBlockEnabled;
     private final ApplicationEventPublisher eventPublisher;
+    private final com.sportscenter.session.ScheduleWriteLock scheduleWriteLock;
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void process(Integer sessionId) {
+        var center=sessionRepository.findCenterIdById(sessionId);
+        if(center.isEmpty())return;
+        scheduleWriteLock.acquire(center.get());
         Session session = sessionRepository.findByIdForUpdate(sessionId).orElse(null);
-        if (session == null || session.isAttendanceFinalized() || "Cancelled".equalsIgnoreCase(session.getStatus())) return;
+        if (session == null || session.isAttendanceFinalized() || session.isCenterInvalidated() || "Cancelled".equalsIgnoreCase(session.getStatus())) return;
         LocalDateTime now = LocalDateTime.now(clock);
         LocalDateTime endsAt = LocalDateTime.of(session.getSessionDate(), session.getEndTime());
         if (endsAt.isAfter(now)) return;
@@ -97,7 +101,7 @@ public class AttendanceFinalizationProcessor {
             }
         }
         if (session.getBookedMember() == null && session.getSportsClass().isNormal()
-                && sessionRepository.countBySportsClassIdAndStatusNot(session.getSportsClass().getId(), "Cancelled") == 12
+                && sessionRepository.countBySportsClassIdAndCenterInvalidatedFalseAndStatusNot(session.getSportsClass().getId(), "Cancelled") == 12
                 && sessionRepository.countBySportsClassIdAndStatusAndAttendanceFinalizedFalse(session.getSportsClass().getId(), "Scheduled") == 0) {
             enrollmentRepository.findByClassIdWithDetails(session.getSportsClass().getId()).stream()
                     .filter(e -> "Registered".equals(e.getStatus())).forEach(e -> {

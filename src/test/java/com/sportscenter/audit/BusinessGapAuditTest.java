@@ -33,7 +33,7 @@ class BusinessGapAuditTest {
     @Test void memberIdAndOtherInvoiceFiltersAreAppliedTogether() {
         var repo=mock(InvoiceRepository.class);
         var service=new InvoiceService(Clock.system(java.time.ZoneId.of("Asia/Ho_Chi_Minh")),repo,mock(UserRepository.class),mock(MembershipPackageRepository.class),mock(MemberPackageRepository.class),
-            mock(SportsClassRepository.class),mock(ClassEnrollmentRepository.class),mock(AuditService.class),mock(PaymentProperties.class),mock(VnPayGateway.class),mock(com.sportscenter.session.ScheduleWriteLock.class),mock(org.springframework.context.ApplicationEventPublisher.class));
+            mock(SportsClassRepository.class),mock(ClassEnrollmentRepository.class),mock(AuditService.class),mock(PaymentProperties.class),mock(VnPayGateway.class),mock(com.sportscenter.session.ScheduleWriteLock.class),mock(org.springframework.context.ApplicationEventPublisher.class),mock(EntitlementTimePolicy.class),mock(CoachCapacityService.class),mock(MemberRepository.class));
         service.findAll(7,null,null,"Pending","Cash","INV-",null,null,null);
         verify(repo).searchInvoices(7,null,null,"Pending","Cash","INV-",null,null);
     }

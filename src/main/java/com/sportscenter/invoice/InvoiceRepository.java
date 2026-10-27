@@ -12,16 +12,18 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 @Repository
-public interface InvoiceRepository extends JpaRepository<Invoice, Integer>, org.springframework.data.jpa.repository.JpaSpecificationExecutor<Invoice> {
+public interface InvoiceRepository extends JpaRepository<Invoice, Integer>, org.springframework.data.jpa.repository.JpaSpecificationExecutor<Invoice>, InvoiceSequence {
+    boolean existsByMemberIdAndSportsClassIdAndPaymentStatusAndReconciliationRequiredFalseAndCashConfirmationReversedFalse(Integer memberId,Integer classId,String status);
+    java.util.Optional<Invoice> findByInvoiceCode(String code);
+    boolean existsBySubscriptionSubscriptionIdAndPaymentStatusAndReconciliationRequiredFalseAndCashConfirmationReversedFalse(Integer id,String status);
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths={"member","membershipPackage","receptionist","subscription"})
+    List<Invoice> findByMemberCenterId(Integer centerId);
     boolean existsBySubscriptionSubscriptionIdAndPaymentStatusAndReconciliationRequiredFalse(Integer subscriptionId, String status);
     @Query("select i.member.centerId from Invoice i where i.invoiceId = :id")
     java.util.Optional<Integer> findCenterIdById(@Param("id") Integer id);
     @Query("select i.member.centerId from Invoice i where i.invoiceCode = :code")
     java.util.Optional<Integer> findCenterIdByCode(@Param("code") String code);
     boolean existsByMemberIdAndSportsClassIdAndPaymentStatusAndInvoiceIdNot(Integer memberId, Integer classId, String status, Integer invoiceId);
-
-    @Query(value = "SELECT nextval('invoice_code_seq')", nativeQuery = true)
-    long nextInvoiceCodeValue();
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     // Lock the root row in the SELECT itself. Fetch joins cause Hibernate follow-on locking,

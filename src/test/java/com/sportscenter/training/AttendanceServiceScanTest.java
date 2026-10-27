@@ -35,6 +35,7 @@ import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class AttendanceServiceScanTest {
+    @Mock com.sportscenter.session.ScheduleWriteLock scheduleWriteLock;
     @Mock AttendanceRepository attendanceRepository;
     @Mock TrainingResultRepository trainingResultRepository;
     @Mock SessionRepository sessionRepository;
@@ -61,7 +62,9 @@ class AttendanceServiceScanTest {
         lenient().when(clock.instant()).thenReturn(Instant.parse("2026-10-16T03:00:00Z"));
         lenient().when(clock.getZone()).thenReturn(ZoneId.of("Asia/Ho_Chi_Minh"));
         memberUser = new User(); memberUser.setId(MEMBER_ID); memberUser.setFullName("Test Member"); memberUser.setStatus("Active");
-        staff = new User(); staff.setId(STAFF_ID); staff.setEmail("staff@test.local");
+        staff = new User(); staff.setId(STAFF_ID); staff.setEmail("staff@test.local");staff.setCenterId(1);staff.setStatus("Active");var role=new com.sportscenter.user.Role();role.setName("Receptionist");staff.setRole(role);memberUser.setCenterId(1);
+        lenient().when(sessionRepository.findByIdForUpdate(anyInt())).thenAnswer(call->Optional.of(session(call.getArgument(0),LocalTime.of(9,30))));
+        lenient().when(enrollmentRepository.existsByMemberIdAndSportsClassIdAndStatus(MEMBER_ID,40,"Registered")).thenReturn(true);
         profile = new Member(); profile.setUser(memberUser); profile.setCheckinSecret(Totp.encodeSecret(SECRET));
         currentStep = clock.instant().getEpochSecond() / 30;
         lenient().when(userRepository.findByEmailIgnoreCase("staff@test.local")).thenReturn(Optional.of(staff));
@@ -76,11 +79,11 @@ class AttendanceServiceScanTest {
     }
 
     @Test
-    void scanCheckin_ValidCodeRecordsLobbyCheckinWithoutExposingSecret() {
+    void scanCheckin_ValidCodeRecordsPresentWithoutExposingSecret() {
         String code = Totp.code(SECRET, currentStep);
-        AttendanceResponse response = service.scanCheckin(MEMBER_ID, code, null, staff.getEmail());
+        AttendanceResponse response = service.scanCheckin(MEMBER_ID, code, 120, staff.getEmail());
 
-        assertEquals("CheckedIn", response.state());
+        assertEquals("Present", response.state());
         assertEquals(currentStep, profile.getCheckinLastStep());
         assertFalse(java.util.Arrays.stream(CheckinCodeResponse.class.getRecordComponents())
                 .anyMatch(component -> component.getName().toLowerCase().contains("secret")));
@@ -105,28 +108,27 @@ class AttendanceServiceScanTest {
     }
 
     @Test
-    void scanCheckin_CodeOneStepAheadIsAccepted() {
-        AttendanceResponse response = service.scanCheckin(MEMBER_ID, Totp.code(SECRET, currentStep + 1), null, staff.getEmail());
-        assertEquals("CheckedIn", response.state());
-        assertEquals(currentStep + 1, profile.getCheckinLastStep());
+    void scanCheckin_CodeFromFutureStepIsRejectedUntilItsValidityWindow() {
+        assertTrue(assertThrows(BusinessException.class,()->service.scanCheckin(MEMBER_ID,Totp.code(SECRET,currentStep+1),120,staff.getEmail())).getMessage().startsWith("INVALID_CHECKIN_CODE:"));
+        verify(attendanceRepository,never()).save(any());
     }
 
     @Test
     void scanCheckin_BookingBlockedMemberCanStillCheckIn() {
         profile.setBookingBlockedUntil(java.time.LocalDateTime.of(2026, 10, 17, 10, 0));
 
-        AttendanceResponse response = service.scanCheckin(MEMBER_ID, Totp.code(SECRET, currentStep), null, staff.getEmail());
+        AttendanceResponse response = service.scanCheckin(MEMBER_ID, Totp.code(SECRET, currentStep), 120, staff.getEmail());
 
-        assertEquals("CheckedIn", response.state());
+        assertEquals("Present", response.state());
     }
 
     @Test
     void scanCheckin_ReusingAcceptedStepIsRejected() {
         String code = Totp.code(SECRET, currentStep);
-        service.scanCheckin(MEMBER_ID, code, null, staff.getEmail());
+        service.scanCheckin(MEMBER_ID, code, 120, staff.getEmail());
 
         BusinessException error = assertThrows(BusinessException.class,
-                () -> service.scanCheckin(MEMBER_ID, code, null, staff.getEmail()));
+                () -> service.scanCheckin(MEMBER_ID, code, 120, staff.getEmail()));
 
         assertTrue(error.getMessage().startsWith("INVALID_CHECKIN_CODE:"));
         verify(attendanceRepository, times(1)).save(any(Attendance.class));
@@ -136,44 +138,40 @@ class AttendanceServiceScanTest {
     void scanCheckin_SixthInvalidAttemptInOneMinuteIsRateLimited() {
         for (int i = 0; i < 5; i++) {
             assertThrows(BusinessException.class,
-                    () -> service.scanCheckin(MEMBER_ID, "not-a-code", null, staff.getEmail()));
+                    () -> service.scanCheckin(MEMBER_ID, "not-a-code", 120, staff.getEmail()));
         }
 
         BusinessException error = assertThrows(BusinessException.class,
-                () -> service.scanCheckin(MEMBER_ID, "not-a-code", null, staff.getEmail()));
+                () -> service.scanCheckin(MEMBER_ID, "not-a-code", 120, staff.getEmail()));
 
         assertTrue(error.getMessage().contains("scan limit reached"));
         verify(attendanceRepository, never()).save(any(Attendance.class));
     }
 
     @Test
-    void scanCheckin_ExpiredPackageIsRejected() {
-        when(memberPackageRepository.findByMemberId(MEMBER_ID)).thenReturn(List.of());
-
-        BusinessException error = assertThrows(BusinessException.class,
-                () -> service.scanCheckin(MEMBER_ID, Totp.code(SECRET, currentStep), null, staff.getEmail()));
-
-        assertTrue(error.getMessage().startsWith("PACKAGE_EXPIRED:"));
-        verify(attendanceRepository, never()).save(any(Attendance.class));
+    void scanCheckin_ExpiredOriginalPrivateEntitlementIsRejected() {
+        Session privateSession=session(120,LocalTime.of(9,30));privateSession.setBookedMember(memberUser);
+        var expired=activePackage();expired.setExpiresAt(java.time.LocalDateTime.of(2026,10,15,8,0));privateSession.setMemberPackage(expired);
+        when(sessionRepository.findByIdForUpdate(120)).thenReturn(Optional.of(privateSession));
+        assertTrue(assertThrows(BusinessException.class,()->service.scanCheckin(MEMBER_ID,Totp.code(SECRET,currentStep),120,staff.getEmail())).getMessage().startsWith("PACKAGE_EXPIRED:"));
+        verify(attendanceRepository,never()).save(any());
     }
 
     @Test
-    void scanCheckin_OutsideThirtyMinuteSessionWindowIsRejected() {
+    void scanCheckin_BeforeSessionStartIsRejected() {
         Session session = session(123, LocalTime.of(12, 0));
-        when(sessionRepository.findById(123)).thenReturn(Optional.of(session));
-        when(enrollmentRepository.existsByMemberIdAndSportsClassIdAndStatus(MEMBER_ID, 40, "Registered")).thenReturn(true);
-
+        when(sessionRepository.findByIdForUpdate(123)).thenReturn(Optional.of(session));
         BusinessException error = assertThrows(BusinessException.class,
                 () -> service.scanCheckin(MEMBER_ID, Totp.code(SECRET, currentStep), 123, staff.getEmail()));
 
-        assertTrue(error.getMessage().startsWith("CHECKIN_WINDOW_CLOSED:"));
+        assertTrue(error.getMessage().startsWith("ATTENDANCE_WINDOW_CLOSED:"));
         verify(attendanceRepository, never()).save(any(Attendance.class));
     }
 
     @Test
     void scanCheckin_RepeatedSessionScanUpdatesSameAttendanceRow() {
         Session session = session(124, LocalTime.of(9, 30));
-        when(sessionRepository.findById(124)).thenReturn(Optional.of(session));
+        when(sessionRepository.findByIdForUpdate(124)).thenReturn(Optional.of(session));
         when(enrollmentRepository.existsByMemberIdAndSportsClassIdAndStatus(MEMBER_ID, 40, "Registered")).thenReturn(true);
         AtomicReference<Attendance> row = new AtomicReference<>();
         when(attendanceRepository.findBySessionIdAndMemberId(124, MEMBER_ID)).thenAnswer(call -> Optional.ofNullable(row.get()));
@@ -185,6 +183,7 @@ class AttendanceServiceScanTest {
         });
 
         service.scanCheckin(MEMBER_ID, Totp.code(SECRET, currentStep), 124, staff.getEmail());
+        when(clock.instant()).thenReturn(Instant.parse("2026-10-16T03:00:30Z"));
         service.scanCheckin(MEMBER_ID, Totp.code(SECRET, currentStep + 1), 124, staff.getEmail());
 
         assertNotNull(row.get());
@@ -195,14 +194,14 @@ class AttendanceServiceScanTest {
     private MemberPackage activePackage() {
         MemberPackage memberPackage = new MemberPackage();
         memberPackage.setStatus("Active");
-        memberPackage.setEndDate(LocalDate.of(2026, 11, 1));
+        memberPackage.setEndDate(LocalDate.of(2026, 11, 1));memberPackage.setActivatedAt(java.time.LocalDateTime.of(2026,10,1,8,0));memberPackage.setExpiresAt(java.time.LocalDateTime.of(2026,11,1,8,0));
         return memberPackage;
     }
 
     private Session session(Integer id, LocalTime start) {
         SportsClass sportsClass = new SportsClass(); sportsClass.setId(40);
         Session session = new Session(); session.setId(id); session.setSportsClass(sportsClass);
-        session.setSessionDate(LocalDate.of(2026, 10, 16)); session.setStartTime(start); session.setEndTime(LocalTime.of(14, 0));
+        session.setSessionDate(LocalDate.of(2026, 10, 16)); session.setStartTime(start); session.setEndTime(start.plusMinutes(90));
         return session;
     }
 }

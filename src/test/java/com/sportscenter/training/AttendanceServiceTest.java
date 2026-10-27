@@ -25,6 +25,12 @@ import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class AttendanceServiceTest {
+    @Mock com.sportscenter.session.ScheduleWriteLock scheduleWriteLock;
+    @Mock com.sportscenter.session.SessionAbsenceNoticeRepository noticeRepository;
+    @Mock com.sportscenter.common.ActorPolicy actors;
+    @InjectMocks com.sportscenter.session.SessionAbsenceService absenceService;
+    private final org.springframework.security.core.Authentication memberAuth = new org.springframework.security.authentication.UsernamePasswordAuthenticationToken("member@example.test","",java.util.List.of(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_MEMBER")));
+
 
     @Mock
     private AttendanceRepository attendanceRepository;
@@ -64,12 +70,17 @@ class AttendanceServiceTest {
         sampleReceptionist = new User();
         sampleReceptionist.setId(5); sampleReceptionist.setCenterId(1);
         sampleReceptionist.setEmail("staff@example.test");
-        sampleReceptionist.setFullName("Đỗ Thị Mai");
+        sampleReceptionist.setFullName("Đỗ Thị Mai");sampleReceptionist.setStatus("Active");
+        var role=new com.sportscenter.user.Role();role.setName("CenterManager");sampleReceptionist.setRole(role);
+        var memberRole=new com.sportscenter.user.Role();memberRole.setName("Member");sampleMember.setRole(memberRole);sampleMember.setStatus("Active");
+        lenient().when(actors.actor(memberAuth)).thenReturn(sampleMember);
+
     }
 
     @Test
     @DisplayName("Counter Check-In creates attendance record with CheckedIn state")
     void checkIn_Success() {
+        org.springframework.test.util.ReflectionTestUtils.setField(attendanceService,"lobbyCheckinEnabled",true);
         when(userRepository.findById(7)).thenReturn(Optional.of(sampleMember));
         when(userRepository.findByEmailIgnoreCase("staff@example.test")).thenReturn(Optional.of(sampleReceptionist));
 
@@ -96,7 +107,8 @@ class AttendanceServiceTest {
         Attendance current = new Attendance();
         current.setAttendanceId(60);
         current.setMember(sampleMember);
-        current.setState("Absent");
+        current.setState("Absent");current.setSession(endedSession(15));
+        when(sessionRepository.findByIdForUpdate(15)).thenReturn(Optional.of(current.getSession()));
 
         when(attendanceRepository.findById(60)).thenReturn(Optional.of(current));
         when(attendanceRepository.save(any(Attendance.class))).thenAnswer(i -> i.getArgument(0));
@@ -112,8 +124,9 @@ class AttendanceServiceTest {
 
     @Test
     @DisplayName("Correcting attendance to Excused syncs the training result")
-    void correctAttendance_Excused_SyncsTrainingResult() {
-        Session session = new Session(); session.setId(15);
+    void correctAttendance_Present_SyncsTrainingResult() {
+        Session session = endedSession(15);
+        when(sessionRepository.findByIdForUpdate(15)).thenReturn(Optional.of(session));
         Attendance current = new Attendance();
         current.setAttendanceId(61); current.setSession(session); current.setMember(sampleMember); current.setState("Absent");
         TrainingResult result = new TrainingResult(); result.setAttendanceStatus("Absent");
@@ -124,84 +137,37 @@ class AttendanceServiceTest {
         when(trainingResultRepository.save(any(TrainingResult.class))).thenAnswer(call -> call.getArgument(0));
 
         AttendanceResponse response = attendanceService.correctAttendance(
-                new AttendanceCorrectionRequest(61, "Excused", "Approved absence"), "staff@example.test");
+                new AttendanceCorrectionRequest(61, "Present", "Approved absence"), "staff@example.test");
 
-        assertEquals("Excused", response.state());
-        assertEquals("Excused", result.getAttendanceStatus());
+        assertEquals("Present", response.state());
+        assertEquals("Present", result.getAttendanceStatus());
         verify(auditService).log(eq(5), eq("ATTENDANCE_CORRECTION"), eq("attendances"), eq(61), contains("Approved absence"));
     }
 
-    @Test
-    @DisplayName("Normal absence requests are rejected regardless of notice")
-    void requestAbsence_NormalIsRejected() {
-        sampleMember.setEmail("member@example.test");
-        Session session = new Session();
-        session.setId(88);
-        session.setSessionDate(java.time.LocalDate.of(2026, 10, 16));
-        session.setStartTime(java.time.LocalTime.of(13, 0));
-        com.sportscenter.sportclass.SportsClass sportsClass = new com.sportscenter.sportclass.SportsClass();
-        sportsClass.setId(3);
-        session.setSportsClass(sportsClass);
-        when(userRepository.findByEmailIgnoreCase("member@example.test")).thenReturn(Optional.of(sampleMember));
-        when(sessionRepository.findById(88)).thenReturn(Optional.of(session));
-
-        var error = assertThrows(com.sportscenter.common.exception.BusinessException.class,
-                () -> attendanceService.requestAbsence(88, "Medical appointment", "member@example.test"));
-        assertTrue(error.getMessage().startsWith("NORMAL_CLASS_NON_CANCELLABLE:"));
-        verify(attendanceRepository, never()).save(any());
+    @Test void requestAbsence_NormalIsRejected() {
+        var session=noticeSession(88);session.getSportsClass().setClassType("Normal");session.setBookedMember(null);
+        when(sessionRepository.findByIdForUpdate(88)).thenReturn(Optional.of(session));
+        assertTrue(assertThrows(com.sportscenter.common.exception.BusinessException.class,()->absenceService.report(88,"Reason",memberAuth)).getMessage().startsWith("NORMAL_CLASS_NON_CANCELLABLE:"));
+        verifyNoInteractions(attendanceRepository);
     }
-
-    @Test
-    @DisplayName("Member absence request inside two hour window is rejected")
-    void requestAbsence_TooLate_Throws() {
-        sampleMember.setEmail("member@example.test");
-        Session session = new Session();
-        session.setId(89);
-        session.setSessionDate(java.time.LocalDate.of(2026, 10, 16));
-        session.setStartTime(java.time.LocalTime.of(9, 0));
-        com.sportscenter.sportclass.SportsClass sportsClass = new com.sportscenter.sportclass.SportsClass();
-        sportsClass.setId(3); sportsClass.setClassType("Advanced");
-        session.setSportsClass(sportsClass);
-        when(userRepository.findByEmailIgnoreCase("member@example.test")).thenReturn(Optional.of(sampleMember));
-        when(sessionRepository.findById(89)).thenReturn(Optional.of(session));
-        when(enrollmentRepository.existsByMemberIdAndSportsClassIdAndStatus(7, 3, "Registered")).thenReturn(true);
-
-        assertThrows(com.sportscenter.common.exception.BusinessException.class,
-                () -> attendanceService.requestAbsence(89, "Reason", "member@example.test"));
-        verify(attendanceRepository, never()).save(any(Attendance.class));
+    @Test void requestAbsence_AfterStartIsRejected() {
+        var session=noticeSession(89);session.setStartTime(java.time.LocalTime.of(9,0));when(sessionRepository.findByIdForUpdate(89)).thenReturn(Optional.of(session));
+        assertThrows(com.sportscenter.common.exception.BusinessException.class,()->absenceService.report(89,"Reason",memberAuth));verifyNoInteractions(attendanceRepository);
     }
-
-    @Test
-    @DisplayName("Pending enrollment cannot request an excused absence")
-    void requestAbsence_PendingEnrollment_IsRejected() {
-        assertAbsenceRejectedForNonRegistered(91);
+    @Test void requestAbsence_CancelledBookingIsRejected() {
+        var session=noticeSession(91);session.setStatus("Cancelled");when(sessionRepository.findByIdForUpdate(91)).thenReturn(Optional.of(session));
+        assertThrows(com.sportscenter.common.exception.BusinessException.class,()->absenceService.report(91,"Reason",memberAuth));verifyNoInteractions(attendanceRepository);
     }
-
-    @Test
-    @DisplayName("Waitlisted enrollment cannot request an excused absence")
-    void requestAbsence_WaitlistedEnrollment_IsRejected() {
-        assertAbsenceRejectedForNonRegistered(92);
+    @Test void requestAbsence_UnownedBookingIsRejected() {
+        var session=noticeSession(92);User other=new User();other.setId(9);session.setBookedMember(other);when(sessionRepository.findByIdForUpdate(92)).thenReturn(Optional.of(session));
+        assertThrows(org.springframework.security.access.AccessDeniedException.class,()->absenceService.report(92,"Reason",memberAuth));verifyNoInteractions(attendanceRepository);
     }
-
-    private void assertAbsenceRejectedForNonRegistered(int sessionId) {
-        sampleMember.setEmail("member@example.test");
-        Session session = new Session();
-        session.setId(sessionId);
-        session.setSessionDate(java.time.LocalDate.of(2026, 10, 16));
-        session.setStartTime(java.time.LocalTime.of(13, 0));
-        com.sportscenter.sportclass.SportsClass sportsClass = new com.sportscenter.sportclass.SportsClass();
-        sportsClass.setId(3); sportsClass.setClassType("Advanced");
-        session.setSportsClass(sportsClass);
-        when(userRepository.findByEmailIgnoreCase("member@example.test")).thenReturn(Optional.of(sampleMember));
-        when(sessionRepository.findById(sessionId)).thenReturn(Optional.of(session));
-        when(enrollmentRepository.existsByMemberIdAndSportsClassIdAndStatus(7, 3, "Registered")).thenReturn(false);
-
-        var error = assertThrows(com.sportscenter.common.exception.BusinessException.class,
-                () -> attendanceService.requestAbsence(sessionId, "Reason", "member@example.test"));
-
-        assertTrue(error.getMessage().startsWith("NOT_YOUR_CLASS:"));
-        verify(attendanceRepository, never()).save(any(Attendance.class));
+    private Session noticeSession(int id) {
+        var s=new Session();s.setId(id);s.setSessionDate(java.time.LocalDate.of(2026,10,16));s.setStartTime(java.time.LocalTime.of(13,0));s.setEndTime(java.time.LocalTime.of(14,30));
+        var c=new com.sportscenter.sportclass.SportsClass();c.setId(3);c.setClassType("Advanced");c.setCenterId(1);s.setSportsClass(c);s.setBookedMember(sampleMember);return s;
     }
+    private Session endedSession(int id){var s=noticeSession(id);s.setStartTime(java.time.LocalTime.of(7,45));s.setEndTime(java.time.LocalTime.of(9,15));return s;}
+    @Test void lobbyCheckinIsDisabledByDefault(){assertThrows(com.sportscenter.common.exception.BusinessException.class,()->attendanceService.checkIn(7,"staff@example.test"));verifyNoInteractions(attendanceRepository);}
 
     @Test
     @DisplayName("Search attendances with null-safe filter")

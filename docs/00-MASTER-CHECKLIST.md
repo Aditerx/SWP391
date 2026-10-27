@@ -6,31 +6,35 @@ Tài liệu này là chốt chặn quản lý tiến độ tổng thể và lị
 
 ## 📌 PHẦN I: TIẾN ĐỘ THỰC HIỆN (ROADMAP)
 
-### Chốt chặn sau rà soát 21/10/2026
-- [ ] Người dùng chốt nguồn nghiệp vụ cho Advanced, hạn 45 ngày, giữ chỗ và phạm vi gói thành viên; xem báo cáo đối chiếu trong HISTORY bên dưới.
-- [x] Sửa nhóm có quy tắc rõ: lịch, credit, phân quyền, timeout, toggle và báo cáo; xem checklist triển khai 23/10.
-- [x] Cập nhật contract/deployment theo implementation, phân biệt các chính sách chưa chốt; nghiệm thu môi trường thật còn ở checklist tích hợp.
+### Phạm vi hiện hành 27/10/2026
 
-**Lưu ý:** Các dấu hoàn thành của các đợt trước là lịch sử triển khai, không phải xác nhận hệ thống đã đạt toàn bộ yêu cầu. Kết quả test xanh hiện tại chưa chứng minh tuân thủ hai PDF.
-
-### Checklist tích hợp còn lại
-- [x] Xử lý merge SMTP/OTP đăng ký, chatbox và thông báo từ `3309b02` vào tai nền `fc00c64`: 8 file conflict đã ghép, giữ guards/locks/lifecycle; clean test 269 run/250 pass/19 skip/0 lỗi. Chứng cứ docs 02 mục 9.14; không phải hoàn thành D01/D09 hoặc hai phase.
-- [x] Rà/push mốc bàn giao tai `9097197`, AGENTS/checklist/ownership theo [04-DEBUG-NOTE.md mục 40](04-DEBUG-NOTE.md). Baseline clean test 223/204 pass/19 skip/0 lỗi, PG riêng 14 pass; chứng cứ docs 02 mục 9.10. Đây chưa phải triển khai feature mới/deploy.
-- [x] Kết nối DB test Supabase mới: Owner chọn DB_PASSWORD hiện tại; đã chuẩn hóa DB_URL không nhúng credential, JDBC sslmode=require, SELECT trong transaction chỉ đọc và rollback thành công. Bằng chứng docs 02 mục 9.13; .env ignored/không commit.
-- [ ] DB Supabase mới chưa có schema SCMS: kiểm metadata thấy 0 bảng public, chưa có sessions.subscription_id. Chưa chạy migration/seed hoặc kiểm API/FE trên DB này; khởi tạo DB cần phạm vi triển khai riêng.
-- [ ] Gói T dự kiến ~15%: D01 hồ sơ Member + D09 Coach directory, contract/tests/evidence thật, hai commit chức năng; chưa thực hiện. Owner làm rõ đồng đội hiện làm SMTP/OTP đăng ký, chatbox cơ bản và thông báo, không phải gói T. Phạm vi/prompt T giữ ở 40.3/40.7; cập nhật bàn giao ở 40.12, hai phase tiếp tục session sau.
-- [ ] Phase 1 ~40%: catalog/giá → đăng ký môn/Coach/năng lực → hạn skip → mua/Cash/VNPay/ghi nhận quyền; gộp T và demo API/PG thật. Cổng P1 ở 40.4/40.6; chưa code/test, chưa coi P1 là release đầy đủ.
-- [ ] Phase 2 ~45%, sau P1: booking/dời/hủy/báo vắng → sự cố/Holiday/expiry → attendance/QR/bù báo muộn → hoàn/sửa Cash → report/quyền/FE E2E. Thứ tự và nghiệm thu ở 40.5/40.6; không dùng test/probe lịch sử làm bằng chứng mới.
-- [ ] Báo cáo sau triển khai phải có đủ tiền đã thu/đã hoàn/thu ròng theo 04 mục 39.3; FE quyết định trình bày. Công bố field/DTO/compatibility totalRevenue thật, kiểm hoàn khác kỳ/đã duyệt chưa hoàn/Cash ghi nhầm và quyền D18; chưa API mới khả dụng.
-- [ ] F-06/F-07 nghiệm thu đầy đủ: sau khi người dùng chạy migration, kiểm lại 24/10 không tái hiện 500; DB .env đủ cột/FK/index, orphan=0. Còn SHA/DB đích Render, quyền Coach và dữ liệu/luồng thực; xem HISTORY.
-- [ ] Chốt quyết định nghiệp vụ đang giữ riêng trong phần triển khai 23/10 bên dưới.
-- [ ] Áp dụng migration 06 trên DB test đúng hệ quản trị; kiểm tra mapping Specialization–Subject và phân loại môn cũ.
-- [ ] Nghiệm thu trên PostgreSQL/SQL Server, VNPay Sandbox và trình duyệt với CORS/cookie thực tế.
-- [ ] Đối chiếu đúng commit/branch FE-01–FE-11 và tích hợp contract mới (Normal atomic, lịch catalog, expiresAt, reconciliationRequired).
+- [x] D01–D19 đã chốt tại docs 04; rule mới ghi đè mô tả cũ. Owner yêu cầu tiếp tục P1.0–P1.4 và BE P2, double-check/demo/tài liệu/push branch/merge main.
+- [x] Source hai phase đã triển khai, clean test và 9 HTTP workflow PostgreSQL local pass. Chi tiết nhóm hoàn tất chuyển HISTORY bên dưới; bản chốt exact commit/merge và evidence xem docs 02 mục 10.
+- [ ] Chốt kiểm exact commit, bàn giao evidence và push branch/merge main (đang thực hiện, không đồng nghĩa deploy).
+- [ ] Production trống đã read-only preflight; khởi tạo schema cần Owner xác nhận riêng theo docs 02 mục 9.8, thực hiện trước nhánh Render autoDeploy. Không seed account/giao dịch demo.
+- [ ] **Để lại theo Owner:** P1.5/gói T D01 hồ sơ Member + D09 Coach directory/FE. Giữ scope/checklist 04 mục 40.3/40.8–40.9. SMTP/OTP/chat/notifications đã merge là việc khác.
+- [ ] Nghiệm thu FE hiện hành bằng browser/CORS/cookie, VNPay IPN qua gateway sandbox thật và deploy SHA/health. Local HTTP không thay cổng này.
+- [ ] SQL Server runtime và smoke vận hành tài khoản thật chưa chạy; migrations MSSQL được bàn giao với giới hạn rõ.
 
 ---
 
 ## 📜 PHẦN II: LỊCH SỬ HOÀN THÀNH (HISTORY)
+
+### [27/10/2026] Hai phase BE theo scope Owner — đang chốt bản bàn giao
+
+| Gói | Hoàn tất trong source và local verification |
+|---|---|
+| P1.0–P1.1 | Baseline/PG cô lập;9 môn/18 giá; migration exact snapshot+FK guard/replay không ghi đè giá đã sửa; Invoice snapshot giữ nguyên |
+| P1.2 | Đăng ký môn/Primary Coach, schedule/năng lực cam kết đa môn, nhận trước Invoice, owner/center/lock/idempotency |
+| P1.3 | activatedAt/expiresAt chính xác,45 ngày sử dụng, union closures/nanos, snapshot credit thu hồi, legacy không đoán |
+| P1.4 | Cash/VNPay5 phút; Return đọc/IPN ghi, Paid mới12credit; late/unavailable Paid cần đối soát không cấp quyền |
+| P2.1 | Coach book/Manager hỗ trợ/consent,12h hủy/dời,notice riêng,audit/idempotency,khóa đường CRUD bỏ qua workflow |
+| P2.2 | Incident chờ/resolve/compensate,khôi phục balance gốc,gia hạn tối thiểu,Holidays preview/stale/confirm/giữ nghỉ quá khứ |
+| P2.3 | Present/Absent [start,end),QR TTL/replay/assigned/correction,finalizer,bù Normal có link13physical/12valid;toggle7ngày giữ code |
+| P2.4 | Note/receipt,refund ngoài SCMS có chứng cứ,approve chưa coi hoàn,CashCorrection hẹp Advanced chưa dùng/không booking/phụ thuộc |
+| P2.5 BE | Report theo người+lượt,đúng center/quyền,3 số thu/hoàn/ròng và tương thích gross totalRevenue;Coach403 |
+
+Chứng cứ: docs 02 mục 10 và artifacts/demo/phase-2/2026-10-27. Đã chạy clean test/9 HTTP H2/9 HTTP PG, PG nâng cấp snapshot/replay/FK rollback và bootstrap DB trống. Những lần fail đã đọc nguyên nhân và sửa sản phẩm/fixture; không xóa test để xanh. Exact commit cuối cần runner chạy lại sau commit; các số test trước đó là lịch sử từng source. P1.5/T/FE, gateway live, SMTP delivery và SQL Server runtime không đánh dấu hoàn tất.
 
 ### [27/10/2026] Xử lý conflict nhánh SMTP/OTP, chatbox và thông báo
 

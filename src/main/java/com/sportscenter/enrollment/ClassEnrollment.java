@@ -27,6 +27,8 @@ public class ClassEnrollment {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "class_id", nullable = false)
     private SportsClass sportsClass;
+    @ManyToOne(fetch=FetchType.LAZY) @JoinColumn(name="eligibility_subscription_id")
+    private com.sportscenter.membership.MemberPackage eligibilitySubscription;
 
     @Column(name = "enrolled_at", nullable = false)
     private LocalDateTime enrolledAt;

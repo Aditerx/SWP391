@@ -54,13 +54,7 @@ INSERT INTO subjects (subject_name, description, normal_price, advanced_price, s
 
 ('Bóng bàn',           'Phản xạ nhanh, khéo léo với nhịp độ cao',                 800000, 2500000, 'Active', 'bong-ban')
 
-ON CONFLICT (slug) DO UPDATE SET
-
-    normal_price = EXCLUDED.normal_price,
-
-    advanced_price = EXCLUDED.advanced_price,
-
-    description = EXCLUDED.description;
+ON CONFLICT (slug) DO NOTHING;
 
 
 

@@ -73,8 +73,8 @@ public interface NotificationRepository extends JpaRepository<Notification, Inte
     int markAllDirectRead(@Param("userId") Integer userId);
 
     @Modifying
-    @Query(value = "INSERT INTO notifications (user_id, title, content, type, notification_type, related_type, related_id, dedupe_key, created_at) " +
-            "VALUES (NULL, :title, :message, :legacyType, :notificationType, :relatedType, :relatedId, :dedupeKey, :createdAt) " +
+    @Query(value = "INSERT INTO notifications (user_id, title, content, type, notification_type, related_type, related_id, dedupe_key, created_at, is_read) " +
+            "VALUES (NULL, :title, :message, :legacyType, :notificationType, :relatedType, :relatedId, :dedupeKey, :createdAt, FALSE) " +
             "ON CONFLICT DO NOTHING", nativeQuery = true)
     int insertEventIfAbsent(@Param("title") String title, @Param("message") String message,
                             @Param("legacyType") String legacyType, @Param("notificationType") String notificationType,

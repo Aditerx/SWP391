@@ -15,6 +15,10 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class HolidayController {
     private final HolidayService holidayService;
+    private final HolidayImpactService holidayImpactService;
+    @PostMapping("/preview")
+    @PreAuthorize("hasAnyRole('CENTERMANAGER','ADMIN') and hasAuthority('MANAGE_CLASSES')")
+    public HolidayImpactService.Preview preview(@RequestBody HolidayImpactService.Change change,org.springframework.security.core.Authentication auth){return holidayImpactService.preview(change,auth);}
 
     @GetMapping
     public ResponseEntity<List<HolidayResponse>> findAll() {
@@ -27,18 +31,20 @@ public class HolidayController {
     }
 
     @PatchMapping("/{id}/toggle")
-    @PreAuthorize("hasAuthority('MANAGE_CLASSES')")
+    @PreAuthorize("hasAnyRole('CENTERMANAGER','ADMIN') and hasAuthority('MANAGE_CLASSES')")
     public ResponseEntity<HolidayResponse> toggleActive(
             @PathVariable Integer id,
-            @RequestBody(required = false) Map<String, Boolean> body) {
+            @RequestBody(required = false) Map<String, Boolean> body,
+            @RequestHeader(value="X-Preview-Token",required=false) String token,org.springframework.security.core.Authentication auth) {
         Boolean active = body != null ? body.get("active") : null;
-        return ResponseEntity.ok(holidayService.toggleActive(id, active));
+        return ResponseEntity.ok(holidayImpactService.confirm(new HolidayImpactService.Change(id,null,null,null,active),token,auth));
     }
 
     @PostMapping
-    @PreAuthorize("hasAuthority('MANAGE_CLASSES')")
-    public ResponseEntity<HolidayResponse> create(@Valid @RequestBody HolidayRequest request) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(holidayService.create(request));
+    @PreAuthorize("hasAnyRole('CENTERMANAGER','ADMIN') and hasAuthority('MANAGE_CLASSES')")
+    public ResponseEntity<HolidayResponse> create(@Valid @RequestBody HolidayRequest request,
+            @RequestHeader(value="X-Preview-Token",required=false) String token,org.springframework.security.core.Authentication auth) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(holidayImpactService.confirm(new HolidayImpactService.Change(null,request.holidayDate(),request.holidayName(),request.tag(),request.active()),token,auth));
     }
 }
 

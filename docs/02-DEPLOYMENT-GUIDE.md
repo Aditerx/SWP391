@@ -76,21 +76,16 @@ Khi thực hiện thanh toán trên cổng VNPay Sandbox, nhập thông tin th�
 2. Gọi `POST /api/classes/{classId}/enroll` với `{"paymentMethod": "VNPay"}`.
 3. Nhận về URL thanh toán VNPay (`paymentUrl`). Hạn giữ chỗ là **5 phút**.
 4. Mở `paymentUrl` trên trình duyệt: Chọn ngân hàng NCB $\rightarrow$ nhập thông tin thẻ demo trên $\rightarrow$ nhập OTP `123456`.
-5. Sau khi thanh toán thành công: VNPay chuyển hướng về `VNPAY_RETURN_URL` $\rightarrow$ Backend kiểm tra chữ ký SHA512 $\rightarrow$ Cập nhật hóa đơn `Paid` $\rightarrow$ Kích hoạt trạng thái `Registered` của Enrollment và gán học viên vào 12 buổi học tĩnh.
+5. Sau khi thanh toán thành công: VNPay chuyển hướng về `VNPAY_RETURN_URL` $\rightarrow$ Return chỉ kiểm chữ ký và redirect; IPN hợp lệ mới ghi Paid và kích hoạt Registered. FE đọc hóa đơn đã xác thực; không coi redirect success là Paid.
 6. Màn hình trả về kết quả `success` tại `FRONTEND_PAYMENT_RESULT_URL`.
 
-### 4.3. Luồng Kiểm Thử Mua Gói 1:1 Advanced (12 Credit / 45 Ngày)
-> Smoke cho implementation cũ, chưa nghiệm thu các quyết định 25/10. Thiết kế mới đã chốt theo môn/Primary Coach, 1080 giờ, Coach tạo ca và hủy >=12 giờ; chỉ kiểm các rule đó sau khi BE tương ứng được triển khai. Xem mục 9 và API contract mục 14; không dùng bước Member tự book/24 giờ dưới đây để ghi đè quyết định mới.
-1. Gọi `POST /api/member-packages/subscribe-me` với gói `Advanced` (`packageId = ...`, `paymentMethod = "VNPay"`).
-2. Nhận về `paymentUrl` $\rightarrow$ Thực hiện thanh toán demo bằng thẻ NCB.
-3. Callback VNPay hoàn tất:
-   * Hóa đơn chuyển trạng thái `Paid`.
-   * Gói hội viên chuyển `Active`.
-   * Số dư nạp đúng **12 Credit**.
-   * Thời hạn tính đúng **45 ngày** kể từ ngày thanh toán.
-4. Kiểm tra qua `GET /api/members/{memberId}/subscriptions` (hoặc `/packages`, memberId đúng người đăng nhập): xác nhận `remainingCredit = 12`, `validityDays = 45`. Source hiện không có GET `/api/member-packages/me`.
-5. Đặt thử 1 buổi học 1:1 qua `POST /api/sessions/book-private` $\rightarrow$ Số credit giảm còn `11`.
-6. Hủy buổi học đó trước $\ge 24h$ qua `POST /api/sessions/{id}/cancel-private` $\rightarrow$ Hoàn trả lại `12` credit.
+### 4.3. Luồng Advanced theo môn/Primary Coach
+
+1. Manager cấu hình work-schedule; Member POST advanced-registrations, Coach nhận rồi Member POST /{id}/order với VNPay (contract mục 6).
+2. Mở paymentUrl trên gateway sandbox. Return chỉ đọc, IPN hợp lệ mới ghi Paid/Active/12 credit; chờ Invoice chính thức. Kiểm activatedAt/expiresAt = 45 ngày sử dụng có skip nghỉ TT, không chỉ phần ngày.
+3. Coach chính tạo ca >=12h, có consent, chuẩn slot/room/Coach/Member/deadline. Credit còn 11.
+4. Member hủy >=12h trả đúng 1 credit; <12h chỉ báo vắng trong 0<notice<12h, không hoàn. Kiểm retry không nhân quyền/credit.
+5. Đây là hướng dẫn smoke **cần chạy riêng trên gateway/Render**; kết quả callback ký test local tại mục 10 không chứng nhận gateway live.
 
 ### 4.4. Kiểm Thử Sự Cố Hết Hạn Giữ Chỗ (Holding Window Timeout)
 1. Tạo yêu cầu đặt chỗ/mua gói nhưng không nhập thanh toán, để quá **5 phút**.
@@ -227,7 +222,7 @@ Probe HTTP bắt đầu 12:23:02 UTC (19:23:02 UTC+7): Session list cả bốn v
 
 Không suy migration 07 đã chạy hoặc SHA nào đã được deploy từ status 200. Đợt làm việc này chỉ sửa repo, kiểm DB .env read-only và probe qua đăng nhập/GET/logout; chưa áp dụng SQL lên DB đang dùng hay deploy service. Lấy SHA và DB/migration history trước khi xác nhận bàn giao cuối.
 
-## 9. Rollout và bàn giao FE cho đợt quyết định 25/10 — KẾ HOẠCH, CHƯA TRIỂN KHAI
+## 9. Lịch sử kế hoạch và các lần kiểm trước hai phase
 
 > Hạn Advanced có quyết định mới tại docs 04 mục 30.3: 45 ngày sử dụng, skip TT nghỉ/đóng, cập nhật gói đang dùng khi sửa ngày nghỉ, không trùng bù D08. Thay các tiêu chí 1080 giờ liên tục/không tăng hạn ở các đoạn kế hoạch cũ; chưa sửa code/migration/deploy.
 
@@ -395,3 +390,45 @@ Kiểm build phát hiện thêm import ZoneId bị mất và Clock trùng ở ba
 **Kiểm thực tế sau sửa:** `.\mvnw.cmd clean test` BUILD SUCCESS, **269 tests / 250 pass / 19 skip / 0 failure-error**. XML Surefire được cộng và đối chiếu summary log; 19 skip thuộc các nhóm opt-in live/demo/prepare và PostgreSQL chuyên biệt. Hai lượt trước thất bại compile (ZoneId) và testCompile (Clock trùng) đã được sửa; không xóa tests để xanh. [Manifest merge](../artifacts/merge-2026-10-27/verification.json) và [test summary](../artifacts/merge-2026-10-27/test-summary.txt) ghi parents, phạm vi, suite/count/hash/giới hạn.
 
 Lượt này không đổi .env, không gửi email/OTP thật, không chạy migration/seed trên Supabase hoặc deploy. Các migration notification/chat chưa được kiểm thực thi PostgreSQL trong lượt merge; 14 tests PG ở 9.10 là baseline trước merge, không dùng thay cho nghiệm thu các migration mới. Còn SMTP delivery, DB migration/permission, API HTTP login thật/FE và cloud cần nghiệm thu riêng. D01/D09 chưa làm; checklist/hai phase và prompt tiếp nối tại docs 04 mục 40.12.
+
+## 10. Bàn giao hai phase và demo tái lập — 27/10/2026
+
+### 10.1. Phạm vi và bằng chứng
+
+Đã triển khai P1.0–P1.4 và BE P2.1–P2.5 theo docs 04 mục 40, để lại P1.5/gói T D01/D09/FE theo xác nhận Owner. Code gồm catalog giá đóng băng, đăng ký/Coach/năng lực/Paid, 45 ngày sử dụng, lịch/hủy/notice/incident/Holiday, attendance/QR/bù Normal, đối soát/biên nhận/Cash sửa hẹp và report. Contract hiện hành docs 01 mục 6–10/14. Không sửa FE cũ để ghi hoàn tất tích hợp.
+
+- Nền: tai `0277b2f`, clean test cô lập 269/250 pass/19 skip. Những count dưới là kết quả từng source, không quota.
+- Bản P2 trước chốt: clean test 297 run/272 pass/25 skip/0 fail-error và 9/9 HTTP PostgreSQL pass. 6 skip phát sinh từ communication proof untracked của công việc khác, không đưa vào commit phase. 19 skip nền là các live audit/Cash/data prepare/PostgreSQL opt-in, không bật để ghi production.
+- Kiểm chốt exact commit/merge, summary và trace xem [demo handoff](../artifacts/demo/phase-2/2026-10-27/README.md) và verification.json tại cùng thư mục. Không công bố source sau sửa là đã test nếu chưa có run tương ứng.
+- Test cũ được sửa có giải trình: quyền tạo Member/Receptionist→Coach, cutoff 24→12h, date→timestamp skip closure, record mới Late/Excused/scan sớm→Present/Absent trong giờ. Utility TOTP/history và booking-block toggle vẫn giữ tests. Không hạ kiểm concurrency/price/Paid để xanh.
+
+### 10.2. Chạy lại demo
+
+Cần Windows PowerShell, Java 17, Python 3, Docker Desktop đang chạy. Tạo PostgreSQL riêng lần đầu nếu chưa có:
+
+```powershell
+docker run --name scms-phases-20261027 -e POSTGRES_PASSWORD=scms-local-only -p 127.0.0.1:55440:5432 -d postgres:17
+# Nếu container đã tồn tại và đang dừng:
+docker start scms-phases-20261027
+.\scripts\run-phases-demo.ps1
+```
+
+Runner tạo detached worktree từ HEAD vào TEMP (không có .env), chạy `.\mvnw.cmd clean test`, tạo DB mới `scms_phases_demo_<timestamp>`, chạy migrations hai lần/snapshot/FK rollback guards, rồi 9 HTTP workflow trên PostgreSQL. Không dùng DB_URL/DB_PASSWORD production. Không drop/reset DB có sẵn; nếu tên đụng thì dừng. Giữ worktree/DB và log/XML/HTTP trace để đọc. Output mặc định artifacts/demo/runs/<timestamp>; có thể truyền -OutputDirectory đường dẫn mới. Không chạy hai Maven clean cùng target.
+
+Đây là đăng nhập thật HTTP loopback + transaction DB đã commit; Clock cố định tua 27/10→01/2027 để demo biên hạn mà không chờ 45 ngày. Tài khoản @example.test, tiền Cash/refund và VNPay test key đều fixture local. Không có tiền thật, IPN internet, SMTP delivery hay trình duyệt FE. SQL Server có migration counterpart và dialect sequence nhưng chưa chạy SQL Server runtime.
+
+### 10.3. Manifest migration và rollout
+
+DB nâng cấp đã có SCMS: backup + kiểm schema/orphan/legacy mapping trước; chạy đúng hệ quản trị theo thứ tự 06→07→08→09→10→11→12. 08 bổ sung entitlement/Coach;09 exact catalog guard;10 incident/lịch/audit;11 lịch sử Holiday;12 đối soát/receipt/dependency. Nullable mới giữ dữ liệu cũ, không suy subject/Coach/timestamp từ giá. Migration09 chỉ xóa bản dư đúng snapshot D02 và chưa bị tham chiếu; sai snapshot/FK thì rollback, không xóa cưỡng bức. Không dùng 05_reseed_demo_users_and_coaches.sql để rollout.
+
+DB production Owner xác nhận trong .env: preflight driver trực tiếp/TLS/read-only thấy public **0 bảng**; không boot jobs để ping. Bootstrap mới `database/bootstrap/scms_structure_postgres.sql` chỉ schema/roles/permissions/default center/9 môn, **0 account, 0 Invoice, 0 subscription, 0 session/enrollment**. Bundle reviewable tại [release SQL](../artifacts/demo/phase-2/2026-10-27/release/scms-phases-empty-schema.sql), [plan/hashes](../artifacts/demo/phase-2/2026-10-27/release/release-plan.json). Không thay .env, không commit secret.
+
+Bundle SHA256: `28635081e1724eb89ea82252fc1e468ca53805d347e4334d40ddf17a9c2866dc`. Local DB rỗng scms_phases_release_proof đã commit đúng 9 môn/0 account/0 business rows; chạy lại bị empty-schema guard từ chối P0001 và rollback. ApplyPhaseRelease.java kiểm hash/target fingerprint, Serializable transaction, lock timeout và counts trước commit. Bundle là artifact cố định; nếu tái sinh/đổi bytes phải review hash mới.
+
+Render autoDeploy:true; chưa biết branch cấu hình trong dashboard nên **schema phải sẵn trước merge/push nhánh mà Render theo dõi**. Trình tự: kiểm source/DB đích → schema được Owner cho phép → xác minh counts/columns → push branch/merge main → theo dõi deploy SHA/log → smoke read-only/API theo tài khoản thật. Không coi git merge là đã deploy thành công. Chỉ chạy production executor sau xác nhận riêng theo 9.8; bằng chứng thực thi nếu có ghi ở README/production-release.json.
+
+Sau bootstrap cần Owner provision tài khoản quản trị thật (email/password riêng, BCrypt, đúng center/role) qua quy trình vận hành được kiểm soát; không dùng tài khoản/mật khẩu demo lịch sử. Tạo HLV/phòng/chuyên môn rồi publish work-schedule trước mở bán Advanced. Nếu đăng ký qua OTP, cần SMTP thật và xác minh email trước khi gán quyền quản trị qua DB bởi Owner. Lượt này không tự tạo tài khoản Owner hoặc phát sinh giao dịch production.
+
+### 10.4. Vận hành và kiểm sau deploy
+
+Giữ ddl-auto=none; cấu hình Clock Asia/Ho_Chi_Minh, holding5 phút, booking-block default false, lobby-checkin default false. VNPay URLs đúng public HTTPS, Return đọc/IPN ghi; cookie/CORS FE domain chính xác. Không chạy opt-in live data/Cash tests trên production. Kiểm log schema mismatch, health/API danh mục trả9 giá đúng, quyền reports Coach403/Manager có quyền, Invoice ownership và luồng mua thật được phép riêng. Nếu code lỗi, quay về code đã tương thích schema bằng deploy trước; không drop cột/bảng hoặc xóa hồ sơ để rollback. Trường hợp legacy thiếu căn cứ cần đối soát, không backfill từ amount.

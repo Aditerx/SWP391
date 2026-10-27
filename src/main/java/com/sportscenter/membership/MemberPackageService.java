@@ -73,6 +73,7 @@ public class MemberPackageService {
                 .orElseThrow(() -> new ResourceNotFoundException("Membership package not found: " + request.packageId()));
 
         if (!"Active".equalsIgnoreCase(pkg.getStatus())) throw new BusinessException("Cannot subscribe to an Inactive membership package");
+        if (pkg.isAdvanced()) throw new BusinessException("USE_ADVANCED_REGISTRATION: Choose a subject and Primary Coach and obtain acceptance before payment");
         String method = request.paymentMethod() == null || request.paymentMethod().isBlank() ? "Cash" : request.paymentMethod();
         LocalDate startDate = LocalDate.now(clock);
         int days = pkg.isAdvanced()
@@ -82,6 +83,7 @@ public class MemberPackageService {
         MemberPackage mp = new MemberPackage();
         mp.setMember(memberUser);
         mp.setMembershipPackage(pkg);
+        mp.setPurchaseAmount(pkg.getPrice());
         mp.setStartDate(startDate);
         mp.setEndDate(startDate.plusDays(days));
         mp.setStatus("Pending");
@@ -115,6 +117,9 @@ public class MemberPackageService {
 
         String normalizedStatus = normalizeStatus(status);
         String previousStatus = mp.getStatus();
+        if(mp.isAdvanced()&&!"Active".equalsIgnoreCase(previousStatus)&&"Active".equals(normalizedStatus))
+            throw new BusinessException("USE_INCIDENT_RECOVERY: Advanced reactivation requires incident and expiry evidence");
+        if(mp.isAdvanced()&&!normalizedStatus.equalsIgnoreCase(previousStatus))throw new BusinessException("ADVANCED_STATUS_WORKFLOW_REQUIRED: Use payment, expiry, attendance completion or the verified incident workflow");
         if (!"Active".equalsIgnoreCase(previousStatus) && "Active".equals(normalizedStatus)) {
             invoiceService.requirePaidSubscription(subscriptionId);
             // Only the first successful payment grants credits. Reactivation never replenishes them.
@@ -142,6 +147,7 @@ public class MemberPackageService {
 
         MemberPackage mp = memberPackageRepository.findByIdForUpdate(subscriptionId)
                 .orElseThrow(() -> new ResourceNotFoundException("Member package subscription not found: " + subscriptionId));
+        if(mp.isAdvanced())throw new BusinessException("USE_INCIDENT_RECOVERY: Advanced extensions require verified incident evidence and an agreed makeup session");
 
         LocalDate today = LocalDate.now(clock);
         LocalDate currentEnd = mp.getEndDate() != null ? mp.getEndDate() : today;
@@ -177,11 +183,20 @@ public class MemberPackageService {
     @Transactional
     public int expireOutdatedPackages() {
         LocalDate today = LocalDate.now(clock);
-        List<Integer> outdated = memberPackageRepository.findExpiredActivePackageIds(today);
+        List<Integer> outdated = memberPackageRepository.findDueForExpiry(java.time.LocalDateTime.now(clock), today);
         int expiredCount = 0;
         for (Integer candidate : outdated) {
+            Integer center=memberPackageRepository.findCenterIdById(candidate).orElse(null);
+            if(center==null)continue;
+            scheduleWriteLock.acquire(center);
             MemberPackage mp = memberPackageRepository.findByIdForUpdate(candidate).orElse(null);
-            if (mp == null || !"Active".equals(mp.getStatus()) || mp.getEndDate() == null || !mp.getEndDate().isBefore(today)) continue;
+            if (mp == null || !"Active".equals(mp.getStatus())) continue;
+            if(mp.isAdvanced()&&(mp.getActivatedAt()==null||mp.getExpiresAt()==null))continue;
+            boolean due = mp.getExpiresAt() != null ? !mp.getExpiresAt().isAfter(java.time.LocalDateTime.now(clock))
+                    : mp.getEndDate() != null && mp.getEndDate().isBefore(today);
+            if (!due) continue;
+            mp.setExpiryRevokedCredit(mp.getRemainingCredit() == null ? 0 : mp.getRemainingCredit());
+            mp.setExpiryProcessedAt(java.time.LocalDateTime.now(clock));
             mp.setStatus("Expired");
             mp.setRemainingCredit(0);
             memberPackageRepository.save(mp);

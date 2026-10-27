@@ -17,6 +17,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @WebMvcTest(value={SessionController.class, InvoiceController.class}, properties={"scms.frontend-origins=https://frontend.test", "debug=false", "logging.level.org.springframework=WARN"}) @Import(SecurityConfig.class)
 class AuthorizationHttpTest {
+    @org.springframework.boot.test.mock.mockito.MockBean com.sportscenter.session.SessionAbsenceService phaseAbsence;
     @Autowired MockMvc mvc;
     @MockBean SessionService sessions;
     @MockBean AttendanceService attendance;
@@ -25,8 +26,8 @@ class AuthorizationHttpTest {
     @MockBean PaymentProperties properties;
     static final String BOOK = "{\"subscriptionId\":1,\"coachId\":2,\"roomId\":1,\"sessionDate\":\"2026-12-01\",\"startTime\":\"06:00\",\"endTime\":\"07:30\",\"classId\":1}";
     @Test void anonymousScheduleRequestIs401() throws Exception { mvc.perform(get("/api/sessions")).andExpect(status().isUnauthorized()); }
-    @Test void coachCannotBookForMember() throws Exception { mvc.perform(post("/api/sessions/book-private").with(user("coach").roles("COACH")).contentType("application/json").content(BOOK)).andExpect(status().isForbidden()); }
-    @Test void receptionistWithOperationalPermissionCanBook() throws Exception { mvc.perform(post("/api/sessions/book-private").with(user("staff").authorities(new SimpleGrantedAuthority("REGISTER_MEMBER"))).contentType("application/json").content(BOOK)).andExpect(status().isCreated()); }
+    @Test void coachCanCreateForAssignedMember() throws Exception { mvc.perform(post("/api/sessions/book-private").with(user("coach").roles("COACH")).contentType("application/json").content(BOOK)).andExpect(status().isCreated()); }
+    @Test void receptionistCannotCreateAdvancedSchedule() throws Exception { mvc.perform(post("/api/sessions/book-private").with(user("staff").authorities(new SimpleGrantedAuthority("REGISTER_MEMBER"))).contentType("application/json").content(BOOK)).andExpect(status().isForbidden()); }
     @Test void centerManagerWithPermissionCanBook() throws Exception { mvc.perform(post("/api/sessions/book-private").with(user("manager").authorities(new SimpleGrantedAuthority("ROLE_CENTERMANAGER"),new SimpleGrantedAuthority("MANAGE_CLASSES"))).contentType("application/json").content(BOOK)).andExpect(status().isCreated()); }
     @Test void managerCannotConfirmCashWithoutReceptionistRole() throws Exception { mvc.perform(post("/api/invoices/1/confirm-cash").with(user("manager").authorities(new SimpleGrantedAuthority("ROLE_CENTERMANAGER"),new SimpleGrantedAuthority("MANAGE_INVOICES")))).andExpect(status().isForbidden()); }
     @Test void receptionistWithInvoicePermissionCanConfirmCash() throws Exception { mvc.perform(post("/api/invoices/1/confirm-cash").with(user("staff").authorities(new SimpleGrantedAuthority("ROLE_RECEPTIONIST"),new SimpleGrantedAuthority("MANAGE_INVOICES")))).andExpect(status().isOk()); }

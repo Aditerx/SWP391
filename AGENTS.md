@@ -2,13 +2,13 @@
 
 Tài liệu này là chốt chặn bắt buộc cho tất cả các AI Agents và Lập trình viên khi tham gia phát triển dự án SCMS (Sports Center Management System).
 
-> **Checkpoint bàn giao 27/10/2026:** dự án đang chốt plan, chưa triển khai các rule mới. Quyết định Owner mới nhất trong `docs/04-DEBUG-NOTE.md` mục 0 và các mục “đã chốt” có hiệu lực hơn mô tả business cũ bên dưới khi chuẩn bị sửa. Cụ thể: Coach chính tạo Advanced (D04); hủy Advanced >=12h (D05); 45 ngày sử dụng skip TT nghỉ/đóng và chống bù trùng (D12, thay 1080 giờ liên tục); attendance mới Present/Absent trong giờ buổi (D15); Normal chỉ được bù có hồ sơ khi buổi thực sự không tổ chức do TT (D14/D15), không mở hủy/báo vắng vì Member. Đây là rule mục tiêu, không phải code đã chạy. Owner làm rõ: đồng đội làm SMTP/OTP đăng ký, chatbox cơ bản và thông báo; gói D01/D09 vừa đề xuất chưa làm, giữ backlog/checklist tại mục 40.3/40.8–40.9. Lượt hiện tại chỉ xử lý merge, hai phase tiếp tục session sau (40.12); test cũ lệch rule phải giải trình trước sửa expected. Các kết quả test nêu trong tài liệu cũ là lịch sử, không phải chỉ tiêu số lượng cố định.
+> **Checkpoint hai phase 27/10/2026:** Owner đã yêu cầu triển khai P1.0–P1.4 và toàn bộ BE P2, giữ P1.5/gói T D01/D09/FE ở backlog; sau double-check/demo/tài liệu phải push branch và merge main. Đã có source, clean test và 9 kịch bản HTTP PostgreSQL local pass; đang chốt kiểm lại exact commit và bàn giao ở docs 02 mục 10/docs 04 mục 40.13. Không lấy test lịch sử làm chỉ tiêu count. Rule đang áp dụng: Primary Coach tạo Advanced; Manager/Admin hỗ trợ có lý do/consent; hủy >=12h; 45 ngày sử dụng hợp nhất nghỉ TT/sự cố; attendance mới Present/Absent trong [start,end); Normal chỉ được bù có hồ sơ khi buổi thực sự không tổ chức vì TT. Đồng đội SMTP/OTP/chat/notification đã merge không đồng nghĩa gói T hoặc FE đã hoàn tất. Production DB Owner chỉ định đã đọc thấy public trống; quyền ghi cloud phải được xác nhận theo docs 02 mục 9.8. Không copy .env hoặc chạy test chuẩn bị dữ liệu vào production.
 
 ---
 
 ## 1. THÔNG TIN CÔNG NGHỆ & MÔI TRƯỜNG VẬN HÀNH
 * **Hệ điều hành:** Windows (Dùng PowerShell, đường dẫn file dùng `/` hoặc `\\`).
-* **Backend:** Java 17, Spring Boot 3.3.3, Spring Data JPA, Hibernate, Spring Security 6.
+* **Backend:** Java 17, Spring Boot 3.3.5, Spring Data JPA, Hibernate, Spring Security 6.
 * **Build tool:** Maven (`.\mvnw.cmd`).
 * **Database:** PostgreSQL (Supabase) và tương thích MS SQL Server.
 * **Frontend:** React + Vite, TailwindCSS (thư mục `FE_Project-main/`).
@@ -39,13 +39,13 @@ Tài liệu này là chốt chặn bắt buộc cho tất cả các AI Agents v�
 * **Khóa Normal (Học nhóm cố định 12 buổi):**
   * Sĩ số tối đa: $\le$ 15 người.
   * Sinh lịch tĩnh 12 buổi vào DB theo ngày bắt đầu và các thứ trong tuần.
-  * **CẤM HỦY / BÁO VẮNG:** Nút hủy bị vô hiệu hóa; học viên vắng tự chịu mất buổi, không hoàn tiền, không hoàn credit, không xếp học bù.
+  * **CẤM HỦY / BÁO VẮNG:** Nút hủy bị vô hiệu hóa; học viên vắng tự chịu mất buổi, không hoàn tiền, không hoàn credit, không xếp học bù do Member. Ngoại lệ duy nhất: hồ sơ xác minh buổi không tổ chức vì TT, đánh dấu buổi gốc không hợp lệ và liên kết đúng một buổi bù để đủ 12 buổi hợp lệ.
 * **Khóa Advanced (Học 1:1 linh hoạt bằng 12 Credit):**
   * Sĩ số: 1 học viên - 1 HLV (`max_capacity = 1`), thời lượng 90 phút/buổi.
-  * Học viên nạp 12 Credit, tự book từng ca học theo giờ rảnh của HLV (đặt trước tối thiểu 12–24h). Thời hạn sử dụng: 45 ngày đếm ngược từ lúc thanh toán.
-  * Hủy lịch $\ge$ 24h: Hoàn lại 1 Credit.
-  * Hủy lịch < 24h hoặc Vắng mặt (No-show): HLV điểm danh "Vắng" $\rightarrow$ Tiêu thụ 1 Credit (bảo vệ thù lao HLV), không hoàn, không sinh lịch bù.
-  * Cronjob 00:00 hàng đêm: Quét các gói quá 45 ngày $\rightarrow$ chuyển `Expired`/`Completed` và hủy credit thừa.
+  * Member đăng ký môn/Primary Coach, được nhận trước Invoice; Paid mới cấp 12 Credit. Coach chính book, Manager/Admin hỗ trợ có lý do/consent, đặt trước >=12h. Thời hạn 45 ngày sử dụng từ Paid, skip hợp thời gian TT đóng/nghỉ; sessionEnd <= expiresAt chính xác.
+  * Hủy lịch $\ge$ 12h: Hoàn lại 1 Credit.
+  * Hủy lịch < 12h hoặc Vắng mặt (No-show): HLV điểm danh "Vắng" $\rightarrow$ Tiêu thụ 1 Credit (bảo vệ thù lao HLV), không hoàn, không sinh lịch bù.
+  * Cronjob 00:00 hàng đêm: Quét expiresAt đã đến $\rightarrow$ chụp credit bị thu hồi, chuyển Expired. Phục hồi chỉ theo incident/evidence và balance gốc; không cấp lại 12.
 
 ### 2.5. Ràng Buộc Khung Giờ Ca Học & Thời Tiết
 * Hệ thống vận hành theo **7 Ca học chuẩn (90 phút/ca)**:
@@ -85,7 +85,7 @@ Tài liệu này là chốt chặn bắt buộc cho tất cả các AI Agents v�
    ```powershell
    .\mvnw.cmd clean test
    ```
-   Đảm bảo 100% tests pass (hiện tại là 138 tests run, 123 passed, 15 skipped). Nếu sửa đổi business rule dẫn đến test cũ bị lệch kỳ vọng, phải giải trình rõ nguyên nhân trước khi cập nhật test.
+   Đảm bảo 100% tests pass (ghi count từ lần chạy hiện tại; số lịch sử không phải chỉ tiêu). Nếu sửa đổi business rule dẫn đến test cũ bị lệch kỳ vọng, phải giải trình rõ nguyên nhân trước khi cập nhật test.
 2. **Kỷ luật Database Migration:**
    * Không tự ý chạy lệnh phá hủy dữ liệu (`DROP TABLE`, `TRUNCATE`).
    * Sử dụng file migration SQL riêng biệt, có `IF NOT EXISTS` và kiểm tra tính tương thích ngược.
@@ -96,7 +96,7 @@ Tài liệu này là chốt chặn bắt buộc cho tất cả các AI Agents v�
    * Tiến độ tổng thể được quản lý tập trung tại `docs/00-MASTER-CHECKLIST.md`.
    * Mỗi khi hoàn thành xong một giai đoạn / danh sách công việc lớn (và khi được Người dùng yêu cầu), phải tóm tắt lại (hoặc giữ nguyên hiện trạng chi tiết) và chuyển vào phần `# LỊCH SỬ HOÀN THÀNH (HISTORY)` để giữ checklist active luôn tinh gọn.
 5. **Cấu trúc Thư mục Docs Tinh Gọn (Bộ 3 Tinh Gọn):**
-   * Duy trì đúng 3 file tài liệu chủ chốt trong `docs/`:
+   * Duy trì 3 file tài liệu chủ chốt và docs/04-DEBUG-NOTE.md theo yêu cầu Owner trong `docs/`:
      * `docs/00-MASTER-CHECKLIST.md`: Tiến độ và lịch sử bàn giao.
      * `docs/01-API-CONTRACT-FE-BE.md`: Hợp đồng kết nối API toàn hệ thống cho Frontend.
      * `docs/02-DEPLOYMENT-GUIDE.md`: Cấu hình deploy Render, Supabase, CORS & biến môi trường.
