@@ -8,6 +8,7 @@ import java.util.List;
 @RestController @RequestMapping("/api/payment-resolutions") @RequiredArgsConstructor
 public class PaymentResolutionController {
     private final PaymentResolutionService service;
+    @io.swagger.v3.oas.annotations.media.Schema(name="PaymentResolutionOpenRequest")
     public record Open(@jakarta.validation.constraints.NotNull Integer invoiceId,@jakarta.validation.constraints.NotBlank String type,@jakarta.validation.constraints.NotBlank String reason) { }
     public record Complete(@jakarta.validation.constraints.NotBlank String evidence,LocalDateTime performedAt,boolean moneyNotReceived) { }
     @GetMapping @PreAuthorize("hasAuthority('MANAGE_INVOICES') and hasAnyRole('RECEPTIONIST','CENTERMANAGER','ADMIN')") public List<PaymentResolutionService.Response> list(Authentication auth){return service.list(auth);}

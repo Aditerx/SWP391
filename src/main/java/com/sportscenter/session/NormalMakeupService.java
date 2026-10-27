@@ -31,6 +31,7 @@ public class NormalMakeupService {
     private final AuditService audit;
     private final Clock clock;
     private final ApplicationEventPublisher events;
+    @io.swagger.v3.oas.annotations.media.Schema(name="NormalMakeupRequest")
     public record Request(@jakarta.validation.constraints.NotNull LocalDate date,@jakarta.validation.constraints.NotNull LocalTime startTime,
             @jakarta.validation.constraints.NotNull LocalTime endTime,@jakarta.validation.constraints.NotNull Integer roomId,
             @jakarta.validation.constraints.NotNull Integer coachId,@jakarta.validation.constraints.NotBlank String reason) { }

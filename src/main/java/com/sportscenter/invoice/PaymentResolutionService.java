@@ -31,6 +31,7 @@ public class PaymentResolutionService {
     private final ApplicationEventPublisher events;
     private final Clock clock;
     private final com.sportscenter.enrollment.ClassEnrollmentRepository enrollments;
+    @io.swagger.v3.oas.annotations.media.Schema(name="PaymentResolutionResponse")
     public record Response(Integer id,Integer invoiceId,String type,String status,BigDecimal amount,String reason,String evidence,
             String outcomeNote,LocalDateTime createdAt,LocalDateTime approvedAt,LocalDateTime performedAt,LocalDateTime completedAt) {
         static Response from(PaymentResolution r){return new Response(r.getId(),r.getInvoice().getInvoiceId(),r.getType(),r.getStatus(),r.getAmount(),r.getReason(),r.getEvidence(),r.getOutcomeNote(),r.getCreatedAt(),r.getApprovedAt(),r.getPerformedAt(),r.getCompletedAt());}

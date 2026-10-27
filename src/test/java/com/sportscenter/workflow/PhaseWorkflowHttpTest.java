@@ -93,6 +93,7 @@ public class PhaseWorkflowHttpTest {
     String invoiceCode;
     final List<String> trace=new ArrayList<>();
     final List<Map<String,Object>> exchanges=new ArrayList<>();
+    final Map<String,Object> openApiProof=new LinkedHashMap<>();
     String currentScenario="fixture";
 
     @BeforeEach void scenario(TestInfo info) {
@@ -389,6 +390,48 @@ public class PhaseWorkflowHttpTest {
         var completed=call(manager,"GET","/api/reports/members",null,200);assertEquals(0,completed.get("activeMembers").asInt());assertEquals(1,completed.get("previouslyEntitledMembersWithoutRights").asInt());assertEquals(1,completed.get("neverEntitledMembers").asInt());
     }
 
+    @Test @Order(10) void publishedOpenApiKeepsDistinctWorkflowDtosAndActualSuccessStatuses() throws Exception {
+        var response=HttpClient.newHttpClient().send(HttpRequest.newBuilder(URI.create("http://127.0.0.1:"+port+"/v3/api-docs")).GET().build(),HttpResponse.BodyHandlers.ofString());
+        assertEquals(200,response.statusCode());JsonNode spec=json.readTree(response.body());
+        Map<String,List<String>> fields=Map.of(
+                "AdvancedRegistrationRequest",List.of("subjectId","primaryCoachId","requestKey"),
+                "NormalMakeupRequest",List.of("date","startTime","endTime","roomId","coachId","reason"),
+                "CenterIncidentOpenRequest",List.of("sessionId","startedAt","reason","evidence","requestKey"),
+                "PaymentResolutionOpenRequest",List.of("invoiceId","type","reason"));
+        for(var entry:fields.entrySet()) {
+            Set<String> actual=new HashSet<>();spec.path("components").path("schemas").path(entry.getKey()).path("properties").fieldNames().forEachRemaining(actual::add);
+            assertEquals(new HashSet<>(entry.getValue()),actual,entry.getKey());
+        }
+        assertSchemaRef(spec,"/api/advanced-registrations","post",true,"AdvancedRegistrationRequest");
+        assertSchemaRef(spec,"/api/center-incidents","post",true,"CenterIncidentOpenRequest");
+        assertSchemaRef(spec,"/api/payment-resolutions","post",true,"PaymentResolutionOpenRequest");
+        assertSchemaRef(spec,"/api/center-incidents/{id}/normal-makeup","post",true,"NormalMakeupRequest");
+        assertSchemaRef(spec,"/api/center-incidents","post",false,"CenterIncidentResponse");
+        assertSchemaRef(spec,"/api/payment-resolutions","post",false,"PaymentResolutionResponse");
+        var centerProperties=spec.path("components").path("schemas").path("CenterIncidentResponse").path("properties");
+        assertTrue(centerProperties.has("sessionId"));assertTrue(centerProperties.has("recoveredCredits"));assertFalse(centerProperties.has("invoiceId"));
+        var moneyProperties=spec.path("components").path("schemas").path("PaymentResolutionResponse").path("properties");
+        assertTrue(moneyProperties.has("invoiceId"));assertTrue(moneyProperties.has("amount"));assertFalse(moneyProperties.has("sessionId"));
+        List<String> created=List.of("/api/classes","/api/classes/normal-with-sessions","/api/classes/{classId}/enroll","/api/enrollments",
+                "/api/classes/{classId}/feedback","/api/holidays","/api/packages","/api/rooms","/api/sessions","/api/sessions/book-private",
+                "/api/sessions/generate","/api/subjects","/api/training-plans","/api/evaluations");
+        for(String path:created)assertTrue(spec.path("paths").path(path).path("post").path("responses").has("201"),path);
+        List<String> noContentPost=List.of("/api/auth/change-password","/api/auth/logout","/api/auth/reset-password","/api/auth/verify-registration","/api/chat/conversations/{id}/read");
+        for(String path:noContentPost)assertTrue(spec.path("paths").path(path).path("post").path("responses").has("204"),path);
+        List<String> noContentDelete=List.of("/api/evaluations/{id}","/api/sessions/{id}","/api/subjects/{id}","/api/training-plans/{id}","/api/users/me/avatar");
+        for(String path:noContentDelete)assertTrue(spec.path("paths").path(path).path("delete").path("responses").has("204"),path);
+        openApiProof.put("result","PASS");openApiProof.put("distinctRequestFields",fields);openApiProof.put("responseSchemas",List.of("CenterIncidentResponse","PaymentResolutionResponse"));
+        openApiProof.put("created201",created);openApiProof.put("post204",noContentPost);openApiProof.put("delete204",noContentDelete);
+        openApiProof.put("source","Real HTTP GET /v3/api-docs in the same local application as the workflows");
+        trace.add("GET /v3/api-docs => 200 [distinct workflow DTOs and 24 success status assertions passed; full spec omitted]");
+    }
+    void assertSchemaRef(JsonNode spec,String path,String method,boolean request,String name) {
+        JsonNode operation=spec.path("paths").path(path).path(method);
+        JsonNode content=request?operation.path("requestBody").path("content"):operation.path("responses").path("200").path("content");
+        assertTrue(content.elements().hasNext(),path);JsonNode schema=content.elements().next().path("schema");
+        assertEquals("#/components/schemas/"+name,schema.path("$ref").asText(),path);
+    }
+
     Map<String,String> previewHeader(JsonNode preview){return Map.of("X-Preview-Token",preview.get("previewToken").asText());}
     void toggleHoliday(int id,boolean active) throws Exception{var p=call(manager,"POST","/api/holidays/preview",Map.of("holidayId",id,"active",active),200);call(manager,"PATCH","/api/holidays/"+id+"/toggle",Map.of("active",active),200,previewHeader(p));}
     Map<String,Object> move(String key,String date,String start,String end,String cause,Integer incidentId){var p=new HashMap<String,Object>();p.put("newDate",date);p.put("newStartTime",start);p.put("newEndTime",end);p.put("reason","Agreed and verified schedule change");p.put("cause",cause);p.put("memberAgreed",true);p.put("requestKey",key);if(incidentId!=null)p.put("incidentId",incidentId);return p;}
@@ -403,5 +446,6 @@ public class PhaseWorkflowHttpTest {
         String dir=System.getProperty("scms.evidence-dir","");
         if(!dir.isBlank()) {Path p=Path.of(dir);Files.createDirectories(p);Files.write(p.resolve("http-workflow.txt"),trace,StandardCharsets.UTF_8);
             json.writerWithDefaultPrettyPrinter().writeValue(p.resolve("http-exchanges.json").toFile(),exchanges);}
+        if(!dir.isBlank())json.writerWithDefaultPrettyPrinter().writeValue(Path.of(dir).resolve("openapi-contract-check.json").toFile(),openApiProof);
     }
 }
