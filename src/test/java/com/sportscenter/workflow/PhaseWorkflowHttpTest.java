@@ -706,10 +706,10 @@ public class PhaseWorkflowHttpTest {
         call(other,"GET","/api/auth/me",null,200);call(other,"GET","/api/members/me",null,200);
         proof("PROFILE-FIRST-LOGIN","D01","Member B already authenticated; firstLogin flag set; changes password through existing allowed route","Profile 403 PASSWORD_CHANGE_REQUIRED before change; password route 204 then profile 200; global filter unchanged",profileSql(),otherId);
         tx.executeWithoutResult(t->users.findById(memberId).orElseThrow().setStatus("Inactive"));
-        try {call(member,"GET","/api/members/me",null,403);call(member,"PATCH","/api/members/me",Map.of("name","Must not persist"),403);}
+        try {call(member,"GET","/api/members/me",null,403);call(member,"PATCH","/api/members/me",Map.of("name","Must not persist"),403);
+            assertEquals("Profile updated",jdbc.queryForObject("SELECT full_name FROM users WHERE user_id=?",String.class,memberId));
+            proof("PROFILE-INACTIVE-SESSION","D01","Previously valid Member session after account is disabled in local fixture","Both GET/PATCH 403; account stays Inactive and profile unchanged; old session cannot bypass disable",profileSql(),memberId);}
         finally {tx.executeWithoutResult(t->users.findById(memberId).orElseThrow().setStatus("Active"));}
-        assertEquals("Profile updated",jdbc.queryForObject("SELECT full_name FROM users WHERE user_id=?",String.class,memberId));
-        proof("PROFILE-INACTIVE-SESSION","D01","Previously valid Member session after account is disabled in local fixture","Both GET/PATCH 403; account disable cannot be bypassed by old session; profile unchanged",profileSql(),memberId);
     }
     void profilePatchRace() throws Exception {
         boolean pg=!System.getProperty("scms.phases.pg-url","").isBlank();
@@ -754,8 +754,9 @@ public class PhaseWorkflowHttpTest {
         proof("DIRECTORY-NPLUS1","D09","Six additional same-center Coach profiles after first complete HTTP directory request; OSIV=false","No LazyInitializationException; prepared statement count stays constant as Coach count grows","SELECT count(*) AS coaches_in_center_1 FROM coaches c JOIN users u ON u.user_id=c.user_id WHERE u.center_id=1");
         acceptance.get(acceptance.size()-1).put("statementCounts",Map.of("before",queriesBefore,"after",queriesAfter));
         tx.executeWithoutResult(t->users.findById(ids[4]).orElseThrow().setStatus("Inactive"));
-        try {call(contact,"GET","/api/coaches",null,403);} finally {tx.executeWithoutResult(t->users.findById(ids[4]).orElseThrow().setStatus("Active"));}
-        proof("DIRECTORY-INACTIVE-SESSION","D09","Manager with MANAGE_USERS has an old session after local account is disabled","Directory 403, no contact disclosure through inactive session","SELECT user_id,status FROM users WHERE user_id=?",ids[4]);
+        try {call(contact,"GET","/api/coaches",null,403);
+            proof("DIRECTORY-INACTIVE-SESSION","D09","Manager with MANAGE_USERS has an old session after local account is disabled","Directory 403, account stays Inactive; no contact disclosure through inactive session","SELECT user_id,status FROM users WHERE user_id=?",ids[4]);}
+        finally {tx.executeWithoutResult(t->users.findById(ids[4]).orElseThrow().setStatus("Active"));}
     }
 
     @Test @Order(99) void publishedOpenApiKeepsDistinctWorkflowDtosAndActualSuccessStatuses() throws Exception {
