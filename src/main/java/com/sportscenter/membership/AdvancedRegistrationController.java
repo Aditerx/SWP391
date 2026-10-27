@@ -12,6 +12,7 @@ import java.util.*;
 @RestController @RequestMapping("/api") @RequiredArgsConstructor
 public class AdvancedRegistrationController {
     private final AdvancedRegistrationService service;
+    @io.swagger.v3.oas.annotations.media.Schema(name="AdvancedRegistrationRequest")
     public record Request(@NotNull Integer subjectId,@NotNull Integer primaryCoachId,@NotBlank String requestKey) { }
     public record Decision(boolean accepted, String reason) { }
     public record Order(@NotBlank @Pattern(regexp="Cash|VNPay") String paymentMethod) { }

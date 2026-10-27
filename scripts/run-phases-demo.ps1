@@ -10,8 +10,13 @@ $db = "scms_phases_demo_$stamp"
 Push-Location $repo
 try {
     $source = (git rev-parse HEAD).Trim()
+    # Windows PowerShell treats Git's ordinary progress on stderr as an error record.
+    # Check the native exit code; keep real worktree failures fatal.
+    $ErrorActionPreference = 'Continue'
     git worktree add --detach $checkout $source
-    if ($LASTEXITCODE) { throw 'Could not create isolated committed checkout' }
+    $worktreeExit = $LASTEXITCODE
+    $ErrorActionPreference = 'Stop'
+    if ($worktreeExit) { throw 'Could not create isolated committed checkout' }
     Push-Location $checkout
     try {
         if (Test-Path .env) { throw 'Demo checkout must not contain .env' }
@@ -30,7 +35,8 @@ try {
         if ($buildExit) { throw 'PostgreSQL HTTP demonstration failed' }
         Copy-Item target/surefire-reports/TEST-com.sportscenter.workflow.PhaseWorkflowHttpTest.xml -Destination (Join-Path $outputPath 'postgres-workflow.xml')
         $suites = Get-ChildItem (Join-Path $outputPath 'clean-xml/TEST-*.xml') | ForEach-Object { ([xml](Get-Content $_.FullName -Raw)).testsuite }
-        $summary = [ordered]@{ sourceCommit=$source; checkout=$checkout; localDatabase=$db; productionAccess=$false; cleanCommand='.\mvnw.cmd clean test'; tests=0; failures=0; errors=0; skipped=0; postgresHttpTests=9; postgresHttpFailures=0; postgresHttpErrors=0 }
+        $pgSuite = ([xml](Get-Content (Join-Path $outputPath 'postgres-workflow.xml') -Raw)).testsuite
+        $summary = [ordered]@{ sourceCommit=$source; checkout=$checkout; localDatabase=$db; productionAccess=$false; cleanCommand='.\mvnw.cmd clean test'; tests=0; failures=0; errors=0; skipped=0; postgresHttpTests=[int]$pgSuite.tests; postgresHttpFailures=[int]$pgSuite.failures; postgresHttpErrors=[int]$pgSuite.errors }
         foreach ($suite in $suites) { foreach ($key in @('tests','failures','errors','skipped')) { $summary[$key] += [int]$suite.$key } }
         $summary | ConvertTo-Json | Set-Content (Join-Path $outputPath 'verification.json') -Encoding UTF8
         Get-Content (Join-Path $outputPath 'verification.json')

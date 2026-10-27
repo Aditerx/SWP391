@@ -92,6 +92,13 @@ public class PhaseWorkflowHttpTest {
     HttpClient member,coach,manager,cashier,other;
     String invoiceCode;
     final List<String> trace=new ArrayList<>();
+    final List<Map<String,Object>> exchanges=new ArrayList<>();
+    final Map<String,Object> openApiProof=new LinkedHashMap<>();
+    String currentScenario="fixture";
+
+    @BeforeEach void scenario(TestInfo info) {
+        currentScenario=info.getTestMethod().map(java.lang.reflect.Method::getName).orElse("unknown");
+    }
 
     @BeforeAll void setup() throws Exception {
         tx.executeWithoutResult(t->{
@@ -128,8 +135,34 @@ public class PhaseWorkflowHttpTest {
         b.method(method,body==null?HttpRequest.BodyPublishers.noBody():HttpRequest.BodyPublishers.ofString(json.writeValueAsString(body)));
         var response=client.send(b.build(),HttpResponse.BodyHandlers.ofString());
         if(!path.equals("/api/auth/login"))trace.add((method+" "+path.replaceAll("vnp_SecureHash=[^&]*","vnp_SecureHash=[redacted]")+" => "+response.statusCode()+" "+(path.contains("checkin-code")?"[QR payload redacted]":response.body().replaceAll("vnp_SecureHash=[^\"&]*","vnp_SecureHash=[redacted]"))).stripTrailing());
+        if(!path.equals("/api/auth/login")) {
+            Map<String,Object> item=new LinkedHashMap<>();
+            item.put("scenario",currentScenario);item.put("actor",actor(client));
+            item.put("businessNow",LocalDateTime.now(clock).toString());
+            item.put("method",method);item.put("path",path.replaceAll("vnp_SecureHash=[^&]*","vnp_SecureHash=[redacted]"));
+            item.put("requestBody",safeRequest(body));item.put("expectedStatus",expected);item.put("actualStatus",response.statusCode());
+            item.put("previewHeaderPresent",headers.containsKey("X-Preview-Token"));
+            Object responseBody=response.body();
+            if(!response.body().isBlank()&&response.statusCode()!=302) {
+                JsonNode parsed=json.readTree(response.body());
+                if(path.contains("checkin-code")&&parsed.isObject())((com.fasterxml.jackson.databind.node.ObjectNode)parsed).put("payload","[redacted]");
+                responseBody=parsed;
+            }
+            item.put("responseBody",responseBody);exchanges.add(item);
+        }
         assertEquals(expected,response.statusCode(),method+" "+path+": "+response.body());
         return response.body().isBlank()||response.statusCode()==302?json.createObjectNode():json.readTree(response.body());
+    }
+    String actor(HttpClient client) {
+        if(client==member)return "MEMBER_A";if(client==other)return "MEMBER_B";
+        if(client==coach)return "PRIMARY_COACH";if(client==manager)return "CENTER_MANAGER";
+        if(client==cashier)return "RECEPTIONIST";return "FIXTURE_LOGIN";
+    }
+    JsonNode safeRequest(Object body) {
+        JsonNode result=json.valueToTree(body);
+        if(result.isObject())for(String key:List.of("code","password","otp","payload"))
+            if(result.has(key))((com.fasterxml.jackson.databind.node.ObjectNode)result).put(key,"[redacted]");
+        return result;
     }
     JsonNode requestOrder(String key,String method,HttpClient owner) throws Exception {
         var r=call(owner,"POST","/api/advanced-registrations",Map.of("subjectId",subjectId,"primaryCoachId",coachId,"requestKey",key),200);
@@ -153,6 +186,10 @@ public class PhaseWorkflowHttpTest {
         assertEquals(new BigDecimal("3000000.00"),jdbc.queryForObject("SELECT amount FROM invoices WHERE invoice_id=?",BigDecimal.class,invoiceId));
         assertEquals(12,jdbc.queryForObject("SELECT remaining_credit FROM member_packages WHERE subscription_id=?",Integer.class,subscriptionId));
         assertEquals(LocalDateTime.of(2026,12,12,8,0),jdbc.queryForObject("SELECT expires_at FROM member_packages WHERE subscription_id=?",LocalDateTime.class,subscriptionId));
+        var rights=call(member,"GET","/api/members/"+memberId+"/subscriptions",null,200).get(0);
+        assertEquals("Active",rights.get("status").asText());assertEquals(12,rights.get("remainingCredit").asInt());
+        assertEquals(3000000,rights.get("price").asInt());assertEquals("2026-12-12T08:00:00",rights.get("expiresAt").asText());
+        call(other,"GET","/api/members/"+memberId+"/subscriptions",null,403);
     }
     @Test @Order(2) void returnCannotPayAndSignedIpnReplaysOnlyOnce() throws Exception {
         var order=requestOrder("online-one","VNPay",member);int iid=order.get("invoiceId").asInt();int sid=order.get("subscriptionId").asInt();
@@ -172,6 +209,8 @@ public class PhaseWorkflowHttpTest {
         assertTrue(jdbc.queryForObject("SELECT reconciliation_required FROM invoices WHERE invoice_id=?",Boolean.class,iid));
         assertEquals(0,jdbc.queryForObject("SELECT remaining_credit FROM member_packages WHERE subscription_id=?",Integer.class,sid));
         assertEquals("Cancelled",jdbc.queryForObject("SELECT status FROM member_packages WHERE subscription_id=?",String.class,sid));
+        var lateReadback=call(member,"GET","/api/members/me/invoices/"+iid,null,200);
+        assertEquals("Paid",lateReadback.get("paymentStatus").asText());assertTrue(lateReadback.get("reconciliationRequired").asBoolean());
         // A verified, on-time receipt must survive a business failure without granting unusable rights.
         var unavailable=requestOrder("on-time-unavailable","VNPay",member);
         jdbc.update("UPDATE subjects SET status='Inactive' WHERE subject_id=?",subjectId);
@@ -191,6 +230,7 @@ public class PhaseWorkflowHttpTest {
         var created=call(coach,"POST","/api/sessions/book-private",payload,201);int id=created.get("id").asInt();
         assertEquals(id,call(coach,"POST","/api/sessions/book-private",payload,201).get("id").asInt());
         assertEquals(11,credit());
+        assertEquals(11,call(member,"GET","/api/members/"+memberId+"/subscriptions",null,200).get(0).get("remainingCredit").asInt());
         assertEquals(1,jdbc.queryForObject("SELECT count(*) FROM notifications WHERE dedupe_key=?",Integer.class,"PRIVATE_BOOKING_CONFIRMED:"+id));
         call(manager,"PATCH","/api/sessions/"+id+"/status",Map.of("status","Completed"),400);
         call(manager,"PATCH","/api/subscriptions/"+subscriptionId+"/status",Map.of("status","Expired"),400);
@@ -199,6 +239,7 @@ public class PhaseWorkflowHttpTest {
         call(member,"POST","/api/sessions/"+id+"/cancel-private",null,200);
         call(member,"POST","/api/sessions/"+id+"/cancel-private",null,400);
         assertEquals(12,credit());
+        assertEquals(12,call(member,"GET","/api/members/"+memberId+"/subscriptions",null,200).get(0).get("remainingCredit").asInt());
         var next=call(coach,"POST","/api/sessions/book-private",booking("notice-session",LocalDate.of(2026,10,28),"07:45","09:15"),201);
         scheduledId=next.get("id").asInt();
         clock.current=LocalDateTime.of(2026,10,28,0,0).atZone(clock.getZone()).toInstant();
@@ -349,6 +390,85 @@ public class PhaseWorkflowHttpTest {
         var completed=call(manager,"GET","/api/reports/members",null,200);assertEquals(0,completed.get("activeMembers").asInt());assertEquals(1,completed.get("previouslyEntitledMembersWithoutRights").asInt());assertEquals(1,completed.get("neverEntitledMembers").asInt());
     }
 
+    @Test @Order(10) void publishedOpenApiKeepsDistinctWorkflowDtosAndActualSuccessStatuses() throws Exception {
+        var response=HttpClient.newHttpClient().send(HttpRequest.newBuilder(URI.create("http://127.0.0.1:"+port+"/v3/api-docs")).GET().build(),HttpResponse.BodyHandlers.ofString());
+        assertEquals(200,response.statusCode());JsonNode spec=json.readTree(response.body());
+        Map<String,List<String>> fields=Map.of(
+                "AdvancedRegistrationRequest",List.of("subjectId","primaryCoachId","requestKey"),
+                "NormalMakeupRequest",List.of("date","startTime","endTime","roomId","coachId","reason"),
+                "CenterIncidentOpenRequest",List.of("sessionId","startedAt","reason","evidence","requestKey"),
+                "PaymentResolutionOpenRequest",List.of("invoiceId","type","reason"));
+        for(var entry:fields.entrySet()) {
+            Set<String> actual=new HashSet<>();spec.path("components").path("schemas").path(entry.getKey()).path("properties").fieldNames().forEachRemaining(actual::add);
+            assertEquals(new HashSet<>(entry.getValue()),actual,entry.getKey());
+        }
+        assertSchemaRef(spec,"/api/advanced-registrations","post",true,"AdvancedRegistrationRequest");
+        assertSchemaRef(spec,"/api/center-incidents","post",true,"CenterIncidentOpenRequest");
+        assertSchemaRef(spec,"/api/payment-resolutions","post",true,"PaymentResolutionOpenRequest");
+        assertSchemaRef(spec,"/api/center-incidents/{id}/normal-makeup","post",true,"NormalMakeupRequest");
+        assertSchemaRef(spec,"/api/center-incidents","post",false,"CenterIncidentResponse");
+        assertSchemaRef(spec,"/api/payment-resolutions","post",false,"PaymentResolutionResponse");
+        var centerProperties=spec.path("components").path("schemas").path("CenterIncidentResponse").path("properties");
+        assertTrue(centerProperties.has("sessionId"));assertTrue(centerProperties.has("recoveredCredits"));assertFalse(centerProperties.has("invoiceId"));
+        var moneyProperties=spec.path("components").path("schemas").path("PaymentResolutionResponse").path("properties");
+        assertTrue(moneyProperties.has("invoiceId"));assertTrue(moneyProperties.has("amount"));assertFalse(moneyProperties.has("sessionId"));
+        assertEquals("string",spec.path("components").path("schemas").path("LocalTime").path("type").asText());
+        List<String> created=List.of("/api/classes","/api/classes/normal-with-sessions","/api/classes/{classId}/enroll","/api/enrollments",
+                "/api/classes/{classId}/feedback","/api/holidays","/api/packages","/api/rooms","/api/sessions","/api/sessions/book-private",
+                "/api/sessions/generate","/api/subjects","/api/training-plans","/api/evaluations");
+        for(String path:created)assertTrue(spec.path("paths").path(path).path("post").path("responses").has("201"),path);
+        List<String> noContentPost=List.of("/api/auth/change-password","/api/auth/logout","/api/auth/reset-password","/api/auth/verify-registration","/api/chat/conversations/{id}/read");
+        for(String path:noContentPost)assertTrue(spec.path("paths").path(path).path("post").path("responses").has("204"),path);
+        List<String> noContentDelete=List.of("/api/evaluations/{id}","/api/sessions/{id}","/api/subjects/{id}","/api/training-plans/{id}","/api/users/me/avatar");
+        for(String path:noContentDelete)assertTrue(spec.path("paths").path(path).path("delete").path("responses").has("204"),path);
+        openApiProof.put("result","PASS");openApiProof.put("distinctRequestFields",fields);openApiProof.put("responseSchemas",List.of("CenterIncidentResponse","PaymentResolutionResponse"));
+        openApiProof.put("created201",created);openApiProof.put("post204",noContentPost);openApiProof.put("delete204",noContentDelete);
+        int checked=0;
+        for(var exchange:exchanges) {
+            int status=(int)exchange.get("actualStatus");if(status<200||status>=300)continue;
+            String path=exchange.get("path").toString().split("\\?")[0];String method=exchange.get("method").toString().toLowerCase(Locale.ROOT);
+            JsonNode operation=null;
+            for(var it=spec.path("paths").fields();it.hasNext();) {
+                var entry=it.next();
+                if(path.matches(entry.getKey().replaceAll("\\{[^}]+}","[^/]+"))&&entry.getValue().has(method)){operation=entry.getValue().get(method);break;}
+            }
+            assertNotNull(operation,path);JsonNode result=operation.path("responses").path(String.valueOf(status));assertFalse(result.isMissingNode(),path+" status "+status);
+            var input=operation.path("requestBody").path("content").elements();
+            if(input.hasNext())assertWireShape((JsonNode)exchange.get("requestBody"),input.next().path("schema"),spec,"request "+path);
+            var output=result.path("content").elements();
+            if(output.hasNext()&&exchange.get("responseBody") instanceof JsonNode value)assertWireShape(value,output.next().path("schema"),spec,"response "+path);
+            checked++;
+        }
+        openApiProof.put("positiveExchangesCheckedForStatusTypeAndProperties",checked);openApiProof.put("localTimeWireType","string");
+        openApiProof.put("source","Real HTTP GET /v3/api-docs in the same local application as the workflows");
+        trace.add("GET /v3/api-docs => 200 [distinct workflow DTOs and 24 success status assertions passed; full spec omitted]");
+    }
+    void assertSchemaRef(JsonNode spec,String path,String method,boolean request,String name) {
+        JsonNode operation=spec.path("paths").path(path).path(method);
+        JsonNode content=request?operation.path("requestBody").path("content"):operation.path("responses").path("200").path("content");
+        assertTrue(content.elements().hasNext(),path);JsonNode schema=content.elements().next().path("schema");
+        assertEquals("#/components/schemas/"+name,schema.path("$ref").asText(),path);
+    }
+    void assertWireShape(JsonNode value,JsonNode schema,JsonNode spec,String where) {
+        if(value==null||value.isNull())return; // Legacy nullable values are documented separately; no false non-null guarantee.
+        if(schema.has("$ref")){assertWireShape(value,spec.at(schema.get("$ref").asText().substring(1)),spec,where);return;}
+        switch(schema.path("type").asText()) {
+            case "object" -> {
+                assertTrue(value.isObject(),where+" expected object");var props=schema.path("properties");
+                value.fields().forEachRemaining(entry->{
+                    if(props.has(entry.getKey()))assertWireShape(entry.getValue(),props.get(entry.getKey()),spec,where+"."+entry.getKey());
+                    else assertTrue(schema.has("additionalProperties"),where+" undeclared property "+entry.getKey());
+                });
+            }
+            case "array" -> {assertTrue(value.isArray(),where+" expected array");for(var item:value)assertWireShape(item,schema.path("items"),spec,where+"[]");}
+            case "string" -> assertTrue(value.isTextual(),where+" expected string");
+            case "integer" -> assertTrue(value.isIntegralNumber(),where+" expected integer");
+            case "number" -> assertTrue(value.isNumber(),where+" expected number");
+            case "boolean" -> assertTrue(value.isBoolean(),where+" expected boolean");
+            default -> { }
+        }
+    }
+
     Map<String,String> previewHeader(JsonNode preview){return Map.of("X-Preview-Token",preview.get("previewToken").asText());}
     void toggleHoliday(int id,boolean active) throws Exception{var p=call(manager,"POST","/api/holidays/preview",Map.of("holidayId",id,"active",active),200);call(manager,"PATCH","/api/holidays/"+id+"/toggle",Map.of("active",active),200,previewHeader(p));}
     Map<String,Object> move(String key,String date,String start,String end,String cause,Integer incidentId){var p=new HashMap<String,Object>();p.put("newDate",date);p.put("newStartTime",start);p.put("newEndTime",end);p.put("reason","Agreed and verified schedule change");p.put("cause",cause);p.put("memberAgreed",true);p.put("requestKey",key);if(incidentId!=null)p.put("incidentId",incidentId);return p;}
@@ -361,6 +481,8 @@ public class PhaseWorkflowHttpTest {
     }
     @AfterAll void evidence() throws Exception {
         String dir=System.getProperty("scms.evidence-dir","");
-        if(!dir.isBlank()) {Path p=Path.of(dir);Files.createDirectories(p);Files.write(p.resolve("http-workflow.txt"),trace,StandardCharsets.UTF_8);}
+        if(!dir.isBlank()) {Path p=Path.of(dir);Files.createDirectories(p);Files.write(p.resolve("http-workflow.txt"),trace,StandardCharsets.UTF_8);
+            json.writerWithDefaultPrettyPrinter().writeValue(p.resolve("http-exchanges.json").toFile(),exchanges);}
+        if(!dir.isBlank())json.writerWithDefaultPrettyPrinter().writeValue(Path.of(dir).resolve("openapi-contract-check.json").toFile(),openApiProof);
     }
 }

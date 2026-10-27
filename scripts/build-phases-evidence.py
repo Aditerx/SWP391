@@ -41,6 +41,12 @@ tree = subprocess.check_output(['git','ls-tree','-r',source,'--','src','database
 (out/'source-tree.txt').write_text(tree,encoding='utf-8',newline='\n')
 verification['evidenceHashes'] = {name: hashlib.sha256((out/name).read_bytes()).hexdigest()
                                   for name in ('postgres-http.txt','test-summary.txt','source-tree.txt')}
+exchanges = run/'postgres-http/http-exchanges.json'
+if exchanges.exists():
+    safe_exchanges = re.sub(r'vnp_SecureHash=[^&"\\]*', 'vnp_SecureHash=[redacted]', exchanges.read_text(encoding='utf-8'))
+    json.loads(safe_exchanges)
+    (out/'http-exchanges.json').write_text(safe_exchanges+'\n',encoding='utf-8',newline='\n')
+    verification['evidenceHashes']['http-exchanges.json'] = hashlib.sha256((out/'http-exchanges.json').read_bytes()).hexdigest()
 (out/'verification.json').write_text(json.dumps(verification,ensure_ascii=False,indent=2)+'\n',encoding='utf-8',newline='\n')
 payload = json.dumps({'v': verification, 'trace': trace},ensure_ascii=False).replace('<','\\u003c')
 html = '''<!doctype html><html lang="vi"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">

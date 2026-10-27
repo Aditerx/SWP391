@@ -52,6 +52,7 @@ public class UserController {
         return avatarService.upload(authentication.getName(), file);
     }
 
+    @org.springframework.web.bind.annotation.ResponseStatus(org.springframework.http.HttpStatus.NO_CONTENT)
     @DeleteMapping("/me/avatar")
     public org.springframework.http.ResponseEntity<Void> deleteMyAvatar(
             org.springframework.security.core.Authentication authentication) {

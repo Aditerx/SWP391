@@ -60,6 +60,7 @@ public class SessionController {
         return ResponseEntity.ok(sessionService.findById(id, authentication));
     }
 
+    @org.springframework.web.bind.annotation.ResponseStatus(org.springframework.http.HttpStatus.CREATED)
     @PostMapping("/book-private")
     @PreAuthorize("hasRole('COACH') or (hasAnyRole('CENTERMANAGER','ADMIN') and hasAuthority('MANAGE_CLASSES'))")
     public ResponseEntity<SessionResponse> bookPrivate(
@@ -98,12 +99,14 @@ public class SessionController {
         return ResponseEntity.ok(sessionService.previewRecurringSessions(request));
     }
 
+    @org.springframework.web.bind.annotation.ResponseStatus(org.springframework.http.HttpStatus.CREATED)
     @PostMapping
     @PreAuthorize("hasAuthority('MANAGE_CLASSES')")
     public ResponseEntity<SessionResponse> create(@Valid @RequestBody SessionRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(sessionService.create(request));
     }
 
+    @org.springframework.web.bind.annotation.ResponseStatus(org.springframework.http.HttpStatus.CREATED)
     @PostMapping("/generate")
     @PreAuthorize("hasAuthority('MANAGE_CLASSES')")
     public ResponseEntity<List<SessionResponse>> generateRecurring(@Valid @RequestBody SessionGenerateRequest request) {
@@ -142,6 +145,7 @@ public class SessionController {
         return ResponseEntity.ok(sessionService.substituteCoach(sessionId, request, authentication));
     }
 
+    @org.springframework.web.bind.annotation.ResponseStatus(org.springframework.http.HttpStatus.NO_CONTENT)
     @DeleteMapping("/{id}")
     @PreAuthorize("hasAuthority('MANAGE_CLASSES')")
     public ResponseEntity<Void> delete(@PathVariable Integer id) {

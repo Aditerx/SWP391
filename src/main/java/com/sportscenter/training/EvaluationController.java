@@ -32,6 +32,7 @@ public class EvaluationController {
         return ResponseEntity.ok(evaluationService.findById(id, authentication));
     }
 
+    @org.springframework.web.bind.annotation.ResponseStatus(org.springframework.http.HttpStatus.CREATED)
     @PostMapping
     @PreAuthorize("hasAnyAuthority('RECORD_RESULT', 'MANAGE_CLASSES')")
     public ResponseEntity<EvaluationResponse> createEvaluation(@Valid @RequestBody EvaluationRequest request) {
@@ -47,6 +48,7 @@ public class EvaluationController {
         return ResponseEntity.ok(evaluationService.updateEvaluation(id, request));
     }
 
+    @org.springframework.web.bind.annotation.ResponseStatus(org.springframework.http.HttpStatus.NO_CONTENT)
     @DeleteMapping("/{id}")
     @PreAuthorize("hasAnyAuthority('RECORD_RESULT', 'MANAGE_CLASSES')")
     public ResponseEntity<Void> deleteEvaluation(@PathVariable Integer id) {

@@ -29,6 +29,7 @@ public class ChatController {
             @RequestParam(defaultValue="30") Integer limit,Authentication auth) { return service.listMessages(id,afterId,limit,auth); }
     @PostMapping("/conversations/{id}/messages")
     public ChatMessageResponse send(@PathVariable Integer id,@Valid @RequestBody ChatMessageRequest request,Authentication auth) { return service.sendMessage(id,request,auth); }
+    @org.springframework.web.bind.annotation.ResponseStatus(org.springframework.http.HttpStatus.NO_CONTENT)
     @PostMapping("/conversations/{id}/read")
     public ResponseEntity<Void> read(@PathVariable Integer id,Authentication auth) { service.markRead(id,auth); return ResponseEntity.noContent().build(); }
     @GetMapping("/conversations") @PreAuthorize("hasAuthority('HANDLE_CHAT')")

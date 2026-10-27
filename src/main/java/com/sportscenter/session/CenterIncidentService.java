@@ -30,6 +30,7 @@ public class CenterIncidentService {
     private final ApplicationEventPublisher events;
     private final com.sportscenter.invoice.InvoiceRepository invoices;
 
+    @io.swagger.v3.oas.annotations.media.Schema(name="CenterIncidentResponse")
     public record Response(Integer id,Integer sessionId,String status,LocalDateTime startedAt,LocalDateTime endedAt,
             LocalDateTime originalDeadline,LocalDateTime deadlineBefore,LocalDateTime deadlineAfter,int recoveredCredits,
             boolean sessionCompensated,Set<Integer> affectedMemberIds,String reason,String evidence) {

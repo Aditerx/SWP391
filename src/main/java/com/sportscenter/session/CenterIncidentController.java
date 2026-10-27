@@ -10,6 +10,7 @@ import java.util.List;
 public class CenterIncidentController {
     private final CenterIncidentService service;
     private final NormalMakeupService makeups;
+    @io.swagger.v3.oas.annotations.media.Schema(name="CenterIncidentOpenRequest")
     public record Open(@jakarta.validation.constraints.NotNull Integer sessionId,@jakarta.validation.constraints.NotNull LocalDateTime startedAt,
             @jakarta.validation.constraints.NotBlank String reason,@jakarta.validation.constraints.NotBlank String evidence,@jakarta.validation.constraints.NotBlank String requestKey) { }
     public record Resolve(@jakarta.validation.constraints.NotNull LocalDateTime endedAt) { }

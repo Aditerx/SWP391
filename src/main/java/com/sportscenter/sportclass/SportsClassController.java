@@ -17,6 +17,7 @@ public class SportsClassController {
     private final SportsClassService service;
     private final NormalClassCreationService normalClassCreationService;
 
+    @org.springframework.web.bind.annotation.ResponseStatus(org.springframework.http.HttpStatus.CREATED)
     @PostMapping("/normal-with-sessions")
     @PreAuthorize("hasAuthority('MANAGE_CLASSES')")
     public ResponseEntity<SportsClassResponse> createNormal(@Valid @RequestBody NormalClassCreationRequest request) {
@@ -33,6 +34,7 @@ public class SportsClassController {
         return ResponseEntity.ok(service.findById(id));
     }
 
+    @org.springframework.web.bind.annotation.ResponseStatus(org.springframework.http.HttpStatus.CREATED)
     @PostMapping
     @PreAuthorize("hasAuthority('MANAGE_CLASSES')")
     public ResponseEntity<SportsClassResponse> create(@Valid @RequestBody SportsClassRequest request) {
