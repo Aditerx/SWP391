@@ -1562,4 +1562,3 @@
 | acceptingNew | boolean | False |  |
 | weeklySlots | array<string> | False | {"uniqueItems": true} |
 | daysOff | array<string(date)> | False | {"uniqueItems": true} |
-

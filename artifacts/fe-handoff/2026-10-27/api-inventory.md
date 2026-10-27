@@ -2897,4 +2897,3 @@ Schema request/response đầy đủ: [schemas.md](schemas.md); mẫu HTTP thậ
 | Parameter | In | Required | Type | Default / enum |
 |---|---|---|---|---|
 | id | path | True | integer(int32) |  |
-

@@ -214,7 +214,7 @@ for n,op in enumerate(operations,1):
             schema=v.get('schema',{})
             lines.append('| '+ ' | '.join(map(escape,[v.get('name'),v.get('in'),v.get('required',False),typename(schema),schema.get('enum',schema.get('default',''))]))+' |')
         lines+=['']
-(OUT/'api-inventory.md').write_text('\n'.join(lines)+'\n',encoding='utf-8',newline='\n')
+(OUT/'api-inventory.md').write_text('\n'.join(lines).rstrip()+'\n',encoding='utf-8',newline='\n')
 lines=['# Schema request/response từ OpenAPI Live','',
        'Đây là schema công bố, không phải response đã gọi. Required/nullable lấy nguyên snapshot; nullable không khai báo không có nghĩa response thực không thể null. Đối chiếu thêm DTO/trace trong contract chính.','']
 for name,schema in sorted(schemas.items()):
@@ -224,7 +224,7 @@ for name,schema in sorted(schemas.items()):
         lines.append('| '+' | '.join(map(escape,[field,typename(value),field in schema.get('required',[]),json.dumps(rules,ensure_ascii=False) if rules else '']))+' |')
     if not schema.get('properties'):lines.append('| (schema) | '+escape(typename(schema))+' | | '+escape(json.dumps(schema,ensure_ascii=False))+' |')
     lines+=['']
-(OUT/'schemas.md').write_text('\n'.join(lines)+'\n',encoding='utf-8',newline='\n')
+(OUT/'schemas.md').write_text('\n'.join(lines).rstrip()+'\n',encoding='utf-8',newline='\n')
 summary={'checkedAtUtc':dt.datetime.now(dt.timezone.utc).isoformat(),'sourceCommit':subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip(),
     'renderIdentity':json.loads((OUT/'render-identity.json').read_text(encoding='utf-8')),
     'paths':len(spec['paths']),'operations':len(operations),'schemas':len(schemas),'sourceHandlersMatched':len(operations)-len(missing_source),
