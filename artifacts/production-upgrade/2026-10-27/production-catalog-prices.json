@@ -1,0 +1,67 @@
+{
+  "targetFingerprint": "188f67654d48aa11c970703f2cdaefc79290f1173a7dedaf93547e74bc6b1048",
+  "database": {
+    "readOnly": "on",
+    "subjects": [
+      {
+        "id": 19,
+        "slug": "quan-vot-tennis",
+        "normalPrice": 2500000.0,
+        "advancedPrice": 8000000.0
+      },
+      {
+        "id": 20,
+        "slug": "boi-loi",
+        "normalPrice": 1500000.0,
+        "advancedPrice": 4500000.0
+      },
+      {
+        "id": 21,
+        "slug": "pickleball",
+        "normalPrice": 1800000.0,
+        "advancedPrice": 5000000.0
+      },
+      {
+        "id": 22,
+        "slug": "ban-cung",
+        "normalPrice": 2000000.0,
+        "advancedPrice": 6000000.0
+      },
+      {
+        "id": 23,
+        "slug": "bong-ro",
+        "normalPrice": 1200000.0,
+        "advancedPrice": 3500000.0
+      },
+      {
+        "id": 24,
+        "slug": "bong-da",
+        "normalPrice": 1000000.0,
+        "advancedPrice": 3500000.0
+      },
+      {
+        "id": 25,
+        "slug": "bong-chuyen",
+        "normalPrice": 1000000.0,
+        "advancedPrice": 3500000.0
+      },
+      {
+        "id": 26,
+        "slug": "cau-long",
+        "normalPrice": 900000.0,
+        "advancedPrice": 3000000.0
+      },
+      {
+        "id": 27,
+        "slug": "bong-ban",
+        "normalPrice": 800000.0,
+        "advancedPrice": 2500000.0
+      }
+    ],
+    "users": 30,
+    "invoices": 6,
+    "subscriptions": 5,
+    "sessions": 2
+  },
+  "rolledBack": true
+}

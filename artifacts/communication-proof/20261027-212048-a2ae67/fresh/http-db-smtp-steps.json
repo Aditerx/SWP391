@@ -1,0 +1,600 @@
+[ {
+  "kind" : "real_http",
+  "method" : "POST",
+  "path" : "/api/auth/register",
+  "expectedStatus" : 200,
+  "actualStatus" : 200,
+  "code" : null
+}, {
+  "mailbox" : "loopback-only",
+  "kind" : "smtp_capture",
+  "otpLength" : 6,
+  "plaintextOtpRecorded" : false
+}, {
+  "kind" : "real_http",
+  "method" : "POST",
+  "path" : "/api/auth/verify-registration",
+  "expectedStatus" : 204,
+  "actualStatus" : 204
+}, {
+  "kind" : "real_http",
+  "method" : "POST",
+  "path" : "/api/auth/login",
+  "expectedStatus" : 200,
+  "actualStatus" : 200,
+  "userId" : 29
+}, {
+  "kind" : "real_http",
+  "method" : "GET",
+  "path" : "/api/auth/me",
+  "expectedStatus" : 200,
+  "actualStatus" : 200,
+  "userId" : 29
+}, {
+  "kind" : "real_http",
+  "method" : "POST",
+  "path" : "/api/chat/conversations",
+  "expectedStatus" : 200,
+  "actualStatus" : 200,
+  "id" : 1,
+  "unreadCount" : 0,
+  "status" : "OPEN"
+}, {
+  "kind" : "real_http",
+  "method" : "POST",
+  "path" : "/api/chat/conversations",
+  "expectedStatus" : 200,
+  "actualStatus" : 200,
+  "id" : 1,
+  "unreadCount" : 0,
+  "status" : "OPEN"
+}, {
+  "kind" : "real_http",
+  "method" : "POST",
+  "path" : "/api/chat/conversations/1/messages",
+  "expectedStatus" : 200,
+  "actualStatus" : 200,
+  "id" : 1,
+  "senderType" : "MEMBER"
+}, {
+  "kind" : "real_http",
+  "method" : "POST",
+  "path" : "/api/chat/conversations/1/messages",
+  "expectedStatus" : 200,
+  "actualStatus" : 200,
+  "id" : 1,
+  "senderType" : "MEMBER"
+}, {
+  "assertion" : "concurrent open/retry: exactly one conversation and one message",
+  "kind" : "database_assertion",
+  "observed" : true
+}, {
+  "kind" : "real_http",
+  "method" : "POST",
+  "path" : "/api/auth/register",
+  "expectedStatus" : 200,
+  "actualStatus" : 200,
+  "code" : null
+}, {
+  "mailbox" : "loopback-only",
+  "kind" : "smtp_capture",
+  "otpLength" : 6,
+  "plaintextOtpRecorded" : false
+}, {
+  "kind" : "real_http",
+  "method" : "POST",
+  "path" : "/api/auth/resend-otp",
+  "expectedStatus" : 400,
+  "actualStatus" : 400,
+  "code" : "OTP_RESEND_TOO_SOON"
+}, {
+  "kind" : "real_http",
+  "method" : "POST",
+  "path" : "/api/auth/verify-registration",
+  "expectedStatus" : 400,
+  "actualStatus" : 400,
+  "code" : "OTP_EXPIRED"
+}, {
+  "kind" : "real_http",
+  "method" : "POST",
+  "path" : "/api/auth/register",
+  "expectedStatus" : 200,
+  "actualStatus" : 200,
+  "code" : null
+}, {
+  "mailbox" : "loopback-only",
+  "kind" : "smtp_capture",
+  "otpLength" : 6,
+  "plaintextOtpRecorded" : false
+}, {
+  "kind" : "real_http",
+  "method" : "POST",
+  "path" : "/api/auth/verify-registration",
+  "expectedStatus" : 400,
+  "actualStatus" : 400,
+  "code" : "OTP_INVALID"
+}, {
+  "kind" : "real_http",
+  "method" : "POST",
+  "path" : "/api/auth/verify-registration",
+  "expectedStatus" : 400,
+  "actualStatus" : 400,
+  "code" : "OTP_INVALID"
+}, {
+  "kind" : "real_http",
+  "method" : "POST",
+  "path" : "/api/auth/verify-registration",
+  "expectedStatus" : 400,
+  "actualStatus" : 400,
+  "code" : "OTP_INVALID"
+}, {
+  "kind" : "real_http",
+  "method" : "POST",
+  "path" : "/api/auth/verify-registration",
+  "expectedStatus" : 400,
+  "actualStatus" : 400,
+  "code" : "OTP_INVALID"
+}, {
+  "kind" : "real_http",
+  "method" : "POST",
+  "path" : "/api/auth/verify-registration",
+  "expectedStatus" : 400,
+  "actualStatus" : 400,
+  "code" : "OTP_ATTEMPTS_EXCEEDED"
+}, {
+  "assertion" : "five wrong attempts persisted; account remains Pending",
+  "kind" : "database_assertion",
+  "observed" : true
+}, {
+  "kind" : "real_http",
+  "method" : "POST",
+  "path" : "/api/auth/register",
+  "expectedStatus" : 200,
+  "actualStatus" : 200,
+  "code" : null
+}, {
+  "mailbox" : "loopback-only",
+  "kind" : "smtp_capture",
+  "otpLength" : 6,
+  "plaintextOtpRecorded" : false
+}, {
+  "kind" : "real_http",
+  "method" : "POST",
+  "path" : "/api/auth/verify-registration",
+  "expectedStatus" : 204,
+  "actualStatus" : 204
+}, {
+  "kind" : "real_http",
+  "method" : "POST",
+  "path" : "/api/auth/login",
+  "expectedStatus" : 200,
+  "actualStatus" : 200,
+  "userId" : 32
+}, {
+  "kind" : "real_http",
+  "method" : "GET",
+  "path" : "/api/auth/me",
+  "expectedStatus" : 200,
+  "actualStatus" : 200,
+  "userId" : 32
+}, {
+  "kind" : "real_http",
+  "method" : "POST",
+  "path" : "/api/auth/register",
+  "expectedStatus" : 200,
+  "actualStatus" : 200,
+  "code" : null
+}, {
+  "mailbox" : "loopback-only",
+  "kind" : "smtp_capture",
+  "otpLength" : 6,
+  "plaintextOtpRecorded" : false
+}, {
+  "kind" : "real_http",
+  "method" : "POST",
+  "path" : "/api/auth/verify-registration",
+  "expectedStatus" : 204,
+  "actualStatus" : 204
+}, {
+  "kind" : "real_http",
+  "method" : "POST",
+  "path" : "/api/auth/login",
+  "expectedStatus" : 200,
+  "actualStatus" : 200,
+  "userId" : 33
+}, {
+  "kind" : "real_http",
+  "method" : "GET",
+  "path" : "/api/auth/me",
+  "expectedStatus" : 200,
+  "actualStatus" : 200,
+  "userId" : 33
+}, {
+  "kind" : "real_http",
+  "method" : "POST",
+  "path" : "/api/auth/login",
+  "expectedStatus" : 200,
+  "actualStatus" : 200,
+  "userId" : 34
+}, {
+  "kind" : "real_http",
+  "method" : "GET",
+  "path" : "/api/auth/me",
+  "expectedStatus" : 200,
+  "actualStatus" : 200,
+  "userId" : 34
+}, {
+  "kind" : "real_http",
+  "method" : "POST",
+  "path" : "/api/auth/login",
+  "expectedStatus" : 200,
+  "actualStatus" : 200,
+  "userId" : 35
+}, {
+  "kind" : "real_http",
+  "method" : "GET",
+  "path" : "/api/auth/me",
+  "expectedStatus" : 200,
+  "actualStatus" : 200,
+  "userId" : 35
+}, {
+  "kind" : "real_http",
+  "method" : "GET",
+  "path" : "/api/chat/conversations/me/active",
+  "expectedStatus" : 401,
+  "actualStatus" : 401,
+  "status" : 401
+}, {
+  "kind" : "real_http",
+  "method" : "GET",
+  "path" : "/api/chat/conversations",
+  "expectedStatus" : 403,
+  "actualStatus" : 403,
+  "status" : 403
+}, {
+  "kind" : "real_http",
+  "method" : "POST",
+  "path" : "/api/chat/conversations",
+  "expectedStatus" : 200,
+  "actualStatus" : 200,
+  "id" : 2,
+  "unreadCount" : 0,
+  "status" : "OPEN"
+}, {
+  "kind" : "real_http",
+  "method" : "POST",
+  "path" : "/api/chat/conversations",
+  "expectedStatus" : 200,
+  "actualStatus" : 200,
+  "id" : 2,
+  "unreadCount" : 0,
+  "status" : "OPEN"
+}, {
+  "kind" : "real_http",
+  "method" : "GET",
+  "path" : "/api/chat/conversations/2/messages",
+  "expectedStatus" : 404,
+  "actualStatus" : 404,
+  "code" : "CHAT_CONVERSATION_NOT_FOUND"
+}, {
+  "kind" : "real_http",
+  "method" : "POST",
+  "path" : "/api/chat/conversations/2/messages",
+  "expectedStatus" : 200,
+  "actualStatus" : 200,
+  "id" : 2,
+  "senderType" : "MEMBER"
+}, {
+  "kind" : "real_http",
+  "method" : "POST",
+  "path" : "/api/chat/conversations/2/messages",
+  "expectedStatus" : 200,
+  "actualStatus" : 200,
+  "id" : 2,
+  "senderType" : "MEMBER"
+}, {
+  "kind" : "real_http",
+  "method" : "POST",
+  "path" : "/api/chat/conversations/2/claim",
+  "expectedStatus" : 200,
+  "actualStatus" : 200,
+  "id" : 2,
+  "unreadCount" : 1,
+  "status" : "OPEN"
+}, {
+  "kind" : "real_http",
+  "method" : "POST",
+  "path" : "/api/chat/conversations/2/messages",
+  "expectedStatus" : 200,
+  "actualStatus" : 200,
+  "id" : 3,
+  "senderType" : "STAFF"
+}, {
+  "kind" : "real_http",
+  "method" : "GET",
+  "path" : "/api/chat/conversations/2/messages?afterId=0&limit=50",
+  "expectedStatus" : 200,
+  "actualStatus" : 200
+}, {
+  "kind" : "real_http",
+  "method" : "GET",
+  "path" : "/api/chat/me/unread-count",
+  "expectedStatus" : 200,
+  "actualStatus" : 200,
+  "unreadCount" : 1
+}, {
+  "kind" : "real_http",
+  "method" : "POST",
+  "path" : "/api/chat/conversations/2/read",
+  "expectedStatus" : 204,
+  "actualStatus" : 204
+}, {
+  "kind" : "real_http",
+  "method" : "GET",
+  "path" : "/api/chat/me/unread-count",
+  "expectedStatus" : 200,
+  "actualStatus" : 200,
+  "unreadCount" : 0
+}, {
+  "kind" : "real_http",
+  "method" : "PATCH",
+  "path" : "/api/chat/conversations/2/close",
+  "expectedStatus" : 200,
+  "actualStatus" : 200,
+  "id" : 2,
+  "unreadCount" : 1,
+  "status" : "CLOSED"
+}, {
+  "kind" : "real_http",
+  "method" : "POST",
+  "path" : "/api/chat/conversations/2/messages",
+  "expectedStatus" : 409,
+  "actualStatus" : 409,
+  "code" : "CHAT_CONVERSATION_CLOSED"
+}, {
+  "kind" : "real_http",
+  "method" : "PATCH",
+  "path" : "/api/chat/conversations/2/reopen",
+  "expectedStatus" : 200,
+  "actualStatus" : 200,
+  "id" : 2,
+  "unreadCount" : 1,
+  "status" : "OPEN"
+}, {
+  "assertion" : "chat messages persisted once; read cursor per viewer; close/reopen works",
+  "kind" : "database_assertion",
+  "observed" : true
+}, {
+  "kind" : "real_http",
+  "method" : "POST",
+  "path" : "/api/auth/register",
+  "expectedStatus" : 200,
+  "actualStatus" : 200,
+  "code" : null
+}, {
+  "mailbox" : "loopback-only",
+  "kind" : "smtp_capture",
+  "otpLength" : 6,
+  "plaintextOtpRecorded" : false
+}, {
+  "kind" : "real_http",
+  "method" : "POST",
+  "path" : "/api/auth/verify-registration",
+  "expectedStatus" : 204,
+  "actualStatus" : 204
+}, {
+  "kind" : "real_http",
+  "method" : "POST",
+  "path" : "/api/auth/login",
+  "expectedStatus" : 200,
+  "actualStatus" : 200,
+  "userId" : 36
+}, {
+  "kind" : "real_http",
+  "method" : "GET",
+  "path" : "/api/auth/me",
+  "expectedStatus" : 200,
+  "actualStatus" : 200,
+  "userId" : 36
+}, {
+  "assertion" : "real transaction: before commit absent; after commit once; rollback absent; DB dedupe holds",
+  "kind" : "database_assertion",
+  "observed" : true
+}, {
+  "kind" : "real_http",
+  "method" : "POST",
+  "path" : "/api/auth/register",
+  "expectedStatus" : 200,
+  "actualStatus" : 200,
+  "code" : null
+}, {
+  "mailbox" : "loopback-only",
+  "kind" : "smtp_capture",
+  "otpLength" : 6,
+  "plaintextOtpRecorded" : false
+}, {
+  "kind" : "real_http",
+  "method" : "POST",
+  "path" : "/api/auth/verify-registration",
+  "expectedStatus" : 204,
+  "actualStatus" : 204
+}, {
+  "kind" : "real_http",
+  "method" : "POST",
+  "path" : "/api/auth/login",
+  "expectedStatus" : 200,
+  "actualStatus" : 200,
+  "userId" : 37
+}, {
+  "kind" : "real_http",
+  "method" : "GET",
+  "path" : "/api/auth/me",
+  "expectedStatus" : 200,
+  "actualStatus" : 200,
+  "userId" : 37
+}, {
+  "kind" : "real_http",
+  "method" : "POST",
+  "path" : "/api/auth/register",
+  "expectedStatus" : 200,
+  "actualStatus" : 200,
+  "code" : null
+}, {
+  "mailbox" : "loopback-only",
+  "kind" : "smtp_capture",
+  "otpLength" : 6,
+  "plaintextOtpRecorded" : false
+}, {
+  "kind" : "real_http",
+  "method" : "POST",
+  "path" : "/api/auth/verify-registration",
+  "expectedStatus" : 204,
+  "actualStatus" : 204
+}, {
+  "kind" : "real_http",
+  "method" : "POST",
+  "path" : "/api/auth/login",
+  "expectedStatus" : 200,
+  "actualStatus" : 200,
+  "userId" : 38
+}, {
+  "kind" : "real_http",
+  "method" : "GET",
+  "path" : "/api/auth/me",
+  "expectedStatus" : 200,
+  "actualStatus" : 200,
+  "userId" : 38
+}, {
+  "kind" : "real_http",
+  "method" : "POST",
+  "path" : "/api/auth/login",
+  "expectedStatus" : 200,
+  "actualStatus" : 200,
+  "userId" : 39
+}, {
+  "kind" : "real_http",
+  "method" : "GET",
+  "path" : "/api/auth/me",
+  "expectedStatus" : 200,
+  "actualStatus" : 200,
+  "userId" : 39
+}, {
+  "kind" : "real_http",
+  "method" : "POST",
+  "path" : "/api/chat/conversations",
+  "expectedStatus" : 200,
+  "actualStatus" : 200,
+  "id" : 3,
+  "unreadCount" : 0,
+  "status" : "OPEN"
+}, {
+  "kind" : "real_http",
+  "method" : "POST",
+  "path" : "/api/chat/conversations/3/messages",
+  "expectedStatus" : 200,
+  "actualStatus" : 200,
+  "id" : 4,
+  "senderType" : "MEMBER"
+}, {
+  "kind" : "real_http",
+  "method" : "POST",
+  "path" : "/api/chat/conversations/3/messages",
+  "expectedStatus" : 200,
+  "actualStatus" : 200,
+  "id" : 5,
+  "senderType" : "STAFF"
+}, {
+  "kind" : "real_http",
+  "method" : "GET",
+  "path" : "/api/notifications/me",
+  "expectedStatus" : 200,
+  "actualStatus" : 200
+}, {
+  "kind" : "real_http",
+  "method" : "GET",
+  "path" : "/api/notifications/me/unread-count",
+  "expectedStatus" : 200,
+  "actualStatus" : 200,
+  "unreadCount" : 1
+}, {
+  "kind" : "real_http",
+  "method" : "PATCH",
+  "path" : "/api/notifications/7/read",
+  "expectedStatus" : 404,
+  "actualStatus" : 404,
+  "code" : "NOTIFICATION_NOT_FOUND"
+}, {
+  "kind" : "real_http",
+  "method" : "PATCH",
+  "path" : "/api/notifications/7/read",
+  "expectedStatus" : 204,
+  "actualStatus" : 204
+}, {
+  "kind" : "real_http",
+  "method" : "GET",
+  "path" : "/api/notifications/me/unread-count",
+  "expectedStatus" : 200,
+  "actualStatus" : 200,
+  "unreadCount" : 0
+}, {
+  "assertion" : "chat AFTER_COMMIT notification recipient and read timestamp persisted",
+  "kind" : "database_assertion",
+  "observed" : true
+}, {
+  "kind" : "real_http",
+  "method" : "POST",
+  "path" : "/api/auth/register",
+  "expectedStatus" : 200,
+  "actualStatus" : 200,
+  "code" : null
+}, {
+  "mailbox" : "loopback-only",
+  "kind" : "smtp_capture",
+  "otpLength" : 6,
+  "plaintextOtpRecorded" : false
+}, {
+  "kind" : "real_http",
+  "method" : "POST",
+  "path" : "/api/auth/login",
+  "expectedStatus" : 400,
+  "actualStatus" : 400,
+  "code" : "REGISTRATION_PENDING"
+}, {
+  "kind" : "real_http",
+  "method" : "POST",
+  "path" : "/api/auth/login",
+  "expectedStatus" : 401,
+  "actualStatus" : 401,
+  "status" : 401
+}, {
+  "kind" : "real_http",
+  "method" : "POST",
+  "path" : "/api/auth/verify-registration",
+  "expectedStatus" : 204,
+  "actualStatus" : 204
+}, {
+  "kind" : "real_http",
+  "method" : "POST",
+  "path" : "/api/auth/login",
+  "expectedStatus" : 200,
+  "actualStatus" : 200,
+  "userId" : 40
+}, {
+  "kind" : "real_http",
+  "method" : "GET",
+  "path" : "/api/auth/me",
+  "expectedStatus" : 200,
+  "actualStatus" : 200,
+  "userId" : 40
+}, {
+  "kind" : "real_http",
+  "method" : "POST",
+  "path" : "/api/auth/verify-registration",
+  "expectedStatus" : 400,
+  "actualStatus" : 400,
+  "code" : "OTP_INVALID"
+}, {
+  "assertion" : "registration stored hash, Pending -> Active, one consumed OTP",
+  "kind" : "database_assertion",
+  "observed" : true
+} ]

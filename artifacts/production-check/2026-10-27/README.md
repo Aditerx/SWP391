@@ -1,5 +1,8 @@
 # Kiểm production Render sau push — 27/10/2026
 
+> Cập nhật cuối: Owner xác nhận DB1a3dfdd7… bootstrap trước là **test**; production188… đã nâng cấp có phê duyệt riêng. Render Live3cfe229/DB UP/9môn đã kiểm sau317s; mail DOWN, Owner xác nhận Free chặn SMTP587. Xem [bàn giao hiện hành](../../production-upgrade/2026-10-27/README.md). Các đoạn điều tra bên dưới là lịch sử, không còn câu hỏi datasource/SHA đang chờ.
+
+
 Đã push main/test/communication-proof `765339c781ef36bb48bfe5ea63b4f38e5121d6d6` lúc16:16:30 UTC+7. Lượt kiểm đầu bắt đầu16:21:43,đã chờ313.66giây,đúng yêu cầu>=5phút.
 
 - [Lượt đầu](after-push.json):SwaggerHTML/assets/config200,ping200;aggregatehealth503DOWN;OpenAPI timeout/502;catalog18môn thay vì9.

@@ -8,18 +8,22 @@ Tài liệu này là chốt chặn quản lý tiến độ tổng thể và lị
 
 ### Phạm vi hiện hành 27/10/2026
 
-- [x] D01–D19 đã chốt tại docs 04; rule mới ghi đè mô tả cũ. Owner yêu cầu tiếp tục P1.0–P1.4 và BE P2, double-check/demo/tài liệu/push branch/merge main.
-- [x] Source hai phase đã triển khai, clean test và 9 HTTP workflow PostgreSQL local pass. Chi tiết nhóm hoàn tất chuyển HISTORY bên dưới; source chốt13a62ee clean292/273pass/19skip/0lỗi và PG HTTP9/9pass; evidence docs02 mục10.
-- [x] Chốt source13a62ee, push feat/advanced-phases199bbf9; merge main86d0076 bằng commit155968d (không conflict,tree bằng feature), kiểm lại clean292/273pass/19skip/0lỗi +PG HTTP9/9. Evidence/demo/tài liệu đã bàn giao. Main remote được đối chiếu khi push; không đồng nghĩa đã nghiệm thu Render.
-- [x] Đã đính chính DB theo username Owner: bootstrap28635081… là **test1a3dfdd7…**. Production188f6765… được duyệt riêng bundle01e31ca6…; backup mã hóa/restore/local proof rồi nâng cấp50bảng/9môn, giữ dữ liệu gốc7bảng. Chi tiết HISTORY/docs02 mục10.9.
-- [ ] **Để lại theo Owner:** P1.5/gói T D01 hồ sơ Member + D09 Coach directory/FE. Giữ scope/checklist 04 mục 40.3/40.8–40.9. SMTP/OTP/chat/notifications đã merge là việc khác.
-- [ ] Render sau nâng cấp đúng production188f6765…: Swagger/OpenAPI149paths, đúng9môn, target và Live08227b8 khớp;21/22checks pass, aggregatehealth503 còn cần chẩn đoán component. Owner dùng health path/api/health (pong). Sẽ push/merge health component status, đợi5phút và kiểm lại; không công bố production đạt trước cổng này.
-- [ ] Nghiệm thu FE hiện hành bằng browser/CORS/cookie, VNPay IPN qua gateway sandbox thật và deploy SHA/health. Local HTTP không thay cổng này.
-- [ ] SQL Server runtime và smoke vận hành tài khoản thật chưa chạy; migrations MSSQL được bàn giao với giới hạn rõ.
+- [x] D01–D19 đã chốt tại docs04; hoàn tất P1.0–P1.4 và toàn bộ BE P2 theo scope Owner. Demo/handoff và các kịch bản PostgreSQL tại docs02 mục10.
+- [x] Source9af6b2d, merge main3cfe229 đã push; clean304run/277pass/27skip/0lỗi, clone2/2, communication fresh6/6+upgrade6/6; CI branch/main test/package pass. Count từng source là bằng chứng lịch sử, không quota.
+- [x] Đính chính target: bootstrap28635081… là DB **test1a3dfdd7…**. Production188f6765… được duyệt riêng bundle01e31ca6…; backup mã hóa/restore/local proof rồi nâng cấp50bảng/9môn, giữ dữ liệu gốc7bảng. Docs02 mục10.9.
+- [x] Kiểm Render sau317s: Live3cfe229 và target188… khớp,9môn/18giá đúng, Swagger/OpenAPI149paths/API mới/anonymous guards đạt.21/22checks pass, xác định db UP/mail DOWN. Evidence docs02 mục10.10.
+- [ ] **Vận hành mail:** Owner xác nhận Render Free, SMTP587 bị nền tảng chặn. Cần chọn dịch vụ email HTTPS, API key/sender và triển khai adapter trước nghiệm thu OTP cloud. Chưa chọn provider hoặc gửi email thật; aggregatehealth503 vẫn được ghi đúng.
+- [ ] **Để lại theo Owner:** P1.5/gói T D01 hồ sơ Member + D09 Coach directory/FE. Giữ checklist04 mục40.3/40.8–40.9; không tự merge nhánh teammate ngoài scope.
+- [ ] FE hiện hành bằng browser/CORS/cookie, VNPay IPN gateway sandbox thật, SQL Server runtime và smoke tài khoản thật chưa nghiệm thu. Local HTTP và Swagger GET không thay các cổng này.
 
 ---
 
 ## 📜 PHẦN II: LỊCH SỬ HOÀN THÀNH (HISTORY)
+
+### [27/10/2026] Chốt nâng cấp production, CI và kiểm Live sau5phút
+
+Branch9af6b2d/CI40520150160 và merge main3cfe229/CI40520450534 đều pass test/package, đã push; backend tree merge bằng branch đã kiểm. Clean304run/277pass/27skip/0lỗi, clone Hibernate2/2 (int64 và health detail redaction), communication fresh6/6+upgrade6/6 từ committed checkout9af6b2d pass. Sửa Notification entity/projection/response sang Long, không thay bundle hay DDL production. Sau push21:22:12, kiểm21:27:29 UTC+7 (317s): Live đúng3cfe229/DB188…/9môn/OpenAPI149paths;21/22checks pass, chỉ mail DOWN, db/các thành phần còn lại UP.18giá JDBC read-only đúng. Owner xác nhận Free; giới hạn SMTP587 cần HTTPS email provider/adapter trước OTP cloud. Không nghiệm thu toàn bộ production hoặc tạo tài khoản/giao dịch cloud. Docs02 mục10.9–10.10 và artifacts/production-upgrade/2026-10-27. Các đoạn điều tra trước giữ làm lịch sử, nhãn DB test/production cũ đã đính chính.
+
 
 ### [27/10/2026] Đính chính target và nâng cấp production có dữ liệu
 
@@ -820,5 +824,3 @@ Cả hai hướng đều cần quyết định rõ Q-02/03/05/06/07. Chưa áp d
 - **Bổ sung:** `chat_conversations`, `chat_messages`, `chat_read_state`, chat API, two chat permissions, post-commit responder/notification listeners, escalation.
 - **Database:** Migration `06_migration_chat.sql` là additive/idempotent; chưa chạy trên PostgreSQL thật nếu môi trường không cung cấp DB.
 - **Kiểm thử:** `mvnw clean test` — 224 run, 209 passed, 15 skipped, 0 failures/errors.
-
-Chốt source sau sửa Long: **clean test304run/277pass/27skip/0failure-error**, XML đối chiếu log; clone opt-in **2/2pass**. Count303 trước đó là lịch sử trước khi thêm regression int64. Các test communication6case opt-in sẽ chạy fresh+upgrade từ committed checkout; không dùng skip làm bằng chứng đã kiểm. CI/Live sau push được ghi riêng.

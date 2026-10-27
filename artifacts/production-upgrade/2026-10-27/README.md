@@ -26,8 +26,15 @@ Lệnh không truy cập remote. Không rollback bằng DROP/TRUNCATE hay restor
 .\mvnw.cmd '-DargLine=-Duser.timezone=Asia/Ho_Chi_Minh' '-Dtest=UpgradedSchemaValidationTest' '-Dscms.upgrade.schema-proof=true' '-Dscms.upgrade.local-url=jdbc:postgresql://127.0.0.1:55440/scms_phases_upgrade_20261027_204720' test
 ```
 
-Clean test:303run/277pass/26skip/0lỗi. Schema validation/CI và Render sau merge sẽ ghi kết quả thực tiếp theo; chưa gọi production đạt khi aggregatehealth503.
+## Kết quả chốt
 
-Kiểm clone Hibernate đã **PASS2/2**: toàn bộ mapping validate; fixture relatedId=3.000.000.000 giữ nguyên qua entity và response, rollback local; health có components/status và không có details. Sửa Java Notification/entity/projection/response sang Long để khớp cột BIGINT production, không sửa bundle/DDL production. Các ID phát sinh hiện tại vẫn Integer và đọc được trên schema INT cũ; JSON field giữ kiểu number. Lỗi thử trước (Docker dừng, mismatch kiểu, mock mail interface) được ghi trong schema-validation-result.json; không đổi rule/expected nghiệp vụ để làm xanh. Đang chạy lại clean test sau sửa source này.
+- Source9af6b2d, merge main3cfe229 đã push. [CI branch/main](push-and-ci.json) test/package pass; backend tree merge bằng branch.
+- [Clean test](clean-test-result.json):304run/277pass/27skip/0lỗi. [Clone2/2](schema-validation-result.json): mọi Hibernate mapping hợp lệ, ID thông báo3tỷ không bị cắt32bit, rollback local; health chỉ có component/status, không details. Sửa Java Notification sang Long, giữ bundle đã duyệt nguyên byte.
+- [Communication fresh6/6+upgrade6/6](communication-result.json) từ committed checkout9af6b2d: HTTP/PostgreSQL/SMTP loopback, không email/cloud; container riêng đã dừng, giữ data.
+- [Render sau merge](render-after-main-merge.json): bắt đầu21:27:29 UTC+7,317s sau push21:22:12. Live đúng3cfe229/target188…/9môn/OpenAPI149paths,21/22checks pass. **db UP/mail DOWN**, các component còn lại UP. [18giá đúng](production-catalog-prices.json), [OpenAPI int64/redaction](render-extra-checks.json).
 
-Chốt source sau sửa Long: **clean test304run/277pass/27skip/0failure-error**, XML đối chiếu log; clone opt-in **2/2pass**. Count303 trước đó là lịch sử trước khi thêm regression int64. Các test communication6case opt-in sẽ chạy fresh+upgrade từ committed checkout; không dùng skip làm bằng chứng đã kiểm. CI/Live sau push được ghi riêng.
+Owner xác nhận **Render Free**. [Free chặn SMTP25/465/587](https://render.com/docs/free), nên SMTP587 hiện tại không gửi OTP được. Muốn giữ Free cần chọn dịch vụ email HTTPS, API key/sender và triển khai adapter OTP rồi kiểm delivery thật; code hiện vẫn JavaMailSender, chưa có adapter/provider/key được chọn. Đây là phần còn lại cần cấu hình/triển khai, không công bố production đã nghiệm thu toàn bộ. API health ping chỉ liveness, aggregate503/mailDOWN được ghi đúng.
+
+Checker bổ sung ban đầu nhầm public catalog có giá (DTO chỉ có id/slug/name/description) được gắn [INVALIDATED](render-extra-checks-invalidated.json); giá được kiểm lại bằng JDBC read-only. GET đầu timeout đã retry thành công. Các lần fail Docker/mapping/mock mail trước cũng được ghi rõ trong schema proof, không xóa để tạo kết quả xanh.
+
+Demo/hướng dẫn nghiệp vụ vẫn ở [phase2](../../demo/phase-2/2026-10-27/README.md) và docs02 mục10. P1.5/T/D01/D09/FE, gateway live và SQL Server runtime giữ backlog. Báo cáo đóng dùng commit `[skip render]`; Live đã kiểm vẫn3cfe229 dù main có commit tài liệu mới hơn.

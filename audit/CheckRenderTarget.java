@@ -28,7 +28,7 @@ public class CheckRenderTarget {
             c.setReadOnly(true);c.setAutoCommit(false);
             try(Statement s=c.createStatement()){
                 s.setQueryTimeout(15);
-                String query="SELECT json_build_object('readOnly',current_setting('transaction_read_only'),'subjects',(SELECT json_agg(json_build_object('id',subject_id,'slug',slug) ORDER BY subject_id) FROM subjects WHERE status='Active'),'users',(SELECT count(*) FROM users),'invoices',(SELECT count(*) FROM invoices),'subscriptions',(SELECT count(*) FROM member_packages),'sessions',(SELECT count(*) FROM sessions))::text";
+                String query="SELECT json_build_object('readOnly',current_setting('transaction_read_only'),'subjects',(SELECT json_agg(json_build_object('id',subject_id,'slug',slug,'normalPrice',normal_price,'advancedPrice',advanced_price) ORDER BY subject_id) FROM subjects WHERE status='Active'),'users',(SELECT count(*) FROM users),'invoices',(SELECT count(*) FROM invoices),'subscriptions',(SELECT count(*) FROM member_packages),'sessions',(SELECT count(*) FROM sessions))::text";
                 String data;
                 try(ResultSet r=s.executeQuery(query)){r.next();data=r.getString(1);}
                 c.rollback();

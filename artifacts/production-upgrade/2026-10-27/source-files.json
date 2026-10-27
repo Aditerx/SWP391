@@ -1,6 +1,6 @@
 {
   "sourceBase": "e73ca49beb629ecb8b874ce473dcc31b80e5faa1",
-  "sourceState": "working tree pending commit",
+  "sourceState": "Snapshot verified against committed branch and merge; backend files unchanged by closing evidence commit",
   "backendFiles": {
     "src/main/resources/application.properties": "a5e10b1b8ac7acb9b9b4a8e3b0df307e61e221fd075d892d2a1366fda6f1996f",
     "src/main/java/com/sportscenter/notification/Notification.java": "994be4d9b0a5700cd85f6b05137dce81ad5dadd2b71fe1ff3d719e0cd434fb66",
@@ -9,5 +9,7 @@
     "src/main/java/com/sportscenter/notification/NotificationService.java": "977bfc537bfaaaecfcba52f99fb84275504c8fc1e9ac59639d8f6118a24ed43c",
     "src/test/java/com/sportscenter/audit/UpgradedSchemaValidationTest.java": "1fe22159299de2fab576cb88695d8f72e5b8ffce1644ec638a7e4b5bcb83d483"
   },
-  "productionBundleSha256": "01e31ca6a8606b47d321fd61a6860076c68317d3490f3b529cf42414a80db8d7"
+  "productionBundleSha256": "01e31ca6a8606b47d321fd61a6860076c68317d3490f3b529cf42414a80db8d7",
+  "branchCommit": "9af6b2da0602d2015c1d600996507b6a58fd376f",
+  "mainMergeCommit": "3cfe22977ffc8395629d1680325b0fd40e973737"
 }
