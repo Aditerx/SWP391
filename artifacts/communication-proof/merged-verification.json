@@ -1,0 +1,17 @@
+{
+  "testedMergeCommit": "216474727063c839c2d18e8a4e7527707869679e",
+  "cleanCommand": ".\\mvnw.cmd clean test",
+  "mavenBuild": "SUCCESS",
+  "tests": 298,
+  "failures": 0,
+  "errors": 0,
+  "skipped": 25,
+  "passed": 273,
+  "skipReason": "19 baseline live/PG opt-in + 6 communication opt-in; latter executed separately on fresh and upgrade PostgreSQL",
+  "communicationProof": "20261027-160912-2bfcd8/verification.json",
+  "communicationTestsExecuted": 12,
+  "applicationSourceChanged": false,
+  "productionDbMutated": false,
+  "externalEmailSent": false,
+  "rawCleanLogSha256": "35171a73a6b80b03a94de9f4bcb0ca77b359588db56163a5a39b4127e50fd9df"
+}

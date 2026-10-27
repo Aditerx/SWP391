@@ -440,3 +440,13 @@ Feature source13a62ee được runner kiểm clean292/273pass/19skip/0failure-er
 Evidence hiện hành [verification.json](../artifacts/demo/phase-2/2026-10-27/evidence/verification.json), [test-summary](../artifacts/demo/phase-2/2026-10-27/evidence/test-summary.txt), [demo.html](../artifacts/demo/phase-2/2026-10-27/evidence/demo.html). Bộ đóng gói chỉ thay docs/evidence/script xuất newline LF để hash ổn định trên Windows;không đổi BE sau lượt kiểm merge. Đối chiếu remote cuối bằng `git ls-remote --heads origin main feat/advanced-phases`;SHA kiểm thử là merge155968d,bản docs cuối có thể là commit con và giữ nguyên source BE.
 
 .env không tracked,scan diff so với0277b2f không chứa giá trị secret production. Các communication tests/proof untracked ngoài scope được giữ nguyên,chưa stage. Demo viewer đã kiểm JS syntax,stats273pass/19skip,9case,bộ lọc và empty search;không gọi đó là FE browser/live E2E. Handoff15–20phút và lệnh tái lập tại artifact README.
+
+### 10.6. Đưa các file kiểm communication còn sót vào main và kiểm Render
+
+Owner yêu cầu commit/push/merge phần còn sót từd95d59b,sau5phút kiểm https://scms-app-p1gy.onrender.com/swagger-ui/index.html#/. Đã review/adopt hai test files,runner và evidence trước đó;không đổi src/main/schema hoặc mở P1.5/T/FE. Runner tạo committed checkout riêng không.env,PGloopback mới,SMTPcapture local,apply migrations07–12 sau06 trước kiểm communication migrations lặp.
+
+Source3857be5:6/6fresh+6/6upgrade HTTP/PG/SMTP thật pass,migration replay/snapshot giữ nguyên. Merge2164747 clean test298run/273pass/25skip/0failure-error,BUILD SUCCESS và XML khớp. 25skip gồm19live/PGnền+6communicationopt-in đã chạy riêng12lượt trên2DB. Artifact [README](../artifacts/communication-proof/README.md),[merge verification](../artifacts/communication-proof/merged-verification.json),[communication proof](../artifacts/communication-proof/20261027-160912-2bfcd8/verification.json).
+
+Lượt test075232 invalidated và160013 FAIL giữ lịch sử.Sửa fixture SMTP pin localhost (tránh hostname/DNS Windows) và thêm diagnostics,không tăng timeout10s/đổi expected/mocking transport. Không có email thực gửi ra ngoài hoặc cloudDBmutation.
+
+Sau push main,chờ>=300s rồi scripts/check-render-production.py kiểm GET Swagger/assets/config/OpenAPI/health/public9môn và anonymous guards. Script không đọc.env và tự từ chối chạy sớm. Kết quả production được bổ sung sau khi thực sự kiểm;commit chỉ đóng evidence dùng `[skip render]` theo [Render deploy docs](https://render.com/docs/deploys#skipping-an-auto-deploy) để tránh tạo vòng deploy mới khi chỉ thêm báo cáo.

@@ -20,6 +20,10 @@ Tài liệu này là chốt chặn quản lý tiến độ tổng thể và lị
 
 ## 📜 PHẦN II: LỊCH SỬ HOÀN THÀNH (HISTORY)
 
+### [27/10/2026] Commit/merge phần kiểm communication còn sót
+
+Owner yêu cầu đưa file ngoài commit phase trước vào branch/main và kiểm Render sau5phút. Đã bổ sung runner checkout/DB/SMTP cô lập,hai test files và evidence lịch sử/hiện hành;6/6fresh+6/6upgrade pass.Source3857be5,merge2164747 clean298/273pass/25skip/0lỗi;không thay code ứng dụng/schema.Kết quả production sau thời gian chờ sẽ ghi docs02 mục10.6 và artifact production-check.Không mở scope P1.5/T/FE.
+
 ### [27/10/2026] Hoàn tất hai phase BE theo scope Owner và kiểm bản merge
 
 | Gói | Hoàn tất trong source và local verification |
