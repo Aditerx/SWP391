@@ -1,10 +1,10 @@
 # 01-API-CONTRACT-FE-BE.md — Hợp Đồng Kết Nối API Giữa Frontend & Backend
 
 > **Mục tiêu:** Đây là tài liệu duy nhất và chính thức quy định toàn bộ Endpoints, Headers, Request Body, Response Schema, Bảng giá chuẩn 9 bộ môn, và Từ điển Mã lỗi (Error Codes Dictionary) để đội Frontend (`FE_Project-main/`) tích hợp thông suốt với Backend SCMS (Sports Center Management System).
-> **Nguyên tắc cốt lõi:** Bám sát tuyệt đối [AGENTS.md](file:///d:/Projects/SWP391/AGENTS.md) và tài liệu nghiệp vụ `Member.pdf`. Không tin tưởng dữ liệu Client, price freezing trên hóa đơn, pessimistic locking chống race condition, và toàn hệ thống đồng nhất múi giờ `Asia/Ho_Chi_Minh` (UTC+7).
+> **Nguyên tắc cốt lõi:** Bám sát tuyệt đối [AGENTS.md](../AGENTS.md) và tài liệu nghiệp vụ `Member.pdf`. Không tin tưởng dữ liệu Client, price freezing trên hóa đơn, pessimistic locking chống race condition, và toàn hệ thống đồng nhất múi giờ `Asia/Ho_Chi_Minh` (UTC+7).
 
 
-> **Bản BE hai phase 27/10/2026:** cần migrations 06/07/08–12 trước BE. Mục 6–10 và 14 mô tả source mới; bằng chứng/hướng dẫn ở docs 02 mục 10. P1.5/gói T D01/D09/FE được Owner để lại. Demo account mục 1.3 chỉ dành seed local lịch sử; production bootstrap không tạo các tài khoản này.
+> **Bản BE hai phase 27/10/2026:** cần migrations 06/07/08–12 trước BE. Mục 6–10 và 14 mô tả source mới; bằng chứng/hướng dẫn ở docs 02 mục 10. P1.5/gói T D01/D09/FE được Owner để lại. Demo account mục 1.3 chỉ dành seed local lịch sử. Bootstrap cũ là DB test1a3dfdd7…; production188… đã nâng cấp có dữ liệu sẵn, không tạo account demo. Xem mục18 và docs02 mục10.9–10.10.
 
 ---
 
@@ -13,13 +13,15 @@
 ### 1.1. Cấu Hình Môi Trường & Kết Nối
 * **Base URL:**
   * Local Development: `http://localhost:8080`
-  * Production (Render): `https://<ten-app>.onrender.com`
+  * Production (Render): `https://scms-app-p1gy.onrender.com`
 * **Múi giờ nghiệp vụ:** `Asia/Ho_Chi_Minh` (UTC+7) qua Spring bean `Clock`. Mọi định dạng ngày giờ gửi lên / nhận về đều theo chuẩn ISO 8601:
   * Ngày: `YYYY-MM-DD` (VD: `2026-10-20`)
   * Giờ: `HH:mm:ss` hoặc `HH:mm` (VD: `06:00:00` hoặc `07:30`)
 * **Headers bắt buộc:**
   * `Content-Type: application/json`
   * `Cookie: JSESSIONID=...` (Hệ thống dùng Session Cookie bảo mật; Axios/Fetch trên Frontend bắt buộc bật `withCredentials: true`).
+
+Business LocalDateTime như Invoice.expiresAt/activatedAt không có offset được diễn giải theo Asia/Ho_Chi_Minh; notification/chat có thể có +07:00, timestamp lỗi chung dùng Instant/Z. FE giữ đúng loại, không nối +07:00 vào chuỗi đã có offset. Countdown chỉ để hiển thị, server vẫn quyết định hết hạn. Cross-site cookie cần cấu hình SESSION_COOKIE_SAME_SITE=none/SESSION_COOKIE_SECURE=true và CORS origin FE chính xác trên HTTPS; mặc định source là lax/false, chưa chứng minh cấu hình browser production. Không bật bearer token thay cho session.
 
 ### 1.2. Nhóm API Xác Thực (Authentication Flow)
 * **Đăng nhập:** `POST /api/auth/login`
@@ -196,69 +198,29 @@ Paid là chốt cấp quyền. Pending 5 phút giữ cam kết năng lực, khô
 ## 4. NHÓM API DANH MỤC & TRA CỨU CHUNG (CATALOG & LOOKUP APIS)
 
 ### 4.1. Danh Sách Môn Thể Thao (Subjects)
-* **Endpoint:** `GET /api/subjects`
-* **Quyền:** Authenticated (SecurityConfig yêu cầu đăng nhập cho `/api/**`; anonymous nhận 401). Không yêu cầu riêng MANAGE_USERS để xem danh sách.
-* **Mô tả:** Trả về danh sách 9 bộ môn kèm giá chuẩn Normal, giá gói Advanced, slug và cờ `outdoor`.
-* **Response (200 OK):**
-```json
-[
-  {
-    "id": 1,
-    "name": "Bóng đá",
-    "slug": "bong-da",
-    "description": "Bóng đá sân cỏ nhân tạo tiêu chuẩn ngoài trời",
-    "normalPrice": 900000.00,
-    "advancedPrice": 8000000.00,
-    "outdoor": true,
-    "status": "Active"
-  },
-  {
-    "id": 8,
-    "name": "Cầu lông",
-    "slug": "cau-long",
-    "description": "Cầu lông sàn thảm tiêu chuẩn thi đấu trong nhà",
-    "normalPrice": 900000.00,
-    "advancedPrice": 7500000.00,
-    "outdoor": false,
-    "status": "Active"
-  }
-]
-```
-* **Chi tiết một môn:** `GET /api/subjects/{id}`
 
-### 4.2. Danh Sách Gói Hội Viên & Gói 1:1 (Membership Packages)
-* **Endpoint:** `GET /api/packages`
-* **Quyền:** Public / Authenticated
-* **Mô tả:** Trả về toàn bộ gói hội viên thường (`Normal`) và gói huấn luyện viên 1:1 (`Advanced`), kèm thời lượng ngày, giá và số lượng credit.
-* **Response (200 OK):**
+`GET /api/subjects` và `GET /api/subjects/{id}` bắt buộc session đăng nhập. DTO có id/name/description/slug/normalPrice/advancedPrice/outdoor/status. Trích2trong9môn theo ID canonical production và giá đã kiểm JDBC read-only ngày27/10 (không phải response GET authenticated mới trên Render):
+
 ```json
 [
-  {
-    "id": 1,
-    "name": "Gói Hội Viên Tháng Tiêu Chuẩn",
-    "durationDays": 30,
-    "price": 500000.00,
-    "benefits": "Sử dụng tự do các trang thiết bị phòng tập gym và hồ bơi",
-    "status": "ACTIVE",
-    "packageType": "Normal",
-    "totalCredit": 12
-  },
-  {
-    "id": 10,
-    "name": "Gói 1:1 Tennis Nâng Cao",
-    "durationDays": 45,
-    "price": 10000000.00,
-    "benefits": "12 buổi học kèm 1:1 cùng HLV Tennis chuyên nghiệp, thời hạn 45 ngày",
-    "status": "ACTIVE",
-    "packageType": "Advanced",
-    "totalCredit": 12
-  }
+  {"id":24,"name":"Bóng đá","slug":"bong-da","description":null,"normalPrice":1000000,"advancedPrice":3500000,"outdoor":true,"status":"Active"},
+  {"id":26,"name":"Cầu lông","slug":"cau-long","description":null,"normalPrice":900000,"advancedPrice":3000000,"outdoor":false,"status":"Active"}
 ]
 ```
+
+`description:null` chỉ minh họa field nullable, không chụp mô tả production. ID luôn lấy từ môi trường đang kết nối; fixture local có thể dùng ID khác. Nguồn giá Advanced là Subject, Invoice giữ snapshot lúc order.
+
+`GET /api/public/subjects` không cần đăng nhập nhưng **chỉ có id/slug/name/description**, không có normalPrice/advancedPrice/outdoor/status. Muốn hiển thị giá phải dùng API có xác thực, không lấy trường không tồn tại từ public DTO hoặc suy giá từ generic package.
+
+### 4.2. Danh Sách Gói Hội Viên (Membership Packages)
+
+`GET /api/packages` yêu cầu đăng nhập; trả MembershipPackageResponse theo schema công bố (id/name/durationDays/price/benefits/status/packageType/totalCredit...). Đây là danh mục gói chung/legacy, không thay giá Advanced theo Subject. Các package Advanced cũ còn trong DB không đồng nghĩa được mua qua luồng subscribe chung; BE trả USE_ADVANCED_REGISTRATION khi dùng sai luồng.
+
+Public lookup riêng: `GET /api/public/membership-packages?centerId=1`, DTO chỉ id/name/price/durationDays/benefits, lọc Active theo center. Không có packageType/totalCredit trong public DTO. Ví dụ số tiền/tài khoản seed lịch sử không phải dữ liệu production đã nghiệm thu.
 
 ### 4.3. Danh Sách Lớp Học (Classes)
 * **Endpoint:** `GET /api/classes`
-* **Quyền:** Public / Authenticated
+* **Quyền:** Authenticated qua session JSESSIONID (anonymous401)
 * **Mô tả:** Trả về danh sách lớp học có sẵn `subjectName`, `coachName`, `enrolledCount`, `maxCapacity`, `tuitionFee`, `classType`.
 * **Response (200 OK):**
 ```json
@@ -285,7 +247,7 @@ Paid là chốt cấp quyền. Pending 5 phút giữ cam kết năng lực, khô
 
 ### 4.4. Danh Sách Phòng & Sân Tập (Rooms / Courts)
 * **Endpoint:** `GET /api/rooms`
-* **Quyền:** Public / Authenticated
+* **Quyền:** Authenticated qua session JSESSIONID (anonymous401)
 * **Mô tả:** Trả về danh sách phòng/sân tập kèm phân loại `facilityType` (`Indoor` / `Outdoor`) và cờ `outdoor`.
 * **Response (200 OK):**
 ```json
@@ -313,7 +275,7 @@ Paid là chốt cấp quyền. Pending 5 phút giữ cam kết năng lực, khô
 
 ### 4.5. Danh Sách Huấn Luyện Viên (Coaches Directory)
 * **Endpoint:** `GET /api/coaches`
-* **Quyền:** Public / Authenticated
+* **Quyền:** Authenticated qua session JSESSIONID (anonymous401)
 * **Query Params:**
   * `specializationId` (Integer, optional): Lọc theo chuyên môn môn học.
   * `keyword` (String, optional): Tìm kiếm theo tên HLV hoặc tên bộ môn.
@@ -335,7 +297,7 @@ Paid là chốt cấp quyền. Pending 5 phút giữ cam kết năng lực, khô
 ```
 *(Lưu ý: Trường `phone` và `email` chỉ được trả về khi người đăng nhập có quyền `MANAGE_USERS` nhằm bảo mật thông tin cá nhân).*
 
-Theo source hiện tại: danh sách giới hạn theo center của tài khoản; Admin không gán center có phạm vi toàn hệ thống, tài khoản thường thiếu center bị từ chối. `keyword` được trim, tìm không phân biệt hoa thường theo tên Coach hoặc chuyên môn; `specializationId` là ID Specialization, không phải Subject. Coach không chuyên môn có `specializations: []`; bộ lọc không khớp trả `[]`. Route chưa tự lọc Coach/chuyên môn chỉ Active. Ví dụ trên minh họa DTO, không phải response probe mới. D09 đang chuẩn bị sửa lazy loading, chưa bảo đảm route live hết 500; xem 14.3.
+Theo source hiện tại: danh sách giới hạn theo center của tài khoản; Admin không gán center có phạm vi toàn hệ thống, tài khoản thường thiếu center bị từ chối. `keyword` được trim, tìm không phân biệt hoa thường theo tên Coach hoặc chuyên môn; `specializationId` là ID Specialization, không phải Subject. Coach không chuyên môn có `specializations: []`; bộ lọc không khớp trả `[]`. Route chưa tự lọc Coach/chuyên môn chỉ Active. Ví dụ trên minh họa DTO, không phải response probe mới. D09 vẫn backlog theo Owner; chưa có smoke authenticated chứng minh route Live hết lỗi lazy loading. Xem mục18 và docs04 mục40.8–40.9.
 
 ---
 
@@ -344,27 +306,27 @@ Theo source hiện tại: danh sách giới hạn theo center của tài khoản
 ### 5.1. Tạo Lớp học Normal (Center Manager)
 * **Endpoint:** `POST /api/classes`
 * **Quyền:** `hasAuthority('MANAGE_CLASSES')` (Center Manager / Admin)
-* **Đặc tả nghiệp vụ:** Backend tự động lấy `normal_price` từ `Subject` gán vào học phí `tuitionFee`. Sĩ số `maxCapacity` bắt buộc $\le 15$.
+* **Đặc tả nghiệp vụ:** Backend lấy Subject.normalPrice làm tuitionFee, sĩ số Normal≤15. POST Normal kiểu tách bước tạo lớp Closed để chuẩn bị lịch; generate đủ12 buổi rồi PUT Open. Luồng nguyên khối được khuyến nghị là POST /api/classes/normal-with-sessions (mục12.1).
 * **Request Body:**
 ```json
 {
   "name": "Cầu lông Cơ bản K01",
-  "subjectId": 8,
+  "subjectId": 26,
   "coachId": 3,
   "maxCapacity": 15,
   "startDate": "2026-11-02",
   "endDate": "2026-12-10",
-  "status": "Open",
+  "status": "Closed",
   "classType": "Normal",
   "totalSessions": 12
 }
 ```
-* **Response (201 Created):**
+* **Response trích field (201 Created), minh họa theo DTO, không phải log Render:**
 ```json
 {
   "id": 105,
   "name": "Cầu lông Cơ bản K01",
-  "subjectId": 8,
+  "subjectId": 26,
   "subjectName": "Cầu lông",
   "coachId": 3,
   "coachName": "Trần Thị Hương",
@@ -373,7 +335,7 @@ Theo source hiện tại: danh sách giới hạn theo center của tài khoản
   "totalSessions": 12,
   "maxCapacity": 15,
   "enrolledCount": 0,
-  "status": "Open"
+  "status": "Closed"
 }
 ```
 
@@ -487,7 +449,7 @@ Theo source hiện tại: danh sách giới hạn theo center của tài khoản
 
 ### 6.1. Đăng ký Advanced theo môn và Primary Coach — source mới 27/10
 
-Luồng mới thay việc mua mẫu gói Advanced chung. Cần migrations 08/09 sau 06/07; chưa deploy, P1.5/gói T/FE được Owner để lại. Các endpoint dưới thuộc BE local; kết quả kiểm cuối xem docs 02.
+Luồng mới thay việc mua mẫu gói Advanced chung. Migrations08–12 sau06/07 đã áp dụng vào production188… theo phê duyệt riêng; Live đã được nhận diện bằng /api/health. Nghiệp vụ đã kiểm HTTP/PostgreSQL local, còn Render mới có schema/GET anonymous smoke, chưa chạy đủ thao tác theo vai trò. P1.5/gói T/FE để lại theo Owner. Bằng chứng ở mục18/docs02 mục10.
 
 1. Manager có `ROLE_CENTERMANAGER` hoặc `ROLE_ADMIN` và `MANAGE_CLASSES` cấu hình `PUT /api/coaches/{id}/work-schedule`:
    ```json
@@ -611,12 +573,12 @@ Bảng đối chiếu mã lỗi để Frontend hiển thị thông báo (Toast /
 | `CANCEL_TOO_LATE` | 400 | Học viên bấm hủy buổi học 1:1 khi còn dưới 12 tiếng. | Toast cảnh báo đỏ: *"Không thể hủy lịch khi còn dưới 12 tiếng. Buổi học sẽ bị tiêu thụ nếu không tham gia."* |
 | `ADVANCED_PACKAGE_EXPIRED` | 400 | Gói 1:1 đã quá expiresAt sau 45 ngày sử dụng. | Toast cảnh báo: *"Gói học 1:1 của bạn đã hết hạn sử dụng (45 ngày). Vui lòng mua gói mới hoặc liên hệ trung tâm để gia hạn."* |
 | `OUT_OF_CREDIT` | 400 | Gói 1:1 đã hết số dư Credit (`remainingCredit < 1`). | Modal gợi ý nạp thêm: *"Số dư buổi học của bạn đã hết (0 Credit). Vui lòng đăng ký thêm gói mới để tiếp tục đặt lịch."* |
-| `ADVANCED_BOOKING_TOO_LATE` | 400 | Học viên đặt ca 1:1 khi ca học bắt đầu dưới 12 tiếng. | Toast lỗi: *"Bạn bắt buộc phải đặt lịch trước giờ học tối thiểu 12 tiếng để HLV sắp xếp giáo án."* |
+| `ADVANCED_BOOKING_TOO_LATE` | 400 | Actor có quyền tạo ca Advanced nhưng giờ bắt đầu còn dưới12tiếng. | Toast lỗi: *"Bạn bắt buộc phải đặt lịch trước giờ học tối thiểu 12 tiếng để HLV sắp xếp giáo án."* |
 | `OUTDOOR_HEAT_BLOCK` | 400 | Đặt môn ngoài trời (Tennis, Bơi, Bóng đá, Bắn cung) vào Ca 3 hoặc Ca 4. | Ẩn hoặc disable nút chọn Ca 3 và Ca 4, báo: *"Ca 3 (09:30 - 11:00) và Ca 4 (13:00 - 14:30) bị khóa đối với môn thể thao ngoài trời nhằm đảm bảo an toàn sức khỏe (chống sốc nhiệt)."* |
 | `ROOM_CONFLICT` | 409 | Phòng / Sân tập đã có lớp hoặc ca học khác chiếm chỗ. | Toast lỗi: *"Sân tập/Phòng học này đã có lịch đặt trong khung giờ đã chọn. Vui lòng chọn sân hoặc khung giờ khác."* |
 | `COACH_CONFLICT` | 409 | HLV đã có lịch dạy ca học khác trong khung giờ đó. | Toast lỗi: *"Huấn luyện viên đã có lịch dạy trong khung giờ này. Vui lòng kiểm tra lại bảng ca rảnh của HLV."* |
-| `CLASS_CAPACITY_EXCEEDED` | 400 | Sĩ số lớp nhóm đã đạt tối đa (`Registered` + `Pending` $\ge$ `maxCapacity`). | Gắn nhãn *"Hết chỗ (Full)"* trên card lớp, khóa nút Đăng ký: *"Lớp học đã đủ sĩ số tối đa (15 học viên)."* |
-| `PAYMENT_NOT_PAYABLE` (dùng fallback message; chưa có code riêng) | 409 | Hóa đơn không còn payable. | Hiển thị lỗi và tải lại hóa đơn. |
+| `CLASS_CAPACITY_EXCEEDED` | 400 | PUT Class giảm maxCapacity thấp hơn số chỗ Registered+Pending đang giữ. Enrollment lớp đầy có thể vào Waitlisted, không mặc định mã này. | Giữ capacity cũ, hiển thị số chỗ đang giữ; xử lý Waitlisted riêng từ response enrollment. |
+| Không có code riêng (không coi PAYMENT_NOT_PAYABLE là code BE phát ra) | 409 | Hóa đơn không còn payable. | Hiển thị lỗi và tải lại hóa đơn. |
 | `HOLIDAY_BLOCKED` | 400 | Đặt lịch vào ngày nghỉ lễ/Tết đang được trung tâm kích hoạt. | Tô đỏ ô lịch ngày lễ: *"Trung tâm tạm đóng cửa nghỉ lễ trong ngày này. Vui lòng chọn ngày học khác."* |
 | `SUBSTITUTE_COACH_CONFLICT` | 409 | HLV thay thế được chỉ định bị trùng lịch dạy khác. | Toast lỗi: *"HLV thay thế đã có lịch dạy khác trong khung giờ này. Vui lòng chọn HLV khác."* |
 | `ROOM_HAS_FUTURE_SESSIONS` | 400 | Đổi trạng thái phòng sang Bảo trì/Đóng cửa khi còn ca học tương lai. | Toast lỗi: *"Phòng/Sân tập vẫn còn các buổi học đã xếp lịch trong tương lai. Vui lòng dời lịch các buổi học trước khi đóng sân."* |
@@ -632,7 +594,7 @@ Bảng đối chiếu mã lỗi để Frontend hiển thị thông báo (Toast /
 {
   "requestId": "5c337454-c07a-45a9-8aa7-e0c26e3ff467",
   "sportsClass": {
-    "name": "Tennis Normal K01", "subjectId": 1, "coachId": 9,
+    "name": "Tennis Normal K01", "subjectId": 19, "coachId": 9,
     "maxCapacity": 15, "startDate": "2026-11-02", "classType": "Normal", "totalSessions": 12
   },
   "roomId": 1, "daysOfWeek": [1, 3, 5], "startTime": "06:00", "endTime": "07:30"
@@ -696,7 +658,7 @@ Member report giữ totalMembers/activeMembers/expiredMembers/packageDistributio
 
 ### 14.2. Giới hạn kiểm chứng
 
-Demo dùng đăng nhập HTTP thật vào BE local và DB assertions sau commit, có cả PostgreSQL. Callback VNPay được ký bằng khóa test cục bộ, không phải giao dịch gateway live. Không SMTP delivery/live gateway/SQL Server runtime hoặc trình duyệt FE từ kết quả này. Đọc hướng dẫn tái lập và sổ evidence trong docs 02 mục 10.
+Demo dùng đăng nhập HTTP thật vào BE local và DB assertions sau commit, có cả PostgreSQL. Callback VNPay được ký bằng khóa test cục bộ, không phải giao dịch gateway live. SMTP loopback đã được kiểm bằng12case communication; chưa xác minh delivery cloud/live gateway/SQL Server runtime hoặc trình duyệt FE từ kết quả này. Đọc hướng dẫn tái lập và sổ evidence trong docs 02 mục 10.
 
 ## 15. THÔNG BÁO TRONG ỨNG DỤNG
 
@@ -801,3 +763,24 @@ Chat notification types persisted in `notification_type`: `CHAT_MEMBER_MESSAGE` 
 `GET /actuator/health` là health tổng: trả200 nếu UP,503 khi DOWN; expose tên thành phần và status (ví dụ db/mail/diskSpace), giữ show-details=never nên không có exception/URL/credential. /api/health tiếp tục là liveness/identity và không thay cổng health tổng.
 
 Notification `relatedId` được đọc/trả dưới dạng JSON integer int64 (Java Long), tương thích cột legacy BIGINT và không cắt về32bit; ID nghiệp vụ hiện tại vẫn được tạo từ nguồn có kiểu Integer. Không đổi endpoint/payload field.
+
+## 18. Gói bàn giao FE, đối chiếu D01–D19 và ví dụ có bằng chứng
+
+Đọc [FE-HANDOFF.md](../artifacts/fe-handoff/2026-10-27/FE-HANDOFF.md) theo thứ tự. Bộ này chứa danh mục mọi thao tác Live, schema field, ma trận D01–D19, request/response local thật và giới hạn kiểm chứng. Không cần FE tự đọc gần2000dòng lịch sử trong docs04 để suy contract.
+
+| Nội dung FE cần | Nguồn hiện hành |
+|---|---|
+| Tất cả method/path, query/body, auth annotation, response status và nguồn controller | [api-inventory.md](../artifacts/fe-handoff/2026-10-27/api-inventory.md) / JSON cùng tên |
+| Toàn bộ request/response schemas từ Live | [schemas.md](../artifacts/fe-handoff/2026-10-27/schemas.md), [OpenAPI snapshot](../artifacts/fe-handoff/2026-10-27/render-openapi.json) |
+| D01–D19 → endpoints → policy → case/source → phần còn thiếu | [decision-matrix.md](../artifacts/fe-handoff/2026-10-27/decision-matrix.md) |
+| Ví dụ request, vai trò, giờ nghiệp vụ, status/body thật và cách FE hiểu | [examples.md](../artifacts/fe-handoff/2026-10-27/examples.md), [http-exchanges.json](../artifacts/fe-handoff/2026-10-27/http-exchanges.json) |
+| Demo xem trace và lệnh tái lập clean+PG | [demo](../artifacts/fe-handoff/2026-10-27/demo/demo.html), docs02 mục10.11 |
+| GET Render đã gọi và các nghiệp vụ chưa chạy trên production | [audit-summary.json](../artifacts/fe-handoff/2026-10-27/audit-summary.json), [render-get-checks.json](../artifacts/fe-handoff/2026-10-27/render-get-checks.json) |
+
+Hợp đồng FE phải phân biệt: Order.status là trạng thái tiền Pending/Paid; registration.status là Requested/Accepted/Invoiced/Rejected; subscription.status là Pending/Active/Cancelled/Expired/Completed; Session.status là Scheduled/Cancelled/Completed. Không gộp các status thành một state. Order.expiresAt là hạn trả tiền5phút; MemberPackageResponse.expiresAt là hạn quyền45ngày sử dụng; cùng tên field nhưng khác ý nghĩa.
+
+Sau đặt/hủy/dời/đối soát, FE tải lại nguồn trạng thái phù hợp (đơn đăng ký, own Invoice, subscriptions, sessions). SessionResponse không chứa remainingCredit; Invoice.Paid một mình không bảo đảm đã cấp quyền nếu reconciliationRequired=true. Package/Coach/timestamp có thể null với legacy; hiển thị cần đối soát thay vì tự gán môn/Coach/12credit. Empty list là trạng thái không có dữ liệu; array response khác Page.content của notification/chat pagination.
+
+Bản kê endpoint đầy đủ không đồng nghĩa đã chạy mọi thao tác với mọi vai trò. Render audit không có credential và không chạy mutation;74GET anonymous là kiểm public/login gate.9workflow local và các test khác ghi rõ môi trường/SHA; FE browser/CORS/cookie, gateway live và full role/ownership/center matrix trên Render vẫn cần nghiệm thu riêng. D01 và D09 vẫn backlog; SMTP Free vẫn chặn OTP cloud.
+
+Các tên schema riêng đã thay generic DTO nested bị trùng: AdvancedRegistrationRequest/NormalMakeupRequest/CenterIncidentOpenRequest/PaymentResolutionOpenRequest và CenterIncidentResponse/PaymentResolutionResponse. LocalTime trong schema là string, ví dụ07:45:00.24success201/204 đã được khai báo đúng theo controller. Kiểm Live sau deploy và before/after evidence tại docs02 mục10.11; không dùng snapshot schema cũ để sinh client mới. [Prefix lỗi có nguồn/status đã quan sát](../artifacts/fe-handoff/2026-10-27/error-prefixes.md) là bổ sung, không phải chứng nhận đã kích hoạt mọi nhánh lỗi. [Wire compatibility](../artifacts/fe-handoff/2026-10-27/wire-schema-checks.json) chỉ kiểm status/basic type/property của positive local exchanges, không thay kiểm nullable/format/range/required hoặc business trên production.

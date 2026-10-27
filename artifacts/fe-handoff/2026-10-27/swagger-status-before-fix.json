@@ -1,0 +1,248 @@
+{
+  "result": "CONFIRMED_DOCUMENTATION_DEFECT",
+  "liveCommit": "3cfe22977ffc8395629d1680325b0fd40e973737",
+  "count": 24,
+  "operations": [
+    {
+      "method": "POST",
+      "path": "/api/auth/change-password",
+      "controller": [
+        204
+      ],
+      "openApi": [
+        "200"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/auth/logout",
+      "controller": [
+        204
+      ],
+      "openApi": [
+        "200"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/auth/reset-password",
+      "controller": [
+        204
+      ],
+      "openApi": [
+        "200"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/auth/verify-registration",
+      "controller": [
+        204
+      ],
+      "openApi": [
+        "200"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/chat/conversations/{id}/read",
+      "controller": [
+        204
+      ],
+      "openApi": [
+        "200"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/classes",
+      "controller": [
+        201
+      ],
+      "openApi": [
+        "200"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/classes/normal-with-sessions",
+      "controller": [
+        201
+      ],
+      "openApi": [
+        "200"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/classes/{classId}/enroll",
+      "controller": [
+        201
+      ],
+      "openApi": [
+        "200"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/classes/{classId}/feedback",
+      "controller": [
+        201
+      ],
+      "openApi": [
+        "200"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/enrollments",
+      "controller": [
+        201
+      ],
+      "openApi": [
+        "200"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/evaluations",
+      "controller": [
+        201
+      ],
+      "openApi": [
+        "200"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/evaluations/{id}",
+      "controller": [
+        204
+      ],
+      "openApi": [
+        "200"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/holidays",
+      "controller": [
+        201
+      ],
+      "openApi": [
+        "200"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/packages",
+      "controller": [
+        201
+      ],
+      "openApi": [
+        "200"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/rooms",
+      "controller": [
+        201
+      ],
+      "openApi": [
+        "200"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/sessions",
+      "controller": [
+        201
+      ],
+      "openApi": [
+        "200"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/sessions/book-private",
+      "controller": [
+        201
+      ],
+      "openApi": [
+        "200"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/sessions/generate",
+      "controller": [
+        201
+      ],
+      "openApi": [
+        "200"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/sessions/{id}",
+      "controller": [
+        204
+      ],
+      "openApi": [
+        "200"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/subjects",
+      "controller": [
+        201
+      ],
+      "openApi": [
+        "200"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/subjects/{id}",
+      "controller": [
+        204
+      ],
+      "openApi": [
+        "200"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/training-plans",
+      "controller": [
+        201
+      ],
+      "openApi": [
+        "200"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/training-plans/{id}",
+      "controller": [
+        204
+      ],
+      "openApi": [
+        "200"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/users/me/avatar",
+      "controller": [
+        204
+      ],
+      "openApi": [
+        "200"
+      ]
+    }
+  ],
+  "fix": "Declare existing 201/204 using @ResponseStatus; controller business logic and explicit ResponseEntity status remain unchanged"
+}

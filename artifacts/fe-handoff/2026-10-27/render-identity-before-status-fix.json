@@ -1,0 +1,7 @@
+{
+  "status": "UP",
+  "message": "pong",
+  "databaseTargetFingerprint": "188f67654d48aa11c970703f2cdaefc79290f1173a7dedaf93547e74bc6b1048",
+  "buildCommit": "3cfe22977ffc8395629d1680325b0fd40e973737",
+  "diagnosticsVersion": "1"
+}

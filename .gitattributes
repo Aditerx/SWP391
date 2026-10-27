@@ -1,3 +1,4 @@
 # Keep reviewable release bundles and evidence byte-stable across Windows checkouts.
 artifacts/demo/** text eol=lf
 artifacts/production-upgrade/** text eol=lf
+artifacts/fe-handoff/** text eol=lf

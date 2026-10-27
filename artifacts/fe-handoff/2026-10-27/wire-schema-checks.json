@@ -1,0 +1,356 @@
+{
+  "result": "PASS",
+  "localExchangeCount": 149,
+  "positiveExchangesChecked": 114,
+  "requestResponseBodyChecks": 201,
+  "uniqueIssues": [],
+  "observedNullablePaths": [
+    {
+      "operation": "GET /api/invoices/{id}/receipt",
+      "fieldPath": "response.classId"
+    },
+    {
+      "operation": "GET /api/invoices/{id}/receipt",
+      "fieldPath": "response.className"
+    },
+    {
+      "operation": "GET /api/invoices/{id}/receipt",
+      "fieldPath": "response.durationDays"
+    },
+    {
+      "operation": "GET /api/invoices/{id}/receipt",
+      "fieldPath": "response.gatewayTransactionRef"
+    },
+    {
+      "operation": "GET /api/invoices/{id}/receipt",
+      "fieldPath": "response.memberPhone"
+    },
+    {
+      "operation": "GET /api/invoices/{id}/receipt",
+      "fieldPath": "response.packageId"
+    },
+    {
+      "operation": "GET /api/invoices/{id}/receipt",
+      "fieldPath": "response.packageName"
+    },
+    {
+      "operation": "GET /api/members/me/invoices/{id}",
+      "fieldPath": "response.cashNote"
+    },
+    {
+      "operation": "GET /api/members/me/invoices/{id}",
+      "fieldPath": "response.classId"
+    },
+    {
+      "operation": "GET /api/members/me/invoices/{id}",
+      "fieldPath": "response.className"
+    },
+    {
+      "operation": "GET /api/members/me/invoices/{id}",
+      "fieldPath": "response.durationDays"
+    },
+    {
+      "operation": "GET /api/members/me/invoices/{id}",
+      "fieldPath": "response.memberPhone"
+    },
+    {
+      "operation": "GET /api/members/me/invoices/{id}",
+      "fieldPath": "response.packageId"
+    },
+    {
+      "operation": "GET /api/members/me/invoices/{id}",
+      "fieldPath": "response.packageName"
+    },
+    {
+      "operation": "GET /api/members/me/invoices/{id}",
+      "fieldPath": "response.receptionistId"
+    },
+    {
+      "operation": "GET /api/members/me/invoices/{id}",
+      "fieldPath": "response.receptionistName"
+    },
+    {
+      "operation": "GET /api/members/me/invoices/{id}",
+      "fieldPath": "response.resolutionStatus"
+    },
+    {
+      "operation": "GET /api/members/{memberId}/subscriptions",
+      "fieldPath": "response[].activatedAt"
+    },
+    {
+      "operation": "GET /api/members/{memberId}/subscriptions",
+      "fieldPath": "response[].endDate"
+    },
+    {
+      "operation": "GET /api/members/{memberId}/subscriptions",
+      "fieldPath": "response[].expiresAt"
+    },
+    {
+      "operation": "GET /api/members/{memberId}/subscriptions",
+      "fieldPath": "response[].packageId"
+    },
+    {
+      "operation": "GET /api/members/{memberId}/subscriptions",
+      "fieldPath": "response[].startDate"
+    },
+    {
+      "operation": "GET /api/reports/revenue",
+      "fieldPath": "response.revenueByPackage[].packageId"
+    },
+    {
+      "operation": "POST /api/advanced-registrations",
+      "fieldPath": "response.acceptedAt"
+    },
+    {
+      "operation": "POST /api/advanced-registrations",
+      "fieldPath": "response.acceptedBy"
+    },
+    {
+      "operation": "POST /api/advanced-registrations",
+      "fieldPath": "response.activatedAt"
+    },
+    {
+      "operation": "POST /api/advanced-registrations",
+      "fieldPath": "response.expiresAt"
+    },
+    {
+      "operation": "POST /api/advanced-registrations",
+      "fieldPath": "response.reason"
+    },
+    {
+      "operation": "POST /api/advanced-registrations",
+      "fieldPath": "response.remainingCredit"
+    },
+    {
+      "operation": "POST /api/advanced-registrations",
+      "fieldPath": "response.subscriptionId"
+    },
+    {
+      "operation": "POST /api/advanced-registrations",
+      "fieldPath": "response.subscriptionStatus"
+    },
+    {
+      "operation": "POST /api/advanced-registrations/{id}/decision",
+      "fieldPath": "response.activatedAt"
+    },
+    {
+      "operation": "POST /api/advanced-registrations/{id}/decision",
+      "fieldPath": "response.expiresAt"
+    },
+    {
+      "operation": "POST /api/advanced-registrations/{id}/decision",
+      "fieldPath": "response.reason"
+    },
+    {
+      "operation": "POST /api/advanced-registrations/{id}/decision",
+      "fieldPath": "response.remainingCredit"
+    },
+    {
+      "operation": "POST /api/advanced-registrations/{id}/decision",
+      "fieldPath": "response.subscriptionId"
+    },
+    {
+      "operation": "POST /api/advanced-registrations/{id}/decision",
+      "fieldPath": "response.subscriptionStatus"
+    },
+    {
+      "operation": "POST /api/advanced-registrations/{id}/order",
+      "fieldPath": "response.paymentUrl"
+    },
+    {
+      "operation": "POST /api/attendances/correct",
+      "fieldPath": "response.checkOutTime"
+    },
+    {
+      "operation": "POST /api/attendances/scan",
+      "fieldPath": "response.checkOutTime"
+    },
+    {
+      "operation": "POST /api/center-incidents",
+      "fieldPath": "response.deadlineAfter"
+    },
+    {
+      "operation": "POST /api/center-incidents",
+      "fieldPath": "response.deadlineBefore"
+    },
+    {
+      "operation": "POST /api/center-incidents",
+      "fieldPath": "response.endedAt"
+    },
+    {
+      "operation": "POST /api/center-incidents",
+      "fieldPath": "response.originalDeadline"
+    },
+    {
+      "operation": "POST /api/center-incidents/{id}/compensate",
+      "fieldPath": "response.deadlineAfter"
+    },
+    {
+      "operation": "POST /api/center-incidents/{id}/compensate",
+      "fieldPath": "response.deadlineBefore"
+    },
+    {
+      "operation": "POST /api/center-incidents/{id}/compensate",
+      "fieldPath": "response.originalDeadline"
+    },
+    {
+      "operation": "POST /api/center-incidents/{id}/normal-makeup",
+      "fieldPath": "response.agreementConfirmedAt"
+    },
+    {
+      "operation": "POST /api/center-incidents/{id}/normal-makeup",
+      "fieldPath": "response.bookedMemberId"
+    },
+    {
+      "operation": "POST /api/center-incidents/{id}/normal-makeup",
+      "fieldPath": "response.bookedMemberName"
+    },
+    {
+      "operation": "POST /api/center-incidents/{id}/normal-makeup",
+      "fieldPath": "response.roomLocation"
+    },
+    {
+      "operation": "POST /api/center-incidents/{id}/resolve",
+      "fieldPath": "response.deadlineAfter"
+    },
+    {
+      "operation": "POST /api/center-incidents/{id}/resolve",
+      "fieldPath": "response.deadlineBefore"
+    },
+    {
+      "operation": "POST /api/center-incidents/{id}/resolve",
+      "fieldPath": "response.originalDeadline"
+    },
+    {
+      "operation": "POST /api/classes/{classId}/enroll",
+      "fieldPath": "response.memberPhone"
+    },
+    {
+      "operation": "POST /api/classes/{classId}/enroll",
+      "fieldPath": "response.paymentUrl"
+    },
+    {
+      "operation": "POST /api/classes/{classId}/enroll",
+      "fieldPath": "response.waitlistPosition"
+    },
+    {
+      "operation": "POST /api/invoices/{id}/confirm-cash",
+      "fieldPath": "request"
+    },
+    {
+      "operation": "POST /api/invoices/{id}/confirm-cash",
+      "fieldPath": "response.cashNote"
+    },
+    {
+      "operation": "POST /api/invoices/{id}/confirm-cash",
+      "fieldPath": "response.classId"
+    },
+    {
+      "operation": "POST /api/invoices/{id}/confirm-cash",
+      "fieldPath": "response.className"
+    },
+    {
+      "operation": "POST /api/invoices/{id}/confirm-cash",
+      "fieldPath": "response.durationDays"
+    },
+    {
+      "operation": "POST /api/invoices/{id}/confirm-cash",
+      "fieldPath": "response.gatewayTransactionRef"
+    },
+    {
+      "operation": "POST /api/invoices/{id}/confirm-cash",
+      "fieldPath": "response.memberPhone"
+    },
+    {
+      "operation": "POST /api/invoices/{id}/confirm-cash",
+      "fieldPath": "response.packageId"
+    },
+    {
+      "operation": "POST /api/invoices/{id}/confirm-cash",
+      "fieldPath": "response.packageName"
+    },
+    {
+      "operation": "POST /api/invoices/{id}/confirm-cash",
+      "fieldPath": "response.resolutionStatus"
+    },
+    {
+      "operation": "POST /api/payment-resolutions",
+      "fieldPath": "response.approvedAt"
+    },
+    {
+      "operation": "POST /api/payment-resolutions",
+      "fieldPath": "response.completedAt"
+    },
+    {
+      "operation": "POST /api/payment-resolutions",
+      "fieldPath": "response.evidence"
+    },
+    {
+      "operation": "POST /api/payment-resolutions",
+      "fieldPath": "response.outcomeNote"
+    },
+    {
+      "operation": "POST /api/payment-resolutions",
+      "fieldPath": "response.performedAt"
+    },
+    {
+      "operation": "POST /api/payment-resolutions/{id}/approve",
+      "fieldPath": "response.approvedAt"
+    },
+    {
+      "operation": "POST /api/payment-resolutions/{id}/approve",
+      "fieldPath": "response.completedAt"
+    },
+    {
+      "operation": "POST /api/payment-resolutions/{id}/approve",
+      "fieldPath": "response.evidence"
+    },
+    {
+      "operation": "POST /api/payment-resolutions/{id}/approve",
+      "fieldPath": "response.outcomeNote"
+    },
+    {
+      "operation": "POST /api/payment-resolutions/{id}/approve",
+      "fieldPath": "response.performedAt"
+    },
+    {
+      "operation": "POST /api/payment-resolutions/{id}/complete",
+      "fieldPath": "response.performedAt"
+    },
+    {
+      "operation": "POST /api/sessions/book-private",
+      "fieldPath": "response.makeupForSessionId"
+    },
+    {
+      "operation": "POST /api/sessions/book-private",
+      "fieldPath": "response.roomLocation"
+    },
+    {
+      "operation": "POST /api/sessions/{sessionId}/absence",
+      "fieldPath": "response.supersededAt"
+    },
+    {
+      "operation": "POST /api/sessions/{sessionId}/cancel-private",
+      "fieldPath": "response.makeupForSessionId"
+    },
+    {
+      "operation": "POST /api/sessions/{sessionId}/cancel-private",
+      "fieldPath": "response.roomLocation"
+    },
+    {
+      "operation": "POST /api/sessions/{sessionId}/reschedule",
+      "fieldPath": "response.makeupForSessionId"
+    },
+    {
+      "operation": "POST /api/sessions/{sessionId}/reschedule",
+      "fieldPath": "response.roomLocation"
+    }
+  ],
+  "method": "Local successful HTTP exchanges checked against published Render status, basic JSON types and declared property names",
+  "limits": [
+    "Does not execute authenticated production requests or business mutations",
+    "Not a complete JSON Schema validator: nullability, formats, ranges, patterns, required fields and negative error schemas need their own contract checks",
+    "Null values are preserved as observations and are not rejected merely because SpringDoc omitted nullable metadata; FE must handle these fields",
+    "Routes not exercised by these exchanges do not gain business-test coverage from this check"
+  ]
+}

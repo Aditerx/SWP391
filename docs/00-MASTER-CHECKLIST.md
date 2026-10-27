@@ -9,16 +9,22 @@ Tài liệu này là chốt chặn quản lý tiến độ tổng thể và lị
 ### Phạm vi hiện hành 27/10/2026
 
 - [x] D01–D19 đã chốt tại docs04; hoàn tất P1.0–P1.4 và toàn bộ BE P2 theo scope Owner. Demo/handoff và các kịch bản PostgreSQL tại docs02 mục10.
-- [x] Source9af6b2d, merge main3cfe229 đã push; clean304run/277pass/27skip/0lỗi, clone2/2, communication fresh6/6+upgrade6/6; CI branch/main test/package pass. Count từng source là bằng chứng lịch sử, không quota.
+- [x] Source mới693f732/main merge4d372e5 đã push/CI pass:clean305run/278pass/27skip/0lỗi; PG10/10 gồm9workflow+1OpenAPI regression. Clone2/2 vàcommunication12case trước giữ riêng theoSHA, không đổi thành lần chạy mới. Count là bằng chứng lịch sử, không quota.
 - [x] Đính chính target: bootstrap28635081… là DB **test1a3dfdd7…**. Production188f6765… được duyệt riêng bundle01e31ca6…; backup mã hóa/restore/local proof rồi nâng cấp50bảng/9môn, giữ dữ liệu gốc7bảng. Docs02 mục10.9.
-- [x] Kiểm Render sau317s: Live3cfe229 và target188… khớp,9môn/18giá đúng, Swagger/OpenAPI149paths/API mới/anonymous guards đạt.21/22checks pass, xác định db UP/mail DOWN. Evidence docs02 mục10.10.
+- [x] Live4d372e5 đã kiểm sau>=5phút:185/185routes/138schemas khớp;74/74GET anonymous,24status gap=0,6schema tách đúng/LocalTime string.149local exchanges/36operations,114positive so Live=201bodychecks/0mismatch. Core21/22 cònmailDOWN,dbUP; docs02 mục10.11.
 - [ ] **Vận hành mail:** Owner xác nhận Render Free, SMTP587 bị nền tảng chặn. Cần chọn dịch vụ email HTTPS, API key/sender và triển khai adapter trước nghiệm thu OTP cloud. Chưa chọn provider hoặc gửi email thật; aggregatehealth503 vẫn được ghi đúng.
 - [ ] **Để lại theo Owner:** P1.5/gói T D01 hồ sơ Member + D09 Coach directory/FE. Giữ checklist04 mục40.3/40.8–40.9; không tự merge nhánh teammate ngoài scope.
-- [ ] FE hiện hành bằng browser/CORS/cookie, VNPay IPN gateway sandbox thật, SQL Server runtime và smoke tài khoản thật chưa nghiệm thu. Local HTTP và Swagger GET không thay các cổng này.
+- [x] Gói bàn giao FE đã bổ sung inventory/schema toànAPI, ma trận19Dxx,20vídụ request/response có actor/giờ/status, errors/demo/lệnh tái lập:docs01 mục18/artifacts/fe-handoff/2026-10-27.
+- [ ] Authenticated business/positive-negative role-owner-center matrix đầy đủ trênRender, FE browser/CORS/cookie/camera, VNPay gateway live và SQLServer runtime chưa nghiệm thu. Local HTTP/type-property compatibility và GET401 không thay các cổng này.
 
 ---
 
 ## 📜 PHẦN II: LỊCH SỬ HOÀN THÀNH (HISTORY)
+
+### [27/10/2026] Audit API và hoàn thiện handoff FE có ví dụ/field đúng
+
+Owner yêu cầu giải thích Hikari, đối chiếu toàn API/docs04 và bàn giao đầy đủ/chính xác/có chứng cứ. Đã đối chiếu185/185operations/149paths với controller,74/74GET anonymous, lập ma trận19Dxx/20vídụ thật và inventory/schema/error prefix/source. Sửa metadata24status201/204,3cặp DTO nested trùng schema, LocalTime object sai string; logic/JSON/migration không đổi. Source693f732 clean305/278pass/27skip/0lỗi,PG10/10 (9business+1contract),149exchange/36operations,114positive/201bodychecks với SwaggerLive0mismatch. CIbranch/mainmerge4d372e5 pass;Live đúng4d sau>=5phút,138schemas/statusgap0,dbUP/mailDOWN. Authenticated production business0; role/center/browser/gateway/SQLServer/OTP cloud chưa được gọi làPASS. Bộhandoff docs01 mục18/docs02 mục10.11/docs04 mục40.18/artifacts/fe-handoff/2026-10-27;D01/D09/T/FE giữbacklog.
+
 
 ### [27/10/2026] Chốt nâng cấp production, CI và kiểm Live sau5phút
 

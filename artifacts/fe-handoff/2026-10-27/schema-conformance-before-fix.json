@@ -1,0 +1,306 @@
+{
+  "result": "FAIL",
+  "meaning": "Type/property mismatches against old Live Swagger; not proof of HTTP product failure",
+  "uniqueMismatches": [
+    [
+      "POST /api/advanced-registrations",
+      "request.primaryCoachId",
+      "unknown-property",
+      ""
+    ],
+    [
+      "POST /api/advanced-registrations",
+      "request.requestKey",
+      "unknown-property",
+      ""
+    ],
+    [
+      "POST /api/advanced-registrations",
+      "request.subjectId",
+      "unknown-property",
+      ""
+    ],
+    [
+      "POST /api/center-incidents",
+      "request.evidence",
+      "unknown-property",
+      ""
+    ],
+    [
+      "POST /api/center-incidents",
+      "request.requestKey",
+      "unknown-property",
+      ""
+    ],
+    [
+      "POST /api/center-incidents",
+      "request.sessionId",
+      "unknown-property",
+      ""
+    ],
+    [
+      "POST /api/center-incidents",
+      "request.startedAt",
+      "unknown-property",
+      ""
+    ],
+    [
+      "POST /api/center-incidents",
+      "response.affectedMemberIds",
+      "unknown-property",
+      ""
+    ],
+    [
+      "POST /api/center-incidents",
+      "response.deadlineAfter",
+      "unknown-property",
+      ""
+    ],
+    [
+      "POST /api/center-incidents",
+      "response.deadlineBefore",
+      "unknown-property",
+      ""
+    ],
+    [
+      "POST /api/center-incidents",
+      "response.endedAt",
+      "unknown-property",
+      ""
+    ],
+    [
+      "POST /api/center-incidents",
+      "response.originalDeadline",
+      "unknown-property",
+      ""
+    ],
+    [
+      "POST /api/center-incidents",
+      "response.recoveredCredits",
+      "unknown-property",
+      ""
+    ],
+    [
+      "POST /api/center-incidents",
+      "response.sessionCompensated",
+      "unknown-property",
+      ""
+    ],
+    [
+      "POST /api/center-incidents",
+      "response.sessionId",
+      "unknown-property",
+      ""
+    ],
+    [
+      "POST /api/center-incidents",
+      "response.startedAt",
+      "unknown-property",
+      ""
+    ],
+    [
+      "POST /api/center-incidents/{id}/compensate",
+      "response.affectedMemberIds",
+      "unknown-property",
+      ""
+    ],
+    [
+      "POST /api/center-incidents/{id}/compensate",
+      "response.deadlineAfter",
+      "unknown-property",
+      ""
+    ],
+    [
+      "POST /api/center-incidents/{id}/compensate",
+      "response.deadlineBefore",
+      "unknown-property",
+      ""
+    ],
+    [
+      "POST /api/center-incidents/{id}/compensate",
+      "response.endedAt",
+      "unknown-property",
+      ""
+    ],
+    [
+      "POST /api/center-incidents/{id}/compensate",
+      "response.originalDeadline",
+      "unknown-property",
+      ""
+    ],
+    [
+      "POST /api/center-incidents/{id}/compensate",
+      "response.recoveredCredits",
+      "unknown-property",
+      ""
+    ],
+    [
+      "POST /api/center-incidents/{id}/compensate",
+      "response.sessionCompensated",
+      "unknown-property",
+      ""
+    ],
+    [
+      "POST /api/center-incidents/{id}/compensate",
+      "response.sessionId",
+      "unknown-property",
+      ""
+    ],
+    [
+      "POST /api/center-incidents/{id}/compensate",
+      "response.startedAt",
+      "unknown-property",
+      ""
+    ],
+    [
+      "POST /api/center-incidents/{id}/normal-makeup",
+      "request.endTime",
+      "object",
+      "str"
+    ],
+    [
+      "POST /api/center-incidents/{id}/normal-makeup",
+      "request.startTime",
+      "object",
+      "str"
+    ],
+    [
+      "POST /api/center-incidents/{id}/normal-makeup",
+      "response.endTime",
+      "object",
+      "str"
+    ],
+    [
+      "POST /api/center-incidents/{id}/normal-makeup",
+      "response.startTime",
+      "object",
+      "str"
+    ],
+    [
+      "POST /api/center-incidents/{id}/resolve",
+      "response.affectedMemberIds",
+      "unknown-property",
+      ""
+    ],
+    [
+      "POST /api/center-incidents/{id}/resolve",
+      "response.deadlineAfter",
+      "unknown-property",
+      ""
+    ],
+    [
+      "POST /api/center-incidents/{id}/resolve",
+      "response.deadlineBefore",
+      "unknown-property",
+      ""
+    ],
+    [
+      "POST /api/center-incidents/{id}/resolve",
+      "response.endedAt",
+      "unknown-property",
+      ""
+    ],
+    [
+      "POST /api/center-incidents/{id}/resolve",
+      "response.originalDeadline",
+      "unknown-property",
+      ""
+    ],
+    [
+      "POST /api/center-incidents/{id}/resolve",
+      "response.recoveredCredits",
+      "unknown-property",
+      ""
+    ],
+    [
+      "POST /api/center-incidents/{id}/resolve",
+      "response.sessionCompensated",
+      "unknown-property",
+      ""
+    ],
+    [
+      "POST /api/center-incidents/{id}/resolve",
+      "response.sessionId",
+      "unknown-property",
+      ""
+    ],
+    [
+      "POST /api/center-incidents/{id}/resolve",
+      "response.startedAt",
+      "unknown-property",
+      ""
+    ],
+    [
+      "POST /api/classes/normal-with-sessions",
+      "request.endTime",
+      "object",
+      "str"
+    ],
+    [
+      "POST /api/classes/normal-with-sessions",
+      "request.startTime",
+      "object",
+      "str"
+    ],
+    [
+      "POST /api/sessions/book-private",
+      "request.endTime",
+      "object",
+      "str"
+    ],
+    [
+      "POST /api/sessions/book-private",
+      "request.startTime",
+      "object",
+      "str"
+    ],
+    [
+      "POST /api/sessions/book-private",
+      "response.endTime",
+      "object",
+      "str"
+    ],
+    [
+      "POST /api/sessions/book-private",
+      "response.startTime",
+      "object",
+      "str"
+    ],
+    [
+      "POST /api/sessions/{sessionId}/cancel-private",
+      "response.endTime",
+      "object",
+      "str"
+    ],
+    [
+      "POST /api/sessions/{sessionId}/cancel-private",
+      "response.startTime",
+      "object",
+      "str"
+    ],
+    [
+      "POST /api/sessions/{sessionId}/reschedule",
+      "request.newEndTime",
+      "object",
+      "str"
+    ],
+    [
+      "POST /api/sessions/{sessionId}/reschedule",
+      "request.newStartTime",
+      "object",
+      "str"
+    ],
+    [
+      "POST /api/sessions/{sessionId}/reschedule",
+      "response.endTime",
+      "object",
+      "str"
+    ],
+    [
+      "POST /api/sessions/{sessionId}/reschedule",
+      "response.startTime",
+      "object",
+      "str"
+    ]
+  ]
+}

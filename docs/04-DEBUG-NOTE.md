@@ -1,23 +1,19 @@
 # 04-DEBUG-NOTE — Sổ quyết định và phân tích SCMS
 
-## 0. ĐỌC ĐẦU TIÊN KHI MỞ SESSION MỚI — checkpoint phía BE
+## 0. ĐỌC ĐẦU TIÊN — checkpoint hiện hành 27/10/2026
 
-> **Lượt tiếp tục 27/10:** Owner đã yêu cầu thực hiện P1.0–P1.4 và P2, để lại P1.5/gói T/FE; sau hoàn tất phải double-check, tự dựng demo, viết bàn giao/hướng dẫn, push branch và merge main. Source đã commit trên feat/advanced-phases; checkpoint 40.13 ghi đè trạng thái “chỉ plan/merge” lịch sử bên dưới. Owner đã cho phép khởi tạo production theo bundle cụ thể; đã commit46bảng/9môn/0account/giao dịch. Không coi git merge là Render đã deploy.
+Owner đã yêu cầu và đã triển khai P1.0–P1.4 cùng BE P2; P1.5/gói T D01/D09/FE vẫn backlog. Các đoạn từ mục1 đến40.12 giữ lịch sử phân tích/plan, không còn là trạng thái triển khai hiện tại. Không hỏi lại quyết định đã chốt chỉ vì gặp câu “chưa code” hoặc1080giờ trong lịch sử. Rule45ngày sử dụng ở30.3 có hiệu lực mới hơn.
 
 ### 0.1. Vai trò và thứ tự đọc
 
-**Chúng ta chính là phía Backend (Owner + coding agent).** “Handoff BE” trong các mục dưới là ghi chú triển khai nội bộ để chính chúng ta tiếp tục, không phải chuyển việc cho BE khác. Handoff ra ngoài là hợp đồng/bằng chứng để FE tích hợp.
-
-Đang ở giai đoạn **phân tích, chốt nghiệp vụ và chuẩn bị sửa**, chưa triển khai hàng loạt D01–D19. Quyết định đã chốt không hỏi lại chỉ vì AGENTS hoặc implementation cũ chưa cập nhật. Điểm mới mơ hồ/mâu thuẫn thì hỏi theo AGENTS §2.9.
-
-Đọc: AGENTS.md → docs/00 phần active → mục 0 này và mục Dxx đang làm trong 04 → docs/01 mục 14 cùng endpoint liên quan → docs/02 mục 9. Chỉ đọc lại PDF/handoff/report gốc khi cần đối chiếu điểm cụ thể, không đọc lại toàn old-docs. Owner đã yêu cầu docs 04, là ngoại lệ hợp lệ với quy tắc ba docs cũ.
+Chúng ta là BE (Owner + coding agent); handoff ra ngoài dành cho FE. Đọc AGENTS → docs00 active → bảng0.2 → mục40.17/40.18 → docs01 mục18 và endpoint liên quan → docs02 mục10.9–10.11. Không đọc old-docs nếu không có yêu cầu tra lịch sử. API dự kiến trong phần phân tích cũ không tự trở thành route đã triển khai.
 
 ### 0.2. Quyết định có hiệu lực — không hỏi lại
 
 | Nhóm | Tóm tắt; chi tiết trong các mục tương ứng |
 |---|---|
 | D01 | GET/PATCH /api/members/me, tự xem/sửa name, phone, address, dateOfBirth, gender, goal, healthNote; DTO riêng, danh tính từ Auth |
-| D02 | Chỉ 9 môn/18 giá Member.pdf/API 2.1; giữ ID 19–27 theo snapshot, xóa 8 bản trùng và loại Bắn súng ngoài danh mục. Không Inactive/giá 0/seed ghi đè; chưa chạy SQL |
+| D02 | Chỉ 9 môn/18 giá Member.pdf/API 2.1; giữ ID 19–27 theo snapshot, xóa 8 bản trùng và loại Bắn súng ngoài danh mục. Không Inactive/giá0/seed ghi đè; production đã nâng cấp có phê duyệt riêng (40.17) |
 | Fixture | Enrollment 2/Class 4, Package 5 và đúng hai subscription được phép đối soát/tạo lại đúng luồng/giá/môn; không reset DB, không sửa Paid.amount hoặc suy môn từ giá; kiểm lại mapping/FK lúc triển khai |
 | D03 | Mua theo môn + Primary Coach, credit/hạn riêng từng đăng ký; Subject là nguồn giá, Invoice snapshot, Paid hợp lệ mới Active/12 credit. Chọn Coach không giữ ca; đồng ý hướng kiểm năng lực/Coach nhận trước Invoice; bỏ khai lịch rảnh Member |
 | Thời hạn | Quyết định mới 30.3 thay D03-c về 1080 giờ liên tục: Advanced 45 ngày sử dụng từ Paid, skip thời gian TT nghỉ/đóng, thêm/tắt ngày nghỉ cập nhật hạn gói đang dùng, không bù trùng D08. BE trả deadline chính xác, ca kết thúc không vượt hạn; Invoice vẫn 5 phút. Biên quá khứ/lịch đã đặt đã chốt 30.5 |
@@ -32,50 +28,33 @@
 | D12–D14 | Hạn skip và biên thay ngày nghỉ 30.3/30.5; report cả người/đăng ký, UI ưu tiên người 31.3; Holiday xem ảnh hưởng/xử lý lịch riêng rồi xác nhận 32.3 |
 | D15 | Attendance mới Present/Absent trong giờ buổi, không Late/scan sớm; CenterManager sửa sau buổi có audit; sự cố thật báo muộn bù có hồ sơ/chống trùng. Check-in cửa ưu tiên nâng cấp sau. Chi tiết 33.3/33.5/34.3 |
 | D16 | Chốt 2 hẹp: CenterManager đảo xác nhận Cash nhầm chưa nhận tiền cho Advanced chưa dùng/booking/phụ thuộc; giữ chứng từ và điều chỉnh riêng, không ngoại lệ Normal. Chi tiết 35.4 |
-| D17–D19 | QR payload/expiresInSeconds handoff 36; report quản trị CenterManager/Admin có quyền, Coach dữ liệu được giao 37.3; test/fixture/FE version/bằng chứng theo 38. Chưa code/FE verified |
+| D17–D19 | QR payload/expiresInSeconds handoff 36; report quản trị CenterManager/Admin có quyền, Coach dữ liệu được giao 37.3; test/fixture/FE version/bằng chứng theo 38. BE đã triển khai trừ gói T; FE chưa browser verified |
 | Báo cáo tiền | BE trả đủ tiền đã thu/đã hoàn/thu ròng; FE quyết định bố trí/chỉ số chính, BE không ép ưu tiên thu ròng. Chi tiết 39.3 |
 
-Giữ Clock Asia/Ho_Chi_Minh, Invoice.amount bất biến, Paid mới kích hoạt, locking/transaction, toggle chế tài khóa đặt lịch tắt nhưng không xóa code. Bảng trên là quyết định mục tiêu, chưa phải implementation đã chạy.
+Giữ Clock Asia/Ho_Chi_Minh, Invoice.amount bất biến, Paid mới kích hoạt, locking/transaction, toggle chế tài khóa đặt lịch tắt nhưng không xóa code. Bảng trên là rule hiện hành; trạng thái code/kiểm chứng theo từng Dxx xem ma trận tại docs01 mục18, không suy tất cả đã nghiệm thu Render.
 
-### 0.3. Điểm tiếp tục, bằng chứng và phần còn mở
+### 0.3. Trạng thái hiện tại và giới hạn
 
-**Phân công đề xuất 27/10 tại mục 40:** T ~15% (D01 + D09, file ownership riêng), Phase 1 ~40% (catalog/đăng ký/mua–thanh toán/quyền), Phase 2 ~45% (dùng quyền/lịch/sự cố/attendance/đối soát/report). Có prompt gửi đồng đội 40.7 và chuẩn evidence 40.6. Owner đã yêu cầu review/commit/push baseline lên tai; chưa bắt đầu coding các feature trong phân công hoặc deploy, không thay business rule.
+Hai phase BE đã có source, clean test và9workflow HTTP/PostgreSQL. Runtime Live mới đã kiểm là4d372e5; identity hash188f6765… khớp DB production đã nâng cấp50bảng/9môn và giữ dữ liệu cũ. Bootstrap1a3dfdd7… trước là DB test; các nhãn “production trống/46bảng/0account” cũ đã được đính chính ở40.17. Không tự suy thêm quyền ghi dữ liệu cloud.
 
-**Làm rõ mới nhất của Owner:** đồng đội làm SMTP cho OTP đăng ký email, chatbox cơ bản và thông báo; gói D01/D09 vừa đề xuất chưa làm. Lượt hiện tại xử lý merge nhánh đồng đội `3309b02` vào tai từ `fc00c64`, không triển khai hai phase. Session sau đọc 40.12 và git status/log trước tiếp tục; không suy OTP/chat/notification đã có nghĩa D01/D09 hoặc P1/P2 hoàn tất.
+Render Free: db UP/mail DOWN, SMTP587 bị nền tảng chặn; chưa có provider/API key/sender/adapter HTTPS. Swagger và GET anonymous không chứng nhận toàn bộ nghiệp vụ hoặc browser FE. D09 lỗi lazy lịch sử vẫn chưa nằm trong scope sửa; D01 chưa có handler self-service riêng. Không nhập hai mục này vào phần hoàn tất hai phase.
 
-**Bàn giao mới nhất:** baseline đã push `9097197`, cập nhật chẩn đoán `7c29607`; clean test 223/204 pass/19 skip/0 lỗi, PG local riêng 14 tests pass (docs 02 mục 9.10). Owner chọn DB_PASSWORD hiện tại, đã chuẩn hóa DB_URL local ignored và kết nối Supabase chỉ đọc/rollback thành công; public có 0 bảng, chưa có schema SCMS. Chưa migration/seed/boot Spring/jobs/API/FE trên DB mới; bằng chứng docs 02 mục 9.13. Không hỏi lại nguồn password hoặc yêu cầu gửi secret.
+### 0.4. Yêu cầu audit và bàn giao mới
 
-**Cập nhật 27/10:** đã đi qua D09–D19 và chốt phần báo cáo tiền tại 39.3; các ghi chú “còn D10–D19/chờ chọn” ở checkpoint/đoạn phân tích cũ là lịch sử, đối chiếu quyết định cuối trong bảng 0.2. Vẫn đang plan, chưa sửa BE/DB/deploy. D09 còn cần tái hiện/sửa/test theo 20.6; chưa đánh dấu mọi chi tiết triển khai/nghiệm thu hoàn tất. Khi chuẩn bị code cần gom backlog theo phụ thuộc và đồng bộ tài liệu/policy cũ với quyết định mới, không hỏi lại các lựa chọn đã chốt.
+Owner hỏi Hikari là gì, đã đối chiếu toàn API Render với docs04 và bàn giao FE đầy đủ/chính xác/có demo/response thật chưa. Lượt40.18 lập inventory toàn bộ Live operations/schema đối chiếu controller, ma trận D01–D19, GET anonymous và9workflow local có request/response theo vai trò. Đã sửa ví dụ giá/security/Normal/checkpoint stale cùng metadata24successstatus,6schema names riêng vàLocalTime string. Source693f732/mainmerge4d372e5 clean305/278pass/27skip,PG10/10/CIpass;Live đã đối chiếu185route/138schema,74GETgate,114positive localexchanges/201bodychecks0mismatch. Chi tiết và giới hạn ở40.18/docs02 mục10.11.
 
-- **D09 là điểm tiếp tục:** Render log xác nhận ba lỗi LazyInitializationException Specialization#5/no Session ngày 24/10 UTC 08:51:20, 08:54:15, 08:54:16. Nguyên văn/mức chắc chắn tại 20.5; không yêu cầu gửi lại log/Caused by. Source CoachController đọc specialization LAZY ngoài transaction, OSIV=false; còn gắn URI/frame hoặc tái hiện khi sửa. Hibernate Session khác bảng sessions, không suy proxy ID bị thiếu trong DB.
-- BE chúng ta cần service read-only transaction + fetch DTO rõ dữ liệu/center, tránh N+1, giữ contact theo quyền; tái hiện OSIV=false, clean test, deploy/probe đúng SHA khi được yêu cầu triển khai. Không giao lại việc này cho một BE khác hoặc bắt Owner chọn chi tiết fetch/transaction.
-- Còn D10 thanh toán/Invoice 3; D11 staging/SHA/DB/quyền mutation; D12 lễ/nắng; D13 báo cáo; D14 Holiday; D15 attendance/check-in/sự cố sau buổi đã chốt; D16 Cash; D17 QR; D18 quyền dashboard; D19 tests. Không coi mọi chi tiết đã chốt từ chữ OK cũ; xem bảng mục 4/câu hỏi mục 7.
-- F-06/F-07 là đợt trước: migration 07 trong repo, Owner báo đã chạy Supabase; lần kiểm DB .env đủ cột/FK/index, orphan=0, probe cũ không tái hiện 500 Session. Chưa xác nhận DB .env trùng Render/SHA deploy. Lỗi Coach là lỗi khác.
+### 0.5. Nguồn bàn giao và cách tiếp nối
 
-### 0.4. Trạng thái workspace và quy tắc tiếp nối
+Docs01 là contract FE hiện hành; mục18 liên kết inventory/schema/matrix/examples/demo. Docs02 ghi môi trường/lệnh/migration/SHA/evidence/giới hạn. Docs04 giữ quyết định/lý do và lịch sử, docs00 quản lý active/HISTORY. Lấy SHA thật từ git và runtime identity, không lấy checkpoint cũ làm SHA Live. Giữ .env/backup riêng tư ignored, không dùng tài khoản demo lịch sử để thử đăng nhập production, không chạy live mutation từ phê duyệt upgrade schema.
 
-Checkpoint ban đầu là tai/8e95759 với nhiều thay đổi/untracked; Owner sau đó đã yêu cầu review/commit/push. Baseline đã được commit/push tới 9097197, cập nhật chẩn đoán tới 7c29607; SHA mới nhất phải lấy từ git log/status, không phải SHA Render. Session mới vẫn kiểm git status/diff, không reset/checkout mất thay đổi hoặc khôi phục tài liệu Owner đã chuyển old-docs. Schema/migration 07/test PostgreSQL thuộc F-06/F-07, docs 04 hiện đã track; chưa triển khai D01/D09/Phase 1/2.
-
-D01–D08 mới sửa docs/đọc source/kiểm kê read-only, chưa áp SQL dọn giá, chưa sửa code nghiệp vụ mới hoặc deploy. Không dùng test xanh cũ làm bằng chứng cho thay đổi chưa code. Sau sửa BE bắt buộc .\mvnw.cmd clean test; kiểm DB/FE/live đúng môi trường được phép. Sandbox không tự tách DB thật. Có thể đọc .env tại workspace khi cần, không cần Owner dán lại secret.
-
-### 0.5. Bản đồ docs và bàn giao FE
-
-- **01:** mục 14 là danh sách thay đổi mục tiêu, 14.1–14.2 quy định trạng thái/gói bàn giao FE; khi code xong phải cập nhật ngay mục endpoint với method/path/DTO/quyền/error/ví dụ thật. Không chỉ thêm ghi chú cuối rồi để FE dùng ví dụ cũ.
-- **02:** mục 9 là quy trình triển khai/DB/deploy/test của đợt mới; mục 4.3 được đánh dấu smoke implementation cũ, không dùng nguyên trạng nghiệm thu rule mới. Chưa có migration D01–D08 chỉ vì docs có kế hoạch.
-- **04:** quyết định/lý do/source/log và ghi chú triển khai BE nội bộ. Các so sánh cũ là lịch sử; quyết định cuối “đã chốt” có hiệu lực hơn câu “chờ chốt” cũ. Endpoint/DTO/error mới chỉ dự kiến không được gọi là khả dụng.
-
-### 0.6. Context dán vào session mới
+### 0.6. Context session sau
 
 ```text
-Workspace D:\Projects\SWP391. Chúng ta là phía BE của SCMS.
-Đọc AGENTS.md, docs/00-MASTER-CHECKLIST.md phần active, docs/04-DEBUG-NOTE.md mục 0 trước; sau đó mục 20/20.5, docs/01-API-CONTRACT-FE-BE.md mục 14 và docs/02-DEPLOYMENT-GUIDE.md mục 9.
-Kế thừa D01–D08 đã chốt, không hỏi lại. Hiện đang phân tích/chốt và chuẩn bị sửa, chưa tự triển khai tất cả hoặc chạy mutation DB/deploy.
-Tiếp tục D09: log đã xác nhận LazyInitializationException Specialization#5/no Session; chính chúng ta xử lý BE, không chờ BE khác. Đọc source và lập bước tái hiện/sửa/kiểm thử; phân biệt lỗi đã có log với URI/frame còn cần kiểm. Không yêu cầu gửi lại log 20.5.
-Kiểm git status/diff, giữ thay đổi workspace/old-docs. Phân tích tuần tự phần còn mở, hỏi khi có mâu thuẫn/nghiệp vụ mới; triển khai theo phạm vi tôi yêu cầu. Sau sửa BE chạy .\mvnw.cmd clean test. Cập nhật docs 01 API thật/handoff FE, docs 02 migration/deploy/bằng chứng, docs 04 quyết định, docs 00 tiến độ. API dự kiến không được coi là đã chạy.
-Owner đã làm rõ: đồng đội làm SMTP/OTP đăng ký, chatbox cơ bản và thông báo; gói D01/D09 vừa phân chưa làm. Đọc thêm mục 40.12 về xử lý merge và trạng thái kiểm. Hai phase chỉ tiếp tục trong session sau theo phạm vi Owner yêu cầu, không coi việc merge feature của đồng đội là đã triển khai phase.
+SCMS BE, D:/Projects/SWP391. Đọc AGENTS, docs00 active, docs04 mục0/40.17/40.18; docs01 mục18 và docs02 mục10.9–10.11.
+P1.0–P1.4 và BE P2 đã triển khai, P1.5/T/D01/D09/FE để lại. Rule hiện hành ở bảng0.2. Các đoạn “chỉ plan” từ lịch sử không ghi đè checkpoint này.
+Phân biệt Live schema/route/GET gate với workflow local và full authenticated business/browser/gateway production. Kiểm git status/log và Live identity thật, không tự ghi cloud/seed hoặc dùng tài khoản demo cũ.
+Bổ sung request/response/dữ liệu đối chiếu vào gói FE, ghi rõ SHA/môi trường/skip/giới hạn; sau sửa BE chạy .\mvnw.cmd clean test và kiểm liên quan. Không đổi expected business để xanh.
 ```
-
-Ngày mở: 25/10/2026. Trạng thái: **D01 đã chốt phương án; D02 đã chốt 9 môn/18 giá, giữ ID 19–27/xóa bản dư và phạm vi đối soát fixture; D03-a đã chốt mô hình mua, Owner đồng ý hướng D03-b và bỏ nhập lịch rảnh, D03-c đã chốt 1080 giờ từ Paid cùng cơ chế thông tin hạn; D04-a chốt A (Coach chính tạo, Manager hỗ trợ, xác nhận trao đổi). Handoff BE tại 11.16/12.4, FE tại API contract mục 14; D05-a đã chốt hủy Advanced >=12 giờ hoàn một credit, D05-b đã chốt A (báo vắng riêng, điểm danh thực tế), D06-a đã chốt A (Manager ghi nhận đồng ý), D06-b đã chốt A ngoại lệ notice khi dời do trung tâm, D07-a đã chốt A kèm UI/UX chung tạo–dời ca, D07-b đã chốt A Manager duyệt bất khả kháng sát giờ, D07-c đã chốt chỉ bỏ dấu khi Dời ca thật sự đổi ngày/giờ, D08-a đã chốt B gia hạn toàn gói theo thời gian ảnh hưởng, D08-b đã chốt bù gián đoạn thực tế và Manager duyệt thêm đủ ca bù, D08-c đã chốt phục hồi credit thu hồi có căn cứ, D08-d đã chốt Chờ khắc phục/duyệt sau, D09 log đã xác nhận lỗi lazy Specialization, cần kiểm gắn endpoint/tái hiện khi sửa; chưa triển khai**.
 
 ## 1. Phạm vi, nguồn và cách làm
 
@@ -1943,3 +1922,15 @@ Double-check clone phát hiện notifications.related_id BIGINT/Java Integer; s�
 Sau push317s, Render Live đúng3cfe229/target188…/9môn/OpenAPI149paths;21/22checks pass. Đã xác định **db UP/mail DOWN**, các component khác UP, không details/secret.18giá JDBC read-only đúng; OpenAPI relatedId int64 đúng. Checker bổ sung ban đầu nhầm public API có giá được INVALIDATED, không quy thành lỗi sản phẩm; đã kiểm lại đúng nguồn.
 
 Owner xác nhận Render Free; SMTP587 bị nền tảng chặn. Muốn giữ Free cần chọn HTTPS email provider/API key/sender và làm adapter trước nghiệm thu OTP cloud; hiện chưa có thông tin provider, không tự đổi plan trả phí hoặc giả aggregatehealth UP. Docs02 mục10.10/README upgrade là bàn giao hiện hành. Các câu hỏi SHA/tên biến datasource trước đã được giải quyết bằng runtime identity và username, không hỏi lại. P1.5/T/D01/D09/FE vẫn backlog, nhánh teammate ngoài scope không tự merge. Đóng docs/evidence bằng commit skiprender để giữ Live đã kiểm3cfe229.
+
+### 40.18. Audit toàn bộ API, sửa metadata Swagger và bàn giao FE có ví dụ thật
+
+Owner hỏi Hikari là gì, toàn API Render đã đối chiếu docs04/bàn giao FE chính xác/đầy đủ/demo có chứng cứ chưa. Câu trả lời cho lần trước là **chưa đủ để nghiệm thu toàn API**:22smoke assertions không phải149path/185operation có phiên đúng vai trò. Đợt này đối chiếu185/185source mappings,74/74GET anonymous; không gọi production mutation hoặc dùng account seed. Dxx matrix đủ19mục, D01/D09 vẫn backlog; nhiều baseline APIs không thuộc một quyết định Dxx riêng. Không suy phân quyền service đầy đủ từ annotation/source parser.
+
+Kiểm từng field phát hiện3cặp DTO nested cùng tên Request/Open/Response bị Swagger gộp sai (Advanced request thành Normal makeup, incident thành payment resolution), LocalTime object sai JSON string, và24success status200sai201/204. Sửa annotation/schema metadata +OpenApiModelConfig, giữ JSON business/HTTP status thực tế và rule cũ; không sửa expected để làm xanh. Có regression HTTP GET OpenAPI, kiểm6schema24status, kiểu/property/status của114positive exchanges. Không coi nullable/format/range/required/error branches đã được validator đầy đủ.
+
+Source693f732 clean305/278pass/27skip/0lỗi vàPG10/10 (9nghiệp vụ+1contract) từ committed checkout không.env;149exchange/36operations, có readback Active12credit/price snapshot/deadline,11sau book,12sau cancel vàPaid reconciliationRequired sau IPN muộn. Bằng chứng/20vídụ và các lần thất bại tooling trước ghi rõ trong artifacts/fe-handoff/2026-10-27. CI branchpass, mainmerge4d372e5 đã push22:13:53UTC+7, chờ kiểmLive sau5phút theo docs02 mục10.11. Các docs01 ví dụ giá/public quyền/Normal Closed/checkpoint đầu04 đã sửa để không dẫn FE theo trạng thái lịch sử sai.
+
+Bàn giao hướng FE qua docs01 mục18 và FE-HANDOFF.md; có full inventory/schema, ma trậnD01–D19, vai trò/field/state/price/time/error, request/response thật/Clock/ID môi trường, demo viewer/lệnh tái lập và giới hạn. User story chính đã có ví dụ dương/âm local; chưa full positive/negative role/owner/center/crosscenter matrix trênRender hoặc mọi baseline API. D01/D09/FE vàcloudSMTPFree/gateway/SQLServer giữ trạng thái đúng. Source/method/byte hash cùngCI/Live được ghi riêng, không che thiếu nghiệm thu bằng count test hoặc status healthping.
+
+**Live đã kiểm:** `4d372e5832bd3e8685008b2e0a2029ff981eb047` lúc 22:19:35 UTC+7, sau push 342.131s. 185/185route khớp, 138schemas;74/74GET anonymous.24status gap đã hết,6schema riêng đúng,LocalTime string.149localexchanges trên36operations;114positive so với SwaggerLive:201bodychecks/0type-property-status mismatch. CIbranch/main pass. DBUP/mailDOWN;0authenticated business operations hoặc mutation tests trênRender. Đây không phải nghiệm thu toàn bộ nghiệp vụ/FE production.

@@ -1,0 +1,16 @@
+{
+  "result" : "PASS",
+  "distinctRequestFields" : {
+    "PaymentResolutionOpenRequest" : [ "invoiceId", "type", "reason" ],
+    "AdvancedRegistrationRequest" : [ "subjectId", "primaryCoachId", "requestKey" ],
+    "CenterIncidentOpenRequest" : [ "sessionId", "startedAt", "reason", "evidence", "requestKey" ],
+    "NormalMakeupRequest" : [ "date", "startTime", "endTime", "roomId", "coachId", "reason" ]
+  },
+  "responseSchemas" : [ "CenterIncidentResponse", "PaymentResolutionResponse" ],
+  "created201" : [ "/api/classes", "/api/classes/normal-with-sessions", "/api/classes/{classId}/enroll", "/api/enrollments", "/api/classes/{classId}/feedback", "/api/holidays", "/api/packages", "/api/rooms", "/api/sessions", "/api/sessions/book-private", "/api/sessions/generate", "/api/subjects", "/api/training-plans", "/api/evaluations" ],
+  "post204" : [ "/api/auth/change-password", "/api/auth/logout", "/api/auth/reset-password", "/api/auth/verify-registration", "/api/chat/conversations/{id}/read" ],
+  "delete204" : [ "/api/evaluations/{id}", "/api/sessions/{id}", "/api/subjects/{id}", "/api/training-plans/{id}", "/api/users/me/avatar" ],
+  "positiveExchangesCheckedForStatusTypeAndProperties" : 114,
+  "localTimeWireType" : "string",
+  "source" : "Real HTTP GET /v3/api-docs in the same local application as the workflows"
+}
