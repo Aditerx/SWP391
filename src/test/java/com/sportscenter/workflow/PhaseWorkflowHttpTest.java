@@ -412,6 +412,7 @@ public class PhaseWorkflowHttpTest {
         assertTrue(centerProperties.has("sessionId"));assertTrue(centerProperties.has("recoveredCredits"));assertFalse(centerProperties.has("invoiceId"));
         var moneyProperties=spec.path("components").path("schemas").path("PaymentResolutionResponse").path("properties");
         assertTrue(moneyProperties.has("invoiceId"));assertTrue(moneyProperties.has("amount"));assertFalse(moneyProperties.has("sessionId"));
+        assertEquals("string",spec.path("components").path("schemas").path("LocalTime").path("type").asText());
         List<String> created=List.of("/api/classes","/api/classes/normal-with-sessions","/api/classes/{classId}/enroll","/api/enrollments",
                 "/api/classes/{classId}/feedback","/api/holidays","/api/packages","/api/rooms","/api/sessions","/api/sessions/book-private",
                 "/api/sessions/generate","/api/subjects","/api/training-plans","/api/evaluations");
@@ -422,6 +423,23 @@ public class PhaseWorkflowHttpTest {
         for(String path:noContentDelete)assertTrue(spec.path("paths").path(path).path("delete").path("responses").has("204"),path);
         openApiProof.put("result","PASS");openApiProof.put("distinctRequestFields",fields);openApiProof.put("responseSchemas",List.of("CenterIncidentResponse","PaymentResolutionResponse"));
         openApiProof.put("created201",created);openApiProof.put("post204",noContentPost);openApiProof.put("delete204",noContentDelete);
+        int checked=0;
+        for(var exchange:exchanges) {
+            int status=(int)exchange.get("actualStatus");if(status<200||status>=300)continue;
+            String path=exchange.get("path").toString().split("\\?")[0];String method=exchange.get("method").toString().toLowerCase(Locale.ROOT);
+            JsonNode operation=null;
+            for(var it=spec.path("paths").fields();it.hasNext();) {
+                var entry=it.next();
+                if(path.matches(entry.getKey().replaceAll("\\{[^}]+}","[^/]+"))&&entry.getValue().has(method)){operation=entry.getValue().get(method);break;}
+            }
+            assertNotNull(operation,path);JsonNode result=operation.path("responses").path(String.valueOf(status));assertFalse(result.isMissingNode(),path+" status "+status);
+            var input=operation.path("requestBody").path("content").elements();
+            if(input.hasNext())assertWireShape((JsonNode)exchange.get("requestBody"),input.next().path("schema"),spec,"request "+path);
+            var output=result.path("content").elements();
+            if(output.hasNext()&&exchange.get("responseBody") instanceof JsonNode value)assertWireShape(value,output.next().path("schema"),spec,"response "+path);
+            checked++;
+        }
+        openApiProof.put("positiveExchangesCheckedForStatusTypeAndProperties",checked);openApiProof.put("localTimeWireType","string");
         openApiProof.put("source","Real HTTP GET /v3/api-docs in the same local application as the workflows");
         trace.add("GET /v3/api-docs => 200 [distinct workflow DTOs and 24 success status assertions passed; full spec omitted]");
     }
@@ -430,6 +448,25 @@ public class PhaseWorkflowHttpTest {
         JsonNode content=request?operation.path("requestBody").path("content"):operation.path("responses").path("200").path("content");
         assertTrue(content.elements().hasNext(),path);JsonNode schema=content.elements().next().path("schema");
         assertEquals("#/components/schemas/"+name,schema.path("$ref").asText(),path);
+    }
+    void assertWireShape(JsonNode value,JsonNode schema,JsonNode spec,String where) {
+        if(value==null||value.isNull())return; // Legacy nullable values are documented separately; no false non-null guarantee.
+        if(schema.has("$ref")){assertWireShape(value,spec.at(schema.get("$ref").asText().substring(1)),spec,where);return;}
+        switch(schema.path("type").asText()) {
+            case "object" -> {
+                assertTrue(value.isObject(),where+" expected object");var props=schema.path("properties");
+                value.fields().forEachRemaining(entry->{
+                    if(props.has(entry.getKey()))assertWireShape(entry.getValue(),props.get(entry.getKey()),spec,where+"."+entry.getKey());
+                    else assertTrue(schema.has("additionalProperties"),where+" undeclared property "+entry.getKey());
+                });
+            }
+            case "array" -> {assertTrue(value.isArray(),where+" expected array");for(var item:value)assertWireShape(item,schema.path("items"),spec,where+"[]");}
+            case "string" -> assertTrue(value.isTextual(),where+" expected string");
+            case "integer" -> assertTrue(value.isIntegralNumber(),where+" expected integer");
+            case "number" -> assertTrue(value.isNumber(),where+" expected number");
+            case "boolean" -> assertTrue(value.isBoolean(),where+" expected boolean");
+            default -> { }
+        }
     }
 
     Map<String,String> previewHeader(JsonNode preview){return Map.of("X-Preview-Token",preview.get("previewToken").asText());}
