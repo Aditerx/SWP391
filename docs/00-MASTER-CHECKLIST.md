@@ -9,9 +9,9 @@ Tài liệu này là chốt chặn quản lý tiến độ tổng thể và lị
 ### Phạm vi hiện hành 27/10/2026
 
 - [x] D01–D19 đã chốt tại docs 04; rule mới ghi đè mô tả cũ. Owner yêu cầu tiếp tục P1.0–P1.4 và BE P2, double-check/demo/tài liệu/push branch/merge main.
-- [x] Source hai phase đã triển khai, clean test và 9 HTTP workflow PostgreSQL local pass. Chi tiết nhóm hoàn tất chuyển HISTORY bên dưới; bản chốt exact commit/merge và evidence xem docs 02 mục 10.
+- [x] Source hai phase đã triển khai, clean test và 9 HTTP workflow PostgreSQL local pass. Chi tiết nhóm hoàn tất chuyển HISTORY bên dưới; source chốt13a62ee clean292/273pass/19skip/0lỗi và PG HTTP9/9pass; evidence docs02 mục10.
 - [ ] Chốt kiểm exact commit, bàn giao evidence và push branch/merge main (đang thực hiện, không đồng nghĩa deploy).
-- [ ] Production trống đã read-only preflight; khởi tạo schema cần Owner xác nhận riêng theo docs 02 mục 9.8, thực hiện trước nhánh Render autoDeploy. Không seed account/giao dịch demo.
+- [x] Owner phê duyệt riêng bundle28635081…; production đã khởi tạo trước merge:46bảng/9môn/0account hoặc giao dịch. Postflight read-only đủ cột; docs02 mục10/evidence production-release.json. Chưa tài khoản thật/live gateway/deploy verification.
 - [ ] **Để lại theo Owner:** P1.5/gói T D01 hồ sơ Member + D09 Coach directory/FE. Giữ scope/checklist 04 mục 40.3/40.8–40.9. SMTP/OTP/chat/notifications đã merge là việc khác.
 - [ ] Nghiệm thu FE hiện hành bằng browser/CORS/cookie, VNPay IPN qua gateway sandbox thật và deploy SHA/health. Local HTTP không thay cổng này.
 - [ ] SQL Server runtime và smoke vận hành tài khoản thật chưa chạy; migrations MSSQL được bàn giao với giới hạn rõ.

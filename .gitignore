@@ -8,3 +8,8 @@ node_modules/
 .env.*
 !.env.example
 application-local.properties
+# Raw isolated demo runs stay local; publish reviewed summaries via build-phases-evidence.py.
+artifacts/demo/runs/
+artifacts/demo/**/committed-run/
+artifacts/demo/**/final-branch-run/
+artifacts/demo/**/merged-run/

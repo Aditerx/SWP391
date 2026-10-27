@@ -2,7 +2,7 @@
 
 ## 0. ĐỌC ĐẦU TIÊN KHI MỞ SESSION MỚI — checkpoint phía BE
 
-> **Lượt tiếp tục 27/10:** Owner đã yêu cầu thực hiện P1.0–P1.4 và P2, để lại P1.5/gói T/FE; sau hoàn tất phải double-check, tự dựng demo, viết bàn giao/hướng dẫn, push branch và merge main. Code đang triển khai trong working tree; checkpoint tiến hành ở 40.13 ghi đè trạng thái “chỉ plan/merge” lịch sử bên dưới. Chưa được suy code chưa commit đã deploy hoặc DB production đã được khởi tạo.
+> **Lượt tiếp tục 27/10:** Owner đã yêu cầu thực hiện P1.0–P1.4 và P2, để lại P1.5/gói T/FE; sau hoàn tất phải double-check, tự dựng demo, viết bàn giao/hướng dẫn, push branch và merge main. Source đã commit trên feat/advanced-phases; checkpoint 40.13 ghi đè trạng thái “chỉ plan/merge” lịch sử bên dưới. Owner đã cho phép khởi tạo production theo bundle cụ thể; đã commit46bảng/9môn/0account/giao dịch. Không coi git merge là Render đã deploy.
 
 ### 0.1. Vai trò và thứ tự đọc
 
@@ -1907,3 +1907,7 @@ Bằng chứng JSON hiện tại và nhãn SSL đúng phạm vi tại docs 02 m�
 - Build trong worktree `D:/Projects/SWP391-phase-verification` vì từng có Maven khác chạy clean cùng target ở workspace chính. Không copy .env vào worktree kiểm chứng. PostgreSQL local `scms-phases-20261027`, chỉ bind 127.0.0.1:55440; script test-phases-postgres.py không đọc .env.
 - Owner xác nhận DB Render là cấu hình ghi “production” trong .env. Preflight JDBC chỉ đọc thấy public có **0 bảng**, rollback hoàn tất; chưa migration/seed production. autoDeploy bật trong render.yaml nên cần trình tự schema → BE khi push/main. Đã chuẩn bị bootstrap cấu trúc/role/catalog không account hoặc giao dịch demo, migrations 06/07/08–12 và bundle kiểm tra hash/empty-schema guard; chưa tự coi đây là quyền ghi production.
 - Điểm còn làm: chạy PG demo toàn bộ, kiểm release SQL trên DB local rỗng, hoàn tất review các đường cập nhật cũ/credit/deadline/quyền, đồng bộ docs/AGENTS, tạo evidence/manifest sạch rồi commit/push và merge đúng main. Sandbox gateway live, trình duyệt FE và SQL Server runtime không được gọi là đã nghiệm thu từ H2/PG local.
+
+**Cập nhật thực thi production theo phê duyệt riêng:** Owner trả lời “Cho phép khởi tạo production trước merge” đối với bundle SHA256 `28635081e1724eb89ea82252fc1e468ca53805d347e4334d40ddf17a9c2866dc`. Đã chạy đúng bundle bằng ApplyPhaseRelease (hash/fingerprint/empty-schema guard, Serializable, atomic commit):9môn,0account,0Invoice/subscription/session/enrollment. Postflight JDBC read-only:46bảng,không thiếu8cột checkpoint,rollback hoàn tất. Artifacts production-release.json/production-postflight.json tại demo phase2. Chưa tài khoản thật/transaction/live gateway;không tự tạo Admin. Source feature9d8c07c,fixture regression13a62ee;đang chạy runner từ đúng committed checkout rồi merge main có kiểm lại.
+
+**Cổng source chốt:** runner tạo worktree từ commit13a62ee không có.env, clean test292 run/273pass/19skip/0lỗi và PG HTTP9/9pass,migration replay/snapshot/FK guard pass. 19skip là baseline opt-in live/PG,không tính6communication tests ngoài commit. Đã tạo evidence manifest/test-summary/source-tree/trace và demo.html;hướng tái lập docs02 mục10 và artifact README. Tiếp theo push feature rồi merge main đúng history và kiểm lại bản merge.

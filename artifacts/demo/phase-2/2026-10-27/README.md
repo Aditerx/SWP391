@@ -1,6 +1,6 @@
 # Bàn giao và demo hai phase SCMS
 
-Phạm vi: P1.0–P1.4 và BE P2.1–P2.5; P1.5/gói T D01/D09/FE để lại theo Owner. Nền tai 0277b2f. Commit/chạy cuối ghi trong verification.json; merge/main được ghi riêng khi đã thực hiện. Contract: [docs 01](../../../../docs/01-API-CONTRACT-FE-BE.md); vận hành/migration: [docs 02 mục 10](../../../../docs/02-DEPLOYMENT-GUIDE.md#10-bàn-giao-hai-phase-và-demo-tái-lập--27102026).
+Phạm vi: P1.0–P1.4 và BE P2.1–P2.5; P1.5/gói T D01/D09/FE để lại theo Owner. Nền tai 0277b2f. Source BE chốt `13a62ee780be19dce62730b45b119e2f97f31def`: clean test292/273pass/19skip/0lỗi,PG HTTP9/9pass. [Trang demo](evidence/demo.html), [manifest](evidence/verification.json), [test summary](evidence/test-summary.txt), [HTTP trace](evidence/postgres-http.txt). Merge/main sẽ được ghi riêng sau kiểm bản merge. Contract: [docs 01](../../../../docs/01-API-CONTRACT-FE-BE.md); vận hành/migration: [docs 02 mục 10](../../../../docs/02-DEPLOYMENT-GUIDE.md#10-bàn-giao-hai-phase-và-demo-tái-lập--27102026).
 
 ## Chạy demo
 
@@ -40,6 +40,14 @@ Chín method trong PhaseWorkflowHttpTest chạy **theo thứ tự**, chia sẻ m
 
 ## Release và giới hạn
 
-[SQL bundle](release/scms-phases-empty-schema.sql),[hash manifest](release/release-plan.json),[local proof](release/local-proof.json),[replay guard](release/local-replay-guard.json). SHA256 28635081e1724eb89ea82252fc1e468ca53805d347e4334d40ddf17a9c2866dc. Bundle chỉ empty schema,1transaction,9môn,0account/business rows. Production đã read-only preflight0bảng; trạng thái ghi thật nếu được Owner cho phép phải có production-release.json và preflight sau. Không chạy seed05/prepare-demo/live Cash trên production.
+[SQL bundle](release/scms-phases-empty-schema.sql),[hash manifest](release/release-plan.json),[local proof](release/local-proof.json),[replay guard](release/local-replay-guard.json). SHA256 28635081e1724eb89ea82252fc1e468ca53805d347e4334d40ddf17a9c2866dc. Bundle chỉ empty schema,1transaction,9môn,0account/business rows. Production trước release read-only0bảng;Owner đã phê duyệt khởi tạo trước merge. [production-release.json](production-release.json) ghi commit đúng bundle,9môn/0account/business rows; [postflight](production-postflight.json)46bảng/đủcột checkpoint. Không chạy seed05/prepare-demo/live Cash trên production.
 
 Demo dùng fake Cash/refund và signed local VNPay protocol,không gateway live/tiền thật. SMTP delivery,FE/CORS/cookie cloud,Render deploy và SQL Server runtime cần nghiệm thu riêng. Migration MSSQL bàn giao nhưng chưa chứng nhận chạy. bootstrap không tạo Admin;Owner cần provision account thật/SMTP/chuyên môn/phòng/work-schedule trước mở bán.
+
+## Double-check và hướng đọc evidence
+
+- So khớp scope từng P1.0–P1.4/P2.1–P2.5 với docs04 mục40;T/D01/D09/FE giữ backlog. Diff không sửa directory/profile hoặc FE. Giữ communication proof untracked của công việc khác ngoài commit này.
+- 19 skip: LiveReadOnlyAudit13,LiveCashDemo1,DemoDataPreparation1,SessionSchemaPostgres4. Không bật live tests để tăng count;PostgreSQL mới đã được kiểm qua runner HTTP9 và migration guards.
+- Final source đã kiểm Price/Paid/owner/center/locks/retry/12h/nanos/holiday union/expiry balance/QR/correction/Normal12/refund khác kỳ/Cash phụ thuộc/report quyền và các đường CRUD cũ. Invoice list center leak đã sửa;test filter cũ thêm actor fixture,giữ assertion filter.
+- Bản check9d8c07c từng fail1 do fixture auth null;13a62ee đã sửa fixture và rerun clean/PG thành công. Lỗi p2-test6 từng dùng source chưa đồng bộ vào worktree;rerun7 đã dùng source đúng. Failed logs giữ local,không được gắn nhãn pass.
+- Log raw/XML do runner tạo nằm local,không đóng gói vào Git vì có debug fixture/QR. Evidence công bố chỉ summary/case names/trace đã loại credential/cookie/QR/signature. scripts/build-phases-evidence.py có thể tái tạo manifest/demo từ output runner.
