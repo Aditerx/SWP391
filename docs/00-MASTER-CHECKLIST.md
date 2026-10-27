@@ -2,24 +2,50 @@
 
 ## Active
 
-**Phạm vi đã giao:** P1.0–P1.4 và BE P2. P1.5/gói T/D01/D09/FE integration vẫn để lại theo Owner. Không coi merge OTP/chat/notification là hoàn tất gói T.
+**Phạm vi đã giao:** P1.0–P1.4, BE P2 và tích hợp D01/D09 theo Owner28/10. P1.5/phần còn lại gói T/FE integration vẫn để lại. Không coi merge OTP/chat/notification hoặc D01/D09 là hoàn tất toàn bộ gói T.
 
 | Việc còn mở | Trạng thái | Điều kiện tiếp tục |
 |---|---|---|
-| Kiểm API có phiên, owner/role/center trên Render | NOT_RUN đầy đủ | Tài khoản thử đúng vai trò, fixture và phạm vi thao tác xác định; kiểm `/auth/me` trước |
+| Kiểm API có phiên, owner/role/center trên Render | BLOCKED; chưa chạy nghiệp vụ | Thiếu tài khoản thử, fixture, phạm vi live và cách đọc state sau commit; kiểm `/auth/me` trước |
+| Toàn bộ tổ hợp CRUD baseline × role/owner/center ngoài matrix workflow đích | NOT_RUN đầy đủ | Xác định contract/fixture từng nghiệp vụ; không suy PASS từ route/schema hoặc workflow liên quan |
 | OTP/email cloud | BLOCKED ở cấu hình hiện tại | Owner xác nhận Render Free; chọn HTTPS email provider/key/sender và adapter, rồi kiểm delivery |
-| D01 hồ sơ Member; D09 Coach directory | BACKLOG theo scope | Chỉ thực hiện khi nhận scope; D09 chưa có positive authenticated proof hết lỗi lazy |
+| D01 hồ sơ Member; D09 Coach directory trên Render | PASS local; chưa publish | Main local đã tích hợp và kiểm PG có phiên; chưa push tại điểm review đã chốt, không gọi đó là nghiệm thu Render |
 | FE browser/CORS/cookie/camera QR | NOT_RUN | Nguồn FE hiện hành và môi trường tích hợp được xác định |
-| VNPay gateway sandbox live | NOT_RUN | Merchant/callback/fixture và quyền kiểm phù hợp; callback ký local không thay gateway |
+| VNPay gateway sandbox live | BLOCKED; chưa gọi gateway | Thiếu Merchant/callback/fixture và quyền kiểm phù hợp; callback ký local không thay gateway |
 | SQLServer runtime | NOT_RUN | Môi trường kiểm riêng nếu được chọn |
 
-**Bước kế tiếp đề nghị:** chuẩn bị matrix nghiệm thu có phiên theo rủi ro: tiền/quyền, owner/center, lịch/credit và biên thời gian. Kiểm local PostgreSQL trước theo D11, sau đó smoke Render trong phạm vi được thống nhất. Không lấy 185 route làm mục tiêu phải gọi mọi mutation lên production.
+**Mức sẵn sàng FE:** contract/schema đủ để bàn giao phạm vi BE đã kiểm local có điều kiện; chưa ký full authenticated Render hoặc FE acceptance. Matrix và response/state chuẩn ở `authenticatedAcceptance` của [QA duy nhất](../artifacts/qa/latest.json).
+
+**Bước kế tiếp:** review bản tích hợp local trước push main (có thể kích hoạt Render auto-deploy); sau khi remote main chứa D01/D09 mới xóa remote feature branch. Khi có tài khoản/fixture/phạm vi live xác định mới kiểm Render theo matrix, xác minh phiên và state; mở rộng kiểm CRUD baseline theo rủi ro/contract. Không lấy số route làm mục tiêu gọi mọi mutation production. P1.5/phần còn lại gói T/FE integration tiếp tục ngoài phạm vi.
 
 Đọc: [AGENTS](../AGENTS.md) → [quyết định Dxx](04-DEBUG-NOTE.md) → [contract FE](01-API-CONTRACT-FE-BE.md) đúng luồng; [vận hành](02-DEPLOYMENT-GUIDE.md) khi cần.
 
-## Nghiệm thu đã ghi nhận — 27/10/2026
+## Nghiệm thu API có phiên — 28/10/2026
 
-Đây là kết quả lưu từ lần kiểm trước, **không phải lần chạy mới trong đợt dọn tài liệu**. App source: `693f732`; Live đã quan sát: `4d372e5`. SHA hiện tại lấy từ Git và runtime khi bắt đầu công việc mới.
+**Môi trường:** PostgreSQL17 riêng `127.0.0.1:55440`, DB mới/fixture mới; checkout không.env, Clock `Asia/Ho_Chi_Minh`. Source kiểm `cc7847f7238ce3084ee74be8373236d52ec55756` đã chứa code/test D01/D09 và các sửa review; main local chưa push. Hash test, actor/fixture/expected/API/response và SQL state sau commit nằm trong QA. Không thêm migration hoặc ghi cloud.
+
+| Điều kiện nghiệm thu | Kết quả mới | Bằng chứng/giới hạn |
+|---|---|---|
+| D01: hồ sơ đúng người/7field, null/validation, race | PASS local | Body không chọn người/role/center; giữ đủ2PATCH field khác nhau dưới lock; User+Member rollback; ngày theo Clock; Inactive403; first-login đổi mật khẩu rồi đọc được |
+| D09: directory thật OSIV=false | PASS local | Member/Manager/Admin scope đúng; Admin null center chạy PG; contact theo MANAGE_USERS; query count không tăng theo Coach; Inactive403; invalid Member thiếu center chỉ kiểm H2 vì PG guard cấm fixture |
+| D02/D03/D10/D16: tiền và quyền | PASS các case local đã ghi | Pending0credit; Paid hợp lệ12; giữ giá cũ; Return không Paid; IPN sai/chậm/retry/race; Cash race; Refund/CashCorrection giữ chứng từ; admission dùng chung tải Coach đa môn |
+| D04/D05/D07: lịch, owner, credit | PASS các case local đã ghi | Consent/Primary Coach; sai role/owner/center; biên12h; notice; idempotency conflict; book/cancel đồng thời và hai slot cùng balance |
+| D06/D08/D12/D14: sự cố và hạn | PASS các case local đã ghi | Dời phòng/cấp cứu, thay Coach có consent/retry không đổi Primary Coach; union nghỉ, preview stale/blocked/xuyên center, restore3+1credit, end ca đúng deadline; Outdoor khóa ca3/4 |
+| D13/D18: báo cáo | PASS các case local đã ghi | Kỳ thu/hoàn; người khác lượt; Coach có VIEW_REPORTS vẫn403; Admin thiếu quyền/Manager Inactive403; Manager center2 không đọc tiền center1 |
+| D15/D17: Normal/attendance/QR | PASS các case local đã ghi | [start,end), TTL/replay; correction;13record/12buổi hợp lệ; hai Member tranh chỗ cuối chỉ1Registered/1Waitlisted |
+| D11/D19: môi trường và bằng chứng | PASS local | Migration replay/snapshot/FK guard; `/auth/me` trước nhóm; response+DB read sau commit; không cloud config/seed/live mutation |
+
+**Kết quả kiểm:** clean326run =299pass/27skip/0lỗi; PostgreSQL HTTP20/20 nhóm (19workflow+1contract); matrix52PASS/2BLOCKED/1NOT_RUN, không có FAIL trong lượt cuối. Contract offline kiểm response local với snapshot không lệch type/property cơ bản; chưa là validator đầy đủ format/nullable/range/error. Lỗi fixture join_date và Member thiếu center được ghi riêng, không tính là pass nghiệp vụ. Skip không là pass và nhánh chưa chạy không được nâng theo count.
+
+**Review và merge D01/D09:** giữ nguyên `053a5f2`/`1dabce5` qua merge `dda99ff` trên nhánh tích hợp, sau kiểm đạt fast-forward main local. Đã tái hiện/sửa race PATCH làm mất field và phiên Inactive vẫn đọc directory/contact; bổ sung Active Member cho self-profile. Test gốc coi28/10 là tương lai bị sai theo ngày chạy: cố định Clock fixture, không đổi rule. Giữ7field và first-login policy; không sửa query Admin-null vì PG đã chạy đúng. Sửa matcher contract để ưu tiên `/me` trước `/{id}`, khai báo schema PATCH/unknown-key đúng runtime.
+
+**Dọn branch:** đã xóa7task branch cũ ở local/remote, xóa local `lan-anh` (remote đã vắng) và `merge/advanced-phases`; giữ LA/tai. Remote `feat/member-profile-coach-directory` còn giữ vì origin/main chưa nhận tích hợp. Danh sách và bằng chứng review ở `integrationReview` trong QA; không xóa worktree/log/backup để làm sạch hình thức.
+
+**Ví dụ local đúng:** giá catalog đổi3.000.000→3.100.000, đơn cũ vẫn3.000.000 và Paid/12credit; IPN đúng mốc5phút ghi Paid cần đối soát nhưng quyền Cancelled/0credit; hai hủy đồng thời trả200/400 và chỉ hoàn1credit. Fixture ngày tương lai dùng Clock test, không là giao dịch Render.
+
+## Bằng chứng giữ lại — 27/10/2026
+
+Đây là bằng chứng cũ, **không chạy lại trong đợt nghiệm thu có phiên này**. App source: `693f732`; Live đã quan sát: `4d372e5`. Không dùng bảng này thay kết quả mới phía trên hoặc suy SHA Live hiện tại.
 
 | Phạm vi | Kết quả lưu | Giới hạn |
 |---|---|---|
@@ -39,6 +65,8 @@ Bằng chứng khi cần: [QA duy nhất](../artifacts/qa/latest.json). Bộ FE 
 
 | Ngày | Nhóm hoàn tất | Dấu vết |
 |---|---|---|
+| 28/10/2026 | Review hai commit D01/D09, tái hiện lỗi Clock/race/Inactive, sửa và tích hợp main local; PG login/SQL state/N+1/contract; dọn branch merged và lan-anh | Source và kết quả mới phía trên/QA; chưa push main hoặc nghiệm thu Render; remote feature giữ tới khi publish |
+| 28/10/2026 | Lập matrix API có phiên và SQL state sau commit; thêm role/center/biên/race HTTP PostgreSQL, collector QA; làm rõ requestId UUID | Local mới theo mục nghiệm thu; Render/gateway BLOCKED, nhánh HTTP còn thiếu ở Active; không sửa BE hoặc ghi cloud |
 | 27/10/2026 | Chuẩn hóa bàn giao: tách trách nhiệm5docs, FE1contract+1 schema, gom QA; bỏ inventory/schema MD và trace trùng | Không sửa BE/DB/deploy; kết quả kiểm cũ giữ theo SHA |
 | 27/10/2026 | Audit và sửa metadata Swagger:24status201/204,6 schema name riêng,LocalTime string; thêm readback/contract regression | App693f732/Live4d372e5; QA |
 | 27/10/2026 | Nâng cấp đúng production188f6765… sau backup mã hóa/restore proof và phê duyệt riêng | Bundle production giữ nguyên hash; docs02/QA |

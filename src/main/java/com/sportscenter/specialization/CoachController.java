@@ -1,7 +1,5 @@
 package com.sportscenter.specialization;
 
-import com.sportscenter.user.CoachRepository;
-import com.sportscenter.center.CenterContext;
 import com.sportscenter.report.AtRiskMemberResponse;
 import com.sportscenter.report.ChurnRiskService;
 import com.sportscenter.session.CoachAvailableSlotResponse;
@@ -19,9 +17,7 @@ import java.util.List;
 @RequestMapping("/api/coaches")
 @RequiredArgsConstructor
 public class CoachController {
-    private final CoachRepository coachRepository;
-    private final CoachSpecializationRepository coachSpecializationRepository;
-    private final CenterContext centerContext;
+    private final CoachDirectoryService coachDirectoryService;
     private final ChurnRiskService churnRiskService;
     private final SessionService sessionService;
 
@@ -44,26 +40,6 @@ public class CoachController {
     public List<CoachSummaryResponse> findAll(@RequestParam(required = false) Integer specializationId,
                                               @RequestParam(required = false) String keyword,
                                               Authentication authentication) {
-        boolean showContacts = authentication != null && authentication.getAuthorities().stream()
-                .anyMatch(authority -> "MANAGE_USERS".equals(authority.getAuthority()));
-        String search = keyword == null ? null : keyword.trim().toLowerCase();
-        Integer centerId = centerContext.currentCenterId();
-        return coachRepository.findAllWithUser().stream().map(coach -> {
-                    List<CoachSpecialization> assignments = coachSpecializationRepository.findByCoachUserId(coach.getUserId());
-                    List<String> names = assignments.stream().map(item -> item.getSpecialization().getName()).toList();
-                    boolean inCenter = centerId == null || centerId.equals(coach.getUser().getCenterId());
-                    boolean hasSpecialization = specializationId == null || assignments.stream()
-                            .anyMatch(item -> specializationId.equals(item.getSpecialization().getId()));
-                    boolean matchesKeyword = search == null || search.isBlank()
-                            || (coach.getUser().getFullName() != null
-                                && coach.getUser().getFullName().toLowerCase().contains(search))
-                            || names.stream().anyMatch(name -> name.toLowerCase().contains(search));
-                    return new CoachFilter(coach, names, inCenter && hasSpecialization && matchesKeyword);
-                })
-                .filter(CoachFilter::matches)
-                .map(item -> CoachSummaryResponse.from(item.coach(), item.specializations(), showContacts))
-                .toList();
+        return coachDirectoryService.findAll(specializationId, keyword, authentication);
     }
-
-    private record CoachFilter(com.sportscenter.user.Coach coach, List<String> specializations, boolean matches) {}
 }

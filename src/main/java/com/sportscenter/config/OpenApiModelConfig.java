@@ -9,6 +9,15 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class OpenApiModelConfig {
     @Bean
+    OpenApiCustomizer memberSelfProfilePatchWireSchema() {
+        return api -> {
+            if (api.getComponents() == null || api.getComponents().getSchemas() == null) return;
+            var patch = api.getComponents().getSchemas().get("MemberSelfProfilePatch");
+            // SpringDoc's JsonAnySetter model otherwise drops the explicit annotation value.
+            if (patch != null) patch.setAdditionalProperties(true);
+        };
+    }
+    @Bean
     OpenApiCustomizer localTimeWireSchema() {
         return api -> {
             if (api.getComponents() == null || api.getComponents().getSchemas() == null

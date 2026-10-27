@@ -6,7 +6,7 @@ Gói FE gồm **file này** và [OpenAPI snapshot](../artifacts/fe-handoff/opena
 
 - Rule Owner: [D01–D19](04-DEBUG-NOTE.md). Trạng thái nghiệm thu và phần còn mở: [docs00](00-MASTER-CHECKLIST.md#active).
 - Snapshot/QA là ghi nhận có thời điểm, không cam kết server hiện tại vẫn cùng trạng thái. Khi tích hợp kiểm lại Live identity và tài khoản thực tế.
-- D01 hồ sơ Member và D09 sửa Coach directory vẫn backlog theo scope. Không dùng API quản trị thay self-service hoặc coi GET401 chứng minh directory hết lỗi lazy.
+- D01 hồ sơ Member và D09 Coach directory có trong bản tích hợp; trạng thái local/Render theo docs00. Không dùng API quản trị thay self-service hoặc coi GET401 chứng minh directory hết lỗi lazy.
 - JSON dưới đây có nhãn **minh họa** hoặc **trích local đã ghi**. ID/ngày/giá fixture không dùng để replay lên production.
 
 ## 1. Kết nối, đăng nhập và lỗi
@@ -40,12 +40,20 @@ FE xử lý **200/201/204** theo route;204 không có body. Lỗi có thể `{co
 | GET `/api/subjects`, `/{id}` | Có phiên; normalPrice/advancedPrice/outdoor/status và metadata. [Bảng giá chuẩn](04-DEBUG-NOTE.md#d02) |
 | GET `/api/public/membership-packages?centerId=1` | Public Active trong center; id/name/price/durationDays/benefits |
 | GET `/api/packages` | Có phiên; gói chung/legacy, không thay giá Advanced theo Subject |
-| GET `/api/coaches?specializationId=...&keyword=...` | Có phiên; specializationId khác subjectId; contact theo MANAGE_USERS; D09 chưa nghiệm thu positive |
+| GET `/api/coaches?specializationId=...&keyword=...` | Actor Active; specializationId khác subjectId; filter/center/contact theo D09 dưới đây |
 | GET `/api/rooms`, `/api/classes` | Có phiên; tra schema/filter; ID từ môi trường đang kết nối |
-| GET/PATCH `/api/members/me` | **D01 chưa có handler self-service riêng**; chưa tích hợp thay bằng `/api/members/{id}` |
+| GET/PATCH `/api/members/me` | Member Active;200; danh tính từ phiên, chỉ7field hồ sơ theo D01 dưới đây |
 | POST/DELETE `/api/users/me/avatar` | Luồng avatar hiện có, tách D01; upload multipart theo schema |
 
 Các group quản trị users/members/staff/roles/permissions/specializations/packages/rooms/classes và training-plan/evaluation/feedback xem OpenAPI. Quyền có thể gồm role+authority+owner/center trong service; snapshot không thay full role matrix. Nhóm baseline chưa có acceptance business đầy đủ chỉ vì route xuất hiện.
+
+**D01 — hồ sơ của Member.** GET và PATCH đều trả đúng `name,phone,address,dateOfBirth,gender,goal,healthNote`; không có id/email/role/credit/giá. Lấy định danh và email từ `/api/auth/me`. PATCH giữ field vắng mặt, `null` xóa6field nullable, `{}` không đổi dữ liệu. `name` nếu gửi phải là string khác null/rỗng/trắng. Key ngoài7field được bỏ qua, gồm memberId/role/status/centerId/packageId/credit/amount/email/password/avatarUrl; không dùng chúng chọn người hay cấp quyền.
+
+Giới hạn: name100,phone20,address255,goal255ký tự; gender `Male`/`Female`/`Other` hoặc null; dateOfBirth đúng `YYYY-MM-DD`, không sau ngày hiện tại theo Clock Asia/Ho_Chi_Minh. Phone chỉ giới hạn độ dài, chưa kiểm format. healthNote theo TEXT, không có giới hạn độ dài ở ứng dụng. Empty string của phone/address/goal/healthNote được giữ nguyên, không tự đổi null.
+
+Lỗi400 `{code,message}` gồm NAME_REQUIRED/NAME_TOO_LONG/PHONE_TOO_LONG/ADDRESS_TOO_LONG/GOAL_TOO_LONG/GENDER_TOO_LONG/INVALID_GENDER/INVALID_DATE_OF_BIRTH/FUTURE_DATE_OF_BIRTH và INVALID_PROFILE_BODY cho JSON null. Sai kiểu field có INVALID_PHONE/INVALID_ADDRESS/INVALID_GOAL/INVALID_HEALTHNOTE; body array/scalar/JSON hỏng dùng lỗi framework400, cần fallback ở mục1. Role khác hoặc phiên cũ của account Inactive trả403. `firstLogin=true` vẫn403 PASSWORD_CHANGE_REQUIRED: đổi mật khẩu qua luồng hiện có, đọc lại `/auth/me`, rồi mở hồ sơ; không có ngoại lệ bỏ filter.
+
+**D09 — Coach directory.** Scope lấy từ account trong phiên: tài khoản thường chỉ center của mình; Admin có center null mới đọc toàn hệ thống. `keyword` trim, không phân biệt hoa/thường, tìm tên Coach hoặc specialization; kết hợp specializationId vẫn trả toàn bộ specialization của Coach khớp. Coach không specialization có `specializations:[]`, không kết quả trả `[]`; không cam kết thứ tự list. Email/phone chỉ có giá trị với MANAGE_USERS, nếu thiếu quyền là null. Account Inactive bị403 kể cả còn cookie cũ. Runtime thiếu center trả400; fixture trạng thái sai này kiểm riêng trên H2 vì guard PostgreSQL không cho lưu Member thiếu center.
 
 <a id="states"></a>
 ## 3. Field và state cần phân biệt
@@ -153,7 +161,7 @@ HOLIDAY_PREVIEW_REQUIRED/HOLIDAY_PREVIEW_STALE/HOLIDAY_IMPACT_UNRESOLVED/HOLIDAY
 <a id="normal"></a>
 ## 11. Normal — 12 buổi cố định
 
-Ưu tiên POST `/api/classes/normal-with-sessions` với requestId,sportsClass,roomId,daysOfWeek,startTime,endTime →201 SportsClassResponse và12buổi cùng transaction. sportsClass gồm name/subjectId/coachId/maxCapacity/startDate/classType:Normal/totalSessions:12. Retry cùng requestId/body cùng Class; conflict không để nửa lịch.
+Ưu tiên POST `/api/classes/normal-with-sessions` với requestId,sportsClass,roomId,daysOfWeek,startTime,endTime →201 SportsClassResponse và12buổi cùng transaction. **requestId là UUID chuẩn36ký tự**, ví dụ `94edc3d1-697a-46fc-9475-c0f9828586cb`; không dùng nhãn tự đặt. sportsClass gồm name/subjectId/coachId/maxCapacity/startDate/classType:Normal/totalSessions:12. Retry cùng requestId/body cùng Class; conflict không để nửa lịch.
 
 Tách bước: POST `/api/classes` tạo Normal Closed →POST `/api/sessions/preview-recurring` →POST `/api/sessions/generate` đủ12 →PUT Class Open. Không publish/enroll chỉ dựa ngày client; generate lại có SCHEDULE_ALREADY_EXISTS.
 
@@ -292,5 +300,7 @@ Gross6200000 khác tiền thực nhận; Approved chưa tính hoàn, CashCorrect
 FE cần xác nhận phiên, lookup ID/role theo môi trường, state/field nullable, refresh nguồn tiền/quyền/lịch sau thao tác, xử lý204/401/403/404/409 và TTL/deadline theo server. Quy trình và lệnh local ở [docs02](02-DEPLOYMENT-GUIDE.md#testing).
 
 Nghiệm thu theo từng điều kiện Dxx: actor+fixture →request →response+state →môi trường/SHA →PASS/FAIL/BLOCKED/NOT_RUN. Ví dụ D05 đúng12h phải hoàn đúng1 và gọi lặp không tăng; D18 dùng phiên Coach hợp lệ để chứng minh403. GET anonymous401 chỉ là security smoke.
+
+Đối chiếu máy đọc nằm trong `authenticatedAcceptance.cases` của [QA duy nhất](../artifacts/qa/latest.json): Dxx/API/actor/fixture/expected, response tham chiếu `local.exchanges` và SQL state đọc sau commit. `authenticatedAcceptance.remaining` giữ phần BLOCKED/NOT_RUN; không suy PASS cho nhánh chưa chạy từ nhánh cùng Dxx đã đạt.
 
 Bộ contract/schema có thể còn thiếu hoặc sai ở phần chưa chạy. [docs00](00-MASTER-CHECKLIST.md#active) giữ các cổng chưa nghiệm thu; không dùng số route/assertion hoặc bản ghi local để ký full production/FE acceptance.

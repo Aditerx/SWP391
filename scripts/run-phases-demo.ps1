@@ -20,6 +20,7 @@ try {
     Push-Location $checkout
     try {
         if (Test-Path .env) { throw 'Demo checkout must not contain .env' }
+        $testSourceHash = (Get-FileHash -LiteralPath src/test/java/com/sportscenter/workflow/PhaseWorkflowHttpTest.java -Algorithm SHA256).Hash.ToLowerInvariant()
         $ErrorActionPreference = 'Continue' # Windows PowerShell wraps native stderr warnings as error records.
         & .\mvnw.cmd clean test *> (Join-Path $outputPath 'clean-test.log')
         $buildExit = $LASTEXITCODE
@@ -29,7 +30,7 @@ try {
         & python scripts/test-phases-postgres.py --database $db --minimal-fixture *> (Join-Path $outputPath 'postgres-prepare.log')
         if ($LASTEXITCODE) { throw 'Disposable PostgreSQL preparation failed' }
         $ErrorActionPreference = 'Continue'
-        & .\mvnw.cmd '-DargLine=-Duser.timezone=Asia/Ho_Chi_Minh' '-Dtest=PhaseWorkflowHttpTest' "-Dscms.phases.pg-url=jdbc:postgresql://127.0.0.1:55440/$db" "-Dscms.evidence-dir=$outputPath/postgres-http" test *> (Join-Path $outputPath 'postgres-http.log')
+        & .\mvnw.cmd '-DargLine=-Duser.timezone=Asia/Ho_Chi_Minh' '-Dtest=PhaseWorkflowHttpTest' "-Dscms.test-source-sha256=$testSourceHash" "-Dscms.phases.pg-url=jdbc:postgresql://127.0.0.1:55440/$db" "-Dscms.evidence-dir=$outputPath/postgres-http" test *> (Join-Path $outputPath 'postgres-http.log')
         $buildExit = $LASTEXITCODE
         $ErrorActionPreference = 'Stop'
         if ($buildExit) { throw 'PostgreSQL HTTP demonstration failed' }

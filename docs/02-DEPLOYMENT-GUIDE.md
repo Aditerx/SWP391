@@ -38,6 +38,18 @@ docker start scms-phases-20261027
 
 Cần Docker Desktop/PostgreSQL 17 container trên, bind **127.0.0.1:55440**, credential local-only `scms-local-only`. Runner tạo committed checkout không.env và DB mới; clean test →migration/replay/snapshot/FK guard →HTTP login/workflow/DB assertions. Clock tiến có kiểm soát; callback ký test key không là gateway live. Không chạy hai Maven clean cùng target.
 
+HTTP test dùng `--minimal-fixture`: schema/catalog local và actor mới trong test, không dùng dữ liệu demo hoặc tài khoản seed lịch sử. Mỗi login xác minh `/api/auth/me`; trước mỗi nhóm xác minh lại5actor chính. Các request race dùng2worker sẵn sàng rồi mở chung latch; kiểm cả response và DB qua connection khác sau HTTP commit. Test phụ thuộc fixture trước sẽ skip nếu nhóm trước thất bại; báo BLOCKED, không coi đó là chặn đúng vai trò.
+
+D01/D09: unit/MockMvc gốc chạy H2, còn `PhaseWorkflowHttpTest` kiểm HTTP login thật trên PG. Fixture ngày sinh dùng Clock cố định. Race PATCH giữ row User bằng connection riêng, chờ cả2request ở DB lock rồi thả; hai field khác nhau phải cùng còn sau commit. Directory kiểm Admin center null, scope/contact và query count không tăng theo số Coach. Snapshot account Inactive được đọc trước khi phục hồi fixture. Case Member thiếu center chỉ chạy H2 vì guard PG từ chối lưu trạng thái đó; lỗi setup không tính là pass403/400. Tích hợp này dùng schema hiện có, không thêm migration hay mở quyền cloud.
+
+Ngoài exchanges, runner giữ `acceptance-cases.json` (Dxx/fixture/expected/SQL state và index response), `actors.json` và XML trong raw run. Sau khi kiểm kết quả, ghi vào QA chuẩn bằng lệnh dưới; lấy checkout từ `verification.json`. Chỉ chạy với test đã commit hoặc bản test được copy có hash khớp; không gọi kết quả checkout cũ là kết quả working tree mới.
+
+```powershell
+python scripts/record-authenticated-acceptance.py --run artifacts/runs/phases/<run> --checkout <checkout> --http-dir postgres-http
+```
+
+Script offline kiểm XML, hash test/source và compatibility schema trước khi thay `artifacts/qa/latest.json`; không login/probe live, không đọc.env hoặc tạo thêm bộ tài liệu bàn giao. Runner truyền `scms.test-source-sha256` vào lượt Maven PostgreSQL và XML lưu lại; collector yêu cầu khớp cả bản test hiện tại lẫn checkout, không ghép XML cũ với source test mới. Khi chạy Maven thủ công phải truyền cùng property từ SHA256 file test ngay trước lượt chạy. Case chỉ lưu response một lần trong `local.exchanges`, matrix tham chiếu index; SHA backend và hash bản test chưa commit được ghi riêng. SQL Timestamp trong snapshot có thể serialize UTC/Z, đối chiếu sang Asia/Ho_Chi_Minh với businessNow/expected. Những gate cloud giữ thời điểm/SHA lịch sử và không được nâng thành nghiệm thu mới.
+
 Output `artifacts/runs/phases/<timestamp>` ignored; raw run cuối trước chuẩn hóa giữ local ở `artifacts/runs/phases/2026-10-27-verified`. Không mặc định có raw run trên máy khác. Communication riêng: `python scripts/test-communication-features.py`, output `artifacts/runs/communication/<run>`; DB/SMTP loopback, không email ra ngoài hoặc .env cloud.
 
 ### Kiểm gói QA đã giữ
