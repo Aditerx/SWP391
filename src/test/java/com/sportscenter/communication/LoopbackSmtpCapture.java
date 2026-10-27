@@ -16,6 +16,7 @@ final class LoopbackSmtpCapture implements AutoCloseable {
         Thread t = new Thread(r, "proof-smtp"); t.setDaemon(true); return t;
     });
     private final List<MimeMessage> received = new CopyOnWriteArrayList<>();
+    private final Queue<String> errors = new ConcurrentLinkedQueue<>();
 
     LoopbackSmtpCapture() throws IOException {
         server = new ServerSocket(0, 20, InetAddress.getByName("127.0.0.1"));
@@ -37,7 +38,7 @@ final class LoopbackSmtpCapture implements AutoCloseable {
             if (matches.size() >= ordinal) return String.valueOf(matches.get(ordinal - 1).getContent());
             Thread.sleep(25);
         }
-        throw new AssertionError("Expected local SMTP delivery was not captured within 10 seconds");
+        throw new AssertionError("Expected local SMTP delivery was not captured within 10 seconds; captured=" + received.size() + "; protocolErrors=" + errors);
     }
     private boolean addressedTo(MimeMessage message, String recipient) {
         try { return Arrays.stream(message.getAllRecipients()).anyMatch(a -> a.toString().equals(recipient)); }
@@ -66,7 +67,7 @@ final class LoopbackSmtpCapture implements AutoCloseable {
                 } else if (command.equals("QUIT")) { reply(out, "221 Bye"); break; }
                 else reply(out, "502 Unsupported test SMTP command");
             }
-        } catch (Exception ex) { throw new IllegalStateException("Local SMTP capture failed", ex); }
+        } catch (Exception ex) { errors.add(ex.getClass().getSimpleName()); throw new IllegalStateException("Local SMTP capture failed", ex); }
     }
     private void reply(PrintWriter out, String line) { out.print(line + "\r\n"); out.flush(); }
     @Override public void close() throws IOException { server.close(); workers.shutdownNow(); }

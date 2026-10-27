@@ -64,6 +64,7 @@ class CommunicationFeaturesPostgresTest {
         p.add("spring.mail.port", smtp::port);
         p.add("spring.mail.username", () -> "sender@proof.invalid");
         p.add("spring.mail.password", () -> "local-proof-only");
+        p.add("spring.mail.properties.mail.smtp.localhost", () -> "localhost");
         p.add("spring.mail.properties.mail.smtp.auth", () -> "false");
         p.add("spring.mail.properties.mail.smtp.starttls.enable", () -> "false");
         p.add("REGISTRATION_DEMO_OTP", () -> "");
