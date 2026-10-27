@@ -92,6 +92,12 @@ public class PhaseWorkflowHttpTest {
     HttpClient member,coach,manager,cashier,other;
     String invoiceCode;
     final List<String> trace=new ArrayList<>();
+    final List<Map<String,Object>> exchanges=new ArrayList<>();
+    String currentScenario="fixture";
+
+    @BeforeEach void scenario(TestInfo info) {
+        currentScenario=info.getTestMethod().map(java.lang.reflect.Method::getName).orElse("unknown");
+    }
 
     @BeforeAll void setup() throws Exception {
         tx.executeWithoutResult(t->{
@@ -128,8 +134,34 @@ public class PhaseWorkflowHttpTest {
         b.method(method,body==null?HttpRequest.BodyPublishers.noBody():HttpRequest.BodyPublishers.ofString(json.writeValueAsString(body)));
         var response=client.send(b.build(),HttpResponse.BodyHandlers.ofString());
         if(!path.equals("/api/auth/login"))trace.add((method+" "+path.replaceAll("vnp_SecureHash=[^&]*","vnp_SecureHash=[redacted]")+" => "+response.statusCode()+" "+(path.contains("checkin-code")?"[QR payload redacted]":response.body().replaceAll("vnp_SecureHash=[^\"&]*","vnp_SecureHash=[redacted]"))).stripTrailing());
+        if(!path.equals("/api/auth/login")) {
+            Map<String,Object> item=new LinkedHashMap<>();
+            item.put("scenario",currentScenario);item.put("actor",actor(client));
+            item.put("businessNow",LocalDateTime.now(clock).toString());
+            item.put("method",method);item.put("path",path.replaceAll("vnp_SecureHash=[^&]*","vnp_SecureHash=[redacted]"));
+            item.put("requestBody",safeRequest(body));item.put("expectedStatus",expected);item.put("actualStatus",response.statusCode());
+            item.put("previewHeaderPresent",headers.containsKey("X-Preview-Token"));
+            Object responseBody=response.body();
+            if(!response.body().isBlank()&&response.statusCode()!=302) {
+                JsonNode parsed=json.readTree(response.body());
+                if(path.contains("checkin-code")&&parsed.isObject())((com.fasterxml.jackson.databind.node.ObjectNode)parsed).put("payload","[redacted]");
+                responseBody=parsed;
+            }
+            item.put("responseBody",responseBody);exchanges.add(item);
+        }
         assertEquals(expected,response.statusCode(),method+" "+path+": "+response.body());
         return response.body().isBlank()||response.statusCode()==302?json.createObjectNode():json.readTree(response.body());
+    }
+    String actor(HttpClient client) {
+        if(client==member)return "MEMBER_A";if(client==other)return "MEMBER_B";
+        if(client==coach)return "PRIMARY_COACH";if(client==manager)return "CENTER_MANAGER";
+        if(client==cashier)return "RECEPTIONIST";return "FIXTURE_LOGIN";
+    }
+    JsonNode safeRequest(Object body) {
+        JsonNode result=json.valueToTree(body);
+        if(result.isObject())for(String key:List.of("code","password","otp","payload"))
+            if(result.has(key))((com.fasterxml.jackson.databind.node.ObjectNode)result).put(key,"[redacted]");
+        return result;
     }
     JsonNode requestOrder(String key,String method,HttpClient owner) throws Exception {
         var r=call(owner,"POST","/api/advanced-registrations",Map.of("subjectId",subjectId,"primaryCoachId",coachId,"requestKey",key),200);
@@ -361,6 +393,7 @@ public class PhaseWorkflowHttpTest {
     }
     @AfterAll void evidence() throws Exception {
         String dir=System.getProperty("scms.evidence-dir","");
-        if(!dir.isBlank()) {Path p=Path.of(dir);Files.createDirectories(p);Files.write(p.resolve("http-workflow.txt"),trace,StandardCharsets.UTF_8);}
+        if(!dir.isBlank()) {Path p=Path.of(dir);Files.createDirectories(p);Files.write(p.resolve("http-workflow.txt"),trace,StandardCharsets.UTF_8);
+            json.writerWithDefaultPrettyPrinter().writeValue(p.resolve("http-exchanges.json").toFile(),exchanges);}
     }
 }
