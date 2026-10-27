@@ -1,0 +1,199 @@
+{
+  "checkedAtUtc": "2026-10-27T13:12:36.165763+00:00",
+  "pushedAtUtc": "2026-10-27T13:07:09+00:00",
+  "elapsedSincePushSeconds": 327.165763,
+  "sourceCommitPushed": "08227b80353e5a52368dddb52888ab73880e0003",
+  "baseUrl": "https://scms-app-p1gy.onrender.com",
+  "method": "GET only; no login, email, payment or database writes",
+  "envRead": false,
+  "requests": [
+    {
+      "path": "/actuator/health",
+      "status": 503,
+      "attempt": 1,
+      "durationSeconds": 2.096,
+      "contentType": "application/vnd.spring-boot.actuator.v3+json",
+      "sha256": "dd6e1162d92ef3185c9eae54ebf943f75f77ebd7bffd5fc43dc06594c755edb3"
+    },
+    {
+      "path": "/actuator/health",
+      "status": 503,
+      "attempt": 2,
+      "durationSeconds": 1.112,
+      "contentType": "application/vnd.spring-boot.actuator.v3+json",
+      "sha256": "dd6e1162d92ef3185c9eae54ebf943f75f77ebd7bffd5fc43dc06594c755edb3"
+    },
+    {
+      "path": "/actuator/health",
+      "status": 503,
+      "attempt": 3,
+      "durationSeconds": 1.107,
+      "contentType": "application/vnd.spring-boot.actuator.v3+json",
+      "sha256": "dd6e1162d92ef3185c9eae54ebf943f75f77ebd7bffd5fc43dc06594c755edb3"
+    },
+    {
+      "path": "/api/health",
+      "status": 200,
+      "attempt": 1,
+      "durationSeconds": 0.495,
+      "contentType": "application/json",
+      "sha256": "a2816881741901a4b6ddd84953a312ca2846ffb5d3651f1fe3e4ae9a420f9b63"
+    },
+    {
+      "path": "/swagger-ui/index.html",
+      "status": 200,
+      "attempt": 1,
+      "durationSeconds": 1.213,
+      "contentType": "text/html",
+      "sha256": "bb9928afd0ea8c12e124c42fef58fb080f36770389684badb2a4dcf548624eeb"
+    },
+    {
+      "path": "/swagger-ui/swagger-ui.css",
+      "status": 200,
+      "attempt": 1,
+      "durationSeconds": 1.265,
+      "contentType": "text/css",
+      "sha256": "40170f0ee859d17f92131ba707329a88a070e4f66874d11365e9a77d232f6117"
+    },
+    {
+      "path": "/swagger-ui/swagger-ui-bundle.js",
+      "status": 200,
+      "attempt": 1,
+      "durationSeconds": 0.758,
+      "contentType": "text/javascript",
+      "sha256": "c2e4a9ef08144839ff47c14202063ecfe4e59e70a4e7154a26bd50d880c88ba1"
+    },
+    {
+      "path": "/swagger-ui/swagger-initializer.js",
+      "status": 200,
+      "attempt": 1,
+      "durationSeconds": 0.338,
+      "contentType": "text/javascript",
+      "sha256": "ce1fd852bad15e4ccbcf93ae8120d1c39539bb4c2d838cc60f3ef991c8c63438"
+    },
+    {
+      "path": "/v3/api-docs/swagger-config",
+      "status": 200,
+      "attempt": 1,
+      "durationSeconds": 0.282,
+      "contentType": "application/json",
+      "sha256": "c46b89da9ca2f9a0aeda4d3c986d1b234bcf34b8c2ecf7e68588e2322b800108"
+    },
+    {
+      "path": "/v3/api-docs",
+      "status": 0,
+      "attempt": 1,
+      "durationSeconds": 25.138,
+      "contentType": "",
+      "sha256": "4e67e948c7499b9cb3cc48dc48c92b0b24b72096992393e8b8904ca505f50b3b"
+    },
+    {
+      "path": "/v3/api-docs",
+      "status": 200,
+      "attempt": 2,
+      "durationSeconds": 13.824,
+      "contentType": "application/json",
+      "sha256": "d47886c41ccfd5db0a8a4f257e663ad54904484ddbe1610cac8b30c2955ff797"
+    },
+    {
+      "path": "/api/public/subjects",
+      "status": 200,
+      "attempt": 1,
+      "durationSeconds": 1.327,
+      "contentType": "application/json",
+      "sha256": "930b5e91ad3342d57e2e5382b07421e4224728591b4fb4fc01b24c74ff461729"
+    },
+    {
+      "path": "/api/reports/dashboard",
+      "status": 401,
+      "attempt": 1,
+      "durationSeconds": 0.597,
+      "contentType": "application/json",
+      "sha256": "9bdb82a2b0ecab5e704477d79196947599e3ebb9d13e41a947058852b7d88778"
+    },
+    {
+      "path": "/api/members/me/invoices",
+      "status": 401,
+      "attempt": 1,
+      "durationSeconds": 0.424,
+      "contentType": "application/json",
+      "sha256": "0369297ed0058b7d4a6c6407b85423e2229236455897d04b5b3392d06bc0448c"
+    },
+    {
+      "path": "/api/center-incidents",
+      "status": 401,
+      "attempt": 1,
+      "durationSeconds": 0.599,
+      "contentType": "application/json",
+      "sha256": "a1807e5cf3e2d9641cc68a579fb4b2ebe10aaed71e57eb288271ec9198934cf7"
+    },
+    {
+      "path": "/actuator/info",
+      "status": 404,
+      "attempt": 1,
+      "durationSeconds": 0.731,
+      "contentType": "application/json",
+      "sha256": "385ad0a62ddf7eaaccac723802384f7a7803bceec4eb3726936e995af0de3f8e"
+    }
+  ],
+  "assertions": {
+    "healthUp": false,
+    "applicationUp": true,
+    "runtimeIdentityAvailable": true,
+    "runtimeCommitMatchesPush": true,
+    "databaseTargetMatchesExpected": false,
+    "swaggerHtml": true,
+    "asset:swagger-ui.css": true,
+    "asset:swagger-ui-bundle.js": true,
+    "asset:swagger-initializer.js": true,
+    "swaggerConfig": true,
+    "openApi": true,
+    "path:/api/advanced-registrations": true,
+    "path:/api/center-incidents": true,
+    "path:/api/payment-resolutions": true,
+    "path:/api/holidays/preview": true,
+    "schema:PrivateBookingRequest": true,
+    "schema:RevenueReportResponse": true,
+    "schema:MemberPackageResponse": true,
+    "nineApprovedSubjects": false,
+    "anonymousDenied:/api/reports/dashboard": true,
+    "anonymousDenied:/api/members/me/invoices": true,
+    "anonymousDenied:/api/center-incidents": true
+  },
+  "health": {
+    "status": "DOWN",
+    "groups": [
+      "liveness",
+      "readiness"
+    ]
+  },
+  "runtimeIdentity": {
+    "diagnosticsVersion": "1",
+    "buildCommit": "08227b80353e5a52368dddb52888ab73880e0003",
+    "databaseTargetFingerprint": "188f67654d48aa11c970703f2cdaefc79290f1173a7dedaf93547e74bc6b1048"
+  },
+  "openApiVersion": "3.0.1",
+  "pathCount": 149,
+  "subjectSlugs": [
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    "bong-da",
+    "quan-vot-tennis",
+    "boi-loi",
+    "ban-cung",
+    "cau-long",
+    "bong-ban",
+    "bong-ro",
+    "bong-chuyen",
+    "pickleball"
+  ],
+  "deploymentShaExposed": null,
+  "result": "FAIL"
+}

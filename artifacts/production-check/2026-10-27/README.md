@@ -24,3 +24,17 @@ Push main17:02:54 UTC+7,lượt [sau sửa CI](after-ci-repair.json) bắt đầ
 Đã hỏiOwnerLiveSHA/latestdeploy status/HealthCheckPath;chưa có thông tin này.Phiên không cóRenderconnector/APIcredential hoặcbrowserkết nối đểtựđọc dashboard.Không hỏi lạiDBpassword/không thayenv/schema.Chưa nghiệmthu production.
 
 Repo khai báoRenderFree/Gmail587;[RenderFree docs](https://render.com/docs/free) xác nhậnSMTP25/465/587 bịchặn trênFree.Nếu service thực tế dùngFree,SMTPcần paid instance hoặc kênh HTTPS phù hợp;chưa thay provider haykhẳngđịnh đây làhealthcomponent đanghỏng khi logschưacó.Render có thểgiữinstance cũ khi deploymới khôngquahealthcheck theo [Renderhealthdocs](https://render.com/docs/health-checks);đây vẫn làgiảthuyết chờLiveSHA/logs,không thay đổihealthcheckđểcheDOWN.
+
+## Owner xác nhận /api/health và Live; đã đọc được commit từ API
+
+Đã bổsungRuntimeIdentity metadataan toàn,không mởDBconnectionhoặcexposeURL/user/password. Source d970c10/merge08227b8,clean302/277pass/25skip/0lỗi;[CI branch/main](runtime-identity-ci.json)success. Ownerkhôngcần tìmvàcopySHAtrongdashboard nữa.
+
+Push main08227b8 lúc20:07:09 UTC+7,[lượt kiểm cóidentity](with-runtime-identity.json) sau327.17s đọcđược:
+
+- diagnosticsVersion1,buildCommit08227b80353e5a52368dddb52888ab73880e0003:đúngbảnchẩnđoánmới trênLive.
+- Pool targetfingerprint188f67654d48aa11c970703f2cdaefc79290f1173a7dedaf93547e74bc6b1048;JDBC.envexpected1a3dfdd756caa0178267fcac431f6eb8d8bbf585c30a0318823da1247464b13e.
+- **19/22pass**,cònhealth503DOWN,targetdigestkhôngkhớp,catalog18vs9. OpenAPI149paths/fields mới vẫnđúng.
+
+Khácdigest chỉrahost/port/path/usernamecủapoolsettingskhácbộ.env,khôngtiếtlộgiátrị;khôngdùnghashmộtmìnhđểcoiDBdatađãđúng. Kiểmoffline khôngmatchcácbiếnthểport/defaultusername/directhostcủaproject.envđãbiết. Chưabiếttrườngnàokhác,khôngquychoOwnercopywrong. Đãhỏi **tênbiến** SPRING_DATASOURCE_*,SPRING_DATASOURCE_HIKARI_* hoặcSPRING_APPLICATION_JSON trongRender;khônghỏiURL/password.SPRING datasource overridescóthểthắngDB_URLplaceholder,hoặcRenderDB_URL/DB_USERNAMEhiệulựcvẫnkhác.env;đâylàhaihướngcầnkiểm,khôngtựđổiràngbuộccấu hình đểnéexternaloverride.
+
+OwnerđãxácnhậnHealthCheckPaththựctế/api/health (pong),latestLive.GiảthuyếtLivecũkhôngnhậnbảnmới đãđượcloạitrừcho08227b8;khôngdùnghealthpathtrongrender.yamlđểquykếtdashboard. Aggregate503 vẫnchưacócomponentlogs đểkếtluậnSMTP/DB. Không DBwrites/configmutation/đổiprovider tronglượt này.
