@@ -32,6 +32,7 @@ public class Holiday {
 
     @Column(name = "description")
     private String description;
+    @Column(name="actual_closed_until") private java.time.LocalDateTime actualClosedUntil;
 
     public Holiday(LocalDate holidayDate, String holidayName, String tag, boolean isActive) {
         this.holidayDate = holidayDate;

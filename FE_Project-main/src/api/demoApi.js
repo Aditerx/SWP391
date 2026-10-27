@@ -7,7 +7,7 @@ const query = (values = {}) => {
 };
 const post = (path, data) => httpClient.post(path, data, { notifyForbidden: false });
 export const demoApi = {
-  me: () => httpClient.get('/api/members/me'),
+  me: () => httpClient.get('/api/auth/me'),
   packages: () => httpClient.get('/api/packages'),
   members: () => httpClient.get('/api/members'),
   classes: () => httpClient.get('/api/classes'),

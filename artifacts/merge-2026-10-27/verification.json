@@ -1,0 +1,414 @@
+{
+  "review_date": "2026-10-27",
+  "timezone": "Asia/Ho_Chi_Minh",
+  "operation": "Resolve existing merge on tai; no phase implementation",
+  "merge_parents": [
+    "fc00c6499547a2873da6787326d508140e24b0fd",
+    "3309b0271326fc634dbe54abfb552ad9571bb613"
+  ],
+  "owner_clarification": {
+    "teammate_scope": [
+      "SMTP registration OTP",
+      "basic chatbox",
+      "notifications"
+    ],
+    "D01_D09": "not implemented",
+    "phase_1_phase_2": "continue in a later session"
+  },
+  "conflicted_paths": [
+    "docs/01-API-CONTRACT-FE-BE.md",
+    "src/main/java/com/sportscenter/auth/PasswordResetService.java",
+    "src/main/java/com/sportscenter/auth/RegistrationService.java",
+    "src/main/java/com/sportscenter/invoice/InvoiceService.java",
+    "src/main/java/com/sportscenter/membership/MemberPackageService.java",
+    "src/main/java/com/sportscenter/session/SessionService.java",
+    "src/main/java/com/sportscenter/training/AttendanceFinalizationProcessor.java",
+    "src/test/java/com/sportscenter/audit/BusinessGapAuditTest.java"
+  ],
+  "resolution": "Preserve tai Clock/locks/guards/lifecycle/toggle; integrate incoming OTP/events and keep both API contract sections",
+  "build_fixes": [
+    "restore ZoneId import",
+    "remove duplicate Clock spies in 3 tests",
+    "merge constructor dependencies without changing business assertions"
+  ],
+  "maven": {
+    "command": ".\\mvnw.cmd clean test",
+    "exit_code": 0,
+    "build": "SUCCESS",
+    "tests": 269,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 19,
+    "passed": 250,
+    "report_count": 47,
+    "skipped_suites": [
+      "com.sportscenter.audit.DemoDataPreparationTest",
+      "com.sportscenter.audit.LiveCashDemoTest",
+      "com.sportscenter.audit.LiveReadOnlyAuditTest",
+      "com.sportscenter.session.SessionSchemaPostgresTest"
+    ],
+    "suites": [
+      {
+        "name": "com.sportscenter.audit.BusinessGapAuditTest",
+        "tests": 3,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "name": "com.sportscenter.audit.DemoDataPreparationTest",
+        "tests": 1,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 1
+      },
+      {
+        "name": "com.sportscenter.audit.LiveCashDemoTest",
+        "tests": 1,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 1
+      },
+      {
+        "name": "com.sportscenter.audit.LiveReadOnlyAuditTest",
+        "tests": 13,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 13
+      },
+      {
+        "name": "com.sportscenter.auth.LoginAttemptServiceTest",
+        "tests": 1,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "name": "com.sportscenter.auth.PasswordResetDemoIsolationTest",
+        "tests": 1,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "name": "com.sportscenter.auth.PendingLoginTest",
+        "tests": 2,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "name": "com.sportscenter.auth.RegistrationOtpServiceTest",
+        "tests": 2,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "name": "com.sportscenter.auth.TemporaryPasswordGeneratorTest",
+        "tests": 1,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "name": "com.sportscenter.chat.ChatControllerTest",
+        "tests": 5,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "name": "com.sportscenter.chat.ChatMessageEventListenerTest",
+        "tests": 3,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "name": "com.sportscenter.chat.ChatResponderDispatcherTest",
+        "tests": 3,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "name": "com.sportscenter.chat.ChatServiceTest",
+        "tests": 15,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "name": "com.sportscenter.config.AuthorizationHttpTest",
+        "tests": 8,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "name": "com.sportscenter.config.LegacyPasswordEncoderTest",
+        "tests": 2,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "name": "com.sportscenter.enrollment.EnrollmentServiceTest",
+        "tests": 25,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "name": "com.sportscenter.feedback.ClassFeedbackAuditTest",
+        "tests": 9,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "name": "com.sportscenter.invoice.InvoiceServiceTest",
+        "tests": 10,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "name": "com.sportscenter.invoice.VnPayGatewayTest",
+        "tests": 3,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "name": "com.sportscenter.membership.MemberPackageExtensionTest",
+        "tests": 3,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "name": "com.sportscenter.membership.MemberPackageServiceTest",
+        "tests": 4,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "name": "com.sportscenter.membership.PackageExpirationJobTest",
+        "tests": 2,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "name": "com.sportscenter.notification.NotificationControllerTest",
+        "tests": 4,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "name": "com.sportscenter.notification.NotificationEventListenerTest",
+        "tests": 2,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "name": "com.sportscenter.notification.NotificationScheduleJobTest",
+        "tests": 3,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "name": "com.sportscenter.notification.NotificationServiceTest",
+        "tests": 8,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "name": "com.sportscenter.report.ChurnRiskServiceTest",
+        "tests": 2,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "name": "com.sportscenter.report.ReportServiceTest",
+        "tests": 3,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "name": "com.sportscenter.session.PrivateSessionServiceTest",
+        "tests": 15,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "name": "com.sportscenter.session.ScheduleDatabaseTest",
+        "tests": 6,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "name": "com.sportscenter.session.SessionIncidentServiceTest",
+        "tests": 12,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "name": "com.sportscenter.session.SessionPrivacyTest",
+        "tests": 7,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "name": "com.sportscenter.session.SessionSchemaPostgresTest",
+        "tests": 4,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 4
+      },
+      {
+        "name": "com.sportscenter.session.SessionServiceTest",
+        "tests": 11,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "name": "com.sportscenter.session.SessionSlotValidatorTest",
+        "tests": 26,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "name": "com.sportscenter.sportclass.SportsClassServiceTest",
+        "tests": 4,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "name": "com.sportscenter.subject.SubjectSafetyTest",
+        "tests": 4,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "name": "com.sportscenter.training.AttendanceFinalizationJobTest",
+        "tests": 1,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "name": "com.sportscenter.training.AttendanceFinalizationProcessorTest",
+        "tests": 10,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "name": "com.sportscenter.training.AttendanceServiceScanTest",
+        "tests": 9,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "name": "com.sportscenter.training.AttendanceServiceTest",
+        "tests": 8,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "name": "com.sportscenter.training.CheckInRequestTest",
+        "tests": 1,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "name": "com.sportscenter.training.TotpTest",
+        "tests": 4,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "name": "com.sportscenter.training.TrainingResultServiceTest",
+        "tests": 3,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "name": "com.sportscenter.user.BookingBlockServiceTest",
+        "tests": 2,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "name": "com.sportscenter.user.MemberRegistrationPaymentTest",
+        "tests": 2,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "name": "com.sportscenter.user.RoleServiceTest",
+        "tests": 1,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    ]
+  },
+  "prior_attempts": [
+    {
+      "log": "maven-clean-test.log",
+      "result": "compile failed: missing ZoneId import"
+    },
+    {
+      "log": "maven-clean-test-2.log",
+      "result": "testCompile failed: duplicate Clock fields in 3 tests"
+    }
+  ],
+  "log_sha256": {
+    "maven-clean-test-2.log": "085771220be8d37b1d331a94207f17e87d3872e5ae9b23b8210776cddc2a6770",
+    "maven-clean-test-3.log": "199be8cec85833e8aaceb075345fb35a0f32c4b660e0feebd42381adffe5f68c",
+    "maven-clean-test.log": "28907802c262b476ad814bb46c42333c4d294d97fc938c764664195355379a2f"
+  },
+  "files_only_schema_sync": true,
+  "env_modified": false,
+  "env_ignored": true,
+  "env_tracked": false,
+  "old_docs_changed": false,
+  "not_verified": [
+    "SMTP delivery",
+    "new notification/chat migrations on PostgreSQL or SQL Server",
+    "real HTTP login/API demo of new features",
+    "current FE browser integration",
+    "live VNPay",
+    "Render deployed SHA"
+  ],
+  "cloud_database_mutation": false,
+  "email_sent_by_this_review": false,
+  "deploy_executed": false,
+  "note": "Previous baseline PostgreSQL 14-pass evidence is historical and does not validate newly merged migrations; incoming FE/dist files retained without browser/build verification."
+}

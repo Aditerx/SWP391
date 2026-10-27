@@ -7,7 +7,13 @@ public record MemberReportResponse(
         long activeMembers,
         long expiredMembers,
         List<PackageDistributionItem> packageDistribution,
-        List<MonthlyMemberGrowthItem> monthlyGrowth
+        List<MonthlyMemberGrowthItem> monthlyGrowth,
+        long neverEntitledMembers,
+        long previouslyEntitledMembersWithoutRights,
+        long expiredRegistrations,
+        long completedRegistrations,
+        long reconciliationRegistrations,
+        long reconciliationMembers
 ) {
     public record PackageDistributionItem(
             String packageName,

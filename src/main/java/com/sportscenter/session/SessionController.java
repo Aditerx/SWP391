@@ -21,6 +21,7 @@ import org.springframework.security.core.Authentication;
 public class SessionController {
     private final SessionService sessionService;
     private final AttendanceService attendanceService;
+    private final SessionAbsenceService sessionAbsenceService;
 
     @GetMapping
     public ResponseEntity<List<SessionResponse>> findAll(
@@ -60,7 +61,7 @@ public class SessionController {
     }
 
     @PostMapping("/book-private")
-    @PreAuthorize("hasRole('MEMBER') or hasAuthority('REGISTER_MEMBER') or hasAuthority('MANAGE_CLASSES')")
+    @PreAuthorize("hasRole('COACH') or (hasAnyRole('CENTERMANAGER','ADMIN') and hasAuthority('MANAGE_CLASSES'))")
     public ResponseEntity<SessionResponse> bookPrivate(
             @Valid @RequestBody PrivateBookingRequest request,
             Authentication authentication) {
@@ -69,7 +70,7 @@ public class SessionController {
     }
 
     @PostMapping("/{sessionId}/cancel-private")
-    @PreAuthorize("hasRole('MEMBER') or hasAuthority('REGISTER_MEMBER') or hasAuthority('MANAGE_CLASSES')")
+    @PreAuthorize("hasRole('MEMBER')")
     public ResponseEntity<SessionResponse> cancelPrivate(
             @PathVariable Integer sessionId,
             Authentication authentication) {
@@ -78,10 +79,12 @@ public class SessionController {
 
     @PostMapping("/{sessionId}/absence")
     @PreAuthorize("hasRole('MEMBER')")
-    public ResponseEntity<AttendanceResponse> requestAbsence(@PathVariable Integer sessionId,
+    public ResponseEntity<SessionAbsenceService.Notice> requestAbsence(@PathVariable Integer sessionId,
             @Valid @RequestBody AbsenceRequest request, Authentication authentication) {
-        return ResponseEntity.ok(attendanceService.requestAbsence(sessionId, request.reason(), authentication.getName()));
+        return ResponseEntity.ok(sessionAbsenceService.report(sessionId, request.reason(), authentication));
     }
+    @GetMapping("/{sessionId}/absence-notices") @PreAuthorize("isAuthenticated()")
+    public List<SessionAbsenceService.Notice> absenceHistory(@PathVariable Integer sessionId,Authentication auth){return sessionAbsenceService.history(sessionId,auth);}
 
     @PostMapping("/check-conflict")
     @PreAuthorize("hasAuthority('MANAGE_CLASSES')")
@@ -122,7 +125,7 @@ public class SessionController {
     }
 
     @PostMapping("/{sessionId}/reschedule")
-    @PreAuthorize("hasAuthority('MANAGE_CLASSES')")
+    @PreAuthorize("hasRole('COACH') or (hasAnyRole('CENTERMANAGER','ADMIN') and hasAuthority('MANAGE_CLASSES'))")
     public ResponseEntity<SessionResponse> reschedule(
             @PathVariable Integer sessionId,
             @Valid @RequestBody SessionRescheduleRequest request,
@@ -131,7 +134,7 @@ public class SessionController {
     }
 
     @PostMapping("/{sessionId}/substitute-coach")
-    @PreAuthorize("hasAuthority('MANAGE_CLASSES')")
+    @PreAuthorize("hasAnyRole('CENTERMANAGER','ADMIN') and hasAuthority('MANAGE_CLASSES')")
     public ResponseEntity<SessionResponse> substituteCoach(
             @PathVariable Integer sessionId,
             @Valid @RequestBody SubstituteCoachRequest request,

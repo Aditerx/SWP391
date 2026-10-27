@@ -10,9 +10,12 @@ public record DashboardResponse(
         BigDecimal totalRevenue,
         long totalInvoices,
         long activeSubscriptions,
-        long todaySessions
+        long todaySessions,
+        BigDecimal moneyReceived,
+        BigDecimal moneyRefunded,
+        BigDecimal netReceived
 ) {
     public DashboardResponse(long totalUsers, long totalMembers, long totalClasses, long totalPackages) {
-        this(totalUsers, totalMembers, totalClasses, totalPackages, BigDecimal.ZERO, 0L, 0L, 0L);
+        this(totalUsers, totalMembers, totalClasses, totalPackages, BigDecimal.ZERO, 0L, 0L, 0L,BigDecimal.ZERO,BigDecimal.ZERO,BigDecimal.ZERO);
     }
 }

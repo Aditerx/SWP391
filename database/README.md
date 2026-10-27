@@ -14,7 +14,12 @@ database/
 │   ├── 01_migration_dynamic_permissions.sql
 │   ├── 02_migration_class_feedback.sql
 │   ├── 03_migration_payment.sql
-│   └── 04_migration_member_flow_v2.sql  # [HIỆN TẠI] Migration mới nhất theo Member.pdf
+│   ├── 04_migration_member_flow_v2.sql
+│   ├── 05_migration_notifications.sql   # Mở rộng thông báo tương thích ngược
+│   ├── 06_migration_chat.sql            # Chat hỗ trợ member và nhân viên
+│   ├── 06_schedule_safety_postgres.sql  # Schedule mutex, không bị chat thay thế
+│   ├── 06_schedule_safety_mssql.sql     # Biến thể SQL Server, không chạy trên PostgreSQL
+│   └── 07_session_subscription_postgres.sql # F-06/F-07: liên kết Session–subscription
 └── archive/                           # Lưu trữ lịch sử (Không dùng trong môi trường live)
     ├── legacy_mssql_20260926.sql           # Schema cũ thời kỳ MS SQL Server
     ├── legacy_postgres_backup_20261003.sql # Bản backup Postgres ngày 03/10/2026
@@ -25,10 +30,12 @@ database/
 
 ## 2. Hướng Dẫn Chạy Migration Mới Nhất Trên Supabase
 
-Hiện tại, hệ thống đã hoàn tất **Giai đoạn 1 (Chuẩn hóa CSDL theo Member.pdf)**.
+Đối chiếu lịch sử DB theo **tên file đầy đủ**, không chỉ số prefix: hai file 06 chat/schedule safety là hai nội dung độc lập; migration 07 vẫn cần cho Session–subscription. DB mới trống cần khởi tạo schema nền và fixture theo kế hoạch riêng; migration nâng cấp không thay schema nền. Hai bản schema_postgres.sql root/database được đồng bộ sau merge. Lượt xử lý conflict chưa chạy các migration mới trên DB.
 
 ### File cần chạy trên Supabase SQL Editor:
-👉 `database/migrations/04_migration_member_flow_v2.sql`
+👉 `database/migrations/06_migration_chat.sql`
+
+Migration 06 tạo các bảng chat và hai quyền `CHAT_AS_MEMBER`, `HANDLE_CHAT`; không xóa, đổi tên hay ghi đè dữ liệu cũ. Migration an toàn khi chạy lại. `HANDLE_CHAT` chỉ được gán mặc định cho Receptionist và CenterManager; Coach không có quyền.
 
 ### Các nội dung cập nhật trong file 04:
 1. **`subjects`**: Thêm cột `normal_price`, `advanced_price` và seed bảng giá chuẩn 9 môn thể thao theo trang 7 `Member.pdf`.

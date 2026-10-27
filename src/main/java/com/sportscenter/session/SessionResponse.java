@@ -22,7 +22,12 @@ public record SessionResponse(
         Integer maxCapacity,
         Integer bookedMemberId,
         String bookedMemberName,
-        Boolean isPrivate
+        Boolean isPrivate,
+        boolean centerInvalidated,
+        Integer makeupForSessionId,
+        boolean creditReturned,
+        Integer createdBy,
+        java.time.LocalDateTime agreementConfirmedAt
 ) {
     public SessionResponse(
             Integer id,
@@ -44,7 +49,7 @@ public record SessionResponse(
     ) {
         this(id, classId, className, subjectId, subjectName, coachId, coachName,
                 roomId, roomName, roomLocation, sessionDate, startTime, endTime,
-                status, enrolledCount, maxCapacity, null, null, false);
+                status, enrolledCount, maxCapacity, null, null, false,false,null,false,null,null);
     }
 
     public static SessionResponse from(Session session) {
@@ -77,7 +82,7 @@ public record SessionResponse(
                 sc != null ? sc.getMaxCapacity() : (room != null ? room.getCapacity() : null),
                 bookedMember != null ? bookedMember.getId() : null,
                 bookedMember != null ? bookedMember.getFullName() : null,
-                isPrivate
+                isPrivate,session.isCenterInvalidated(),session.getMakeupFor()==null?null:session.getMakeupFor().getId(),session.isCreditReturned(),session.getCreatedBy(),session.getAgreementConfirmedAt()
         );
     }
 }

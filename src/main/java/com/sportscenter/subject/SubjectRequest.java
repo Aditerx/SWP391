@@ -8,8 +8,8 @@ public record SubjectRequest(
         String description,
         @jakarta.validation.constraints.Pattern(regexp = "(?i)Active|Inactive") String status,
         String slug,
-        @jakarta.validation.constraints.DecimalMin("0") BigDecimal normalPrice,
-        @jakarta.validation.constraints.DecimalMin("0") BigDecimal advancedPrice, Boolean outdoor) {
+        @jakarta.validation.constraints.DecimalMin(value="0", inclusive=false) BigDecimal normalPrice,
+        @jakarta.validation.constraints.DecimalMin(value="0", inclusive=false) BigDecimal advancedPrice, Boolean outdoor) {
 
     public SubjectRequest(String name, String description, String status, String slug, BigDecimal normalPrice, BigDecimal advancedPrice) {
         this(name, description, status, slug, normalPrice, advancedPrice, null);

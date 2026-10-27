@@ -1,0 +1,181 @@
+{
+  "review_date": "2026-10-27",
+  "timezone": "Asia/Ho_Chi_Minh",
+  "base_commit": "8e957593b865b1172814c2622578c5f7f1e5656a",
+  "scope": "Existing F06/F07 baseline and documentation handoff review; D01-D19 target features not implemented",
+  "maven": {
+    "command": ".\\mvnw.cmd clean test",
+    "tests": 223,
+    "passed": 204,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 19,
+    "build": "SUCCESS",
+    "skipped_groups": [
+      "DemoDataPreparationTest",
+      "LiveCashDemoTest",
+      "LiveReadOnlyAuditTest",
+      "SessionSchemaPostgresTest opt-in"
+    ]
+  },
+  "postgres": {
+    "command": "python scripts/test-session-subscription-postgres.py --container scms-f0607-review-20261027",
+    "container": "scms-f0607-review-20261027",
+    "server_version": "17.11",
+    "databases": [
+      "scms_f0607_fresh",
+      "scms_f0607_upgrade"
+    ],
+    "application_tests_per_database": 7,
+    "application_tests_passed": 14,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "sql_checks": [
+      "fresh and upgrade schema",
+      "repeat migration",
+      "equivalent renamed FK/index",
+      "NOT VALID validation",
+      "orphan rollback",
+      "index-name collision rollback",
+      "incompatible cascading FK rejection",
+      "business-data snapshots unchanged"
+    ],
+    "evidence_type": "Isolated local PostgreSQL and Spring/MockMvc, not Render HTTP or live VNPay"
+  },
+  "security": {
+    "env_ignored": true,
+    "env_tracked": false,
+    "current_env_secret_match_scan": "no matches in candidate files",
+    "private_key_and_common_token_scan": "no findings",
+    "moved_docs": "content preserved by byte/newline-normalized hash comparison; no business-history reread"
+  },
+  "working_tree_file_sha256": {
+    "database/migrations/07_session_subscription_postgres.sql": "c39249682d50fa27a96f53ea5115d2ac8a96cf56c316f61a6082cbd4d48a05dd",
+    "schema_postgres.sql": "0c6ed30e891cbcb11c1d103a6d67de124cf57f41a9e05dbf3b9ca0c4f6e8e8c0",
+    "database/schema_postgres.sql": "0c6ed30e891cbcb11c1d103a6d67de124cf57f41a9e05dbf3b9ca0c4f6e8e8c0",
+    "scripts/test-session-subscription-postgres.py": "42991840a67822adbb025fcaa9b23500507885275c8a84f2ac98736375830355",
+    "src/test/java/com/sportscenter/session/SessionSchemaPostgresTest.java": "40b1199f9d6b6e9e6279506e5f28cb5db3a914d16c1b26d3547320c494f8556a"
+  },
+  "log_sha256": {
+    "maven": "339dc9fa0df20620025757635e695c5cdf27e35e26beb1fc9ce20e4197095739",
+    "postgres": "358dee165018502fe118abb96261ab04f00776891a4a9483e57744f3f2018748"
+  },
+  "not_verified": [
+    "new D01-D19 business features",
+    "FE current source/browser",
+    "Render deployed SHA and DB",
+    "live VNPay IPN",
+    "SQL Server migration execution"
+  ],
+  "supabase_connection": {
+    "success": true,
+    "host": "aws-0-ap-northeast-2.pooler.supabase.com",
+    "select_one": 1,
+    "database": "postgres",
+    "schema": "public",
+    "server_version": "17.11",
+    "client_sslmode": "require",
+    "postgres_backend_tls": false,
+    "transaction_read_only": true,
+    "public_tables": 0,
+    "sessions_subscription_id_present": false,
+    "elapsed_ms": 3055,
+    "rollback_completed": true,
+    "method": "JDBC Session pooler, read-only metadata, rollback",
+    "tested_after_push": "7c29607355dd13072aeb424be25241c2b1daa322",
+    "driver": "PostgreSQL JDBC 42.7.4",
+    "checker_source": "CheckDb.java",
+    "evidence_file": "supabase-connection-normalized.json",
+    "sql_executed": true,
+    "sql_scope": "SHOW transaction_read_only; SELECT 1, database/schema/server version, backend TLS and public table/column metadata; rollback",
+    "business_writes": false,
+    "migration_or_seed_executed": false,
+    "spring_or_jobs_started": false,
+    "env_modified_by_agent": true,
+    "env_change": "Owner selected current DB_PASSWORD; normalized DB_URL only, removing embedded credentials; DB_USERNAME and DB_PASSWORD preserved",
+    "env_ignored": true,
+    "env_tracked": false,
+    "schema_inspected": "public metadata only; zero base tables visible to configured database user",
+    "scms_schema_initialized": false,
+    "api_or_fe_verified_on_new_database": false,
+    "tls_field_scope": "client_sslmode is effective pgJDBC encryption mode; postgres_backend_tls is pg_stat_ssl at PostgreSQL behind pooler, not client-to-pooler TLS",
+    "status": "Connectivity verified; SCMS schema initialization is a separate pending deployment step"
+  },
+  "supabase_connection_history": {
+    "initial_after_baseline_push": {
+      "tested_after_push": "90971974c6b75a7a798f179f286e73a3ae15b2af",
+      "configured_env": {
+        "success": false,
+        "host": "aws-0-ap-southeast-2.pooler.supabase.com",
+        "sql_state": "XX000",
+        "message": "FATAL: (ENOTFOUND) tenant/user [REDACTED] not found",
+        "error_types": [
+          "PSQLException"
+        ],
+        "elapsed_ms": 2201
+      },
+      "direct_diagnostic": {
+        "success": false,
+        "host": "db.zomadlfjncetjtgrcold.supabase.co",
+        "sql_state": "08001",
+        "message": "The connection attempt failed.",
+        "error_types": [
+          "PSQLException",
+          "UnknownHostException"
+        ],
+        "elapsed_ms": 3440
+      },
+      "direct_ipv6_flags_diagnostic": {
+        "success": false,
+        "host": "db.zomadlfjncetjtgrcold.supabase.co",
+        "sql_state": "08001",
+        "message": "The connection attempt failed.",
+        "error_types": [
+          "PSQLException",
+          "UnknownHostException"
+        ],
+        "elapsed_ms": 464
+      },
+      "windows_dns": "Direct hostname has AAAA response; JDBC still reports UnknownHostException",
+      "sql_executed": false,
+      "env_modified_by_agent": false,
+      "spring_or_jobs_started": false,
+      "schema_verified": false,
+      "status": "Blocked on matching Session pooler connection settings; user asked to update DB_URL/DB_USERNAME without sharing password",
+      "checker_source": "CheckDb.java",
+      "driver": "PostgreSQL JDBC 42.7.4",
+      "planned_sql": "SHOW transaction_read_only; SELECT 1 and database/schema/TLS metadata; rollback (not reached)"
+    },
+    "updated_pooler_retry": {
+      "success": false,
+      "host": "aws-0-ap-northeast-2.pooler.supabase.com",
+      "sql_state": "08001",
+      "message": "The connection attempt failed.",
+      "error_types": [
+        "PSQLException",
+        "UnknownHostException"
+      ],
+      "error_reasons": [
+        "The connection attempt failed.",
+        "[REDACTED]:[REDACTED]aws-0-ap-northeast-2.pooler.supabase.com"
+      ],
+      "elapsed_ms": 121
+    },
+    "credential_source_conflict": {
+      "success": false,
+      "host": "aws-0-ap-northeast-2.pooler.supabase.com",
+      "configuration_error": "JDBC_URL_CONTAINS_USERINFO",
+      "username_sources_match": true,
+      "password_sources_match": false,
+      "sql_executed": false
+    },
+    "note": "Historical failures before Owner selected DB_PASSWORD and JDBC URL normalization; latest result is supabase_connection"
+  },
+  "connection_evidence_sha256": {
+    "CheckDb.java": "d905e7f850caa7d5744f85b376e576ea25adb8c9d2c2318ad3bf8bbe2a40da78",
+    "supabase-connection-retry.json": "ad498c8cc1980ef8220cc88b1b5ed6f1cf51717b2d6731ddb30b194364623158",
+    "supabase-connection-config-check.json": "23bdf8d00229e89dec672fe4596091bdae240fd526d687857338b5192e1fdc0f",
+    "supabase-connection-normalized.json": "4e175ce6ae154817b34780d3d2fc4ecbd6edb3cb77159393b1e4cd7ea1c80a10"
+  }
+}

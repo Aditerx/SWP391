@@ -30,4 +30,13 @@ public interface UserRepository extends JpaRepository<User, Integer> {
     @Query(value = "SELECT COUNT(*) FROM users u JOIN roles r ON r.role_id = u.role_id " +
             "WHERE UPPER(r.role_name) = 'MEMBER'", nativeQuery = true)
     long countMembers();
+
+    @Query(value = "SELECT u.* FROM users u JOIN roles r ON r.role_id=u.role_id " +
+            "WHERE UPPER(r.role_name)='RECEPTIONIST' AND LOWER(u.status)='active' " +
+            "AND (:centerId IS NULL OR u.center_id=:centerId)", nativeQuery = true)
+    java.util.List<User> findActiveReceptionists(@Param("centerId") Integer centerId);
+
+    @Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("select u from User u where u.id=:id")
+    Optional<User> findByIdForUpdate(@Param("id") Integer id);
 }

@@ -4,6 +4,8 @@ import com.sportscenter.audit.AuditService;
 import com.sportscenter.enrollment.ClassEnrollment;
 import com.sportscenter.enrollment.ClassEnrollmentRepository;
 import com.sportscenter.notification.NotificationService;
+import com.sportscenter.notification.NotificationTemplates;
+import com.sportscenter.notification.NotificationType;
 import com.sportscenter.session.Session;
 import com.sportscenter.session.SessionRepository;
 import com.sportscenter.user.Member;
@@ -12,6 +14,7 @@ import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -34,14 +37,20 @@ public class AttendanceFinalizationProcessor {
     private final com.sportscenter.membership.MemberPackageRepository memberPackageRepository;
     @org.springframework.beans.factory.annotation.Value("${scms.booking-block.enabled:false}")
     private boolean bookingBlockEnabled;
+    private final ApplicationEventPublisher eventPublisher;
+    private final com.sportscenter.session.ScheduleWriteLock scheduleWriteLock;
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void process(Integer sessionId) {
+        var center=sessionRepository.findCenterIdById(sessionId);
+        if(center.isEmpty())return;
+        scheduleWriteLock.acquire(center.get());
         Session session = sessionRepository.findByIdForUpdate(sessionId).orElse(null);
-        if (session == null || session.isAttendanceFinalized() || "Cancelled".equalsIgnoreCase(session.getStatus())) return;
+        if (session == null || session.isAttendanceFinalized() || session.isCenterInvalidated() || "Cancelled".equalsIgnoreCase(session.getStatus())) return;
         LocalDateTime now = LocalDateTime.now(clock);
         LocalDateTime endsAt = LocalDateTime.of(session.getSessionDate(), session.getEndTime());
         if (endsAt.isAfter(now)) return;
+        List<Integer> noShowMemberIds = new java.util.ArrayList<>();
         if (session.getBookedMember() != null) {
             Integer memberId = session.getBookedMember().getId();
             if (attendanceRepository.findBySessionIdAndMemberId(sessionId, memberId).isEmpty()) {
@@ -51,6 +60,7 @@ public class AttendanceFinalizationProcessor {
                 absent.setState("Absent");
                 absent.setRecordedBy(null);
                 attendanceRepository.save(absent);
+                noShowMemberIds.add(memberId);
                 auditService.log(null, "NO_SHOW_PRIVATE_SESSION", "SESSION", sessionId,
                         "Member " + memberId + " marked Absent (No-show) for private session " + sessionId + ". 1 credit consumed.");
             }
@@ -66,6 +76,7 @@ public class AttendanceFinalizationProcessor {
                 absent.setState("Absent");
                 absent.setRecordedBy(null);
                 attendanceRepository.save(absent);
+                noShowMemberIds.add(memberId);
 
                 LocalDate monthStart = now.toLocalDate().withDayOfMonth(1);
                 long absences = attendanceRepository.countAbsencesForMemberInRange(memberId, monthStart, monthStart.plusMonths(1));
@@ -90,12 +101,18 @@ public class AttendanceFinalizationProcessor {
             }
         }
         if (session.getBookedMember() == null && session.getSportsClass().isNormal()
-                && sessionRepository.countBySportsClassIdAndStatusNot(session.getSportsClass().getId(), "Cancelled") == 12
+                && sessionRepository.countBySportsClassIdAndCenterInvalidatedFalseAndStatusNot(session.getSportsClass().getId(), "Cancelled") == 12
                 && sessionRepository.countBySportsClassIdAndStatusAndAttendanceFinalizedFalse(session.getSportsClass().getId(), "Scheduled") == 0) {
             enrollmentRepository.findByClassIdWithDetails(session.getSportsClass().getId()).stream()
                     .filter(e -> "Registered".equals(e.getStatus())).forEach(e -> {
                         e.setStatus("Completed"); enrollmentRepository.save(e);
                     });
+        }
+        if (!noShowMemberIds.isEmpty()) {
+            eventPublisher.publishEvent(NotificationTemplates.event(NotificationType.NO_SHOW_RECORDED,
+                    noShowMemberIds,
+                    NotificationTemplates.noShow(session.getSessionDate(), session.getStartTime(), session.getEndTime()),
+                    "SESSION", session.getId(), "NO_SHOW_RECORDED:" + session.getId()));
         }
     }
 

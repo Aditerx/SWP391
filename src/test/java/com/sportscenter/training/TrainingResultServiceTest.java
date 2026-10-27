@@ -28,6 +28,8 @@ import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class TrainingResultServiceTest {
+    @Mock com.sportscenter.session.ScheduleWriteLock scheduleWriteLock;
+    private final Authentication coachAuth=new org.springframework.security.authentication.UsernamePasswordAuthenticationToken("coach@example.test","",List.of(new SimpleGrantedAuthority("ROLE_COACH")));
 
     @Mock
     private TrainingResultRepository trainingResultRepository;
@@ -63,19 +65,21 @@ class TrainingResultServiceTest {
         lenient().when(clock.getZone()).thenReturn(ZoneId.of("Asia/Ho_Chi_Minh"));
         sampleCoach = new User();
         sampleCoach.setId(2); sampleCoach.setCenterId(1);
-        sampleCoach.setFullName("Trần Thị Hương");
+        sampleCoach.setFullName("Trần Thị Hương");sampleCoach.setStatus("Active");sampleCoach.setEmail("coach@example.test");
 
         sampleMember = new User();
         sampleMember.setId(7); sampleMember.setCenterId(1);
         sampleMember.setFullName("Hoàng Thị Oanh");
 
         sampleSession = new Session();
-        sampleSession.setId(1);
+        sampleSession.setId(1);sampleSession.setSessionDate(java.time.LocalDate.of(2026,10,16));sampleSession.setStartTime(java.time.LocalTime.of(9,30));sampleSession.setEndTime(java.time.LocalTime.of(11,0));
+        lenient().when(sessionRepository.findCenterIdById(1)).thenReturn(Optional.of(1));
+        lenient().when(userRepository.findByEmailIgnoreCase("coach@example.test")).thenReturn(Optional.of(sampleCoach));
         var sportsClass = new com.sportscenter.sportclass.SportsClass();
         sportsClass.setId(3);
         sportsClass.setCoach(sampleCoach);
         sampleSession.setSportsClass(sportsClass);
-        lenient().when(enrollmentRepository.existsByMemberIdAndSportsClassIdAndStatusIn(7, 3, List.of("Registered", "Completed"))).thenReturn(true);
+        lenient().when(enrollmentRepository.existsByMemberIdAndSportsClassIdAndStatus(7, 3, "Registered")).thenReturn(true);
     }
 
     @Test
@@ -83,7 +87,7 @@ class TrainingResultServiceTest {
     void recordResult_Success() {
         TrainingResultRequest request = new TrainingResultRequest(1, 7, 2, "Tập rất tốt, đúng kỹ thuật", "Present");
 
-        when(sessionRepository.findById(1)).thenReturn(Optional.of(sampleSession));
+        when(sessionRepository.findByIdForUpdate(1)).thenReturn(Optional.of(sampleSession));
         when(userRepository.findById(7)).thenReturn(Optional.of(sampleMember));
         when(userRepository.findById(2)).thenReturn(Optional.of(sampleCoach));
         when(trainingResultRepository.findBySessionIdAndMemberId(1, 7)).thenReturn(Optional.empty());
@@ -99,7 +103,7 @@ class TrainingResultServiceTest {
         when(trainingResultRepository.save(any(TrainingResult.class))).thenReturn(saved);
         when(attendanceRepository.findBySessionIdAndMemberId(1, 7)).thenReturn(Optional.empty());
 
-        TrainingResultResponse response = trainingResultService.recordResult(request);
+        TrainingResultResponse response = trainingResultService.recordResult(request,coachAuth);
 
         assertNotNull(response);
         assertEquals(10, response.resultId());
@@ -115,7 +119,7 @@ class TrainingResultServiceTest {
         BulkTrainingResultRequest.Item item1 = new BulkTrainingResultRequest.Item(7, "Present", "Tốt", null);
         BulkTrainingResultRequest request = new BulkTrainingResultRequest(1, 2, List.of(item1));
 
-        when(sessionRepository.findById(1)).thenReturn(Optional.of(sampleSession));
+        when(sessionRepository.findByIdForUpdate(1)).thenReturn(Optional.of(sampleSession));
         when(userRepository.findById(2)).thenReturn(Optional.of(sampleCoach));
         when(userRepository.findById(7)).thenReturn(Optional.of(sampleMember));
         when(trainingResultRepository.findBySessionIdAndMemberId(1, 7)).thenReturn(Optional.empty());
@@ -126,7 +130,7 @@ class TrainingResultServiceTest {
         });
         when(attendanceRepository.findBySessionIdAndMemberId(1, 7)).thenReturn(Optional.empty());
 
-        List<TrainingResultResponse> responses = trainingResultService.recordBulkResults(request);
+        List<TrainingResultResponse> responses = trainingResultService.recordBulkResults(request,coachAuth);
 
         assertEquals(1, responses.size());
         assertEquals("Present", responses.get(0).attendanceStatus());
@@ -144,9 +148,10 @@ class TrainingResultServiceTest {
         sampleSession.setSportsClass(sportsClass);
 
         Authentication authentication = org.mockito.Mockito.mock(Authentication.class);
+        when(authentication.isAuthenticated()).thenReturn(true);
         when(authentication.getName()).thenReturn("coach@example.test");
         when(authentication.getAuthorities()).thenAnswer(invocation -> java.util.List.of(new SimpleGrantedAuthority("ROLE_COACH")));
-        when(sessionRepository.findById(1)).thenReturn(Optional.of(sampleSession));
+        when(sessionRepository.findByIdForUpdate(1)).thenReturn(Optional.of(sampleSession));
         when(userRepository.findById(7)).thenReturn(Optional.of(sampleMember));
         when(userRepository.findById(2)).thenReturn(Optional.of(sampleCoach));
         when(userRepository.findByEmailIgnoreCase("coach@example.test")).thenReturn(Optional.of(sampleCoach));

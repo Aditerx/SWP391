@@ -198,21 +198,16 @@ ON CONFLICT (user_id) DO UPDATE SET
 -- ==============================================================================
 
 INSERT INTO subjects (subject_name, description, normal_price, advanced_price, status, slug) VALUES
-('Bóng đá',            'Môn thể thao vua ngoài trời, rèn luyện thể lực và phối hợp',         900000,  8000000, 'Active', 'bong-da'),
-('Quần vợt (Tennis)',  'Môn thể thao ngoài trời, rèn luyện phản xạ và thể lực',             1500000, 10000000, 'Active', 'quan-vot-tennis'),
-('Bơi lội',            'Môn thể thao dưới nước ngoài trời, phát triển toàn diện cơ thể',     1200000,  9000000, 'Active', 'boi-loi'),
-('Bắn cung',           'Môn ngoài trời, rèn luyện sự tập trung cao độ và tính kiên nhẫn',   1400000,  9500000, 'Active', 'ban-cung'),
-('Cầu lông',           'Môn thể thao nhanh nhẹn, linh hoạt trong nhà',                        900000,  7500000, 'Active', 'cau-long'),
-('Bóng bàn',           'Phản xạ nhanh, khéo léo với nhịp độ cao trong nhà',                   800000,  6500000, 'Active', 'bong-ban'),
-('Bóng rổ',            'Môn thể thao đồng đội tốc độ và sức bật trong nhà',                  1000000,  8000000, 'Active', 'bong-ro'),
-('Bóng chuyền',        'Phối hợp đồng đội và kỹ thuật phản xạ trên lưới trong nhà',          900000,  7000000, 'Active', 'bong-chuyen'),
-('Pickleball',         'Môn thể thao thời thượng trong nhà, kết hợp tennis, bóng bàn',       1100000,  8500000, 'Active', 'pickleball')
-ON CONFLICT (slug) DO UPDATE SET
-    subject_name = EXCLUDED.subject_name,
-    normal_price = EXCLUDED.normal_price,
-    advanced_price = EXCLUDED.advanced_price,
-    description = EXCLUDED.description,
-    status = EXCLUDED.status;
+('Bóng đá',            'Môn thể thao vua ngoài trời, rèn luyện thể lực và phối hợp',         1000000, 3500000, 'Active', 'bong-da'),
+('Quần vợt (Tennis)',  'Môn thể thao ngoài trời, rèn luyện phản xạ và thể lực',             2500000, 8000000, 'Active', 'quan-vot-tennis'),
+('Bơi lội',            'Môn thể thao dưới nước ngoài trời, phát triển toàn diện cơ thể',     1500000, 4500000, 'Active', 'boi-loi'),
+('Bắn cung',           'Môn ngoài trời, rèn luyện sự tập trung cao độ và tính kiên nhẫn',   2000000, 6000000, 'Active', 'ban-cung'),
+('Cầu lông',           'Môn thể thao nhanh nhẹn, linh hoạt trong nhà',                        900000, 3000000, 'Active', 'cau-long'),
+('Bóng bàn',           'Phản xạ nhanh, khéo léo với nhịp độ cao trong nhà',                   800000, 2500000, 'Active', 'bong-ban'),
+('Bóng rổ',            'Môn thể thao đồng đội tốc độ và sức bật trong nhà',                  1200000, 3500000, 'Active', 'bong-ro'),
+('Bóng chuyền',        'Phối hợp đồng đội và kỹ thuật phản xạ trên lưới trong nhà',          1000000, 3500000, 'Active', 'bong-chuyen'),
+('Pickleball',         'Môn thể thao thời thượng trong nhà, kết hợp tennis, bóng bàn',       1800000, 5000000, 'Active', 'pickleball')
+ON CONFLICT (slug) DO NOTHING;
 
 INSERT INTO rooms (room_name, location, capacity, status, facility_type, center_id) VALUES
 ('Sân cỏ ngoài trời (Bóng đá)',    'Khu sân bóng đá cỏ nhân tạo',   30, 'Available', 'Outdoor', 1),

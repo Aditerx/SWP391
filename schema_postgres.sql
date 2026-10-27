@@ -303,6 +303,7 @@ CREATE TABLE IF NOT EXISTS sessions (
     end_time             TIME NOT NULL,
     attendance_finalized BOOLEAN NOT NULL DEFAULT FALSE,
     booked_member_id     INT NULL,
+    subscription_id      INT NULL,
     coach_id             INT NULL,
     status               VARCHAR(20) NOT NULL DEFAULT 'Scheduled'
         CHECK (status IN ('Scheduled', 'Completed', 'Cancelled')),
@@ -473,6 +474,82 @@ ALTER TABLE member_packages ADD COLUMN IF NOT EXISTS validity_days INT DEFAULT 4
 CREATE INDEX IF NOT EXISTS idx_mp_member  ON member_packages(member_id);
 CREATE INDEX IF NOT EXISTS idx_mp_package ON member_packages(package_id);
 
+-- Session subscription FK must follow creation of member_packages.
+-- PostgreSQL/public schema only. Additive upgrade; never run the demo reset.
+-- Run after 04 and 06. No historical subscription is inferred or backfilled.
+BEGIN;
+SET LOCAL lock_timeout = '5s';
+LOCK TABLE public.member_packages IN SHARE ROW EXCLUSIVE MODE;
+LOCK TABLE public.sessions IN ACCESS EXCLUSIVE MODE;
+ALTER TABLE public.sessions ADD COLUMN IF NOT EXISTS subscription_id INTEGER NULL;
+
+DO $migration$
+DECLARE
+    source_column SMALLINT;
+    target_column SMALLINT;
+    existing_fk RECORD;
+BEGIN
+    SELECT attnum INTO source_column FROM pg_attribute
+    WHERE attrelid = 'public.sessions'::regclass AND attname = 'subscription_id'
+      AND NOT attisdropped AND atttypid = 'integer'::regtype AND NOT attnotnull;
+    IF source_column IS NULL THEN
+        RAISE EXCEPTION 'sessions.subscription_id must be nullable INTEGER; manual review required';
+    END IF;
+    SELECT attnum INTO target_column FROM pg_attribute
+    WHERE attrelid = 'public.member_packages'::regclass AND attname = 'subscription_id' AND NOT attisdropped;
+
+    IF EXISTS (SELECT 1 FROM public.sessions s LEFT JOIN public.member_packages mp
+               ON mp.subscription_id = s.subscription_id
+               WHERE s.subscription_id IS NOT NULL AND mp.subscription_id IS NULL) THEN
+        RAISE EXCEPTION 'Orphan sessions.subscription_id detected; no business data was changed';
+    END IF;
+
+    -- Compare definitions, not names. Never silently retain an incompatible FK.
+    IF EXISTS (SELECT 1 FROM pg_constraint c
+               WHERE c.conrelid = 'public.sessions'::regclass AND c.contype = 'f'
+                 AND source_column = ANY(c.conkey)
+                 AND NOT (c.conkey = ARRAY[source_column]
+                     AND c.confrelid = 'public.member_packages'::regclass
+                     AND c.confkey = ARRAY[target_column]
+                     AND c.confdeltype IN ('a', 'r') AND c.confupdtype IN ('a', 'r'))) THEN
+        RAISE EXCEPTION 'Incompatible subscription foreign key; manual review required';
+    END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint c
+                   WHERE c.conrelid = 'public.sessions'::regclass AND c.contype = 'f'
+                     AND c.conkey = ARRAY[source_column]
+                     AND c.confrelid = 'public.member_packages'::regclass
+                     AND c.confkey = ARRAY[target_column]) THEN
+        IF EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid = 'public.sessions'::regclass
+                   AND conname = 'fk_session_subscription') THEN
+            RAISE EXCEPTION 'Constraint name fk_session_subscription already used by another definition';
+        END IF;
+        ALTER TABLE public.sessions ADD CONSTRAINT fk_session_subscription
+            FOREIGN KEY (subscription_id) REFERENCES public.member_packages(subscription_id);
+    END IF;
+    FOR existing_fk IN SELECT conname FROM pg_constraint
+        WHERE conrelid = 'public.sessions'::regclass AND contype = 'f'
+          AND conkey = ARRAY[source_column] AND NOT convalidated
+    LOOP
+        EXECUTE format('ALTER TABLE public.sessions VALIDATE CONSTRAINT %I', existing_fk.conname);
+    END LOOP;
+
+    -- An existing valid btree with this leading column also supports FK lookups.
+    IF NOT EXISTS (SELECT 1 FROM pg_index i JOIN pg_class ic ON ic.oid = i.indexrelid
+                   JOIN pg_am am ON am.oid = ic.relam
+                   WHERE i.indrelid = 'public.sessions'::regclass
+                     AND i.indisvalid AND i.indisready AND i.indpred IS NULL
+                     AND i.indexprs IS NULL AND i.indkey[0] = source_column AND am.amname = 'btree') THEN
+        IF to_regclass('public.idx_sessions_subscription') IS NOT NULL THEN
+            RAISE EXCEPTION 'Index name idx_sessions_subscription already used by another definition';
+        END IF;
+        CREATE INDEX IF NOT EXISTS idx_sessions_subscription ON public.sessions(subscription_id);
+    END IF;
+END
+$migration$;
+COMMIT;
+
+
 CREATE TABLE IF NOT EXISTS class_enrollments (
     enrollment_id SERIAL PRIMARY KEY,
     member_id     INT NOT NULL,
@@ -577,6 +654,10 @@ CREATE TABLE IF NOT EXISTS notifications (
     content         TEXT,
     type            VARCHAR(20) NOT NULL DEFAULT 'Other'
         CHECK (type IN ('Schedule', 'Payment', 'System', 'Promotion', 'Other')),
+    notification_type VARCHAR(40),
+    related_type    VARCHAR(40),
+    related_id      INT,
+    dedupe_key      VARCHAR(180),
     is_read         BOOLEAN NOT NULL DEFAULT FALSE,
     created_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_noti_user   FOREIGN KEY (user_id)   REFERENCES users(user_id) ON DELETE CASCADE,
@@ -584,21 +665,73 @@ CREATE TABLE IF NOT EXISTS notifications (
 );
 
 CREATE INDEX IF NOT EXISTS idx_noti_user ON notifications(user_id);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_notifications_dedupe_key
+    ON notifications (dedupe_key) WHERE dedupe_key IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_notifications_created_at
+    ON notifications (created_at DESC, notification_id DESC);
 
 CREATE TABLE IF NOT EXISTS notification_recipients (
     notification_id INT NOT NULL,
     user_id         INT NOT NULL,
     is_read         BOOLEAN NOT NULL DEFAULT FALSE,
     read_at         TIMESTAMP NULL,
+    created_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT pk_notification_recipients PRIMARY KEY (notification_id, user_id),
     CONSTRAINT fk_nr_notification FOREIGN KEY (notification_id) REFERENCES notifications(notification_id) ON DELETE CASCADE,
     CONSTRAINT fk_nr_user         FOREIGN KEY (user_id)         REFERENCES users(user_id)
 );
 
 CREATE INDEX IF NOT EXISTS idx_nr_user ON notification_recipients(user_id);
+CREATE INDEX IF NOT EXISTS idx_notification_recipients_feed
+    ON notification_recipients (user_id, is_read, created_at DESC);
 
 -- =====================================================================
--- 10. AI CONSULTATIONS
+-- 10. SUPPORT CHAT
+-- =====================================================================
+
+CREATE TABLE IF NOT EXISTS chat_conversations (
+    id SERIAL PRIMARY KEY,
+    member_user_id INT NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+    status VARCHAR(16) NOT NULL DEFAULT 'OPEN' CHECK (status IN ('OPEN','CLOSED')),
+    assigned_staff_user_id INT NULL REFERENCES users(user_id) ON DELETE SET NULL,
+    handler_type VARCHAR(16) NOT NULL DEFAULT 'STAFF' CHECK (handler_type IN ('STAFF','AI')),
+    subject VARCHAR(200) NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    last_message_at TIMESTAMP NULL,
+    closed_at TIMESTAMP NULL
+);
+CREATE INDEX IF NOT EXISTS idx_chat_conversations_member ON chat_conversations(member_user_id);
+CREATE INDEX IF NOT EXISTS idx_chat_conversations_inbox ON chat_conversations(status,last_message_at DESC,id DESC);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_chat_conversations_member_open
+    ON chat_conversations(member_user_id) WHERE status='OPEN';
+
+CREATE TABLE IF NOT EXISTS chat_messages (
+    id SERIAL PRIMARY KEY,
+    conversation_id INT NOT NULL REFERENCES chat_conversations(id) ON DELETE CASCADE,
+    sender_type VARCHAR(16) NOT NULL CHECK (sender_type IN ('MEMBER','STAFF','AI','SYSTEM')),
+    sender_user_id INT NULL REFERENCES users(user_id) ON DELETE SET NULL,
+    content TEXT NOT NULL,
+    content_type VARCHAR(16) NOT NULL DEFAULT 'TEXT',
+    metadata TEXT NULL,
+    client_message_id VARCHAR(100) NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_chat_messages_conversation ON chat_messages(conversation_id);
+CREATE INDEX IF NOT EXISTS idx_chat_messages_cursor ON chat_messages(conversation_id,id);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_chat_message_client_id
+    ON chat_messages(conversation_id,sender_user_id,client_message_id) WHERE client_message_id IS NOT NULL;
+
+CREATE TABLE IF NOT EXISTS chat_read_state (
+    conversation_id INT NOT NULL REFERENCES chat_conversations(id) ON DELETE CASCADE,
+    user_id INT NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+    last_read_message_id INT NULL REFERENCES chat_messages(id) ON DELETE SET NULL,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY(conversation_id,user_id)
+);
+
+-- =====================================================================
+-- 11. AI CONSULTATIONS
 -- =====================================================================
 
 CREATE TABLE IF NOT EXISTS ai_consultations (
@@ -769,6 +902,8 @@ INSERT INTO permissions (permission_name, description) VALUES
 ('MANAGE_SUBSCRIPTIONS', 'Dang ky va gia han goi tap'),
 ('MANAGE_PERMISSIONS',   'Chi quan tri vien duoc cau hinh ma tran phan quyen'),
 ('MANAGE_INVOICES',      'Quan ly va xem hoa don cua cac thanh vien'),
+('CHAT_AS_MEMBER',       'Member may access their own support chat'),
+('HANDLE_CHAT',          'Receptionist and CenterManager may handle support chats'),
 ('LOCK_SUBJECTS',        'Khoa hoac mo mon hoc'),
 ('MANAGE_SPECIALIZATIONS', 'Quan ly chuyen mon huan luyen vien')
 ON CONFLICT (permission_name) DO NOTHING;
@@ -785,6 +920,7 @@ FROM (VALUES
     ('CenterManager', 'HANDLE_SUPPORT'),
     ('CenterManager', 'VIEW_AUDIT_LOG'),
     ('CenterManager', 'MANAGE_INVOICES'),
+    ('CenterManager', 'HANDLE_CHAT'),
     ('Coach', 'MANAGE_TRAINING_PLAN'),
     ('Coach', 'RECORD_RESULT'),
     ('Receptionist', 'RECORD_RESULT'),
@@ -793,6 +929,8 @@ FROM (VALUES
     ('Receptionist', 'REGISTER_MEMBER'),
     ('Receptionist', 'MANAGE_SUBSCRIPTIONS'),
     ('Receptionist', 'MANAGE_INVOICES'),
+    ('Receptionist', 'HANDLE_CHAT'),
+    ('Member', 'CHAT_AS_MEMBER'),
     ('Admin', 'MANAGE_USERS'),
     ('Admin', 'VIEW_REPORTS'),
     ('Admin', 'VIEW_AUDIT_LOG'),
@@ -926,21 +1064,16 @@ ON CONFLICT (user_id) DO UPDATE SET
 
 -- Bảng giá chuẩn 9 môn thể thao Member.pdf & 01-API-CONTRACT-FE-BE.md
 INSERT INTO subjects (subject_name, description, normal_price, advanced_price, status, slug) VALUES
-('Bóng đá',            'Môn thể thao vua ngoài trời, rèn luyện thể lực và phối hợp',         900000,  8000000, 'Active', 'bong-da'),
-('Quần vợt (Tennis)',  'Môn thể thao ngoài trời, rèn luyện phản xạ và thể lực',             1500000, 10000000, 'Active', 'quan-vot-tennis'),
-('Bơi lội',            'Môn thể thao dưới nước ngoài trời, phát triển toàn diện cơ thể',     1200000,  9000000, 'Active', 'boi-loi'),
-('Bắn cung',           'Môn ngoài trời, rèn luyện sự tập trung cao độ và tính kiên nhẫn',   1400000,  9500000, 'Active', 'ban-cung'),
-('Cầu lông',           'Môn thể thao nhanh nhẹn, linh hoạt trong nhà',                        900000,  7500000, 'Active', 'cau-long'),
-('Bóng bàn',           'Phản xạ nhanh, khéo léo với nhịp độ cao trong nhà',                   800000,  6500000, 'Active', 'bong-ban'),
-('Bóng rổ',            'Môn thể thao đồng đội tốc độ và sức bật trong nhà',                  1000000,  8000000, 'Active', 'bong-ro'),
-('Bóng chuyền',        'Phối hợp đồng đội và kỹ thuật phản xạ trên lưới trong nhà',          900000,  7000000, 'Active', 'bong-chuyen'),
-('Pickleball',         'Môn thể thao thời thượng trong nhà, kết hợp tennis, bóng bàn',       1100000,  8500000, 'Active', 'pickleball')
-ON CONFLICT (slug) DO UPDATE SET
-    subject_name = EXCLUDED.subject_name,
-    normal_price = EXCLUDED.normal_price,
-    advanced_price = EXCLUDED.advanced_price,
-    description = EXCLUDED.description,
-    status = EXCLUDED.status;
+('Bóng đá',            'Môn thể thao vua ngoài trời, rèn luyện thể lực và phối hợp',         1000000, 3500000, 'Active', 'bong-da'),
+('Quần vợt (Tennis)',  'Môn thể thao ngoài trời, rèn luyện phản xạ và thể lực',             2500000, 8000000, 'Active', 'quan-vot-tennis'),
+('Bơi lội',            'Môn thể thao dưới nước ngoài trời, phát triển toàn diện cơ thể',     1500000, 4500000, 'Active', 'boi-loi'),
+('Bắn cung',           'Môn ngoài trời, rèn luyện sự tập trung cao độ và tính kiên nhẫn',   2000000, 6000000, 'Active', 'ban-cung'),
+('Cầu lông',           'Môn thể thao nhanh nhẹn, linh hoạt trong nhà',                        900000, 3000000, 'Active', 'cau-long'),
+('Bóng bàn',           'Phản xạ nhanh, khéo léo với nhịp độ cao trong nhà',                   800000, 2500000, 'Active', 'bong-ban'),
+('Bóng rổ',            'Môn thể thao đồng đội tốc độ và sức bật trong nhà',                  1200000, 3500000, 'Active', 'bong-ro'),
+('Bóng chuyền',        'Phối hợp đồng đội và kỹ thuật phản xạ trên lưới trong nhà',          1000000, 3500000, 'Active', 'bong-chuyen'),
+('Pickleball',         'Môn thể thao thời thượng trong nhà, kết hợp tennis, bóng bàn',       1800000, 5000000, 'Active', 'pickleball')
+ON CONFLICT (slug) DO NOTHING;
 
 INSERT INTO rooms (room_name, location, capacity, status, facility_type, center_id) VALUES
 ('Sân cỏ ngoài trời (Bóng đá)',    'Khu sân bóng đá cỏ nhân tạo',   30, 'Available', 'Outdoor', 1),

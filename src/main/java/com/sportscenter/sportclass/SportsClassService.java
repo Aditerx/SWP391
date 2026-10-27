@@ -74,7 +74,7 @@ public class SportsClassService {
         BigDecimal previousFee = sportsClass.getTuitionFee();
         long occupied = classEnrollmentRepository.countBySportsClassIdAndStatusIn(id, List.of("Registered", "Pending"));
         if (request.maxCapacity() != null && request.maxCapacity() < occupied) throw new BusinessException("CLASS_CAPACITY_EXCEEDED: Cannot reduce capacity below reserved seats");
-        if (sessionRepository.countBySportsClassIdAndStatusNot(id, "Cancelled") > 0
+        if ((sessionRepository.countBySportsClassIdAndStatusNot(id, "Cancelled") > 0||sessionRepository.existsBySportsClassId(id))
                 && (!java.util.Objects.equals(request.subjectId(), sportsClass.getSubject().getId())
                 || request.classType() != null && !request.classType().equalsIgnoreCase(sportsClass.getClassType())
                 || !java.util.Objects.equals(request.coachId(), sportsClass.getCoach() == null ? null : sportsClass.getCoach().getId()))) {
@@ -99,7 +99,7 @@ public class SportsClassService {
     public SportsClassResponse assignCoach(Integer id, Integer coachId) {
         scheduleWriteLock.acquire(repository.findCenterIdById(id).orElseThrow(() -> new ResourceNotFoundException("Class center not found")));
         SportsClass sportsClass = repository.findByIdForUpdate(id).orElseThrow();
-        if (sessionRepository.countBySportsClassIdAndStatusNot(id, "Cancelled") > 0) throw new BusinessException("CLASS_HAS_SCHEDULE: Use substitute-coach for individual scheduled sessions to preserve history");
+        if (sessionRepository.countBySportsClassIdAndStatusNot(id, "Cancelled") > 0||sessionRepository.existsBySportsClassId(id)) throw new BusinessException("CLASS_HAS_SCHEDULE: Use substitute-coach for individual scheduled sessions to preserve history");
         User coach = getCoach(coachId);
         sportsClass.setCoach(coach);
         SportsClass saved = repository.save(sportsClass);
@@ -130,10 +130,8 @@ public class SportsClassService {
             // Tự động gán mức giá chuẩn từ Subject.normal_price (Freeze price logic)
             if (subject.getNormalPrice() != null && subject.getNormalPrice().compareTo(BigDecimal.ZERO) > 0) {
                 sportsClass.setTuitionFee(subject.getNormalPrice());
-            } else if (request.tuitionFee() != null) {
-                sportsClass.setTuitionFee(request.tuitionFee());
             } else {
-                sportsClass.setTuitionFee(BigDecimal.ZERO);
+                throw new BusinessException("INVALID_PRICE: A positive server subject price is required; client tuition overrides are unsupported");
             }
         } else if ("Advanced".equalsIgnoreCase(classType)) {
             if (request.maxCapacity() != null && request.maxCapacity() != 1) {
@@ -143,10 +141,8 @@ public class SportsClassService {
             sportsClass.setTotalSessions(12);
             if (subject.getAdvancedPrice() != null && subject.getAdvancedPrice().compareTo(BigDecimal.ZERO) > 0) {
                 sportsClass.setTuitionFee(subject.getAdvancedPrice());
-            } else if (request.tuitionFee() != null) {
-                sportsClass.setTuitionFee(request.tuitionFee());
             } else {
-                sportsClass.setTuitionFee(BigDecimal.ZERO);
+                throw new BusinessException("INVALID_PRICE: A positive server subject price is required; client tuition overrides are unsupported");
             }
         } else {
             throw new BusinessException("Loại lớp học không hợp lệ: " + classType + ". Chỉ chấp nhận 'Normal' hoặc 'Advanced'.");

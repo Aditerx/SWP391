@@ -22,10 +22,14 @@ class SubjectSafetyTest {
     @Mock SpecializationRepository specializations;
     @org.mockito.Spy java.time.Clock clock = java.time.Clock.system(java.time.ZoneId.of("Asia/Ho_Chi_Minh"));
     @InjectMocks SubjectService service;
-    @Test void customOutdoorSubjectDoesNotDependOnItsName() {
-        when(repository.save(any())).thenAnswer(c -> c.getArgument(0));
-        var response = service.create(new SubjectRequest("A new sport",null,"Inactive",null,java.math.BigDecimal.TEN,java.math.BigDecimal.TEN,true));
-        assertTrue(response.outdoor());
+    @Test void approvedFootballNameProducesItsCanonicalSlugWithoutClientSlug() {
+        when(repository.save(any())).thenAnswer(c->c.getArgument(0));
+        var response=service.create(new SubjectRequest("Bóng đá",null,"Active",null,new java.math.BigDecimal("1000000"),new java.math.BigDecimal("3500000"),true));
+        assertEquals("bong-da",response.slug());assertTrue(response.outdoor());
+    }
+    @Test void nonCatalogSportIsRejectedByD02() {
+        assertThrows(BusinessException.class, () -> service.create(new SubjectRequest("A new sport",null,"Inactive",null,java.math.BigDecimal.TEN,java.math.BigDecimal.TEN,true)));
+        verify(repository,never()).save(any());
     }
     @Test void missingIndoorOutdoorConfigurationIsRejected() {
         assertThrows(BusinessException.class, () -> service.create(new SubjectRequest("A new sport",null,"Inactive",null)));

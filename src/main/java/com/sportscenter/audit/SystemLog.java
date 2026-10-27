@@ -30,7 +30,7 @@ public class SystemLog {
     @Column(name = "target_id")
     private Integer targetId;
 
-    @Column(name = "detail")
+    @Column(name = "detail", length = 8000)
     private String detail;
 
     @Column(name = "timestamp")

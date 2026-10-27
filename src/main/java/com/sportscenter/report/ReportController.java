@@ -18,24 +18,24 @@ public class ReportController {
     private final ReportService service;
 
     @GetMapping("/dashboard")
-    @PreAuthorize("hasAnyAuthority('VIEW_REPORTS', 'MANAGE_USERS', 'MANAGE_CLASSES')")
-    public ResponseEntity<DashboardResponse> dashboard() {
-        return ResponseEntity.ok(service.dashboard());
+    @PreAuthorize("hasAnyRole('CENTERMANAGER','ADMIN') and hasAuthority('VIEW_REPORTS')")
+    public ResponseEntity<DashboardResponse> dashboard(org.springframework.security.core.Authentication auth) {
+        return ResponseEntity.ok(service.dashboard(auth));
     }
 
     @GetMapping("/revenue")
-    @PreAuthorize("hasAnyAuthority('VIEW_REPORTS', 'PROCESS_PAYMENT')")
+    @PreAuthorize("hasAnyRole('CENTERMANAGER','ADMIN') and hasAuthority('VIEW_REPORTS')")
     public ResponseEntity<RevenueReportResponse> revenue(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
-            @RequestParam(defaultValue = "month") String groupBy
+            @RequestParam(defaultValue = "month") String groupBy,org.springframework.security.core.Authentication auth
     ) {
-        return ResponseEntity.ok(service.revenueReport(startDate, endDate, groupBy));
+        return ResponseEntity.ok(service.revenueReport(startDate, endDate, groupBy,auth));
     }
 
     @GetMapping("/members")
-    @PreAuthorize("hasAnyAuthority('VIEW_REPORTS', 'MANAGE_USERS')")
-    public ResponseEntity<MemberReportResponse> members() {
-        return ResponseEntity.ok(service.memberReport());
+    @PreAuthorize("hasAnyRole('CENTERMANAGER','ADMIN') and hasAuthority('VIEW_REPORTS')")
+    public ResponseEntity<MemberReportResponse> members(org.springframework.security.core.Authentication auth) {
+        return ResponseEntity.ok(service.memberReport(auth));
     }
 }

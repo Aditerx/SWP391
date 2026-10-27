@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.Optional;
 
 public interface ClassEnrollmentRepository extends JpaRepository<ClassEnrollment, Integer> {
+    boolean existsByEligibilitySubscriptionSubscriptionId(Integer id);
 
     @Query("SELECT e FROM ClassEnrollment e " +
            "JOIN FETCH e.member m " +

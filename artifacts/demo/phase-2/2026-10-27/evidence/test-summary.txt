@@ -1,0 +1,62 @@
+clean-test.log SHA256 d61453118833e12e406eae7bc49c582962aa7e71b3c68a1f4686c195e890a254
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 4.485 s -- in com.sportscenter.audit.BusinessGapAuditTest
+[WARNING] Tests run: 1, Failures: 0, Errors: 0, Skipped: 1, Time elapsed: 0.001 s -- in com.sportscenter.audit.DemoDataPreparationTest
+[WARNING] Tests run: 1, Failures: 0, Errors: 0, Skipped: 1, Time elapsed: 0.018 s -- in com.sportscenter.audit.LiveCashDemoTest
+[WARNING] Tests run: 13, Failures: 0, Errors: 0, Skipped: 13, Time elapsed: 0.001 s -- in com.sportscenter.audit.LiveReadOnlyAuditTest
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.042 s -- in com.sportscenter.auth.LoginAttemptServiceTest
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.405 s -- in com.sportscenter.auth.PasswordResetDemoIsolationTest
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.457 s -- in com.sportscenter.auth.PendingLoginTest
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.124 s -- in com.sportscenter.auth.RegistrationOtpServiceTest
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.260 s -- in com.sportscenter.auth.TemporaryPasswordGeneratorTest
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 6.856 s -- in com.sportscenter.chat.ChatControllerTest
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.023 s -- in com.sportscenter.chat.ChatMessageEventListenerTest
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.070 s -- in com.sportscenter.chat.ChatResponderDispatcherTest
+[INFO] Tests run: 15, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.313 s -- in com.sportscenter.chat.ChatServiceTest
+[INFO] Tests run: 8, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 2.001 s -- in com.sportscenter.config.AuthorizationHttpTest
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.315 s -- in com.sportscenter.config.LegacyPasswordEncoderTest
+[INFO] Tests run: 25, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.429 s -- in com.sportscenter.enrollment.EnrollmentServiceTest
+[INFO] Tests run: 9, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.269 s -- in com.sportscenter.feedback.ClassFeedbackAuditTest
+[INFO] Tests run: 11, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.144 s -- in com.sportscenter.invoice.InvoiceServiceTest
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.023 s -- in com.sportscenter.invoice.VnPayGatewayTest
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.012 s -- in com.sportscenter.membership.EntitlementTimePolicyTest
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.057 s -- in com.sportscenter.membership.MemberPackageExtensionTest
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.032 s -- in com.sportscenter.membership.MemberPackageServiceTest
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.067 s -- in com.sportscenter.membership.PackageExpirationJobTest
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.936 s -- in com.sportscenter.notification.NotificationControllerTest
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.006 s -- in com.sportscenter.notification.NotificationEventListenerTest
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.015 s -- in com.sportscenter.notification.NotificationScheduleJobTest
+[INFO] Tests run: 8, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.174 s -- in com.sportscenter.notification.NotificationServiceTest
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.151 s -- in com.sportscenter.report.ChurnRiskServiceTest
+[INFO] Tests run: 7, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.245 s -- in com.sportscenter.report.ReportServiceTest
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.188 s -- in com.sportscenter.session.CenterIncidentRecoveryTest
+[INFO] Tests run: 15, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.425 s -- in com.sportscenter.session.PrivateSessionServiceTest
+[INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 15.89 s -- in com.sportscenter.session.ScheduleDatabaseTest
+[INFO] Tests run: 12, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.157 s -- in com.sportscenter.session.SessionIncidentServiceTest
+[INFO] Tests run: 7, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.039 s -- in com.sportscenter.session.SessionPrivacyTest
+[WARNING] Tests run: 4, Failures: 0, Errors: 0, Skipped: 4, Time elapsed: 0.001 s -- in com.sportscenter.session.SessionSchemaPostgresTest
+[INFO] Tests run: 11, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.176 s -- in com.sportscenter.session.SessionServiceTest
+[INFO] Tests run: 26, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.410 s -- in com.sportscenter.session.SessionSlotValidatorTest
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.149 s -- in com.sportscenter.sportclass.SportsClassServiceTest
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.119 s -- in com.sportscenter.subject.SubjectSafetyTest
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.065 s -- in com.sportscenter.training.AttendanceFinalizationJobTest
+[INFO] Tests run: 10, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.057 s -- in com.sportscenter.training.AttendanceFinalizationProcessorTest
+[INFO] Tests run: 9, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.145 s -- in com.sportscenter.training.AttendanceServiceScanTest
+[INFO] Tests run: 9, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.184 s -- in com.sportscenter.training.AttendanceServiceTest
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.018 s -- in com.sportscenter.training.CheckInRequestTest
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.011 s -- in com.sportscenter.training.TotpTest
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.047 s -- in com.sportscenter.training.TrainingResultServiceTest
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.012 s -- in com.sportscenter.user.BookingBlockServiceTest
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.075 s -- in com.sportscenter.user.MemberRegistrationPaymentTest
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.078 s -- in com.sportscenter.user.RoleServiceTest
+[INFO] Tests run: 9, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 18.81 s -- in com.sportscenter.workflow.PhaseWorkflowHttpTest
+[WARNING] Tests run: 292, Failures: 0, Errors: 0, Skipped: 19
+[INFO] BUILD SUCCESS
+[INFO] Total time:  01:23 min
+[INFO] Finished at: 2026-10-27T15:32:48+07:00
+postgres-http.log SHA256 8b0e14f3f6a6332c4ad8d495500baff177c0155728b13997ae0e29450417921a
+[INFO] Tests run: 9, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 40.42 s -- in com.sportscenter.workflow.PhaseWorkflowHttpTest
+[INFO] Tests run: 9, Failures: 0, Errors: 0, Skipped: 0
+[INFO] BUILD SUCCESS
+[INFO] Total time:  46.819 s
+[INFO] Finished at: 2026-10-27T15:33:45+07:00
+postgres-prepare.log SHA256 b7447c65272b485b04b1c214f7c3a7497526a9d3af2c72f79dad23cb2d35a46c

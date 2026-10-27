@@ -13,6 +13,9 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
+import org.springframework.context.ApplicationEventPublisher;
+import java.time.Clock;
+import java.time.ZoneId;
 
 import java.time.LocalDate;
 import java.util.Optional;
@@ -24,7 +27,6 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class MemberPackageExtensionTest {
     @Mock private com.sportscenter.session.ScheduleWriteLock scheduleWriteLock;
-    @org.mockito.Spy private java.time.Clock clock = java.time.Clock.system(java.time.ZoneId.of("Asia/Ho_Chi_Minh"));
 
     @Mock
     private MemberPackageRepository memberPackageRepository;
@@ -34,6 +36,12 @@ class MemberPackageExtensionTest {
 
     @Mock
     private AuditService auditService;
+
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
+
+    @org.mockito.Spy
+    private Clock clock = Clock.system(ZoneId.of("Asia/Ho_Chi_Minh"));
 
     @InjectMocks
     private MemberPackageService memberPackageService;
@@ -56,8 +64,8 @@ class MemberPackageExtensionTest {
 
         MembershipPackage mp = new MembershipPackage();
         mp.setId(2);
-        mp.setName("Gói 1:1 Tennis");
-        mp.setPackageType("Advanced");
+        mp.setName("Legacy non-Advanced membership");
+        mp.setPackageType("Normal");
 
         subscription = new MemberPackage();
         subscription.setSubscriptionId(101);
@@ -116,6 +124,12 @@ class MemberPackageExtensionTest {
 
         assertThrows(BusinessException.class, () ->
                 memberPackageService.extendValidity(101, request, managerAuth));
+    }
+    @Test void advancedExtensionCannotBypassIncidentRecovery() {
+        subscription.getMembershipPackage().setPackageType("Advanced");
+        when(memberPackageRepository.findByIdForUpdate(101)).thenReturn(Optional.of(subscription));
+        assertTrue(assertThrows(BusinessException.class,()->memberPackageService.extendValidity(101,new PackageExtensionRequest(15,"Unproven extension"),managerAuth)).getMessage().startsWith("USE_INCIDENT_RECOVERY:"));
+        assertEquals(6,subscription.getRemainingCredit());verify(memberPackageRepository,never()).save(any());
     }
 }
 

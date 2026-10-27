@@ -4,7 +4,7 @@
 > **Nguyên tắc cốt lõi:** Bám sát tuyệt đối [AGENTS.md](file:///d:/Projects/SWP391/AGENTS.md) và tài liệu nghiệp vụ `Member.pdf`. Không tin tưởng dữ liệu Client, price freezing trên hóa đơn, pessimistic locking chống race condition, và toàn hệ thống đồng nhất múi giờ `Asia/Ho_Chi_Minh` (UTC+7).
 
 
-> **Bản sửa 23/10/2026:** Cần migration 06 trước khi chạy backend. Mục 12 bên dưới quy định hành vi an toàn mới; bảng giá và các chính sách còn xung đột vẫn chờ quyết định.
+> **Bản BE hai phase 27/10/2026:** cần migrations 06/07/08–12 trước BE. Mục 6–10 và 14 mô tả source mới; bằng chứng/hướng dẫn ở docs 02 mục 10. P1.5/gói T D01/D09/FE được Owner để lại. Demo account mục 1.3 chỉ dành seed local lịch sử; production bootstrap không tạo các tài khoản này.
 
 ---
 
@@ -37,6 +37,15 @@
 * **Đặt lại mật khẩu:** `POST /api/auth/reset-password`
   * Body: `{ "email": "a@example.com", "otp": "123456", "newPassword": "NewPassword123" }`
 * **Đăng xuất:** `POST /api/auth/logout`
+
+#### Quy tắc đăng ký OTP
+
+- Đăng ký mới trả `200` với `{ "message": "..." }`. Tài khoản Pending đăng ký lại chỉ phát OTP mới, giữ nguyên thông tin hiện có và trả `{ "message": "Tài khoản đang chờ xác thực; mã OTP mới đã được gửi.", "code": "REGISTRATION_PENDING" }`.
+- Email Active bị từ chối với `400 { "code": "EMAIL_ALREADY_REGISTERED", "message": "..." }`.
+- Đăng nhập Pending: mật khẩu đúng trả `400` với `REGISTRATION_PENDING`; mật khẩu sai vẫn trả `401 Invalid email or password`.
+- OTP có hiệu lực 10 phút, tối đa 5 lần nhập sai, dùng một lần. Hết lượt phải yêu cầu OTP mới. Demo OTP chỉ bật bằng `REGISTRATION_DEMO_OTP`; chỉ áp dụng đăng ký.
+- Gửi lại OTP tối đa 3 OTP trong một giờ và cách lần phát trước tối thiểu 60 giây. Lỗi `OTP_RESEND_LIMIT` hoặc `OTP_RESEND_TOO_SOON`; lỗi chờ gồm số giây còn lại trong `message` (ví dụ `OTP_RESEND_TOO_SOON: 42`). FE nên đếm ngược 60 giây trước khi bật nút gửi lại.
+- Các lỗi xác thực OTP: `OTP_INVALID`, `OTP_EXPIRED`, `OTP_ATTEMPTS_EXCEEDED`. `forgot-password` luôn trả phản hồi chung dù email có tồn tại hay không.
 
 ### 1.3. Danh Sách Tài Khoản Demo Hệ Thống (Mật Khẩu Đồng Bộ: `Scms@2026`)
 Toàn bộ tài khoản mẫu đã được khởi tạo trong cơ sở dữ liệu (`schema_postgres.sql` / `schema_user_2310.sql`) với mật khẩu chuẩn hóa: **`Scms@2026`** (BCrypt: `$2a$10$QBctKpWoGbyJxKd43TNSPemf2xsDeVUugnAhEEfkZH6pLU8ncMqMi`).
@@ -78,31 +87,38 @@ Toàn bộ tài khoản mẫu đã được khởi tạo trong cơ sở dữ li�
 ## 2. BẢNG GIÁ CHUẨN 9 BỘ MÔN THỂ THAO & HAI DÒNG SẢN PHẨM (ĐỐI CHIẾU MEMBER.PDF)
 
 ### 2.1. Ma Trận Giá 9 Môn Thể Thao
-**Chưa chốt giá:** Bảng dưới là giá demo của contract cũ, khác 16/18 ô so với Member.pdf trang 7. Không dùng làm giá chính thức hoặc để ghi đè DB vận hành. Chờ người dùng chọn nguồn giá; amount trên hóa đơn cũ giữ nguyên.
+**Phạm vi danh mục đã chốt:** chỉ 9 môn trong Member.pdf; giữ ID 19–27 theo snapshot DB đã kiểm. Owner chọn xóa hẳn 8 bản trùng, không giữ Inactive; môn ngoài danh mục như Bắn súng cũng phải loại khỏi danh mục. Đây là kế hoạch chưa thực thi trên DB; không dùng ID snapshot cho DB khác nếu chưa kiểm mapping.
+
+**Đã chốt ngày 25/10/2026:** Mỗi môn có một giá Normal và một giá Advanced riêng; Owner chọn đủ 18 mức giá PDF/migration 04 dưới đây. Đây là giá niêm yết mục tiêu cho giao dịch mới, **chưa phải xác nhận DB/deploy đã cập nhật**. Bảng demo cũ và kiểm kê ID/liên kết nằm tại [04-DEBUG-NOTE.md, mục 9–10](04-DEBUG-NOTE.md). Không chạy seed ghi đè DB hoặc thay amount hóa đơn cũ.
 
 | STT | Môn Thể Thao | Loại Sân / Phòng | Ca Học Cho Phép | Học Phí Khóa Normal (12 buổi nhóm cố định) | Giá Gói Khóa Advanced (1:1 linh hoạt 12 Credit) |
 | :---: | :--- | :---: | :---: | :---: | :---: |
-| **1** | **Bóng đá (Soccer)** | **Outdoor** | Ca 1, 2, 5, 6, 7 *(Khóa Ca 3 & 4)* | **900.000 VNĐ** | **8.000.000 VNĐ** *(12 Credit / 45 ngày)* |
-| **2** | **Quần vợt (Tennis)** | **Outdoor** | Ca 1, 2, 5, 6, 7 *(Khóa Ca 3 & 4)* | **1.500.000 VNĐ** | **10.000.000 VNĐ** *(12 Credit / 45 ngày)* |
-| **3** | **Bơi lội (Swimming)** | **Outdoor** | Ca 1, 2, 5, 6, 7 *(Khóa Ca 3 & 4)* | **1.200.000 VNĐ** | **9.000.000 VNĐ** *(12 Credit / 45 ngày)* |
-| **4** | **Bắn cung (Archery)** | **Outdoor** | Ca 1, 2, 5, 6, 7 *(Khóa Ca 3 & 4)* | **1.400.000 VNĐ** | **9.500.000 VNĐ** *(12 Credit / 45 ngày)* |
-| **5** | **Cầu lông (Badminton)** | **Indoor** | Toàn bộ 7 ca (Ca 1 – Ca 7) | **900.000 VNĐ** | **7.500.000 VNĐ** *(12 Credit / 45 ngày)* |
-| **6** | **Bóng bàn (Table Tennis)** | **Indoor** | Toàn bộ 7 ca (Ca 1 – Ca 7) | **800.000 VNĐ** | **6.500.000 VNĐ** *(12 Credit / 45 ngày)* |
-| **7** | **Bóng rổ (Basketball)** | **Indoor** | Toàn bộ 7 ca (Ca 1 – Ca 7) | **1.000.000 VNĐ** | **8.000.000 VNĐ** *(12 Credit / 45 ngày)* |
-| **8** | **Bóng chuyền (Volleyball)** | **Indoor** | Toàn bộ 7 ca (Ca 1 – Ca 7) | **900.000 VNĐ** | **7.000.000 VNĐ** *(12 Credit / 45 ngày)* |
-| **9** | **Pickleball** | **Indoor** | Toàn bộ 7 ca (Ca 1 – Ca 7) | **1.100.000 VNĐ** | **8.500.000 VNĐ** *(12 Credit / 45 ngày)* |
+| **1** | **Bóng đá (Soccer)** | **Outdoor** | Ca 1, 2, 5, 6, 7 *(Khóa Ca 3 & 4)* | **1.000.000 VNĐ** | **3.500.000 VNĐ** *(12 Credit / 45 ngày)* |
+| **2** | **Quần vợt (Tennis)** | **Outdoor** | Ca 1, 2, 5, 6, 7 *(Khóa Ca 3 & 4)* | **2.500.000 VNĐ** | **8.000.000 VNĐ** *(12 Credit / 45 ngày)* |
+| **3** | **Bơi lội (Swimming)** | **Outdoor** | Ca 1, 2, 5, 6, 7 *(Khóa Ca 3 & 4)* | **1.500.000 VNĐ** | **4.500.000 VNĐ** *(12 Credit / 45 ngày)* |
+| **4** | **Bắn cung (Archery)** | **Outdoor** | Ca 1, 2, 5, 6, 7 *(Khóa Ca 3 & 4)* | **2.000.000 VNĐ** | **6.000.000 VNĐ** *(12 Credit / 45 ngày)* |
+| **5** | **Cầu lông (Badminton)** | **Indoor** | Toàn bộ 7 ca (Ca 1 – Ca 7) | **900.000 VNĐ** | **3.000.000 VNĐ** *(12 Credit / 45 ngày)* |
+| **6** | **Bóng bàn (Table Tennis)** | **Indoor** | Toàn bộ 7 ca (Ca 1 – Ca 7) | **800.000 VNĐ** | **2.500.000 VNĐ** *(12 Credit / 45 ngày)* |
+| **7** | **Bóng rổ (Basketball)** | **Indoor** | Toàn bộ 7 ca (Ca 1 – Ca 7) | **1.200.000 VNĐ** | **3.500.000 VNĐ** *(12 Credit / 45 ngày)* |
+| **8** | **Bóng chuyền (Volleyball)** | **Indoor** | Toàn bộ 7 ca (Ca 1 – Ca 7) | **1.000.000 VNĐ** | **3.500.000 VNĐ** *(12 Credit / 45 ngày)* |
+| **9** | **Pickleball** | **Indoor** | Toàn bộ 7 ca (Ca 1 – Ca 7) | **1.800.000 VNĐ** | **5.000.000 VNĐ** *(12 Credit / 45 ngày)* |
 
-### 2.2. So Sánh Đặc Tính Kỹ Thuật Hai Dòng Sản Phẩm
 
-| Đặc Tính | Khóa Normal (Học Nhóm Cố Định) | Khóa Advanced (Học 1:1 Kèm Riêng) |
-| :--- | :--- | :--- |
-| **Sĩ số lớp** | Tối đa 15 học viên (`maxCapacity <= 15`) | Đúng 1 học viên - 1 HLV (`maxCapacity = 1`) |
-| **Cơ chế lịch học** | Sinh cố định 12 buổi vào DB theo thứ trong tuần (VD: T2-4-6) | Tự do book từng ca học theo giờ rảnh của HLV |
-| **Đơn vị thanh toán** | Thu học phí trọn gói theo môn (1 hóa đơn) | Nạp 12 Credit vào tài khoản gói 1:1 |
-| **Thời hạn sử dụng** | Theo chu kỳ ngày bắt đầu $\rightarrow$ ngày kết thúc của lớp | **45 ngày đếm ngược** từ thời điểm thanh toán thành công |
-| **Chính sách Hủy lịch** | **CẤM HỦY / BÁO VẮNG** (`NORMAL_CLASS_NON_CANCELLABLE`). Nút hủy bị vô hiệu hóa trên FE. | - Hủy trước $\ge 24h$: Hoàn trả 1 Credit vào gói.<br>- Hủy dưới 24h: Bị từ chối (`CANCEL_TOO_LATE`). |
-| **Xử lý Vắng mặt (No-show)**| Điểm danh vắng $\rightarrow$ Mất buổi học đó, không hoàn tiền, không bảo lưu, không học bù. | HLV điểm danh vắng $\rightarrow$ Tiêu thụ 1 Credit (bảo vệ thù lao HLV), không hoàn lại credit. |
-| **Quản lý Hết hạn** | Kết thúc khi buổi học thứ 12 diễn ra xong | Cronjob 00:00 hàng đêm quét: Gói quá 45 ngày chuyển `Expired`, vô hiệu hóa credit thừa. |
+**Lưu ý mẫu response:** Các số tiền/ID gói và hóa đơn minh họa ở các mục API khác chưa được rà lại theo cấu hình gói theo môn; không dùng chúng thay bảng niêm yết này. Hóa đơn/lớp lịch sử có thể giữ snapshot khác hợp lệ. Cách áp giá cho lớp đang mở và gói còn chờ D02/D03.
+
+### 2.2. Hai dòng sản phẩm — rule đang triển khai
+
+| Thuộc tính | Normal | Advanced |
+|---|---|---|
+| Quy mô | Tối đa 15, 12 buổi hợp lệ | 1:1, 12 credit |
+| Mua | Lớp có lịch cố định, giá Subject.normalPrice | Đăng ký môn/Primary Coach, nhận trước khi xuất Invoice |
+| Lịch | Sinh nguyên khối 12 buổi, skip Holiday | Coach chính tạo, Manager/Admin hỗ trợ có lý do và consent |
+| Hạn | Lịch khóa học | Từ Paid + 45 ngày sử dụng, skip thời gian TT đóng theo hợp các khoảng |
+| Thành viên hủy | Cấm hủy/báo vắng | Hủy >=12h hoàn đúng 1 credit; báo vắng chỉ 0<notice<12h, không hoàn |
+| Sự cố TT | Có chứng cứ buổi thực sự không tổ chức: liên kết 1 buổi bù | Hồ sơ sự cố, pause/khôi phục credit gốc; không cấp lại 12 |
+| Attendance mới | Present/Absent trong [start,end) | Present/Absent trong [start,end), credit đã trừ khi book |
+
+Paid là chốt cấp quyền. Pending 5 phút giữ cam kết năng lực, không giữ một ca cụ thể. Giá Invoice được lưu cứng; thay bảng giá không đổi hóa đơn cũ.
 
 ---
 
@@ -181,7 +197,7 @@ Toàn bộ tài khoản mẫu đã được khởi tạo trong cơ sở dữ li�
 
 ### 4.1. Danh Sách Môn Thể Thao (Subjects)
 * **Endpoint:** `GET /api/subjects`
-* **Quyền:** Public / Authenticated
+* **Quyền:** Authenticated (SecurityConfig yêu cầu đăng nhập cho `/api/**`; anonymous nhận 401). Không yêu cầu riêng MANAGE_USERS để xem danh sách.
 * **Mô tả:** Trả về danh sách 9 bộ môn kèm giá chuẩn Normal, giá gói Advanced, slug và cờ `outdoor`.
 * **Response (200 OK):**
 ```json
@@ -318,6 +334,8 @@ Toàn bộ tài khoản mẫu đã được khởi tạo trong cơ sở dữ li�
 ]
 ```
 *(Lưu ý: Trường `phone` và `email` chỉ được trả về khi người đăng nhập có quyền `MANAGE_USERS` nhằm bảo mật thông tin cá nhân).*
+
+Theo source hiện tại: danh sách giới hạn theo center của tài khoản; Admin không gán center có phạm vi toàn hệ thống, tài khoản thường thiếu center bị từ chối. `keyword` được trim, tìm không phân biệt hoa thường theo tên Coach hoặc chuyên môn; `specializationId` là ID Specialization, không phải Subject. Coach không chuyên môn có `specializations: []`; bộ lọc không khớp trả `[]`. Route chưa tự lọc Coach/chuyên môn chỉ Active. Ví dụ trên minh họa DTO, không phải response probe mới. D09 đang chuẩn bị sửa lazy loading, chưa bảo đảm route live hết 500; xem 14.3.
 
 ---
 
@@ -467,331 +485,113 @@ Toàn bộ tài khoản mẫu đã được khởi tạo trong cơ sở dữ li�
 
 ## 6. NHÓM API KHÓA ADVANCED (HỌC 1:1 LINH HOẠT BẰNG 12 CREDIT)
 
-### 6.1. Mua Gói 1:1 & Kiểm Tra Số Dư Credit
-* **Mua Gói:** `POST /api/members/me/subscriptions` *(hoặc alias `POST /api/member-packages/subscribe-me`)*
-* **Quyền:** `hasRole('MEMBER')`
-* **Request Body:**
+### 6.1. Đăng ký Advanced theo môn và Primary Coach — source mới 27/10
+
+Luồng mới thay việc mua mẫu gói Advanced chung. Cần migrations 08/09 sau 06/07; chưa deploy, P1.5/gói T/FE được Owner để lại. Các endpoint dưới thuộc BE local; kết quả kiểm cuối xem docs 02.
+
+1. Manager có `ROLE_CENTERMANAGER` hoặc `ROLE_ADMIN` và `MANAGE_CLASSES` cấu hình `PUT /api/coaches/{id}/work-schedule`:
+   ```json
+   {"weeklySlots":["MONDAY:1","WEDNESDAY:2","FRIDAY:7"],"daysOff":[],"acceptingNew":true}
+   ```
+   `GET` cùng đường dẫn trả `coachId/acceptingNew/weeklySlots/daysOff`; `GET /api/coaches/{id}/admission-capacity?subjectId=26` kiểm năng lực dự kiến và trả `availableSlots/outstandingCredits/requestedCredits`. Kiểm cả môn khác của Coach, credit chưa xếp, đơn Pending chưa hết hạn, sân và lịch đã giữ. Chọn Coach không giữ ca/sân.
+2. Member gọi `POST /api/advanced-registrations` với `{"subjectId":26,"primaryCoachId":15,"requestKey":"purchase-unique-1"}`. Danh tính lấy từ phiên. `requestKey` 1–80 ký tự `[A-Za-z0-9_.:-]`; lặp cùng nội dung trả bản cũ, đổi nội dung trả 409 `IDEMPOTENCY_CONFLICT`.
+3. Coach chính gọi `POST /api/advanced-registrations/{id}/decision` với `{"accepted":true}`. Manager hỗ trợ cùng center phải thêm `reason`. Chưa nhận thì chưa có Invoice, credit hoặc thời hạn đang chạy.
+4. Member chủ yêu cầu gọi `POST /api/advanced-registrations/{id}/order` với `{"paymentMethod":"Cash"}` hoặc `VNPay`. BE kiểm lại năng lực dưới center lock rồi snapshot `Subject.advancedPrice`. Response là `subscriptionId/invoiceId/invoiceCode/amount/paymentMethod/status/expiresAt/paymentUrl`; `expiresAt` ở response đơn là hạn thanh toán 5 phút. Retry trả cùng hóa đơn; không tự mở lại đơn hết hạn.
+5. Cash do Receptionist có `MANAGE_INVOICES` xác nhận; VNPay chỉ IPN hợp lệ cập nhật. Paid đúng hạn mới Active/12 credit. Return chỉ kiểm chữ ký/chuyển hướng; Member đọc Invoice qua API có xác thực để biết kết quả chính thức. IPN muộn ghi nhận Paid/cần đối soát và không cấp quyền.
+
+`GET /api/advanced-registrations` trả các bản trong phạm vi Member chủ/Coach chính/Manager hoặc Admin cùng center. Field: `id/memberId/memberName/subjectId/subjectName/primaryCoachId/primaryCoachName/status/createdAt/acceptedBy/acceptedAt/reason/subscriptionId/subscriptionStatus/remainingCredit/activatedAt/expiresAt`. Trạng thái: Requested → Accepted → Invoiced, hoặc Requested → Rejected; Invoice là nguồn trạng thái tiền sau đó.
+
+`GET /api/members/{memberId}/subscriptions` giữ kiểm chủ tài khoản. DTO thêm `subjectId/primaryCoachId/activatedAt/expiresAt`. `activatedAt/expiresAt` null trước Paid; sau Paid, deadline chính xác dùng 45 ngày sử dụng, hợp nhất thời gian TT đóng/nghỉ, không cộng bù trùng. Session phải kết thúc không vượt deadline. `startDate/endDate` chỉ là phần ngày tương thích, không thay timestamp. Field `price` lấy purchaseAmount đã đóng băng khi mua; legacy chỉ fallback metadata mẫu gói nếu có, có thể null. Chứng từ tiền chính thức là Invoice.amount.
+
+Mua Advanced qua `POST /api/member-packages/subscribe-me` hoặc endpoint gói chung trả 400 `USE_ADVANCED_REGISTRATION`; không tự suy môn từ tên/giá của dữ liệu cũ. Các bản legacy thiếu môn/Coach/timestamp cần đối soát, không backfill từ amount. D01/D09 vẫn backlog riêng.
+
+Lỗi chính: 401 chưa đăng nhập; 403 sai chủ/role/center; 404 không thấy bản; 400 `COACH_ACCEPTANCE_REQUIRED`, `COACH_NOT_ACCEPTING`, `COACH_SCHEDULE_REQUIRED`, `COACH_CAPACITY_INSUFFICIENT`, `COACH_SUBJECT_MISMATCH`, `MEMBER_NOT_ACTIVE`, `BOOKING_BLOCKED`, `INVALID_PRICE`; 409 xung đột idempotency/trạng thái. JSON request không nhận amount/actor/thời điểm xác nhận từ client.
+
+### 6.2. Tra cứu ca và đặt lịch
+
+`GET /api/coaches/{coachId}/available-slots?date=YYYY-MM-DD&subjectId=26&roomId=1` (alias `/api/sessions/coaches/...`) trả 7 ca với `slotNumber/slotName/startTime/endTime/isAvailable/reason`. Đây là tra cứu lịch tài nguyên; cấu hình làm việc lấy từ `/work-schedule`, quyền gói/deadline được kiểm lại lúc ghi. Chọn ca không giữ chỗ.
+
+`POST /api/sessions/book-private` — Coach chính, hoặc Manager/Admin có MANAGE_CLASSES hỗ trợ cùng center. Member/Receptionist không tự tạo:
+
 ```json
-{
-  "packageId": 10,
-  "paymentMethod": "VNPay"
-}
-```
-* **Response (201 Created):**
-```json
-{
-  "subscriptionId": 101,
-  "invoiceId": 55,
-  "invoiceCode": "INV-2026-000055",
-  "amount": 10000000.00,
-  "paymentMethod": "VNPay",
-  "status": "Pending",
-  "expiresAt": "2026-10-20T16:05:00",
-  "paymentUrl": "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html?..."
-}
-```
-* **Kích hoạt sau thanh toán:** Khi hóa đơn được xác nhận `Paid` (VNPay callback hoặc Cash tại quầy) $\rightarrow$ Backend tự động nạp `remainingCredit = 12`, `validityDays = 45`, `startDate = today`, `endDate = today + 45 ngày`.
-* **Xem thông tin Gói & Số dư Credit:** `GET /api/member-packages/me` (hoặc `GET /api/member-packages?memberId=me`)
-* **Response (200 OK):**
-```json
-[
-  {
-    "subscriptionId": 101,
-    "memberId": 20,
-    "memberName": "Nguyễn Văn B",
-    "packageId": 10,
-    "packageName": "Gói 1:1 Tennis Nâng Cao",
-    "price": 10000000.00,
-    "startDate": "2026-10-20",
-    "endDate": "2026-12-04",
-    "status": "Active",
-    "packageType": "Advanced",
-    "remainingCredit": 12,
-    "validityDays": 45
-  }
-]
+{"subscriptionId":101,"coachId":15,"roomId":1,"sessionDate":"2026-11-02","startTime":"07:45:00","endTime":"09:15:00","subjectId":26,"agreementConfirmed":true,"requestKey":"booking-101-1","supportReason":null}
 ```
 
-### 6.2. Tra Cứu Ca Rảnh Của HLV (Coach Available Slots)
-* **Endpoint:** `GET /api/coaches/{coachId}/available-slots`
-  *(Hoặc `GET /api/sessions/coaches/{coachId}/available-slots`)*
-* **Quyền:** `hasRole('MEMBER')`, `hasAuthority('MANAGE_CLASSES')`
-* **Query Params:**
-  * `date`: `YYYY-MM-DD` (Bắt buộc, ví dụ: `2026-10-25`)
-  * `subjectId`: `Integer` (Tùy chọn; nếu là môn ngoài trời như Tennis, Bơi, Bắn cung, Bóng đá $\rightarrow$ tự động khóa Ca 3 và Ca 4)
-  * `roomId`: `Integer` (Tùy chọn; kiểm tra trùng phòng/sân tập cụ thể)
-* **Response (200 OK):**
+`classId` tùy chọn tương thích. BE kiểm Paid/Active, chủ Member active/không bị block, môn/Primary Coach, lịch làm việc, credit, >=12h, end<=expiresAt chính xác, 7 ca, Outdoor khóa 3/4, Holiday, phòng/Coach/Member không trùng. Center lock + subscription lock + transaction bảo đảm trừ đúng một credit. Retry cùng requestKey/nội dung trả ca cũ; đổi nội dung 409 IDEMPOTENCY_CONFLICT. Manager hỗ trợ bắt buộc supportReason. Consent phải true.
+
+Response Session giữ field cũ; thêm `centerInvalidated/makeupForSessionId/creditReturned/createdBy/agreementConfirmedAt`. Không gửi amount/memberId/actor để thay danh tính hay giá. Ca Advanced không tạo/chuyển status/sửa thời gian qua CRUD chung; dùng workflow có audit.
+
+### 6.3. Hủy, báo vắng và hết hạn
+
+- `POST /api/sessions/{id}/cancel-private`: chỉ Member chủ, ca Scheduled, còn >=12h (bằng 12h hợp lệ). Cancelled và trả đúng 1 credit về gói gốc. Retry trả lỗi SESSION_ALREADY_CANCELLED, không hoàn lần hai. <12h: CANCEL_TOO_LATE. Normal luôn cấm.
+- `POST /api/sessions/{id}/absence` body `{"reason":"..."}`: chỉ Member chủ Advanced trong 0<notice<12h. Trả notice riêng, không tạo Excused/Attendance, không hoàn credit. `GET /api/sessions/{id}/absence-notices` cho chủ/Coach được giao/Manager cùng center.
+- Job expiry dùng expiresAt chính xác và Clock UTC+7; chụp expiryRevokedCredit rồi thu credit dư, không tự cấp lại khi reactivation. Legacy thiếu thời điểm gốc cần đối soát. No-show tiêu thụ buổi đã book, không trừ thêm credit; chế tài khóa 7 ngày giữ code nhưng default tắt.
+
+## 7. LỊCH THAY ĐỔI VÀ SỰ CỐ TRUNG TÂM
+
+### 7.1. Dời lịch có audit
+
+`POST /api/sessions/{id}/reschedule` — Primary Coach hoặc Manager/Admin hỗ trợ; body:
+
 ```json
-[
-  {
-    "slotNumber": 1,
-    "slotName": "Ca 1",
-    "startTime": "06:00:00",
-    "endTime": "07:30:00",
-    "isAvailable": true,
-    "reason": null
-  },
-  {
-    "slotNumber": 2,
-    "slotName": "Ca 2",
-    "startTime": "07:45:00",
-    "endTime": "09:15:00",
-    "isAvailable": false,
-    "reason": "HLV đã có lịch dạy vào khung giờ này"
-  },
-  {
-    "slotNumber": 3,
-    "slotName": "Ca 3",
-    "startTime": "09:30:00",
-    "endTime": "11:00:00",
-    "isAvailable": false,
-    "reason": "Ca học bị khóa cho môn thể thao ngoài trời (chính sách chống sốc nhiệt 09:30:00 - 11:00:00)"
-  },
-  {
-    "slotNumber": 4,
-    "slotName": "Ca 4",
-    "startTime": "13:00:00",
-    "endTime": "14:30:00",
-    "isAvailable": false,
-    "reason": "Ca học bị khóa cho môn thể thao ngoài trời (chính sách chống sốc nhiệt 13:00:00 - 14:30:00)"
-  },
-  {
-    "slotNumber": 5,
-    "slotName": "Ca 5",
-    "startTime": "14:45:00",
-    "endTime": "16:15:00",
-    "isAvailable": true,
-    "reason": null
-  }
-]
+{"newDate":"2026-11-03","newStartTime":"07:45:00","newEndTime":"09:15:00","newRoomId":1,"reason":"Member đề nghị","cause":"MEMBER_EARLY","memberAgreed":true,"requestKey":"move-1"}
 ```
 
-### 6.3. Member Đặt Lịch Ca Học 1:1 (Flexible Booking)
-* **Endpoint:** `POST /api/sessions/book-private`
-* **Quyền:** `hasRole('MEMBER') or hasAuthority('REGISTER_MEMBER') or hasAuthority('MANAGE_CLASSES')`
-* **Ràng buộc kiểm tra nghiêm ngặt (Backend Validation):**
-  1. Gói học 1:1 phải ở trạng thái `Active`, còn hạn 45 ngày (`today <= endDate`) và còn ít nhất 1 Credit (`remainingCredit >= 1`).
-  2. Bắt buộc đặt trước tối thiểu **12 tiếng** (`sessionStart >= now + 12h`).
-  3. Khung giờ phải thuộc 7 ca học chuẩn; không được rơi vào Ca 3 và Ca 4 nếu môn ngoài trời.
-  4. Không được đặt lịch vào ngày nghỉ lễ đang có hiệu lực của trung tâm.
-  5. Pessimistic lock `findByIdForUpdate` trên `member_packages` để trừ 1 Credit và chống tranh chấp đồng thời.
-* **Request Body:**
-```json
-{
-  "subscriptionId": 101,
-  "coachId": 3,
-  "roomId": 1,
-  "sessionDate": "2026-10-25",
-  "startTime": "07:45:00",
-  "endTime": "09:15:00",
-  "classId": 200,
-  "subjectId": 1
-}
-```
-* **Response (201 Created):**
-```json
-{
-  "id": 999,
-  "classId": 200,
-  "className": "Quần vợt (Tennis) (1:1 Nâng Cao)",
-  "subjectId": 1,
-  "subjectName": "Quần vợt (Tennis)",
-  "coachId": 3,
-  "coachName": "Trần Thị Hương",
-  "roomId": 1,
-  "roomName": "Sân Tennis ngoài trời 1",
-  "roomLocation": "Khu thể thao ngoài trời",
-  "sessionDate": "2026-10-25",
-  "startTime": "07:45:00",
-  "endTime": "09:15:00",
-  "status": "Scheduled",
-  "enrolledCount": 1,
-  "maxCapacity": 1,
-  "bookedMemberId": 20,
-  "bookedMemberName": "Nguyễn Văn B",
-  "isPrivate": true
-}
-```
+`MEMBER_EARLY`: ca cũ và mới đều >=12h. `MEMBER_EMERGENCY`: Manager/Admin, ca cũ còn 0<12h, ca mới >=12h, không hoàn credit. `CENTER_INCIDENT`: Manager/Admin, incidentId đúng hồ sơ, ca tương lai có thể dưới 12h. Tất cả kiểm ca chuẩn/tài nguyên/deadline/consent và audit trước-sau. `extendValidityDays` không cho cộng tùy ý; nếu ca bù vượt hạn cần `incidentId/extraValidityReason`, chỉ duyệt phần thời gian mở cửa tối thiểu tới cuối ca. Dời thực sự supersede notice cũ nhưng giữ lịch sử; no-op/đổi sân/Coach cùng giờ giữ notice.
 
-### 6.4. Hủy Lịch Học 1:1
-* **Endpoint:** `POST /api/sessions/{sessionId}/cancel-private`
-* **Quyền:** `hasRole('MEMBER') or hasAuthority('REGISTER_MEMBER') or hasAuthority('MANAGE_CLASSES')` (Member chỉ được hủy buổi của chính mình).
-* **Quy tắc thời gian (24h Cutoff):**
-  * **Hủy trước $\ge 24h$:** Hợp lệ $\rightarrow$ Buổi học chuyển sang `Cancelled`, hoàn trả 1 Credit vào gói học 1:1 của Member. Trả về `200 OK`.
-  * **Hủy dưới 24h:** Backend từ chối `400 Bad Request` kèm mã lỗi:
-    `CANCEL_TOO_LATE: Không thể hủy lịch khi còn dưới 24 tiếng. Buổi học sẽ bị tiêu thụ nếu không tham gia.`
-    *(Credit không được hoàn, bảo vệ thù lao cho HLV).*
-* **Response khi hủy thành công (200 OK):**
-```json
-{
-  "id": 999,
-  "classId": 200,
-  "className": "Quần vợt (Tennis) (1:1 Nâng Cao)",
-  "status": "Cancelled",
-  "isPrivate": true,
-  "bookedMemberId": 20
-}
-```
+### 7.2. Thay Coach
 
-### 6.5. Điểm Danh Vắng Mặt (No-show) & Tự Động Hết Hạn 45 Ngày
-* **Điểm danh Vắng mặt (No-show):** Nếu học viên không đến lớp và không hủy trước $\ge 24h$, HLV/Hệ thống điểm danh `Absent` $\rightarrow$ Tiêu thụ 1 Credit (credit đã trừ khi book không được hoàn), không sinh lịch bù.
-* **Cronjob tự động 00:00 hàng đêm (`PackageExpirationJob`):** Quét các gói `Active` có `endDate < today` $\rightarrow$ Tự động chuyển `status = 'Expired'` và hủy toàn bộ số credit thừa còn lại (`remainingCredit = 0`).
+`POST /api/sessions/{id}/substitute-coach`: Manager/Admin MANAGE_CLASSES cùng center, body `{"newCoachId":16,"reason":"...","incidentId":1,"memberAgreed":true,"requestKey":"sub-1"}`. Kiểm chuyên môn/lịch làm việc/trùng lịch, consent riêng cho thay Coach. Không đổi Primary Coach trên gói.
 
----
+### 7.3. Hồ sơ và phục hồi
 
-## 7. NHÓM API XỬ LÝ SỰ CỐ TRUNG TÂM (MƯA BÃO, HLV NGHỈ, GIA HẠN GÓI)
+Các API `/api/center-incidents` cần Manager/Admin + MANAGE_CLASSES, active và cùng center:
 
-### 7.1. Dời Lịch Buổi Học Do Sự Cố (Reschedule Session)
-* **Endpoint:** `POST /api/sessions/{sessionId}/reschedule`
-* **Quyền:** `hasAuthority('MANAGE_CLASSES')` (Center Manager / Admin)
-* **Mục đích:** Xử lý các tình huống bất khả kháng (sân ngập mưa bão, hỏng thiết bị, bảo trì đột xuất, v.v.).
-* **Hành vi nghiệp vụ:**
-  * Kiểm tra ca học mới phải thuộc 7 ca chuẩn và tuân thủ chính sách chống sốc nhiệt ngoài trời.
-  * Kiểm tra không trùng phòng và không trùng HLV trong ca mới.
-  * Nếu là buổi học của lớp Normal: tự động cập nhật ngày kết thúc `SportsClass.endDate` nếu dời vượt qua ngày cũ.
-  * Nếu là buổi học 1:1:
-    * Kiểm tra không trùng lịch của học viên.
-    * **Tự động gia hạn hạn 45 ngày:** Nếu ngày dời mới vượt quá ngày hết hạn của gói hội viên, hệ thống tự động kéo dài `endDate` và tăng `validityDays` tương ứng, chuyển lại `Active` nếu gói bị `Expired` do quá ngày.
-    * Có thể kèm thêm `extendValidityDays` để Manager chủ động đền bù thêm ngày sử dụng cho hội viên.
-* **Request Body:**
-```json
-{
-  "newDate": "2026-11-05",
-  "newStartTime": "07:45:00",
-  "newEndTime": "09:15:00",
-  "newRoomId": 2,
-  "reason": "Mưa bão lớn ngập sân ngoài trời",
-  "extendValidityDays": 7
-}
-```
-* **Response (200 OK):** Đối tượng `SessionResponse` với thông tin ngày, giờ, phòng mới và trạng thái `Scheduled`.
+| Method/path | JSON / hành vi |
+|---|---|
+| GET | Danh sách hồ sơ theo center |
+| POST | `sessionId,startedAt,reason,evidence,requestKey`; WaitingForRecovery; snapshot Member ảnh hưởng, chưa bù tự động |
+| POST /{id}/resolve | `endedAt`; hợp nhất pause, tính lại hạn không bù trùng |
+| POST /{id}/compensate | `reason,verifiedNotHeld:true`; xác minh buổi thực sự không tổ chức vì TT, đánh dấu centerInvalidated và bù đúng một lần |
+| POST /{id}/normal-makeup | `date,startTime,endTime,roomId,coachId,reason`; buổi thay có makeupForSessionId, một bản cho buổi gốc |
 
-### 7.2. Chỉ Định HLV Thay Thế Do Sự Cố (Substitute Coach)
-* **Endpoint:** `POST /api/sessions/{sessionId}/substitute-coach`
-* **Quyền:** `hasAuthority('MANAGE_CLASSES')` (Center Manager / Admin)
-* **Mục đích:** Xử lý sự cố HLV phụ trách đột xuất bị ốm, tai nạn, việc gia đình khẩn cấp.
-* **Hành vi nghiệp vụ:**
-  * Buổi học chưa diễn ra (`Scheduled`).
-  * Người thay thế bắt buộc phải có vai trò `Coach`.
-  * HLV thay thế không được có lịch dạy khác trùng vào khung giờ của buổi học.
-  * Hệ thống ghi nhận nhật ký kiểm toán (Audit Log) chi tiết HLV cũ $\rightarrow$ HLV mới và lý do thay thế.
-* **Request Body:**
-```json
-{
-  "newCoachId": 11,
-  "reason": "HLV Nguyễn Văn A nghỉ ốm đột xuất, bàn giao HLV Trần Văn B đứng lớp"
-}
-```
-* **Response (200 OK):** Đối tượng `SessionResponse` cập nhật HLV mới.
+Advanced hoàn vào gói gốc; nếu hết hạn giữ credit chờ, phục hồi từ revoked/deferred thực tế có chứng cứ, không reset 12. Hồ sơ báo sau buổi vẫn phải xác minh wholly unheld. Buổi gốc giữ lịch sử nhưng không tính vào đủ 12 Normal. Member nghỉ cá nhân không được dùng luồng này. Gia hạn Advanced qua API gói chung bị chặn USE_INCIDENT_RECOVERY.
 
-### 7.3. Gia Hạn Thời Hạn Gói Học Viên (Extend Package Validity)
-* **Endpoint:** `POST /api/member-packages/{subscriptionId}/extend`
-  *(Hoặc `POST /api/subscriptions/{subscriptionId}/extend`)*
-* **Quyền:** `hasAuthority('MANAGE_SUBSCRIPTIONS')` (Center Manager / Admin)
-* **Mục đích:** Chủ động bù thêm ngày sử dụng cho học viên bị ảnh hưởng bởi sự cố trung tâm hoặc bảo trì dài ngày.
-* **Hành vi nghiệp vụ:**
-  * Cộng thêm `extendDays` vào `endDate` và `validityDays`.
-  * Nếu gói đang `Expired` mà ngày hết hạn mới lớn hơn ngày hiện tại, tự động phục hồi về `Active`.
-* **Request Body:**
-```json
-{
-  "extendDays": 14,
-  "reason": "Bù thời gian hội viên do trung tâm đóng cửa bảo dưỡng mặt sàn thảm"
-}
-```
-* **Response (200 OK):**
-```json
-{
-  "subscriptionId": 101,
-  "memberId": 20,
-  "memberName": "Nguyễn Văn B",
-  "packageId": 10,
-  "packageName": "Gói 1:1 Tennis Nâng Cao",
-  "price": 10000000.00,
-  "startDate": "2026-10-20",
-  "endDate": "2026-12-18",
-  "status": "Active",
-  "packageType": "Advanced",
-  "remainingCredit": 8,
-  "validityDays": 59
-}
-```
+## 8. HOLIDAY — PREVIEW RỒI CONFIRM
 
----
+`GET /api/holidays` và `/active` giữ nguyên. Thay đổi cần Manager/Admin MANAGE_CLASSES:
 
-## 8. NHÓM API QUẢN LÝ NGÀY NGHỈ LỄ (HOLIDAYS)
+1. `POST /api/holidays/preview` body `{"holidayDate":"2026-12-01","holidayName":"Bảo trì","tag":"CENTER_EVENT","active":true}` hoặc `{"holidayId":1,"active":false}`.
+2. Response `previewToken/blocked/affectedSessionIds/reconciliationSubscriptionIds/deadlineChanges` (subscriptionId/oldDeadline/newDeadline). Nếu blocked, xử lý từng ca qua workflow sự cố/dời trước.
+3. `POST /api/holidays` body tạo như trên, hoặc `PATCH /api/holidays/{id}/toggle` body `{"active":false}`; gửi header `X-Preview-Token` đúng preview gần nhất.
 
-### 8.1. Xem Danh Sách Ngày Lễ
-* **Endpoint:** `GET /api/holidays`
-* **Response (200 OK):**
-```json
-[
-  {
-    "id": 1,
-    "holidayDate": "2026-04-30",
-    "holidayName": "Giải phóng miền Nam",
-    "tag": "NATIONAL_FIXED",
-    "active": true,
-    "description": "Kỷ niệm ngày thống nhất đất nước"
-  },
-  {
-    "id": 2,
-    "holidayDate": "2026-05-01",
-    "holidayName": "Quốc tế Lao động",
-    "tag": "NATIONAL_FIXED",
-    "active": true,
-    "description": "Ngày Quốc tế Lao động"
-  }
-]
-```
+Thiếu preview: HOLIDAY_PREVIEW_REQUIRED; dữ liệu đổi:409 HOLIDAY_PREVIEW_STALE; tác động chưa xử lý:409 HOLIDAY_IMPACT_UNRESOLVED. Không tự hủy/dời hàng loạt. Tắt nghỉ tương lai tính rút hạn và chặn ca vượt hạn; phần TT đã thực sự đóng trong quá khứ được giữ. Không tạo nghỉ quá khứ để tự bù, dùng incident có chứng cứ. Holidays đang global; ảnh hưởng center khác bị chặn HOLIDAY_SCOPE_REVIEW_REQUIRED.
 
-### 8.2. Bật / Tắt Trạng Thái Ngày Nghỉ
-* **Endpoint:** `PATCH /api/holidays/{id}/toggle`
-* **Quyền:** `hasAuthority('MANAGE_CLASSES')` (Center Manager)
-* **Request Body:** `{ "active": false }`
-* **Response (200 OK):** Trả về đối tượng Holiday sau khi cập nhật.
+## 9. THANH TOÁN, BIÊN NHẬN VÀ ĐỐI SOÁT
 
----
+- `POST /api/invoices/{id}/confirm-cash`: Receptionist + MANAGE_INVOICES, body tùy chọn `{"note":"..."}`. Chỉ Cash Pending còn đúng hạn/đủ điều kiện mới Paid và cấp quyền, retry không cấp lại.
+- `POST /api/invoices/{id}/pay-online`: Member chủ, response `paymentUrl`. Invoice Pending có expiresAt 5 phút; không nhận giá từ client.
+- `GET /api/payments/vnpay/return`: kiểm chữ ký, redirect FE, **chỉ đọc**. FE đọc `GET /api/members/me/invoices/{id}` để biết trạng thái tiền; status trên redirect không phải bằng chứng Paid.
+- `GET /api/payments/vnpay/ipn`: chỉ callback chữ ký hợp lệ mới ghi Paid. Kiểm amount/reference/idempotency. Tiền đến sau hạn hoặc không còn đủ điều kiện: Paid + reconciliationRequired, không cấp quyền.
+- `GET /api/invoices/{id}/receipt`: Member chủ hoặc staff có MANAGE_INVOICES cùng center; chỉ Paid. Response Invoice giữ amount gốc, thêm cashNote/resolutionStatus/cashConfirmationReversed. Sửa Cash không xóa chứng từ Paid ban đầu.
 
-## 9. NHÓM API THANH TOÁN (VNPAY SANDBOX & TIỀN MẶT TẠI QUẦY)
+Các case `/api/payment-resolutions`: GET/POST cho Receptionist/Manager/Admin có MANAGE_INVOICES; approve/complete chỉ Manager/Admin cùng center:
 
-### 9.1. Xác nhận Thu Tiền Mặt Tại Quầy (Receptionist)
-* **Endpoint:** `POST /api/invoices/{invoiceId}/confirm-cash`
-* **Quyền:** `hasAuthority('MANAGE_INVOICES')`
-* **Xử lý:** Xác nhận thanh toán hóa đơn `Paid` $\rightarrow$ Kích hoạt ngay suất học hoặc gói 1:1.
+| Method/path | JSON |
+|---|---|
+| POST | `{"invoiceId":1,"type":"Refund","reason":"..."}` hoặc CashCorrection; retry một case/type/invoice |
+| POST /{id}/approve | Không body; Open→Approved hoặc Blocked nếu không đủ điều kiện; chưa ghi tiền hoàn |
+| POST /{id}/complete | Refund: `{"evidence":"chứng từ bên ngoài","performedAt":"2026-11-01T10:00:00","moneyNotReceived":false}`; CashCorrection: `{"evidence":"...","moneyNotReceived":true}` |
 
-### 9.2. Lấy URL Thanh Toán Trực Tuyến VNPay Sandbox
-* **Endpoint:** `POST /api/invoices/{invoiceId}/pay-online`
-* **Response (200 OK):**
-```json
-{
-  "paymentUrl": "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html?..."
-}
-```
-* **Cửa sổ giữ chỗ:** **5 phút** (`SCMS_PAYMENT_EXPIRE_MINUTES = 5`). Hết 5 phút mà chưa thanh toán, hệ thống tự động hủy giữ chỗ.
+Refund MVP chỉ toàn bộ tiền Paid cần đối soát/chưa cấp quyền; hoàn được thực hiện bên ngoài SCMS, thời gian receipt<=performedAt<=now. Không tự gọi gateway refund. CashCorrection chỉ Advanced Cash chưa nhận tiền thực, đủ 12 chưa dùng, không lịch kể cả đã hủy, không phụ thuộc/gia hạn/expiry/sự cố/hóa đơn khác; không áp dụng Normal. Complete kiểm lại điều kiện dưới lock, original amount/Paid giữ nguyên, quyền gói bị thu hồi; không tạo tiền hoàn giả. Response có id/invoiceId/type/status/amount/reason/evidence/outcomeNote/createdAt/approvedAt/performedAt/completedAt.
 
----
+## 10. ATTENDANCE VÀ QR
 
-## 10. ĐIỂM DANH & QUÉT MÃ QR TOTP
-
-### 10.1. Lấy Mã QR TOTP Check-in (Member)
-* **Endpoint:** `GET /api/members/me/checkin-code` *(hoặc alias `GET /api/attendance/checkin-code`)*
-* **Quyền:** `hasRole('MEMBER')`
-* **Response (200 OK):**
-```json
-{
-  "payload": "974219",
-  "expiresInSeconds": 30
-}
-```
-*(Trường `payload` là chuỗi mã 6 chữ số đổi liên tục mỗi 30 giây để chống gian lận điểm danh; trường `expiresInSeconds` là thời gian đếm ngược còn lại của mã).*
-
-### 10.2. Quét Mã Check-in (Staff / Coach)
-* **Endpoint:** `POST /api/attendance/scan`
-* **Quyền:** `hasRole('COACH')` hoặc `hasRole('RECEPTIONIST')`
-* **Phạm vi giờ hợp lệ:** Trong vòng 30 phút trước hoặc trong giờ buổi học.
-
----
+- `GET /api/attendances/me/checkin-code` (alias `/checkin-code`, prefix `/api/attendance` cũng hỗ trợ): chỉ Member chủ. Response **đúng hai field** `{"payload":"123456","expiresInSeconds":17}`. TTL còn lại của bước hiện tại 1–30 giây. FE bỏ mã hết hạn/refetch khi foreground, không log token. D17 FE chưa browser verified.
+- `POST /api/attendances/scan` body `{"memberId":20,"code":"123456","sessionId":999}`: staff/Coach có quyền, active/cùng center/Coach được giao, bắt buộc session. Member có quyền ca Paid. Chỉ nhận bước QR hiện tại, chống replay/rate; chỉ [start,end), không scan sớm hoặc check-in cửa.
+- TrainingResult/điểm danh thủ công chỉ Coach được giao và trong giờ ca, record mới chỉ Present hoặc Absent. Lịch sử Late/Excused giữ nguyên. Finalizer sau end ghi Absent còn thiếu/Completed, không trừ credit lần hai và không tính buổi centerInvalidated.
+- `POST /api/attendances/correct` body `{"attendanceId":1,"newState":"Present","reason":"..."}`: Manager/Admin MANAGE_CLASSES sau end, có audit, đồng bộ result, không đổi credit.
+- Check-in cửa `/check-in` và `/check-out` giữ code nâng cấp, default `scms.lobby-checkin.enabled=false`; không dùng để thay attendance ca.
 
 ## 11. BẢNG TRA CỨU MÃ LỖI CHUẨN TOÀN HỆ THỐNG (ERROR CODES DICTIONARY)
 
@@ -808,8 +608,8 @@ Bảng đối chiếu mã lỗi để Frontend hiển thị thông báo (Toast /
 | Mã Lỗi (`code`) | HTTP Status | Nguyên Nhân Nghiệp Vụ | Hướng Dẫn Hiển Thị Cho Frontend |
 | :--- | :---: | :--- | :--- |
 | `NORMAL_CLASS_NON_CANCELLABLE` | 400 | Học viên cố bấm hủy lớp học nhóm Normal 12 buổi. | Vô hiệu hóa nút Hủy, hiển thị tooltip hoặc toast: *"Lớp học nhóm cố định 12 buổi không hỗ trợ hủy hoặc hoàn tiền theo quy chế trung tâm."* |
-| `CANCEL_TOO_LATE` | 400 | Học viên bấm hủy buổi học 1:1 khi còn dưới 24 tiếng. | Toast cảnh báo đỏ: *"Không thể hủy lịch khi còn dưới 24 tiếng. Buổi học sẽ bị tiêu thụ nếu không tham gia."* |
-| `ADVANCED_PACKAGE_EXPIRED` | 400 | Gói 1:1 đã quá hạn 45 ngày kể từ ngày thanh toán. | Toast cảnh báo: *"Gói học 1:1 của bạn đã hết hạn sử dụng (45 ngày). Vui lòng mua gói mới hoặc liên hệ trung tâm để gia hạn."* |
+| `CANCEL_TOO_LATE` | 400 | Học viên bấm hủy buổi học 1:1 khi còn dưới 12 tiếng. | Toast cảnh báo đỏ: *"Không thể hủy lịch khi còn dưới 12 tiếng. Buổi học sẽ bị tiêu thụ nếu không tham gia."* |
+| `ADVANCED_PACKAGE_EXPIRED` | 400 | Gói 1:1 đã quá expiresAt sau 45 ngày sử dụng. | Toast cảnh báo: *"Gói học 1:1 của bạn đã hết hạn sử dụng (45 ngày). Vui lòng mua gói mới hoặc liên hệ trung tâm để gia hạn."* |
 | `OUT_OF_CREDIT` | 400 | Gói 1:1 đã hết số dư Credit (`remainingCredit < 1`). | Modal gợi ý nạp thêm: *"Số dư buổi học của bạn đã hết (0 Credit). Vui lòng đăng ký thêm gói mới để tiếp tục đặt lịch."* |
 | `ADVANCED_BOOKING_TOO_LATE` | 400 | Học viên đặt ca 1:1 khi ca học bắt đầu dưới 12 tiếng. | Toast lỗi: *"Bạn bắt buộc phải đặt lịch trước giờ học tối thiểu 12 tiếng để HLV sắp xếp giáo án."* |
 | `OUTDOOR_HEAT_BLOCK` | 400 | Đặt môn ngoài trời (Tennis, Bơi, Bóng đá, Bắn cung) vào Ca 3 hoặc Ca 4. | Ẩn hoặc disable nút chọn Ca 3 và Ca 4, báo: *"Ca 3 (09:30 - 11:00) và Ca 4 (13:00 - 14:30) bị khóa đối với môn thể thao ngoài trời nhằm đảm bảo an toàn sức khỏe (chống sốc nhiệt)."* |
@@ -821,6 +621,7 @@ Bảng đối chiếu mã lỗi để Frontend hiển thị thông báo (Toast /
 | `SUBSTITUTE_COACH_CONFLICT` | 409 | HLV thay thế được chỉ định bị trùng lịch dạy khác. | Toast lỗi: *"HLV thay thế đã có lịch dạy khác trong khung giờ này. Vui lòng chọn HLV khác."* |
 | `ROOM_HAS_FUTURE_SESSIONS` | 400 | Đổi trạng thái phòng sang Bảo trì/Đóng cửa khi còn ca học tương lai. | Toast lỗi: *"Phòng/Sân tập vẫn còn các buổi học đã xếp lịch trong tương lai. Vui lòng dời lịch các buổi học trước khi đóng sân."* |
 | `INVALID_TIME_SLOT` | 400 | Giờ bắt đầu / kết thúc gửi lên không khớp 7 ca học chuẩn. | Toast lỗi: *"Khung giờ học không hợp lệ. Vui lòng chọn đúng 1 trong 7 ca học chuẩn của trung tâm."* |
+| `NOTIFICATION_NOT_FOUND` | 404 | Thông báo không tồn tại hoặc không thuộc người đang đăng nhập. | Hiển thị thông báo đã bị xóa hoặc không còn khả dụng. |
 
 ## 12. CONTRACT AN TOÀN BỔ SUNG NGÀY 23/10/2026
 
@@ -856,17 +657,139 @@ Không thêm Draft: POST Normal kiểu cũ trả Closed để chuẩn bị lịc
 - Coach API dùng `id`, `name`, `avatarUrl`, `specializations`, `email`, `phone`, thêm `bio`, `certification`, `status`. Contact chỉ hiện theo MANAGE_USERS. Book/generate/substitute kiểm Coach Active, cùng center, đúng môn qua specialization.subjectId.
 
 ### 12.4. Tiền, credit, điểm danh và lịch sử
-- Cash: POST `/api/invoices/{id}/confirm-cash`, cần role RECEPTIONIST và MANAGE_INVOICES; lưu người/giờ thu. Chưa mở thêm quyền thu Cash cho Manager.
-- Giữ cấu hình holding hiện tại, chưa chọn lại 5/15 phút; deadline được kiểm khi xác nhận, job giải phóng suất chạy mỗi 60 giây.
-- VNPay hợp lệ về sau khi đơn không còn payable vẫn được ghi Paid, `reconciliationRequired=true`; không tự kích hoạt suất/gói đã giải phóng. Callback lặp không cấp quyền lần hai. Hóa đơn cần đối soát không dùng để tự re-activate gói qua API đổi status. Quy trình Manager xếp lại lịch/hoàn tiền còn chờ chốt.
-- InvoiceResponse thêm `reconciliationRequired`. Đổi status/gia hạn không nạp lại credit đã dùng. Cancel hoàn về subscription gốc còn Active/hạn, không chọn gói khác; dữ liệu mất liên kết/vượt trần bị từ chối.
-- Normal không hỗ trợ báo vắng/hủy enrollment, kể cả staff. Hủy Invoice Pending có route riêng trước khi thu tiền.
-- HLV 1:1/thay thế được kiểm theo Session.coach và bookedMember. Staff chỉ hỗ trợ điểm danh, không ghi nhận xét chuyên môn.
-- Finalization chuyển Session Completed; Normal đủ 12 buổi chốt thì Enrollment Completed. Advanced chỉ Completed khi credit bằng 0 và không còn ca Scheduled chưa chốt; 0 credit đang giữ cho lịch tương lai chưa phải học xong.
-- `scms.booking-block.enabled=false` tắt khóa 7 ngày, vẫn ghi vắng/tiêu thụ buổi; giữ code và test chế tài.
-- Toggle ngăn tạo khóa tự động mới; không tự xóa bookingBlockedUntil đã có. Manager vẫn dùng route gỡ khóa hiện có khi cần.
-- Không xóa/dời ca đã kết thúc/finalized; không hủy thẳng ca có quyền học đã trả tiền qua update-status để tránh mất quyền. Dùng reschedule; chính sách hủy sự cố khác còn chờ quyết định.
 
-Mã mới (400): CLASS_NOT_READY, NORMAL_SESSION_COUNT, SCHEDULE_ALREADY_EXISTS, COACH_INACTIVE, COACH_SUBJECT_MISMATCH, SUBJECT_FACILITY_REQUIRED, SUBSCRIPTION_LINK_REQUIRED, CREDIT_LIMIT_EXCEEDED, SESSION_HISTORY_IMMUTABLE, INCIDENT_POLICY_REQUIRED. Các xung đột (409): IDEMPOTENCY_CONFLICT, SUBJECT_IN_USE, ROOM_CONFLICT, COACH_CONFLICT, SUBSTITUTE_COACH_CONFLICT. FE vẫn cần fallback message/status với lỗi chưa có code.
+Các quy tắc hiện hành và JSON nằm tại mục 6–10. Invoice.amount/purchaseAmount đóng băng, Paid mới cấp quyền, center/row locks bảo vệ ghi cạnh tranh. Không chuyển Advanced Active bằng status CRUD; không sửa/hủy ca đã mua qua CRUD chung. Generic Class CRUD không nhận giá thay Subject hoặc xóa lịch đã có history. Giữ code/tests booking-block nhưng default tắt. Mọi thời điểm nghiệp vụ dùng Clock Asia/Ho_Chi_Minh.
 
-Tạo Member tại quầy có packageId: backend tạo subscription và Invoice Cash Pending, không cấp quyền học ngay. Staff tra Invoice theo memberId rồi confirm-cash sau khi nhận đủ tiền. MemberResponse.membershipStatus là pending và totalSpent không cộng đơn chưa thu. Tổng đã thu lấy từ Invoice Paid.amount đã chốt, không lấy giá package hiện tại.
+---
+
+## 13. F-06/F-07 — đồng bộ schema Session ngày 23/10/2026
+
+Không đổi endpoint, payload hoặc quyền. Session.memberPackage cần cột nullable public.sessions.subscription_id tham chiếu member_packages(subscription_id). DB hiện hữu dùng migration `07_session_subscription_postgres.sql`, sau 04/06; hai schema dựng mới đã đồng bộ, FK tạo sau bảng đích. Không chạy schema seed lên DB đang dùng.
+
+Log Render bổ sung xác nhận truy vấn thiếu subscription_id lúc 08:28:28 UTC+7 ngày 23/10. Probe thật bắt đầu 19:23:02 UTC+7 tại https://scms-app-p1gy.onrender.com: Session list bốn vai trò và dashboard Manager đều 200; không tái hiện 500. Chưa có SHA deploy hay lịch sử sửa DB để nối các mốc. DB trong .env hiện có cột/FK/index, chưa xác nhận trùng DB Render. Xem bằng chứng trong `be-request-f06-f07.md` và HISTORY.
+
+FE chỉ đóng F-06/F-07 sau khi đối chiếu SHA deploy và probe mới: Session list theo bốn vai trò, dashboard Manager, dữ liệu và phạm vi owner/assignment/center đúng. Test local chưa chứng minh lịch, đặt lớp và dashboard đã nghiệm thu Render.
+
+Lưu ý quyền live: Coach mẫu có MANAGE_CLASSES và đọc dashboard được (200), khác seed workspace. Backend dashboard hiện chấp nhận VIEW_REPORTS/MANAGE_USERS/MANAGE_CLASSES. Chờ đối chiếu cấu hình quyền mong muốn; không tự thay role/permission để đạt status kỳ vọng.
+
+## 14. Báo cáo và trạng thái bàn giao 27/10/2026
+
+P1.0–P1.4 và BE P2 đã có source + kiểm local (chi tiết bằng chứng/command tại docs 02 mục 10). P1.5/gói T D01/D09/FE vẫn backlog theo Owner, không lấy notification/chat merge làm nghiệm thu FE. Các phần kế hoạch/quyết định lịch sử giữ tại docs 04; hợp đồng hiện hành là mục 6–10 ở trên. Migration 06/07/08–12 bắt buộc trước BE; source local không chứng minh Render đã deploy.
+
+### 14.1. Báo cáo theo center và quyền
+
+`GET /api/reports/dashboard`, `/members`, `/revenue?startDate=2026-10-01&endDate=2026-10-31&groupBy=month` chỉ Manager/Admin **có VIEW_REPORTS**, active cùng center. Coach không đọc tổng tài chính, kể cả có authority phụ. EndDate bao gồm cả ngày bằng khoảng [start,ngày kế tiếp), không mất phần giây lẻ cuối ngày.
+
+Dashboard giữ field cũ và thêm moneyReceived/moneyRefunded/netReceived. Revenue giữ totalRevenue/totalTransactions/averageTransactionValue/revenueByPackage/revenueByMethod/timeline; thêm:
+
+| Field | Ý nghĩa |
+|---|---|
+| moneyReceived | Tiền thực thu theo paymentDate, có tiền muộn cần đối soát; loại Cash được xác minh chưa nhận |
+| moneyRefunded | Case Refund Completed theo performedAt thực tế, có chứng cứ; Approved chưa tính |
+| netReceived | moneyReceived − moneyRefunded; có thể âm ở kỳ chỉ hoàn |
+| cashCorrectionsRecorded | Giá trị CashCorrection ghi nhận trong kỳ completedAt, không phải tiền hoàn |
+| totalRevenue | Gross Paid lịch sử để tương thích; không dùng thay ba số trên |
+
+Revenue breakdown/timeline cũ vẫn theo gross Paid. FE tự chọn cách trình bày ba số, BE không ép layout.
+
+Member report giữ totalMembers/activeMembers/expiredMembers/packageDistribution/monthlyGrowth và thêm neverEntitledMembers/previouslyEntitledMembersWithoutRights/expiredRegistrations/completedRegistrations/reconciliationRegistrations/reconciliationMembers. activeMembers đếm người có quyền hiện tại (Normal Paid còn nghĩa vụ hoặc Advanced đúng hạn có credit/ca hợp lệ); 0 credit còn ca vẫn có quyền. expiredMembers là alias nhóm đã từng có nhưng hiện hết quyền, không gom người chưa từng mua. Registrations đếm từng gói/lượt, Completed tách Expired; legacy thiếu dữ kiện tách reconciliation. Người có nhiều đăng ký chỉ đếm một lần trong chỉ số người.
+
+### 14.2. Giới hạn kiểm chứng
+
+Demo dùng đăng nhập HTTP thật vào BE local và DB assertions sau commit, có cả PostgreSQL. Callback VNPay được ký bằng khóa test cục bộ, không phải giao dịch gateway live. Không SMTP delivery/live gateway/SQL Server runtime hoặc trình duyệt FE từ kết quả này. Đọc hướng dẫn tái lập và sổ evidence trong docs 02 mục 10.
+
+## 15. THÔNG BÁO TRONG ỨNG DỤNG
+
+Tất cả endpoint yêu cầu đăng nhập và chỉ truy cập thông báo của user trong session. Member, Coach, Receptionist và Manager đều dùng được. Không có email, push hay WebSocket.
+
+### 15.1. Danh sách thông báo
+
+`GET /api/notifications/me?unreadOnly=false&type=SESSION_REMINDER&page=0&size=20`
+
+Query params:
+
+| Tên | Kiểu | Mặc định | Mô tả |
+|---|---|---:|---|
+| `unreadOnly` | boolean | `false` | Chỉ lấy thông báo chưa đọc khi `true`. |
+| `type` | enum | — | Lọc theo một `NotificationType`. |
+| `page` | integer | `0` | Trang, bắt đầu từ 0. |
+| `size` | integer | `20` | Số mục mỗi trang, tối đa 100. |
+
+Response là Spring `Page`:
+
+```json
+{
+  "content": [
+    {
+      "id": 101,
+      "type": "SESSION_RESCHEDULED",
+      "title": "Buổi học được dời lịch",
+      "message": "Buổi học Cầu lông đã được dời sang 28/10/2026, 07:45–09:15, Sân A2.",
+      "relatedType": "SESSION",
+      "relatedId": 5531,
+      "isRead": false,
+      "createdAt": "2026-10-22T09:15:00+07:00"
+    }
+  ],
+  "number": 0,
+  "size": 20,
+  "totalElements": 1,
+  "totalPages": 1
+}
+```
+
+### 15.2. Đếm và cập nhật trạng thái đọc
+
+| Method | Endpoint | Thành công |
+|---|---|---|
+| `GET` | `/api/notifications/me/unread-count` | `200 { "unreadCount": 3 }` |
+| `PATCH` | `/api/notifications/{id}/read` | `204 No Content` |
+| `PATCH` | `/api/notifications/me/read-all` | `204 No Content` |
+
+Thông báo không thuộc user hiện tại và ID không tồn tại đều trả `404` với mã `NOTIFICATION_NOT_FOUND`.
+
+### 15.3. Các loại thông báo
+
+| `NotificationType` | Ý nghĩa |
+|---|---|
+| `ENROLLMENT_CONFIRMED` | Thanh toán thành công và ghi danh lớp Normal. |
+| `PRIVATE_BOOKING_CONFIRMED` | Đặt lịch học 1:1 thành công. |
+| `PRIVATE_BOOKING_CANCELLED` | Hủy lịch 1:1; nội dung nêu trạng thái hoàn credit. |
+| `SESSION_RESCHEDULED` | Lịch buổi học được dời. |
+| `COACH_SUBSTITUTED` | HLV dạy buổi học được thay đổi. |
+| `PAYMENT_SUCCESS` | Hóa đơn đã thanh toán. |
+| `PAYMENT_EXPIRED` | Hóa đơn hết hạn giữ chỗ. |
+| `PACKAGE_EXTENDED` | Gói 1:1 được gia hạn. |
+| `PACKAGE_EXPIRING_SOON` | Gói 1:1 còn không quá 3 ngày. |
+| `PACKAGE_EXPIRED` | Gói 1:1 hết hạn. |
+| `CREDIT_LOW` | Số dư credit sau khi đặt buổi học còn không quá 2. |
+| `NO_SHOW_RECORDED` | Buổi vắng/no-show đã được chốt. |
+| `SESSION_REMINDER` | Nhắc lịch khoảng 24 giờ trước buổi học. |
+
+FE có thể poll `GET /api/notifications/me/unread-count` mỗi 30–60 giây để cập nhật badge. Module không dùng WebSocket. Các bản ghi legacy giữ nguyên nội dung và cột `type`; các loại nghiệp vụ mới lưu trong `notification_type` và được API trả dưới tên trường `type`.
+
+## 16. Chat hỗ trợ Member – Receptionist
+
+Toàn bộ API dùng session đăng nhập hiện tại. Member chỉ đọc/ghi conversation của chính mình; truy cập conversation khác trả `404 CHAT_CONVERSATION_NOT_FOUND`. Receptionist và CenterManager cần quyền `HANDLE_CHAT`; Coach bị từ chối. Tin nhắn là text thuần, tối đa 2000 ký tự sau trim; FE phải render bằng text để tránh XSS.
+
+| Method | Endpoint | Mô tả |
+|---|---|---|
+| `POST` | `/api/chat/conversations` | Member lấy conversation `OPEN` hoặc tạo mới; body tùy chọn `{"subject":"Payment question"}`. |
+| `GET` | `/api/chat/conversations/me/active` | Conversation đang mở của member; 404 `CHAT_ACTIVE_CONVERSATION_NOT_FOUND` nếu chưa có. |
+| `GET` | `/api/chat/me/unread-count` | Tổng số tin chưa đọc trong các conversation của member: `{"unreadCount":2}`. |
+| `GET` | `/api/chat/conversations/{id}/messages?afterId=0&limit=30` | Poll theo ID tăng dần; mặc định 30, giới hạn tối đa 50. |
+| `POST` | `/api/chat/conversations/{id}/messages` | Gửi `{ "content":"Hello", "clientMessageId":"uuid" }`; ID client tùy chọn để retry an toàn. |
+| `POST` | `/api/chat/conversations/{id}/read` | Đánh dấu đã đọc tới message mới nhất cho user hiện tại. |
+| `GET` | `/api/chat/conversations?status=OPEN&assigned=true&unreadOnly=false&page=0&size=30` | Hộp thư staff, mới hoạt động gần nhất trước; `assigned=true` lọc hội thoại của người đang xem, `false` lọc hội thoại chưa được nhận; mỗi hàng kèm last message và unread của staff đang xem. |
+| `POST` | `/api/chat/conversations/{id}/claim` / `/release` | Nhận hội thoại hoặc tự nhả hội thoại đã nhận. |
+| `PATCH` | `/api/chat/conversations/{id}/close` / `/reopen` | Đóng/mở lại hội thoại. Reopen trả 409 nếu member đã có hội thoại khác đang mở. |
+
+Message response gồm `id`, `conversationId`, `senderType`, `senderName`, `isMine`, `content`, `contentType`, `metadata`, `clientMessageId`, `createdAt`. Thời gian trả ISO-8601 cùng offset `+07:00`. Ví dụ: `{ "id":4021,"conversationId":88,"senderType":"STAFF","senderName":"Tran Thi Huong","isMine":false,"content":"Hello","createdAt":"2026-10-24T09:15:00+07:00" }`.
+
+Các mã lỗi chính: `CHAT_CONVERSATION_NOT_FOUND` (404), `CHAT_ACTIVE_CONVERSATION_NOT_FOUND` (404), `CHAT_CONVERSATION_CLOSED` (409), `CHAT_RATE_LIMITED` (429, tối đa 20 tin/phút/người; response có `retryAfterSeconds` và header `Retry-After`), `CHAT_MESSAGE_EMPTY`, `CHAT_MESSAGE_TOO_LONG`, `CHAT_ALREADY_CLAIMED`, `CHAT_NOT_ASSIGNED_TO_ACTOR`, `CHAT_OPEN_CONVERSATION_EXISTS`. FE nên poll message mỗi 3–5 giây khi cửa sổ chat mở, unread count mỗi 30–60 giây, và gửi `clientMessageId` cho mỗi tin.
+
+### Mở rộng chat AI
+
+`ChatService` chỉ xử lý nghiệp vụ; thêm bean `ChatResponder` với `supports(ChatConversation)` và `respond(conversation, N tin gần nhất, memberUserId)`. `ChatResponderDispatcher` chạy nền và gọi responder đầu tiên hỗ trợ conversation khi `handler_type=AI`; lỗi hoặc timeout không rollback hay chặn response của tin member. Reply được lưu `sender_type=AI`, `sender_user_id=NULL`, cùng metadata tùy chọn (quy ước đề nghị: `model`, `latencyMs`, `sources`). Không có responder AI hoặc lời gọi dịch vụ ngoài được bật mặc định. `escalateToStaff(conversationId, reason)` chuyển handler về `STAFF`, lưu SYSTEM message và phát notification tới assigned staff hoặc các receptionist Active trong cùng center.
+
+Chat notification types persisted in `notification_type`: `CHAT_MEMBER_MESSAGE` (member message or escalation to staff) and `CHAT_STAFF_REPLY` (staff/AI reply to member). Notifications are emitted only on that viewer's unread transition from zero to one; storage failures do not roll back the chat message.

@@ -9,7 +9,11 @@ public record RevenueReportResponse(
         BigDecimal averageTransactionValue,
         List<RevenueByPackageItem> revenueByPackage,
         List<RevenueByMethodItem> revenueByMethod,
-        List<RevenueTimelineItem> timeline
+        List<RevenueTimelineItem> timeline,
+        BigDecimal moneyReceived,
+        BigDecimal moneyRefunded,
+        BigDecimal netReceived,
+        BigDecimal cashCorrectionsRecorded
 ) {
     public record RevenueByPackageItem(
             Integer packageId,

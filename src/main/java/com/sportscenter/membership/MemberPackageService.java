@@ -7,14 +7,17 @@ import com.sportscenter.user.User;
 import com.sportscenter.user.UserRepository;
 import com.sportscenter.invoice.InvoiceService;
 import com.sportscenter.invoice.InvoiceOrderResponse;
+import com.sportscenter.notification.NotificationTemplates;
+import com.sportscenter.notification.NotificationType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
-import java.time.ZoneId;
+import java.time.Clock;
 import java.util.Comparator;
 import java.util.List;
 
@@ -28,6 +31,7 @@ public class MemberPackageService {
     private final AuditService auditService;
     private final InvoiceService invoiceService;
     private final com.sportscenter.session.ScheduleWriteLock scheduleWriteLock;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional(readOnly = true)
     public List<MemberPackageResponse> findAll() {
@@ -69,6 +73,7 @@ public class MemberPackageService {
                 .orElseThrow(() -> new ResourceNotFoundException("Membership package not found: " + request.packageId()));
 
         if (!"Active".equalsIgnoreCase(pkg.getStatus())) throw new BusinessException("Cannot subscribe to an Inactive membership package");
+        if (pkg.isAdvanced()) throw new BusinessException("USE_ADVANCED_REGISTRATION: Choose a subject and Primary Coach and obtain acceptance before payment");
         String method = request.paymentMethod() == null || request.paymentMethod().isBlank() ? "Cash" : request.paymentMethod();
         LocalDate startDate = LocalDate.now(clock);
         int days = pkg.isAdvanced()
@@ -78,6 +83,7 @@ public class MemberPackageService {
         MemberPackage mp = new MemberPackage();
         mp.setMember(memberUser);
         mp.setMembershipPackage(pkg);
+        mp.setPurchaseAmount(pkg.getPrice());
         mp.setStartDate(startDate);
         mp.setEndDate(startDate.plusDays(days));
         mp.setStatus("Pending");
@@ -111,6 +117,9 @@ public class MemberPackageService {
 
         String normalizedStatus = normalizeStatus(status);
         String previousStatus = mp.getStatus();
+        if(mp.isAdvanced()&&!"Active".equalsIgnoreCase(previousStatus)&&"Active".equals(normalizedStatus))
+            throw new BusinessException("USE_INCIDENT_RECOVERY: Advanced reactivation requires incident and expiry evidence");
+        if(mp.isAdvanced()&&!normalizedStatus.equalsIgnoreCase(previousStatus))throw new BusinessException("ADVANCED_STATUS_WORKFLOW_REQUIRED: Use payment, expiry, attendance completion or the verified incident workflow");
         if (!"Active".equalsIgnoreCase(previousStatus) && "Active".equals(normalizedStatus)) {
             invoiceService.requirePaidSubscription(subscriptionId);
             // Only the first successful payment grants credits. Reactivation never replenishes them.
@@ -138,6 +147,7 @@ public class MemberPackageService {
 
         MemberPackage mp = memberPackageRepository.findByIdForUpdate(subscriptionId)
                 .orElseThrow(() -> new ResourceNotFoundException("Member package subscription not found: " + subscriptionId));
+        if(mp.isAdvanced())throw new BusinessException("USE_INCIDENT_RECOVERY: Advanced extensions require verified incident evidence and an agreed makeup session");
 
         LocalDate today = LocalDate.now(clock);
         LocalDate currentEnd = mp.getEndDate() != null ? mp.getEndDate() : today;
@@ -159,6 +169,13 @@ public class MemberPackageService {
         auditService.log(actorId, "EXTEND_PACKAGE_VALIDITY", "MEMBER_PACKAGE", saved.getSubscriptionId(),
                 String.format("Gia hạn gói %d ngày (hạn mới: %s). Lý do: %s",
                         request.extendDays(), newEnd, request.reason() != null ? request.reason() : "N/A"));
+        if (saved.getMembershipPackage() != null && saved.getMembershipPackage().isAdvanced()) {
+            eventPublisher.publishEvent(NotificationTemplates.event(NotificationType.PACKAGE_EXTENDED,
+                    List.of(saved.getMember().getId()),
+                    NotificationTemplates.packageExtended(packageName(saved), request.extendDays(), newEnd),
+                    "MEMBER_PACKAGE", saved.getSubscriptionId(),
+                    "PACKAGE_EXTENDED:" + saved.getSubscriptionId() + ":" + newEnd));
+        }
 
         return MemberPackageResponse.from(saved);
     }
@@ -166,17 +183,33 @@ public class MemberPackageService {
     @Transactional
     public int expireOutdatedPackages() {
         LocalDate today = LocalDate.now(clock);
-        List<Integer> outdated = memberPackageRepository.findExpiredActivePackageIds(today);
+        List<Integer> outdated = memberPackageRepository.findDueForExpiry(java.time.LocalDateTime.now(clock), today);
         int expiredCount = 0;
         for (Integer candidate : outdated) {
+            Integer center=memberPackageRepository.findCenterIdById(candidate).orElse(null);
+            if(center==null)continue;
+            scheduleWriteLock.acquire(center);
             MemberPackage mp = memberPackageRepository.findByIdForUpdate(candidate).orElse(null);
-            if (mp == null || !"Active".equals(mp.getStatus()) || mp.getEndDate() == null || !mp.getEndDate().isBefore(today)) continue;
+            if (mp == null || !"Active".equals(mp.getStatus())) continue;
+            if(mp.isAdvanced()&&(mp.getActivatedAt()==null||mp.getExpiresAt()==null))continue;
+            boolean due = mp.getExpiresAt() != null ? !mp.getExpiresAt().isAfter(java.time.LocalDateTime.now(clock))
+                    : mp.getEndDate() != null && mp.getEndDate().isBefore(today);
+            if (!due) continue;
+            mp.setExpiryRevokedCredit(mp.getRemainingCredit() == null ? 0 : mp.getRemainingCredit());
+            mp.setExpiryProcessedAt(java.time.LocalDateTime.now(clock));
             mp.setStatus("Expired");
             mp.setRemainingCredit(0);
             memberPackageRepository.save(mp);
             expiredCount++;
             auditService.log(null, "EXPIRE_MEMBER_PACKAGE", "MEMBER_PACKAGE", mp.getSubscriptionId(),
                     "Package expired past " + mp.getEndDate() + ". Remaining credits wiped.");
+            if (mp.getMembershipPackage() != null && mp.getMembershipPackage().isAdvanced()) {
+                eventPublisher.publishEvent(NotificationTemplates.event(NotificationType.PACKAGE_EXPIRED,
+                        List.of(mp.getMember().getId()),
+                        NotificationTemplates.packageExpired(packageName(mp), mp.getEndDate()),
+                        "MEMBER_PACKAGE", mp.getSubscriptionId(),
+                        "PACKAGE_EXPIRED:" + mp.getSubscriptionId() + ":" + mp.getEndDate()));
+            }
         }
         return expiredCount;
     }
@@ -186,5 +219,9 @@ public class MemberPackageService {
         if ("Cancelled".equalsIgnoreCase(status)) return "Cancelled";
         if ("Active".equalsIgnoreCase(status)) return "Active";
         throw new BusinessException("Subscription status must be Active, Expired or Cancelled");
+    }
+
+    private String packageName(MemberPackage memberPackage) {
+        return memberPackage.getMembershipPackage() == null ? "học" : memberPackage.getMembershipPackage().getName();
     }
 }

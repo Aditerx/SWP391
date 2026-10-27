@@ -38,6 +38,8 @@ public class AttendanceService {
     private final ClassEnrollmentRepository enrollmentRepository;
     private final MemberRepository memberRepository;
     private final MemberPackageRepository memberPackageRepository;
+    private final com.sportscenter.session.ScheduleWriteLock scheduleWriteLock;
+    @org.springframework.beans.factory.annotation.Value("${scms.lobby-checkin.enabled:false}") private boolean lobbyCheckinEnabled;
 
     @Transactional(readOnly = true)
     public List<AttendanceResponse> searchAttendances(
@@ -80,6 +82,7 @@ public class AttendanceService {
 
     @Transactional
     public AttendanceResponse checkIn(Integer memberId, String actorEmail) {
+        if(!lobbyCheckinEnabled)throw new BusinessException("LOBBY_CHECKIN_DISABLED: Lobby check-in is reserved for a later release");
         User member = userRepository.findById(memberId)
                 .orElseThrow(() -> new ResourceNotFoundException("Member not found: " + memberId));
 
@@ -104,6 +107,7 @@ public class AttendanceService {
 
     @Transactional
     public AttendanceResponse checkOut(Integer memberId, String actorEmail) {
+        if(!lobbyCheckinEnabled)throw new BusinessException("LOBBY_CHECKIN_DISABLED: Lobby check-out is reserved for a later release");
         User actor = userRepository.findByEmailIgnoreCase(actorEmail)
                 .orElseThrow(() -> new ResourceNotFoundException("Authenticated user not found"));
         List<Attendance> openCheckIns = attendanceRepository.findOpenCheckInsByMemberId(memberId);
@@ -125,9 +129,16 @@ public class AttendanceService {
     public AttendanceResponse correctAttendance(AttendanceCorrectionRequest request, String actorEmail) {
         User actor = userRepository.findByEmailIgnoreCase(actorEmail)
                 .orElseThrow(() -> new ResourceNotFoundException("Authenticated user not found"));
+        com.sportscenter.common.ActorPolicy.manager(actor);
+        if(!"Active".equals(actor.getStatus()))throw new AccessDeniedException("Active Manager required");
+        scheduleWriteLock.acquire(actor.getCenterId());
         Attendance att = attendanceRepository.findById(request.attendanceId())
                 .orElseThrow(() -> new ResourceNotFoundException("Attendance record not found: " + request.attendanceId()));
         if (att.getMember() != null && !java.util.Objects.equals(actor.getCenterId(), att.getMember().getCenterId())) throw new AccessDeniedException("Attendance belongs to another center");
+        if(att.getSession()==null)throw new BusinessException("SESSION_REQUIRED: This correction flow applies to session attendance");
+        Session locked=sessionRepository.findByIdForUpdate(att.getSession().getId()).orElseThrow(()->new ResourceNotFoundException("Session not found"));
+        if(LocalDateTime.now(clock).isBefore(locked.getSessionDate().atTime(locked.getEndTime())))throw new BusinessException("USE_SESSION_ATTENDANCE: Record in-session attendance before session end");
+        if(locked.isCenterInvalidated())throw new BusinessException("SESSION_NOT_HELD: Preserve incident and attendance history");
 
         if (request.reason() == null || request.reason().isBlank()) {
             throw new BusinessException("A reason is required for attendance correction");
@@ -163,42 +174,17 @@ public class AttendanceService {
         return AttendanceResponse.from(saved);
     }
 
-    @Transactional
-    public AttendanceResponse requestAbsence(Integer sessionId, String reason, String actorEmail) {
-        User member = userRepository.findByEmailIgnoreCase(actorEmail)
-                .orElseThrow(() -> new ResourceNotFoundException("Authenticated member not found"));
-        Session session = sessionRepository.findById(sessionId)
-                .orElseThrow(() -> new ResourceNotFoundException("Session not found: " + sessionId));
-        if (session.getSportsClass().isNormal()) {
-            throw new BusinessException("NORMAL_CLASS_NON_CANCELLABLE: Normal classes do not support absence requests");
-        }
-        if (member.getCenterId() != null && session.getSportsClass().getCenterId() != null
-                && !member.getCenterId().equals(session.getSportsClass().getCenterId())) {
-            throw new AccessDeniedException("Members may only request absence for sessions in their center");
-        }
-        Integer classId = session.getSportsClass().getId();
-        if (!enrollmentRepository.existsByMemberIdAndSportsClassIdAndStatus(member.getId(), classId, "Registered")) {
-            throw new BusinessException("NOT_YOUR_CLASS: member must be Registered in the session class");
-        }
-        LocalDateTime startsAt = LocalDateTime.of(session.getSessionDate(), session.getStartTime());
-        if (Duration.between(LocalDateTime.now(clock), startsAt).compareTo(Duration.ofHours(2)) < 0) {
-            throw new BusinessException("ABSENCE_TOO_LATE: absence requests require at least two hours notice");
-        }
-        Attendance attendance = attendanceRepository.findBySessionIdAndMemberId(sessionId, member.getId())
-                .orElseGet(Attendance::new);
-        attendance.setSession(session);
-        attendance.setMember(member);
-        attendance.setState("Excused");
-        attendance.setNote(reason);
-        Attendance saved = attendanceRepository.save(attendance);
-        auditService.log(member.getId(), "REQUEST_ABSENCE", "attendances", saved.getAttendanceId(), "Reason: " + reason);
-        return AttendanceResponse.from(saved);
+    /** Compatibility entry point: absence is now a separate session notice, never attendance. */
+    @Deprecated
+    public AttendanceResponse requestAbsence(Integer sessionId,String reason,String actorEmail) {
+        throw new BusinessException("USE_ABSENCE_NOTICE: Report absence through /api/sessions/{id}/absence");
     }
 
     @Transactional
     public CheckinCodeResponse createCheckinCode(String actorEmail) {
         User user = userRepository.findByEmailIgnoreCase(actorEmail)
                 .orElseThrow(() -> new ResourceNotFoundException("Authenticated member not found"));
+        if(!"Active".equalsIgnoreCase(user.getStatus()))throw new BusinessException("MEMBER_NOT_ACTIVE: Active Member required");
         Member member = memberRepository.findByIdForUpdate(user.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("Member profile not found"));
         if (member.getCheckinSecret() == null) {
@@ -214,6 +200,12 @@ public class AttendanceService {
     public AttendanceResponse scanCheckin(Integer memberId, String code, Integer sessionId, String actorEmail) {
         User recorder = userRepository.findByEmailIgnoreCase(actorEmail)
                 .orElseThrow(() -> new ResourceNotFoundException("Authenticated user not found"));
+        if(!"Active".equalsIgnoreCase(recorder.getStatus())||recorder.getRole()==null||!java.util.Set.of("Coach","Receptionist","CenterManager","Admin").contains(recorder.getRole().getName()))throw new AccessDeniedException("Active session staff required");
+        if(sessionId==null)throw new BusinessException("SESSION_REQUIRED: Lobby QR check-in is not enabled");
+        scheduleWriteLock.acquire(recorder.getCenterId());
+        Session lockedSession=sessionRepository.findByIdForUpdate(sessionId).orElseThrow(()->new ResourceNotFoundException("Session not found"));
+        com.sportscenter.common.ActorPolicy.center(recorder,lockedSession.getSportsClass().getCenterId());
+        SessionAttendancePolicy.requireWindow(lockedSession,LocalDateTime.now(clock));
         Member member = memberRepository.findByIdForUpdate(memberId)
                 .orElseThrow(() -> new ResourceNotFoundException("Member not found: " + memberId));
         Integer memberCenterId = member.getUser() != null ? member.getUser().getCenterId() : null;
@@ -230,7 +222,7 @@ public class AttendanceService {
         if (attemptWindow != null && epoch - attemptWindow.startedAt() >= 60) SCAN_ATTEMPTS.remove(memberId, attemptWindow);
         Long step = member.getCheckinSecret() == null ? null : Totp.matchingStep(
                 java.util.Base64.getDecoder().decode(member.getCheckinSecret()), code, epoch / 30);
-        if (step == null || step.equals(member.getCheckinLastStep())) {
+        if (step == null || step != epoch / 30 || step.equals(member.getCheckinLastStep())) {
             SCAN_ATTEMPTS.compute(memberId, (id, current) -> current == null || epoch - current.startedAt() >= 60
                     ? new ScanWindow(epoch, 1) : new ScanWindow(current.startedAt(), current.count() + 1));
             throw new BusinessException("INVALID_CHECKIN_CODE: code is invalid, expired, or already used");
@@ -238,15 +230,9 @@ public class AttendanceService {
         if (!"Active".equalsIgnoreCase(member.getUser().getStatus())) {
             throw new BusinessException("MEMBER_NOT_ACTIVE: member account is not active");
         }
-        boolean activePackage = memberPackageRepository.findByMemberId(memberId).stream()
-                .anyMatch(p -> "Active".equalsIgnoreCase(p.getStatus()) && p.getEndDate() != null
-                        && !p.getEndDate().isBefore(now.toLocalDate()));
-        if (!activePackage) throw new BusinessException("PACKAGE_EXPIRED: member package is expired");
-
         Attendance attendance;
         if (sessionId != null) {
-            Session session = sessionRepository.findById(sessionId)
-                    .orElseThrow(() -> new ResourceNotFoundException("Session not found: " + sessionId));
+            Session session = lockedSession;
             if (recorder.getRole() != null && "Coach".equalsIgnoreCase(recorder.getRole().getName()) && !recorder.getId().equals(assignedCoachId(session))) {
                 throw new AccessDeniedException("Coach may only check in assigned sessions");
             }
@@ -255,12 +241,14 @@ public class AttendanceService {
                 if (!session.getBookedMember().getId().equals(memberId)) {
                     throw new BusinessException("NOT_YOUR_CLASS: member is not the booked member for this private session");
                 }
+                var entitlement=session.getMemberPackage();
+                if(entitlement==null||!"Active".equals(entitlement.getStatus())||!com.sportscenter.membership.EntitlementTimePolicy.validThrough(entitlement,session.getSessionDate().atTime(session.getEndTime())))throw new BusinessException("PACKAGE_EXPIRED: Original entitlement is not valid for this session");
             } else if (!enrollmentRepository.existsByMemberIdAndSportsClassIdAndStatus(memberId, classId, "Registered")) {
                 throw new BusinessException("NOT_YOUR_CLASS: member is not Registered in the class");
             }
             LocalDateTime startsAt = LocalDateTime.of(session.getSessionDate(), session.getStartTime());
             LocalDateTime endsAt = LocalDateTime.of(session.getSessionDate(), session.getEndTime());
-            if ("Cancelled".equalsIgnoreCase(session.getStatus()) || now.isBefore(startsAt.minusMinutes(30)) || now.isAfter(endsAt)) {
+            if ("Cancelled".equalsIgnoreCase(session.getStatus()) || now.isBefore(startsAt) || !now.isBefore(endsAt)) {
                 throw new BusinessException("CHECKIN_WINDOW_CLOSED: check-in is outside the session window");
             }
             attendance = attendanceRepository.findBySessionIdAndMemberId(sessionId, memberId).orElseGet(Attendance::new);
@@ -269,7 +257,7 @@ public class AttendanceService {
                 attendance.setMember(member.getUser());
                 attendance.setRecordedBy(recorder);
             }
-            attendance.setState(now.isAfter(startsAt.plusMinutes(10)) ? "Late" : "Present");
+            attendance.setState("Present");
             if (attendance.getCheckInTime() == null) attendance.setCheckInTime(now);
             trainingResultRepository.findBySessionIdAndMemberId(sessionId, memberId).ifPresent(result -> {
                 result.setAttendanceStatus(attendance.getState());
@@ -292,11 +280,7 @@ public class AttendanceService {
     }
 
     private String normalizeState(String state) {
-        if ("Absent".equalsIgnoreCase(state) || "absent".equalsIgnoreCase(state)) return "Absent";
-        if ("Late".equalsIgnoreCase(state) || "late".equalsIgnoreCase(state)) return "Late";
-        if ("Excused".equalsIgnoreCase(state) || "excused".equalsIgnoreCase(state)) return "Excused";
-        if ("CheckedIn".equalsIgnoreCase(state) || "checked_in".equalsIgnoreCase(state)) return "CheckedIn";
-        return "Present";
+        return SessionAttendancePolicy.state(state);
     }
 
     private Integer assignedCoachId(Session session) {

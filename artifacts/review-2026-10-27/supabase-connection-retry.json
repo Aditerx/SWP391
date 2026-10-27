@@ -1,0 +1,1 @@
+{"success":false,"host":"aws-0-ap-northeast-2.pooler.supabase.com","sql_state":"08001","message":"The connection attempt failed.","error_types":["PSQLException","UnknownHostException"],"error_reasons":["The connection attempt failed.","[REDACTED]:[REDACTED]aws-0-ap-northeast-2.pooler.supabase.com"],"elapsed_ms":121}

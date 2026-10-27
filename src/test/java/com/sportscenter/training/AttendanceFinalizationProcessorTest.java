@@ -5,6 +5,7 @@ import com.sportscenter.enrollment.ClassEnrollment;
 import com.sportscenter.enrollment.ClassEnrollmentRepository;
 import com.sportscenter.membership.MemberPackageRepository;
 import com.sportscenter.notification.NotificationService;
+import com.sportscenter.notification.NotificationEvent;
 import com.sportscenter.session.Session;
 import com.sportscenter.session.SessionRepository;
 import com.sportscenter.sportclass.SportsClass;
@@ -17,6 +18,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.time.Clock;
 import java.time.Instant;
@@ -34,12 +36,16 @@ import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class AttendanceFinalizationProcessorTest {
+    @org.mockito.Mock com.sportscenter.session.ScheduleWriteLock scheduleWriteLock;
+    @org.junit.jupiter.api.BeforeEach void centerLockFixture(){lenient().when(sessionRepository.findCenterIdById(anyInt())).thenReturn(java.util.Optional.of(1));}
+
     @Mock SessionRepository sessionRepository;
     @Mock ClassEnrollmentRepository enrollmentRepository;
     @Mock AttendanceRepository attendanceRepository;
     @Mock MemberRepository memberRepository;
     @Mock AuditService auditService;
     @Mock NotificationService notificationService;
+    @Mock ApplicationEventPublisher eventPublisher;
     @Mock Clock clock;
     @Mock MemberPackageRepository memberPackageRepository;
     @InjectMocks AttendanceFinalizationProcessor processor;
@@ -80,6 +86,11 @@ class AttendanceFinalizationProcessorTest {
 
         verify(attendanceRepository, times(1)).save(argThat(a -> "Absent".equals(a.getState()) && a.getRecordedBy() == null));
         verify(sessionRepository, times(1)).save(session);
+        org.mockito.ArgumentCaptor<Object> eventCaptor = org.mockito.ArgumentCaptor.forClass(Object.class);
+        verify(eventPublisher).publishEvent(eventCaptor.capture());
+        NotificationEvent event = (NotificationEvent) eventCaptor.getValue();
+        assertEquals("NO_SHOW_RECORDED", event.type().name());
+        assertEquals(List.of(31), event.recipientIds());
         verifyNoInteractions(notificationService);
     }
 
@@ -212,7 +223,7 @@ class AttendanceFinalizationProcessorTest {
         when(enrollmentRepository.findByClassIdWithDetails(12)).thenReturn(List.of(registered));
         when(attendanceRepository.findBySessionIdAndMemberId(90,31)).thenReturn(Optional.empty());
         when(attendanceRepository.save(any(Attendance.class))).thenAnswer(call -> call.getArgument(0));
-        when(sessionRepository.countBySportsClassIdAndStatusNot(12,"Cancelled")).thenReturn(12L);
+        when(sessionRepository.countBySportsClassIdAndCenterInvalidatedFalseAndStatusNot(12,"Cancelled")).thenReturn(12L);
         processor.process(90);
         assertEquals("Completed",registered.getStatus());
     }

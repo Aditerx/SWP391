@@ -43,6 +43,16 @@ public class Session {
     @JoinColumn(name = "subscription_id")
     private MemberPackage memberPackage;
 
+    @Column(name = "booking_key", length = 80)
+    private String bookingKey;
+    @Column(name="booking_hash",length=64) private String bookingHash;
+    @Column(name = "created_by") private Integer createdBy;
+    @Column(name = "agreement_confirmed_at") private java.time.LocalDateTime agreementConfirmedAt;
+    @Column(name = "support_reason", length = 2000) private String supportReason;
+    @Column(name = "credit_returned", nullable = false) private boolean creditReturned;
+    @Column(name = "center_invalidated", nullable = false) private boolean centerInvalidated;
+    @ManyToOne(fetch = FetchType.LAZY) @JoinColumn(name = "makeup_for_session_id") private Session makeupFor;
+
     @Column(name = "session_date", nullable = false)
     private LocalDate sessionDate;
 

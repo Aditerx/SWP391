@@ -29,6 +29,7 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.time.*;
 import java.util.Collections;
@@ -41,6 +42,10 @@ import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class PrivateSessionServiceTest {
+    @org.mockito.Mock com.sportscenter.membership.CoachCapacityService phaseCapacity;
+    @org.mockito.Mock com.sportscenter.session.SessionChangeRepository phaseChanges;
+    @org.mockito.Mock com.sportscenter.session.SessionAbsenceService phaseAbsence;
+    @org.mockito.Mock com.sportscenter.session.CenterIncidentService phaseIncidents;
 
     @Mock
     private SessionRepository sessionRepository;
@@ -72,6 +77,9 @@ class PrivateSessionServiceTest {
     @Mock
     private SubjectRepository subjectRepository;
 
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
+
     @Spy
     private SessionSlotValidator sessionSlotValidator = new SessionSlotValidator();
 
@@ -92,6 +100,7 @@ class PrivateSessionServiceTest {
     private Subject tennisSubject;
     private Subject badmintonSubject;
     private Authentication memberAuth;
+    private Authentication coachAuth;
 
     @BeforeEach
     void setUp() {
@@ -170,11 +179,14 @@ class PrivateSessionServiceTest {
         badmintonSubject.setSlug("cau-long");
 
         advancedClass = new SportsClass();
+        activeSubscription.setPrimaryCoach(sampleCoach); activeSubscription.setSubject(badmintonSubject); activeSubscription.setActivatedAt(LocalDateTime.of(2026,10,15,8,0)); activeSubscription.setExpiresAt(LocalDateTime.of(2026,11,29,8,0));
+        coachAuth = new UsernamePasswordAuthenticationToken("coach@example.com", "n/a", List.of(new SimpleGrantedAuthority("ROLE_COACH")));
+        lenient().when(userRepository.findByEmailIgnoreCase("coach@example.com")).thenReturn(Optional.of(sampleCoach));
         advancedClass.setId(200);
-        advancedClass.setName("Tennis 1:1 Nâng Cao");
+        advancedClass.setName("Badminton 1:1");
         advancedClass.setClassType("Advanced");
         advancedClass.setMaxCapacity(1);
-        advancedClass.setSubject(tennisSubject);
+        advancedClass.setSubject(badmintonSubject);
 
         outdoorRoom = new Room();
         outdoorRoom.setId(1);
@@ -197,8 +209,8 @@ class PrivateSessionServiceTest {
 
     @Test void bookingOutsideSubscriptionDatesIsRejectedBeforeCreditIsChanged() {
         when(memberPackageRepository.findByIdForUpdate(50)).thenReturn(Optional.of(activeSubscription));
-        var request = new PrivateBookingRequest(50,10,1,activeSubscription.getEndDate().plusDays(1),LocalTime.of(6,0),LocalTime.of(7,30),200,1);
-        var error = assertThrows(BusinessException.class, () -> sessionService.bookPrivateSession(request, memberAuth));
+        var request = booking(50,10,1,activeSubscription.getEndDate().plusDays(1),LocalTime.of(6,0),LocalTime.of(7,30),200,1);
+        var error = assertThrows(BusinessException.class, () -> sessionService.bookPrivateSession(request, coachAuth));
         assertTrue(error.getMessage().startsWith("ADVANCED_PACKAGE_EXPIRED:"));
         assertEquals(12,activeSubscription.getRemainingCredit()); verify(sessionRepository,never()).save(any());
     }
@@ -207,8 +219,8 @@ class PrivateSessionServiceTest {
         when(memberPackageRepository.findByIdForUpdate(50)).thenReturn(Optional.of(activeSubscription));
         var profile = new com.sportscenter.user.Member(); profile.setBookingBlockedUntil(LocalDateTime.now(clock).plusDays(1));
         when(memberRepository.findById(20)).thenReturn(Optional.of(profile));
-        var request = new PrivateBookingRequest(50,10,1,LocalDate.of(2026,10,25),LocalTime.of(6,0),LocalTime.of(7,30),200,1);
-        assertTrue(assertThrows(BusinessException.class, () -> sessionService.bookPrivateSession(request,memberAuth)).getMessage().startsWith("BOOKING_BLOCKED:"));
+        var request = booking(50,10,1,LocalDate.of(2026,10,25),LocalTime.of(6,0),LocalTime.of(7,30),200,1);
+        assertTrue(assertThrows(BusinessException.class, () -> sessionService.bookPrivateSession(request,coachAuth)).getMessage().startsWith("BOOKING_BLOCKED:"));
         assertEquals(12,activeSubscription.getRemainingCredit());
     }
 
@@ -313,7 +325,7 @@ class PrivateSessionServiceTest {
     void bookPrivateSession_Success() {
         // Book 2 days in advance: 2026-10-22 Ca 2 (07:45 - 09:15)
         LocalDate bookingDate = LocalDate.of(2026, 10, 22);
-        PrivateBookingRequest request = new PrivateBookingRequest(
+        PrivateBookingRequest request = booking(
                 50, 10, 2, bookingDate, LocalTime.of(7, 45), LocalTime.of(9, 15), 200, null);
 
         when(memberPackageRepository.findByIdForUpdate(50)).thenReturn(Optional.of(activeSubscription));
@@ -329,7 +341,7 @@ class PrivateSessionServiceTest {
             return s;
         });
 
-        SessionResponse response = sessionService.bookPrivateSession(request, memberAuth);
+        SessionResponse response = sessionService.bookPrivateSession(request, coachAuth);
 
         assertNotNull(response);
         assertEquals(999, response.id());
@@ -341,7 +353,7 @@ class PrivateSessionServiceTest {
         // Verify credit was deducted from 12 to 11
         assertEquals(11, activeSubscription.getRemainingCredit());
         verify(memberPackageRepository).save(activeSubscription);
-        verify(auditService).log(eq(20), eq("BOOK_PRIVATE_SESSION"), eq("SESSION"), eq(999), contains("Remaining credit: 11"));
+        verify(auditService).log(eq(10), eq("BOOK_PRIVATE_SESSION"), eq("SESSION"), eq(999), contains("Remaining credit: 11"));
     }
 
     @Test
@@ -349,13 +361,13 @@ class PrivateSessionServiceTest {
     void bookPrivateSession_ZeroCredit_ThrowsException() {
         activeSubscription.setRemainingCredit(0);
         LocalDate bookingDate = LocalDate.of(2026, 10, 22);
-        PrivateBookingRequest request = new PrivateBookingRequest(
+        PrivateBookingRequest request = booking(
                 50, 10, 2, bookingDate, LocalTime.of(7, 45), LocalTime.of(9, 15), 200, null);
 
         when(memberPackageRepository.findByIdForUpdate(50)).thenReturn(Optional.of(activeSubscription));
 
         BusinessException ex = assertThrows(BusinessException.class,
-                () -> sessionService.bookPrivateSession(request, memberAuth));
+                () -> sessionService.bookPrivateSession(request, coachAuth));
         assertTrue(ex.getMessage().contains("Credit = 0"));
     }
 
@@ -363,16 +375,16 @@ class PrivateSessionServiceTest {
     @DisplayName("bookPrivateSession: Fails when package validity past 45 days")
     void bookPrivateSession_ExpiredPackage_ThrowsException() {
         // Expired yesterday
-        activeSubscription.setEndDate(LocalDate.of(2026, 10, 19));
+        activeSubscription.setEndDate(LocalDate.of(2026, 10, 19)); activeSubscription.setExpiresAt(LocalDateTime.of(2026,10,19,8,0));
         LocalDate bookingDate = LocalDate.of(2026, 10, 22);
-        PrivateBookingRequest request = new PrivateBookingRequest(
+        PrivateBookingRequest request = booking(
                 50, 10, 2, bookingDate, LocalTime.of(7, 45), LocalTime.of(9, 15), 200, null);
 
         when(memberPackageRepository.findByIdForUpdate(50)).thenReturn(Optional.of(activeSubscription));
 
         BusinessException ex = assertThrows(BusinessException.class,
-                () -> sessionService.bookPrivateSession(request, memberAuth));
-        assertTrue(ex.getMessage().contains("hết hạn sử dụng 45 ngày"));
+                () -> sessionService.bookPrivateSession(request, coachAuth));
+        assertTrue(ex.getMessage().startsWith("ADVANCED_PACKAGE_EXPIRED:"));
     }
 
     @Test
@@ -380,13 +392,13 @@ class PrivateSessionServiceTest {
     void bookPrivateSession_LessThan12HoursNotice_ThrowsException() {
         // Current time is 2026-10-20 08:00. Trying to book today at 14:45 (6h45m away < 12h)
         LocalDate bookingDate = LocalDate.of(2026, 10, 20);
-        PrivateBookingRequest request = new PrivateBookingRequest(
+        PrivateBookingRequest request = booking(
                 50, 10, 2, bookingDate, LocalTime.of(14, 45), LocalTime.of(16, 15), 200, null);
 
         when(memberPackageRepository.findByIdForUpdate(50)).thenReturn(Optional.of(activeSubscription));
 
         BusinessException ex = assertThrows(BusinessException.class,
-                () -> sessionService.bookPrivateSession(request, memberAuth));
+                () -> sessionService.bookPrivateSession(request, coachAuth));
         assertTrue(ex.getMessage().contains("tối thiểu 12 tiếng"));
     }
 
@@ -397,7 +409,7 @@ class PrivateSessionServiceTest {
         otherMember.setId(999);
         activeSubscription.setMember(otherMember);
 
-        PrivateBookingRequest request = new PrivateBookingRequest(
+        PrivateBookingRequest request = booking(
                 50, 10, 2, LocalDate.of(2026, 10, 22), LocalTime.of(7, 45), LocalTime.of(9, 15), 200, null);
 
         when(memberPackageRepository.findByIdForUpdate(50)).thenReturn(Optional.of(activeSubscription));
@@ -414,7 +426,7 @@ class PrivateSessionServiceTest {
         normalClass.setClassType("Normal");
 
         LocalDate bookingDate = LocalDate.of(2026, 10, 22);
-        PrivateBookingRequest request = new PrivateBookingRequest(
+        PrivateBookingRequest request = booking(
                 50, 10, 2, bookingDate, LocalTime.of(7, 45), LocalTime.of(9, 15), 300, null);
 
         when(memberPackageRepository.findByIdForUpdate(50)).thenReturn(Optional.of(activeSubscription));
@@ -423,7 +435,7 @@ class PrivateSessionServiceTest {
         when(sportsClassRepository.findById(300)).thenReturn(Optional.of(normalClass));
 
         BusinessException ex = assertThrows(BusinessException.class,
-                () -> sessionService.bookPrivateSession(request, memberAuth));
+                () -> sessionService.bookPrivateSession(request, coachAuth));
         assertTrue(ex.getMessage().contains("không phải khóa học 1:1 Advanced"));
     }
 
@@ -459,18 +471,18 @@ class PrivateSessionServiceTest {
         // Verify credit was refunded from 11 to 12
         assertEquals(12, activeSubscription.getRemainingCredit());
         verify(memberPackageRepository).save(activeSubscription);
-        verify(auditService).log(eq(20), eq("CANCEL_PRIVATE_SESSION"), eq("SESSION"), eq(777), contains("Refunded 1 credit"));
+        verify(auditService).log(eq(20), eq("CANCEL_PRIVATE_SESSION"), eq("SESSION"), eq(777), contains("Refunded original credit"));
     }
 
     @Test
-    @DisplayName("cancelPrivateSession: Fails with CANCEL_TOO_LATE when cancelling under 24 hours")
-    void cancelPrivateSession_Under24Hours_ThrowsCancelTooLate() {
+    @DisplayName("cancelPrivateSession: Fails with CANCEL_TOO_LATE when cancelling under 12 hours")
+    void cancelPrivateSession_Under12Hours_ThrowsCancelTooLate() {
         // Session is tomorrow morning 2026-10-21 07:45 (23h45m away < 24h)
         Session session = new Session(); session.setSportsClass(advancedClass);
         session.setId(778);
-        session.setSessionDate(LocalDate.of(2026, 10, 21));
-        session.setStartTime(LocalTime.of(7, 45));
-        session.setEndTime(LocalTime.of(9, 15));
+        session.setSessionDate(LocalDate.of(2026, 10, 20));
+        session.setStartTime(LocalTime.of(14, 45));
+        session.setEndTime(LocalTime.of(16, 15));
         session.setStatus("Scheduled");
         session.setBookedMember(sampleMember);
         session.setMemberPackage(activeSubscription);
@@ -505,5 +517,8 @@ class PrivateSessionServiceTest {
         BusinessException ex = assertThrows(BusinessException.class,
                 () -> sessionService.cancelPrivateSession(779, memberAuth));
         assertTrue(ex.getMessage().contains("Chỉ có thể hủy lịch riêng cho ca học 1:1"));
+    }
+    private PrivateBookingRequest booking(Integer sub,Integer coach,Integer room,LocalDate date,LocalTime start,LocalTime end,Integer cls,Integer subject) {
+        return new PrivateBookingRequest(sub,coach,room,date,start,end,cls,subject,true,java.util.UUID.randomUUID().toString(),null,null,null);
     }
 }
