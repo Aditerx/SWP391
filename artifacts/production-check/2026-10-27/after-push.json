@@ -1,0 +1,190 @@
+{
+  "checkedAtUtc": "2026-10-27T09:21:43.661683+00:00",
+  "pushedAtUtc": "2026-10-27T09:16:30+00:00",
+  "elapsedSincePushSeconds": 313.661683,
+  "sourceCommitPushed": "765339c781ef36bb48bfe5ea63b4f38e5121d6d6",
+  "baseUrl": "https://scms-app-p1gy.onrender.com",
+  "method": "GET only; no login, email, payment or database writes",
+  "envRead": false,
+  "requests": [
+    {
+      "path": "/actuator/health",
+      "status": 503,
+      "attempt": 1,
+      "durationSeconds": 4.247,
+      "contentType": "application/vnd.spring-boot.actuator.v3+json",
+      "sha256": "dd6e1162d92ef3185c9eae54ebf943f75f77ebd7bffd5fc43dc06594c755edb3"
+    },
+    {
+      "path": "/actuator/health",
+      "status": 503,
+      "attempt": 2,
+      "durationSeconds": 0.564,
+      "contentType": "application/vnd.spring-boot.actuator.v3+json",
+      "sha256": "dd6e1162d92ef3185c9eae54ebf943f75f77ebd7bffd5fc43dc06594c755edb3"
+    },
+    {
+      "path": "/actuator/health",
+      "status": 503,
+      "attempt": 3,
+      "durationSeconds": 0.341,
+      "contentType": "application/vnd.spring-boot.actuator.v3+json",
+      "sha256": "dd6e1162d92ef3185c9eae54ebf943f75f77ebd7bffd5fc43dc06594c755edb3"
+    },
+    {
+      "path": "/api/health",
+      "status": 200,
+      "attempt": 1,
+      "durationSeconds": 0.253,
+      "contentType": "application/json",
+      "sha256": "42e394054ca6584a6318e12f8e17cfdff70d7ef0c17f84f430ccda0d656dfaff"
+    },
+    {
+      "path": "/swagger-ui/index.html",
+      "status": 200,
+      "attempt": 1,
+      "durationSeconds": 0.165,
+      "contentType": "text/html",
+      "sha256": "bb9928afd0ea8c12e124c42fef58fb080f36770389684badb2a4dcf548624eeb"
+    },
+    {
+      "path": "/swagger-ui/swagger-ui.css",
+      "status": 200,
+      "attempt": 1,
+      "durationSeconds": 0.387,
+      "contentType": "text/css",
+      "sha256": "40170f0ee859d17f92131ba707329a88a070e4f66874d11365e9a77d232f6117"
+    },
+    {
+      "path": "/swagger-ui/swagger-ui-bundle.js",
+      "status": 200,
+      "attempt": 1,
+      "durationSeconds": 0.474,
+      "contentType": "text/javascript",
+      "sha256": "c2e4a9ef08144839ff47c14202063ecfe4e59e70a4e7154a26bd50d880c88ba1"
+    },
+    {
+      "path": "/swagger-ui/swagger-initializer.js",
+      "status": 200,
+      "attempt": 1,
+      "durationSeconds": 0.402,
+      "contentType": "text/javascript",
+      "sha256": "ce1fd852bad15e4ccbcf93ae8120d1c39539bb4c2d838cc60f3ef991c8c63438"
+    },
+    {
+      "path": "/v3/api-docs/swagger-config",
+      "status": 200,
+      "attempt": 1,
+      "durationSeconds": 0.206,
+      "contentType": "application/json",
+      "sha256": "c46b89da9ca2f9a0aeda4d3c986d1b234bcf34b8c2ecf7e68588e2322b800108"
+    },
+    {
+      "path": "/v3/api-docs",
+      "status": 0,
+      "attempt": 1,
+      "durationSeconds": 25.104,
+      "contentType": "",
+      "sha256": "4e67e948c7499b9cb3cc48dc48c92b0b24b72096992393e8b8904ca505f50b3b"
+    },
+    {
+      "path": "/v3/api-docs",
+      "status": 502,
+      "attempt": 2,
+      "durationSeconds": 1.815,
+      "contentType": "text/html; charset=utf-8",
+      "sha256": "00147ae3d7c9df0e2c039c48789947d74c291134be9d0970b48a500a2056ae1d"
+    },
+    {
+      "path": "/v3/api-docs",
+      "status": 0,
+      "attempt": 3,
+      "durationSeconds": 25.129,
+      "contentType": "",
+      "sha256": "4e67e948c7499b9cb3cc48dc48c92b0b24b72096992393e8b8904ca505f50b3b"
+    },
+    {
+      "path": "/api/public/subjects",
+      "status": 200,
+      "attempt": 1,
+      "durationSeconds": 1.815,
+      "contentType": "application/json",
+      "sha256": "930b5e91ad3342d57e2e5382b07421e4224728591b4fb4fc01b24c74ff461729"
+    },
+    {
+      "path": "/api/reports/dashboard",
+      "status": 401,
+      "attempt": 1,
+      "durationSeconds": 1.317,
+      "contentType": "application/json",
+      "sha256": "682415e61392eb2f22fb1c57ace92893bc12a23ba642684db3be704c867c8598"
+    },
+    {
+      "path": "/api/members/me/invoices",
+      "status": 401,
+      "attempt": 1,
+      "durationSeconds": 0.389,
+      "contentType": "application/json",
+      "sha256": "4c528a7d40bbaad8516bf09fa61f131279f6bcc74bce89e5ec9ca1614ebdefec"
+    },
+    {
+      "path": "/api/center-incidents",
+      "status": 401,
+      "attempt": 1,
+      "durationSeconds": 0.297,
+      "contentType": "application/json",
+      "sha256": "501f294e14046738661bb152778285c325d6da3eb9a8fe363e5043bc4c4be102"
+    },
+    {
+      "path": "/actuator/info",
+      "status": 404,
+      "attempt": 1,
+      "durationSeconds": 0.6,
+      "contentType": "application/json",
+      "sha256": "49f91df77b1e49a7869356f6ed2357b6fb23964a8d4a50fba6092f6dcb4f9ae3"
+    }
+  ],
+  "assertions": {
+    "healthUp": false,
+    "applicationUp": true,
+    "swaggerHtml": true,
+    "asset:swagger-ui.css": true,
+    "asset:swagger-ui-bundle.js": true,
+    "asset:swagger-initializer.js": true,
+    "swaggerConfig": true,
+    "openApi": false,
+    "nineApprovedSubjects": false,
+    "anonymousDenied:/api/reports/dashboard": true,
+    "anonymousDenied:/api/members/me/invoices": true,
+    "anonymousDenied:/api/center-incidents": true
+  },
+  "health": {
+    "status": "DOWN",
+    "groups": [
+      "liveness",
+      "readiness"
+    ]
+  },
+  "subjectSlugs": [
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    "bong-da",
+    "quan-vot-tennis",
+    "boi-loi",
+    "ban-cung",
+    "cau-long",
+    "bong-ban",
+    "bong-ro",
+    "bong-chuyen",
+    "pickleball"
+  ],
+  "deploymentShaExposed": null,
+  "result": "FAIL"
+}
