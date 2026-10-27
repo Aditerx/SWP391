@@ -31,7 +31,7 @@ Bản rút gọn từ lịch sử chốt25–27/10/2026. D12 về45ngày sử d�
 <a id="d01"></a>
 ## D01 — Hồ sơ Member
 
-GET/PATCH `/api/members/me`, DTO tự phục vụ riêng; danh tính từ Auth. Tự sửa đúng7trường: name,phone,address,dateOfBirth,gender,goal,healthNote. Email/password/avatar theo luồng riêng; không mở role/status/center/gói/credit/giá. Validation/null phải đặc tả khi triển khai, không tự mở thêm field. D01 vẫn backlog theo phạm vi Owner.
+GET/PATCH `/api/members/me`, DTO tự phục vụ riêng; danh tính từ Auth. Tự sửa đúng7trường: name,phone,address,dateOfBirth,gender,goal,healthNote. Email/password/avatar theo luồng riêng; không mở role/status/center/gói/credit/giá. Validation/null phải đặc tả khi triển khai, không tự mở thêm field. Trạng thái triển khai/nghiệm thu xem docs00.
 
 <a id="d02"></a>
 ## D02 — Danh mục và giá
@@ -104,7 +104,7 @@ Job expiry lưu số credit thu hồi. Khi phục hồi chỉ restore balance ex
 <a id="d09"></a>
 ## D09 — Coach directory
 
-Log lịch sử đã xác nhận LazyInitializationException specialization ngoài Hibernate Session; D09 vẫn backlog, không suy đã hết lỗi từ GET anonymous401. Khi nhận scope: tái hiện JPA thật OSIV=false; service read-only transaction/DTO/batch query theo center, tránhN+1; giữ filter/contact theo quyền. Không mở rộng thành đổi capacity/admission workflow.
+Log lịch sử đã xác nhận LazyInitializationException specialization ngoài Hibernate Session; không suy đã hết lỗi từ GET anonymous401. Nghiệm thu bằng JPA thật OSIV=false; service read-only transaction/DTO/batch query theo center, tránhN+1; giữ filter/contact theo quyền. Không mở rộng thành đổi capacity/admission workflow. Trạng thái triển khai/nghiệm thu xem docs00.
 
 <a id="d10"></a>
 ## D10 — Thanh toán và đối soát

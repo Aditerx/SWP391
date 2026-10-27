@@ -1,30 +1,30 @@
 {
   "schemaVersion": 1,
-  "recordedAt": "2026-10-27T17:24:30.894912+00:00",
+  "recordedAt": "2026-10-27T18:30:40.875138+00:00",
   "purpose": "FE handoff readiness: fresh local authenticated HTTP and post-commit acceptance; retained cloud evidence is not rerun",
   "historyCommit": "a4f3cd0df946963ee905c1f6a3263f941f1b8fa2",
   "results": {
     "result": "PARTIAL_LOCAL_PASS_LIVE_BLOCKED",
-    "sourceCommit": "0a89ad95c88573f09af03fe07293788afd6acba6",
+    "sourceCommit": "cc7847f7238ce3084ee74be8373236d52ec55756",
     "liveCommit": "4d372e5832bd3e8685008b2e0a2029ff981eb047",
-    "paths": 149,
-    "operations": 185,
-    "schemas": 138,
+    "paths": 150,
+    "operations": 187,
+    "schemas": 140,
     "sourceRouteMatches": 185,
     "renderGetChecks": 74,
     "renderGetPassed": 74,
     "authenticatedBusinessOperationsExecutedOnRender": 0,
     "productionMutationTestsExecuted": 0,
-    "cleanTests": 313,
-    "cleanPassed": 286,
+    "cleanTests": 326,
+    "cleanPassed": 299,
     "cleanSkipped": 27,
-    "postgresTests": 18,
-    "postgresBusinessWorkflows": 17,
+    "postgresTests": 20,
+    "postgresBusinessWorkflows": 19,
     "postgresContractRegressions": 1,
-    "recordedExchanges": 359,
-    "operationsWithLocalExchanges": 38,
-    "positiveExchangesChecked": 289,
-    "bodyCompatibilityChecks": 434,
+    "recordedExchanges": 396,
+    "operationsWithLocalExchanges": 43,
+    "positiveExchangesChecked": 318,
+    "bodyCompatibilityChecks": 469,
     "wireIssues": 0,
     "decisionRows": 19,
     "workedExamples": 20,
@@ -58,11 +58,11 @@
     "limits": [
       "Controller parser is static; service ownership/center/locking checks need separate policy review/tests",
       "Anonymous GET guards and OpenAPI do not prove full role matrix, error mapping, concurrency, callbacks or business outcomes",
-      "P1.5/D01/D09/FE integration remain excluded; no production session credentials were supplied or guessed",
       "Does not execute authenticated production requests or business mutations",
       "Not a complete JSON Schema validator: nullability, formats, ranges, patterns, required fields and negative error schemas need their own contract checks",
       "Null values are preserved as observations and are not rejected merely because SpringDoc omitted nullable metadata; FE must handle these fields",
-      "Routes not exercised by these exchanges do not gain business-test coverage from this check"
+      "Routes not exercised by these exchanges do not gain business-test coverage from this check",
+      "P1.5, package T beyond integrated D01/D09, and FE integration remain excluded; no production credentials were supplied or guessed"
     ]
   },
   "ciAndDeployment": {
@@ -95,7 +95,7 @@
   },
   "openApi": {
     "path": "artifacts/fe-handoff/openapi.json",
-    "sha256": "a2a8897427843c93b1de42795db85645d16526c2af3e63931fc1d93cfb459cf1"
+    "sha256": "84801f882323dd45e8f5e497417de517f67a964aeb2890d906984de6fcecc4d6"
   },
   "local": {
     "workflowCases": [
@@ -116,6 +116,8 @@
       "incidentSubstituteRequiresExactConsentAndKeepsPrimaryCoach",
       "globalHolidayCannotChangeAnotherCentersEntitlement",
       "multiSubjectAdmissionSharesCapacityAndOutdoorHeatBlocksOnlyHotSlots",
+      "selfProfileUsesOnlyOwnerFieldsAndProtectsConcurrentPatches",
+      "directoryRealSessionsRespectScopeContactsAndConstantQueries",
       "publishedOpenApiKeepsDistinctWorkflowDtosAndActualSuccessStatuses"
     ],
     "openApiRegression": {
@@ -181,7 +183,7 @@
         "/api/training-plans/{id}",
         "/api/users/me/avatar"
       ],
-      "positiveExchangesCheckedForStatusTypeAndProperties": 289,
+      "positiveExchangesCheckedForStatusTypeAndProperties": 318,
       "localTimeWireType": "string",
       "source": "Real HTTP GET /v3/api-docs in the same local application as the workflows"
     },
@@ -644,7 +646,7 @@
         "actualStatus": 404,
         "previewHeaderPresent": false,
         "responseBody": {
-          "timestamp": "2026-10-27T17:21:32.728455900Z",
+          "timestamp": "2026-10-27T18:21:13.757265100Z",
           "status": 404,
           "error": "Not Found",
           "message": "Invoice not found: 1"
@@ -661,7 +663,7 @@
         "actualStatus": 403,
         "previewHeaderPresent": false,
         "responseBody": {
-          "timestamp": "2026-10-27T17:21:32.745719600Z",
+          "timestamp": "2026-10-27T18:21:13.786313100Z",
           "status": 403,
           "error": "Forbidden",
           "message": "Access Denied"
@@ -715,7 +717,7 @@
         "actualStatus": 409,
         "previewHeaderPresent": false,
         "responseBody": {
-          "timestamp": "2026-10-27T17:21:33.027424400Z",
+          "timestamp": "2026-10-27T18:21:14.067900500Z",
           "status": 409,
           "error": "Conflict",
           "message": "Invoice is no longer payable"
@@ -763,7 +765,7 @@
         "actualStatus": 403,
         "previewHeaderPresent": false,
         "responseBody": {
-          "timestamp": "2026-10-27T17:21:33.145886800Z",
+          "timestamp": "2026-10-27T18:21:14.135301400Z",
           "status": 403,
           "error": "Forbidden",
           "message": "Members may only view their own subscriptions"
@@ -1380,7 +1382,7 @@
         "actualStatus": 409,
         "previewHeaderPresent": false,
         "responseBody": {
-          "timestamp": "2026-10-27T17:21:34.856556900Z",
+          "timestamp": "2026-10-27T18:21:15.470263800Z",
           "status": 409,
           "error": "Conflict",
           "message": "Invoice is not payable online"
@@ -1740,8 +1742,8 @@
         "path": "/api/sessions/book-private",
         "requestBody": {
           "agreementConfirmed": true,
-          "requestKey": "book-boundary",
           "sessionDate": "2026-10-28",
+          "requestKey": "book-boundary",
           "startTime": "06:00",
           "endTime": "07:30",
           "subscriptionId": 1,
@@ -1753,7 +1755,7 @@
         "actualStatus": 403,
         "previewHeaderPresent": false,
         "responseBody": {
-          "timestamp": "2026-10-27T17:21:35.655379800Z",
+          "timestamp": "2026-10-27T18:21:16.365602400Z",
           "status": 403,
           "error": "Forbidden",
           "message": "Access Denied"
@@ -1767,8 +1769,8 @@
         "path": "/api/sessions/book-private",
         "requestBody": {
           "agreementConfirmed": false,
-          "requestKey": "book-boundary",
           "sessionDate": "2026-10-28",
+          "requestKey": "book-boundary",
           "startTime": "06:00",
           "endTime": "07:30",
           "subscriptionId": 1,
@@ -1792,8 +1794,8 @@
         "path": "/api/sessions/book-private",
         "requestBody": {
           "agreementConfirmed": true,
-          "requestKey": "book-boundary",
           "sessionDate": "2026-10-28",
+          "requestKey": "book-boundary",
           "startTime": "06:00",
           "endTime": "07:30",
           "subscriptionId": 1,
@@ -1839,8 +1841,8 @@
         "path": "/api/sessions/book-private",
         "requestBody": {
           "agreementConfirmed": true,
-          "requestKey": "book-boundary",
           "sessionDate": "2026-10-28",
+          "requestKey": "book-boundary",
           "startTime": "06:00",
           "endTime": "07:30",
           "subscriptionId": 1,
@@ -2142,8 +2144,8 @@
         "path": "/api/sessions/book-private",
         "requestBody": {
           "agreementConfirmed": true,
-          "requestKey": "notice-session",
           "sessionDate": "2026-10-28",
+          "requestKey": "notice-session",
           "startTime": "07:45",
           "endTime": "09:15",
           "subscriptionId": 1,
@@ -2319,7 +2321,7 @@
         "actualStatus": 403,
         "previewHeaderPresent": false,
         "responseBody": {
-          "timestamp": "2026-10-27T17:21:37.116799600Z",
+          "timestamp": "2026-10-27T18:21:17.712441200Z",
           "status": 403,
           "error": "Forbidden",
           "message": "CenterManager required"
@@ -3067,7 +3069,7 @@
         "actualStatus": 403,
         "previewHeaderPresent": false,
         "responseBody": {
-          "timestamp": "2026-10-27T17:21:38.783879200Z",
+          "timestamp": "2026-10-27T18:21:19.511905200Z",
           "status": 403,
           "error": "Forbidden",
           "message": "Access Denied"
@@ -3239,7 +3241,7 @@
         "actualStatus": 403,
         "previewHeaderPresent": false,
         "responseBody": {
-          "timestamp": "2026-10-27T17:21:39.223284500Z",
+          "timestamp": "2026-10-27T18:21:19.883946200Z",
           "status": 403,
           "error": "Forbidden",
           "message": "Access Denied"
@@ -3480,7 +3482,7 @@
         "actualStatus": 403,
         "previewHeaderPresent": false,
         "responseBody": {
-          "timestamp": "2026-10-27T17:21:39.602270900Z",
+          "timestamp": "2026-10-27T18:21:20.241777100Z",
           "status": 403,
           "error": "Forbidden",
           "message": "Access Denied"
@@ -3802,8 +3804,8 @@
         "path": "/api/sessions/book-private",
         "requestBody": {
           "agreementConfirmed": true,
-          "requestKey": "history-booking",
           "sessionDate": "2026-11-03",
+          "requestKey": "history-booking",
           "startTime": "14:45",
           "endTime": "16:15",
           "subscriptionId": 5,
@@ -4483,8 +4485,8 @@
         "path": "/api/sessions/book-private",
         "requestBody": {
           "agreementConfirmed": true,
-          "requestKey": "expiry-book-2",
           "sessionDate": "2026-11-02",
+          "requestKey": "expiry-book-2",
           "startTime": "07:45",
           "endTime": "09:15",
           "subscriptionId": 1,
@@ -4530,8 +4532,8 @@
         "path": "/api/sessions/book-private",
         "requestBody": {
           "agreementConfirmed": true,
-          "requestKey": "expiry-book-3",
           "sessionDate": "2026-11-03",
+          "requestKey": "expiry-book-3",
           "startTime": "07:45",
           "endTime": "09:15",
           "subscriptionId": 1,
@@ -4577,8 +4579,8 @@
         "path": "/api/sessions/book-private",
         "requestBody": {
           "agreementConfirmed": true,
-          "requestKey": "expiry-book-4",
           "sessionDate": "2026-11-04",
+          "requestKey": "expiry-book-4",
           "startTime": "07:45",
           "endTime": "09:15",
           "subscriptionId": 1,
@@ -4624,8 +4626,8 @@
         "path": "/api/sessions/book-private",
         "requestBody": {
           "agreementConfirmed": true,
-          "requestKey": "expiry-book-5",
           "sessionDate": "2026-11-05",
+          "requestKey": "expiry-book-5",
           "startTime": "07:45",
           "endTime": "09:15",
           "subscriptionId": 1,
@@ -4671,8 +4673,8 @@
         "path": "/api/sessions/book-private",
         "requestBody": {
           "agreementConfirmed": true,
-          "requestKey": "expiry-book-6",
           "sessionDate": "2026-11-06",
+          "requestKey": "expiry-book-6",
           "startTime": "07:45",
           "endTime": "09:15",
           "subscriptionId": 1,
@@ -4718,8 +4720,8 @@
         "path": "/api/sessions/book-private",
         "requestBody": {
           "agreementConfirmed": true,
-          "requestKey": "expiry-book-7",
           "sessionDate": "2026-11-07",
+          "requestKey": "expiry-book-7",
           "startTime": "07:45",
           "endTime": "09:15",
           "subscriptionId": 1,
@@ -4765,8 +4767,8 @@
         "path": "/api/sessions/book-private",
         "requestBody": {
           "agreementConfirmed": true,
-          "requestKey": "expiry-book-8",
           "sessionDate": "2026-11-08",
+          "requestKey": "expiry-book-8",
           "startTime": "07:45",
           "endTime": "09:15",
           "subscriptionId": 1,
@@ -4812,8 +4814,8 @@
         "path": "/api/sessions/book-private",
         "requestBody": {
           "agreementConfirmed": true,
-          "requestKey": "expiry-book-9",
           "sessionDate": "2026-11-09",
+          "requestKey": "expiry-book-9",
           "startTime": "07:45",
           "endTime": "09:15",
           "subscriptionId": 1,
@@ -4893,8 +4895,8 @@
         "path": "/api/sessions/book-private",
         "requestBody": {
           "agreementConfirmed": true,
-          "requestKey": "expired-attempt",
           "sessionDate": "2026-12-16",
+          "requestKey": "expired-attempt",
           "startTime": "06:00",
           "endTime": "07:30",
           "subscriptionId": 1,
@@ -4906,7 +4908,7 @@
         "actualStatus": 400,
         "previewHeaderPresent": false,
         "responseBody": {
-          "timestamp": "2026-10-27T17:21:42.721063700Z",
+          "timestamp": "2026-10-27T18:21:22.726690400Z",
           "status": 400,
           "error": "Bad Request",
           "message": "Gói hội viên chưa được kích hoạt hoặc đã hết hiệu lực."
@@ -5066,8 +5068,8 @@
         "path": "/api/sessions/book-private",
         "requestBody": {
           "agreementConfirmed": true,
-          "requestKey": "rebook-after-recovery",
           "sessionDate": "2026-12-16",
+          "requestKey": "rebook-after-recovery",
           "startTime": "06:00",
           "endTime": "07:30",
           "subscriptionId": 1,
@@ -5113,8 +5115,8 @@
         "path": "/api/sessions/book-private",
         "requestBody": {
           "agreementConfirmed": true,
-          "requestKey": "approved-minimum",
           "sessionDate": "2027-01-21",
+          "requestKey": "approved-minimum",
           "startTime": "18:15",
           "endTime": "19:45",
           "subscriptionId": 1,
@@ -5138,8 +5140,8 @@
         "path": "/api/sessions/book-private",
         "requestBody": {
           "agreementConfirmed": true,
-          "requestKey": "approved-minimum",
           "sessionDate": "2027-01-21",
+          "requestKey": "approved-minimum",
           "supportReason": "Manager supports the agreed makeup",
           "startTime": "18:15",
           "endTime": "19:45",
@@ -5357,7 +5359,7 @@
         "requestBody": {
           "startTime": "07:45",
           "endTime": "09:15",
-          "requestId": "f7e5631d-7469-4612-a758-0000ad8e1994",
+          "requestId": "c34980fe-d461-4889-ad3a-f99a3cf93c3b",
           "daysOfWeek": [
             2,
             4
@@ -6163,7 +6165,7 @@
         "actualStatus": 403,
         "previewHeaderPresent": false,
         "responseBody": {
-          "timestamp": "2026-10-27T17:21:46.792649300Z",
+          "timestamp": "2026-10-27T18:21:26.503740200Z",
           "status": 403,
           "error": "Forbidden",
           "message": "Invoice belongs to another center"
@@ -6177,8 +6179,8 @@
         "path": "/api/sessions/book-private",
         "requestBody": {
           "agreementConfirmed": true,
-          "requestKey": "center-denied",
           "sessionDate": "2027-02-02",
+          "requestKey": "center-denied",
           "supportReason": "Agreed support by manager",
           "startTime": "06:00",
           "endTime": "07:30",
@@ -6191,7 +6193,7 @@
         "actualStatus": 403,
         "previewHeaderPresent": false,
         "responseBody": {
-          "timestamp": "2026-10-27T17:21:46.811026400Z",
+          "timestamp": "2026-10-27T18:21:26.522083200Z",
           "status": 403,
           "error": "Forbidden",
           "message": "Schedule belongs to another center"
@@ -6205,8 +6207,8 @@
         "path": "/api/sessions/book-private",
         "requestBody": {
           "agreementConfirmed": true,
-          "requestKey": "center-denied",
           "sessionDate": "2027-02-02",
+          "requestKey": "center-denied",
           "supportReason": "Agreed support by manager",
           "startTime": "06:00",
           "endTime": "07:30",
@@ -6219,7 +6221,7 @@
         "actualStatus": 403,
         "previewHeaderPresent": false,
         "responseBody": {
-          "timestamp": "2026-10-27T17:21:46.819857500Z",
+          "timestamp": "2026-10-27T18:21:26.530555800Z",
           "status": 403,
           "error": "Forbidden",
           "message": "Access Denied"
@@ -6236,7 +6238,7 @@
         "actualStatus": 403,
         "previewHeaderPresent": false,
         "responseBody": {
-          "timestamp": "2026-10-27T17:21:46.834754900Z",
+          "timestamp": "2026-10-27T18:21:26.546460100Z",
           "status": 403,
           "error": "Forbidden",
           "message": "Access Denied"
@@ -6276,7 +6278,7 @@
         "actualStatus": 409,
         "previewHeaderPresent": false,
         "responseBody": {
-          "timestamp": "2026-10-27T17:21:46.978164300Z",
+          "timestamp": "2026-10-27T18:21:26.752945Z",
           "status": 409,
           "error": "Conflict",
           "message": "Invoice is no longer payable"
@@ -6329,8 +6331,8 @@
         "path": "/api/sessions/book-private",
         "requestBody": {
           "agreementConfirmed": true,
-          "requestKey": "center-denied",
           "sessionDate": "2027-02-02",
+          "requestKey": "center-denied",
           "supportReason": "Agreed support by manager",
           "startTime": "06:00",
           "endTime": "07:30",
@@ -6343,7 +6345,7 @@
         "actualStatus": 403,
         "previewHeaderPresent": false,
         "responseBody": {
-          "timestamp": "2026-10-27T17:21:47.024797800Z",
+          "timestamp": "2026-10-27T18:21:26.808158800Z",
           "status": 403,
           "error": "Forbidden",
           "message": "CenterManager required"
@@ -6473,8 +6475,8 @@
         "path": "/api/sessions/book-private",
         "requestBody": {
           "agreementConfirmed": true,
-          "requestKey": "race-book-a",
           "sessionDate": "2027-02-02",
+          "requestKey": "race-book-b",
           "startTime": "06:00",
           "endTime": "07:30",
           "subscriptionId": 7,
@@ -6521,8 +6523,8 @@
         "path": "/api/sessions/book-private",
         "requestBody": {
           "agreementConfirmed": true,
-          "requestKey": "race-book-b",
           "sessionDate": "2027-02-02",
+          "requestKey": "race-book-a",
           "startTime": "06:00",
           "endTime": "07:30",
           "subscriptionId": 7,
@@ -6547,8 +6549,8 @@
         "path": "/api/sessions/book-private",
         "requestBody": {
           "agreementConfirmed": true,
-          "requestKey": "race-book-a",
           "sessionDate": "2027-02-02",
+          "requestKey": "race-book-b",
           "startTime": "07:45",
           "endTime": "09:15",
           "subscriptionId": 7,
@@ -6575,7 +6577,7 @@
         "actualStatus": 403,
         "previewHeaderPresent": false,
         "responseBody": {
-          "timestamp": "2026-10-27T17:21:47.335023Z",
+          "timestamp": "2026-10-27T18:21:27.121867500Z",
           "status": 403,
           "error": "Forbidden",
           "message": "Hội viên chỉ được hủy ca học của chính mình."
@@ -6643,8 +6645,8 @@
         "path": "/api/sessions/book-private",
         "requestBody": {
           "agreementConfirmed": true,
-          "requestKey": "same-key-race",
           "sessionDate": "2027-02-03",
+          "requestKey": "same-key-race",
           "startTime": "06:00",
           "endTime": "07:30",
           "subscriptionId": 7,
@@ -6691,8 +6693,8 @@
         "path": "/api/sessions/book-private",
         "requestBody": {
           "agreementConfirmed": true,
-          "requestKey": "same-key-race",
           "sessionDate": "2027-02-03",
+          "requestKey": "same-key-race",
           "startTime": "06:00",
           "endTime": "07:30",
           "subscriptionId": 7,
@@ -6739,10 +6741,10 @@
         "path": "/api/sessions/book-private",
         "requestBody": {
           "agreementConfirmed": true,
-          "requestKey": "different-slot-a",
           "sessionDate": "2027-02-04",
-          "startTime": "06:00",
-          "endTime": "07:30",
+          "requestKey": "different-slot-b",
+          "startTime": "07:45",
+          "endTime": "09:15",
           "subscriptionId": 7,
           "coachId": 2,
           "subjectId": 5,
@@ -6763,8 +6765,8 @@
           "roomName": "Phase test room",
           "roomLocation": null,
           "sessionDate": "2027-02-04",
-          "startTime": "06:00:00",
-          "endTime": "07:30:00",
+          "startTime": "07:45:00",
+          "endTime": "09:15:00",
           "status": "Scheduled",
           "enrolledCount": 1,
           "maxCapacity": 1,
@@ -6787,10 +6789,10 @@
         "path": "/api/sessions/book-private",
         "requestBody": {
           "agreementConfirmed": true,
-          "requestKey": "different-slot-b",
           "sessionDate": "2027-02-04",
-          "startTime": "07:45",
-          "endTime": "09:15",
+          "requestKey": "different-slot-a",
+          "startTime": "06:00",
+          "endTime": "07:30",
           "subscriptionId": 7,
           "coachId": 2,
           "subjectId": 5,
@@ -6811,8 +6813,8 @@
           "roomName": "Phase test room",
           "roomLocation": null,
           "sessionDate": "2027-02-04",
-          "startTime": "07:45:00",
-          "endTime": "09:15:00",
+          "startTime": "06:00:00",
+          "endTime": "07:30:00",
           "status": "Scheduled",
           "enrolledCount": 1,
           "maxCapacity": 1,
@@ -7520,8 +7522,8 @@
         "path": "/api/sessions/book-private",
         "requestBody": {
           "agreementConfirmed": true,
-          "requestKey": "end-after-deadline",
           "sessionDate": "2027-03-21",
+          "requestKey": "end-after-deadline",
           "startTime": "07:45",
           "endTime": "09:15",
           "subscriptionId": 9,
@@ -7545,8 +7547,8 @@
         "path": "/api/sessions/book-private",
         "requestBody": {
           "agreementConfirmed": true,
-          "requestKey": "end-equal-deadline",
           "sessionDate": "2027-03-21",
+          "requestKey": "end-equal-deadline",
           "startTime": "06:00",
           "endTime": "07:30",
           "subscriptionId": 9,
@@ -7592,8 +7594,8 @@
         "path": "/api/sessions/book-private",
         "requestBody": {
           "agreementConfirmed": true,
-          "requestKey": "member-inactive-blocked",
           "sessionDate": "2027-02-06",
+          "requestKey": "member-inactive-blocked",
           "startTime": "06:00",
           "endTime": "07:30",
           "subscriptionId": 9,
@@ -7617,8 +7619,8 @@
         "path": "/api/sessions/book-private",
         "requestBody": {
           "agreementConfirmed": true,
-          "requestKey": "member-inactive-blocked",
           "sessionDate": "2027-02-06",
+          "requestKey": "member-inactive-blocked",
           "startTime": "06:00",
           "endTime": "07:30",
           "subscriptionId": 9,
@@ -7667,7 +7669,7 @@
         "actualStatus": 403,
         "previewHeaderPresent": false,
         "responseBody": {
-          "timestamp": "2026-10-27T17:21:49.777909Z",
+          "timestamp": "2026-10-27T18:21:29.315151800Z",
           "status": 403,
           "error": "Forbidden",
           "message": "Access Denied"
@@ -7684,7 +7686,7 @@
         "actualStatus": 403,
         "previewHeaderPresent": false,
         "responseBody": {
-          "timestamp": "2026-10-27T17:21:49.797706Z",
+          "timestamp": "2026-10-27T18:21:29.335394600Z",
           "status": 403,
           "error": "Forbidden",
           "message": "Account is not Active"
@@ -7698,8 +7700,8 @@
         "path": "/api/sessions/book-private",
         "requestBody": {
           "agreementConfirmed": true,
-          "requestKey": "exact-12h-create",
           "sessionDate": "2027-02-05",
+          "requestKey": "exact-12h-create",
           "startTime": "06:00",
           "endTime": "07:30",
           "subscriptionId": 9,
@@ -7723,8 +7725,8 @@
         "path": "/api/sessions/book-private",
         "requestBody": {
           "agreementConfirmed": true,
-          "requestKey": "exact-12h-create",
           "sessionDate": "2027-02-05",
+          "requestKey": "exact-12h-create",
           "startTime": "06:00",
           "endTime": "07:30",
           "subscriptionId": 9,
@@ -8119,7 +8121,7 @@
         "requestBody": {
           "startTime": "14:45",
           "endTime": "16:15",
-          "requestId": "4b5b1b0c-508d-4934-8738-be0940880da1",
+          "requestId": "5ea51a55-f1b8-48f9-ab00-71b1308b7d11",
           "daysOfWeek": [
             2,
             4
@@ -8478,8 +8480,8 @@
         "path": "/api/sessions/book-private",
         "requestBody": {
           "agreementConfirmed": true,
-          "requestKey": "substitute-original",
           "sessionDate": "2027-02-08",
+          "requestKey": "substitute-original",
           "startTime": "07:45",
           "endTime": "09:15",
           "subscriptionId": 9,
@@ -8611,7 +8613,7 @@
         "actualStatus": 403,
         "previewHeaderPresent": false,
         "responseBody": {
-          "timestamp": "2026-10-27T17:21:51.512395600Z",
+          "timestamp": "2026-10-27T18:21:30.904132700Z",
           "status": 403,
           "error": "Forbidden",
           "message": "Access Denied"
@@ -8732,8 +8734,8 @@
         "path": "/api/sessions/book-private",
         "requestBody": {
           "agreementConfirmed": true,
-          "requestKey": "substitute-cannot-own-package",
           "sessionDate": "2027-02-09",
+          "requestKey": "substitute-cannot-own-package",
           "startTime": "06:00",
           "endTime": "07:30",
           "subscriptionId": 9,
@@ -8745,7 +8747,7 @@
         "actualStatus": 403,
         "previewHeaderPresent": false,
         "responseBody": {
-          "timestamp": "2026-10-27T17:21:51.703542600Z",
+          "timestamp": "2026-10-27T18:21:31.095559900Z",
           "status": 403,
           "error": "Forbidden",
           "message": "CenterManager required"
@@ -9941,8 +9943,8 @@
         "requestBody": {
           "agreementConfirmed": true,
           "classId": 4,
-          "requestKey": "outdoor-hot-slot",
           "sessionDate": "2027-02-12",
+          "requestKey": "outdoor-hot-slot",
           "startTime": "09:30",
           "endTime": "11:00",
           "subscriptionId": 13,
@@ -9967,8 +9969,8 @@
         "requestBody": {
           "agreementConfirmed": true,
           "classId": 4,
-          "requestKey": "outdoor-hot-slot",
           "sessionDate": "2027-02-12",
+          "requestKey": "outdoor-hot-slot",
           "startTime": "13:00",
           "endTime": "14:30",
           "subscriptionId": 13,
@@ -9993,8 +9995,8 @@
         "requestBody": {
           "agreementConfirmed": true,
           "classId": 4,
-          "requestKey": "outdoor-hot-slot",
           "sessionDate": "2027-02-12",
+          "requestKey": "outdoor-hot-slot",
           "startTime": "06:00",
           "endTime": "07:30",
           "subscriptionId": 13,
@@ -10033,7 +10035,7 @@
         }
       },
       {
-        "scenario": "publishedOpenApiKeepsDistinctWorkflowDtosAndActualSuccessStatuses",
+        "scenario": "selfProfileUsesOnlyOwnerFieldsAndProtectsConcurrentPatches",
         "actor": "MEMBER_A",
         "businessNow": "2027-02-07T20:00",
         "method": "GET",
@@ -10046,6 +10048,1097 @@
           "userId": 1,
           "email": "phase.member@example.test",
           "fullName": "phase.member",
+          "role": "Member",
+          "authorities": [
+            "ROLE_MEMBER"
+          ],
+          "isFirstLogin": false,
+          "memberId": 1
+        }
+      },
+      {
+        "scenario": "selfProfileUsesOnlyOwnerFieldsAndProtectsConcurrentPatches",
+        "actor": "PRIMARY_COACH",
+        "businessNow": "2027-02-07T20:00",
+        "method": "GET",
+        "path": "/api/auth/me",
+        "requestBody": null,
+        "expectedStatus": 200,
+        "actualStatus": 200,
+        "previewHeaderPresent": false,
+        "responseBody": {
+          "userId": 2,
+          "email": "phase.coach@example.test",
+          "fullName": "phase.coach",
+          "role": "Coach",
+          "authorities": [
+            "RECORD_RESULT",
+            "ROLE_COACH"
+          ],
+          "isFirstLogin": false,
+          "memberId": null
+        }
+      },
+      {
+        "scenario": "selfProfileUsesOnlyOwnerFieldsAndProtectsConcurrentPatches",
+        "actor": "CENTER_MANAGER",
+        "businessNow": "2027-02-07T20:00",
+        "method": "GET",
+        "path": "/api/auth/me",
+        "requestBody": null,
+        "expectedStatus": 200,
+        "actualStatus": 200,
+        "previewHeaderPresent": false,
+        "responseBody": {
+          "userId": 4,
+          "email": "phase.manager@example.test",
+          "fullName": "phase.manager",
+          "role": "CenterManager",
+          "authorities": [
+            "MANAGE_CLASSES",
+            "MANAGE_INVOICES",
+            "MANAGE_SUBSCRIPTIONS",
+            "ROLE_CENTERMANAGER",
+            "VIEW_REPORTS"
+          ],
+          "isFirstLogin": false,
+          "memberId": null
+        }
+      },
+      {
+        "scenario": "selfProfileUsesOnlyOwnerFieldsAndProtectsConcurrentPatches",
+        "actor": "RECEPTIONIST",
+        "businessNow": "2027-02-07T20:00",
+        "method": "GET",
+        "path": "/api/auth/me",
+        "requestBody": null,
+        "expectedStatus": 200,
+        "actualStatus": 200,
+        "previewHeaderPresent": false,
+        "responseBody": {
+          "userId": 5,
+          "email": "phase.cashier@example.test",
+          "fullName": "phase.cashier",
+          "role": "Receptionist",
+          "authorities": [
+            "MANAGE_INVOICES",
+            "ROLE_RECEPTIONIST"
+          ],
+          "isFirstLogin": false,
+          "memberId": null
+        }
+      },
+      {
+        "scenario": "selfProfileUsesOnlyOwnerFieldsAndProtectsConcurrentPatches",
+        "actor": "MEMBER_B",
+        "businessNow": "2027-02-07T20:00",
+        "method": "GET",
+        "path": "/api/auth/me",
+        "requestBody": null,
+        "expectedStatus": 200,
+        "actualStatus": 200,
+        "previewHeaderPresent": false,
+        "responseBody": {
+          "userId": 3,
+          "email": "phase.other@example.test",
+          "fullName": "phase.other",
+          "role": "Member",
+          "authorities": [
+            "ROLE_MEMBER"
+          ],
+          "isFirstLogin": false,
+          "memberId": 3
+        }
+      },
+      {
+        "scenario": "selfProfileUsesOnlyOwnerFieldsAndProtectsConcurrentPatches",
+        "actor": "MEMBER_A",
+        "businessNow": "2027-02-07T20:00",
+        "method": "GET",
+        "path": "/api/members/me",
+        "requestBody": null,
+        "expectedStatus": 200,
+        "actualStatus": 200,
+        "previewHeaderPresent": false,
+        "responseBody": {
+          "name": "phase.member",
+          "phone": null,
+          "address": null,
+          "dateOfBirth": null,
+          "gender": null,
+          "goal": null,
+          "healthNote": null
+        }
+      },
+      {
+        "scenario": "selfProfileUsesOnlyOwnerFieldsAndProtectsConcurrentPatches",
+        "actor": "PRIMARY_COACH",
+        "businessNow": "2027-02-07T20:00",
+        "method": "GET",
+        "path": "/api/members/me",
+        "requestBody": null,
+        "expectedStatus": 403,
+        "actualStatus": 403,
+        "previewHeaderPresent": false,
+        "responseBody": {
+          "timestamp": "2026-10-27T18:21:34.198808700Z",
+          "status": 403,
+          "error": "Forbidden",
+          "message": "Access Denied"
+        }
+      },
+      {
+        "scenario": "selfProfileUsesOnlyOwnerFieldsAndProtectsConcurrentPatches",
+        "actor": "MEMBER_A",
+        "businessNow": "2027-02-07T20:00",
+        "method": "PATCH",
+        "path": "/api/members/me",
+        "requestBody": {
+          "centerId": 2,
+          "amount": 1,
+          "goal": "Run",
+          "role": "Admin",
+          "phone": "0901234567",
+          "name": "Profile updated",
+          "credit": 999,
+          "memberId": 3,
+          "status": "Inactive"
+        },
+        "expectedStatus": 200,
+        "actualStatus": 200,
+        "previewHeaderPresent": false,
+        "responseBody": {
+          "name": "Profile updated",
+          "phone": "0901234567",
+          "address": null,
+          "dateOfBirth": null,
+          "gender": null,
+          "goal": "Run",
+          "healthNote": null
+        }
+      },
+      {
+        "scenario": "selfProfileUsesOnlyOwnerFieldsAndProtectsConcurrentPatches",
+        "actor": "MEMBER_A",
+        "businessNow": "2027-02-07T20:00",
+        "method": "GET",
+        "path": "/api/members/3",
+        "requestBody": null,
+        "expectedStatus": 403,
+        "actualStatus": 403,
+        "previewHeaderPresent": false,
+        "responseBody": {
+          "timestamp": "2026-10-27T18:21:34.245810Z",
+          "status": 403,
+          "error": "Forbidden",
+          "message": "Access Denied"
+        }
+      },
+      {
+        "scenario": "selfProfileUsesOnlyOwnerFieldsAndProtectsConcurrentPatches",
+        "actor": "MEMBER_A",
+        "businessNow": "2027-02-07T20:00",
+        "method": "PATCH",
+        "path": "/api/members/me",
+        "requestBody": {
+          "address": null,
+          "goal": null,
+          "phone": null,
+          "healthNote": null
+        },
+        "expectedStatus": 200,
+        "actualStatus": 200,
+        "previewHeaderPresent": false,
+        "responseBody": {
+          "name": "Profile updated",
+          "phone": null,
+          "address": null,
+          "dateOfBirth": null,
+          "gender": null,
+          "goal": null,
+          "healthNote": null
+        }
+      },
+      {
+        "scenario": "selfProfileUsesOnlyOwnerFieldsAndProtectsConcurrentPatches",
+        "actor": "MEMBER_A",
+        "businessNow": "2027-02-07T20:00",
+        "method": "PATCH",
+        "path": "/api/members/me",
+        "requestBody": {},
+        "expectedStatus": 200,
+        "actualStatus": 200,
+        "previewHeaderPresent": false,
+        "responseBody": {
+          "name": "Profile updated",
+          "phone": null,
+          "address": null,
+          "dateOfBirth": null,
+          "gender": null,
+          "goal": null,
+          "healthNote": null
+        }
+      },
+      {
+        "scenario": "selfProfileUsesOnlyOwnerFieldsAndProtectsConcurrentPatches",
+        "actor": "MEMBER_A",
+        "businessNow": "2027-02-07T20:00",
+        "method": "PATCH",
+        "path": "/api/members/me",
+        "requestBody": {
+          "dateOfBirth": "2027-02-08",
+          "goal": "Temporary"
+        },
+        "expectedStatus": 400,
+        "actualStatus": 400,
+        "previewHeaderPresent": false,
+        "responseBody": {
+          "code": "FUTURE_DATE_OF_BIRTH",
+          "message": "dateOfBirth cannot be in the future"
+        }
+      },
+      {
+        "scenario": "selfProfileUsesOnlyOwnerFieldsAndProtectsConcurrentPatches",
+        "actor": "MEMBER_A",
+        "businessNow": "2027-02-07T20:00",
+        "method": "PATCH",
+        "path": "/api/members/me",
+        "requestBody": {
+          "dateOfBirth": "2027-02-08"
+        },
+        "expectedStatus": 400,
+        "actualStatus": 400,
+        "previewHeaderPresent": false,
+        "responseBody": {
+          "code": "FUTURE_DATE_OF_BIRTH",
+          "message": "dateOfBirth cannot be in the future"
+        }
+      },
+      {
+        "scenario": "selfProfileUsesOnlyOwnerFieldsAndProtectsConcurrentPatches",
+        "actor": "MEMBER_A",
+        "businessNow": "2027-02-07T20:00",
+        "method": "PATCH",
+        "path": "/api/members/me",
+        "requestBody": {
+          "dateOfBirth": "2027-02-07"
+        },
+        "expectedStatus": 200,
+        "actualStatus": 200,
+        "previewHeaderPresent": false,
+        "responseBody": {
+          "name": "Profile updated",
+          "phone": null,
+          "address": null,
+          "dateOfBirth": "2027-02-07",
+          "gender": null,
+          "goal": null,
+          "healthNote": null
+        }
+      },
+      {
+        "scenario": "selfProfileUsesOnlyOwnerFieldsAndProtectsConcurrentPatches",
+        "actor": "MEMBER_A",
+        "businessNow": "2027-02-07T20:00",
+        "method": "PATCH",
+        "path": "/api/members/me",
+        "requestBody": {
+          "address": "Race address"
+        },
+        "expectedStatus": 200,
+        "actualStatus": 200,
+        "previewHeaderPresent": false,
+        "responseBody": {
+          "name": "Profile updated",
+          "phone": null,
+          "address": "Race address",
+          "dateOfBirth": "2027-02-07",
+          "gender": null,
+          "goal": null,
+          "healthNote": null
+        }
+      },
+      {
+        "scenario": "selfProfileUsesOnlyOwnerFieldsAndProtectsConcurrentPatches",
+        "actor": "MEMBER_A",
+        "businessNow": "2027-02-07T20:00",
+        "method": "PATCH",
+        "path": "/api/members/me",
+        "requestBody": {
+          "phone": "Race phone"
+        },
+        "expectedStatus": 200,
+        "actualStatus": 200,
+        "previewHeaderPresent": false,
+        "responseBody": {
+          "name": "Profile updated",
+          "phone": "Race phone",
+          "address": "Race address",
+          "dateOfBirth": "2027-02-07",
+          "gender": null,
+          "goal": null,
+          "healthNote": null
+        }
+      },
+      {
+        "scenario": "selfProfileUsesOnlyOwnerFieldsAndProtectsConcurrentPatches",
+        "actor": "MEMBER_B",
+        "businessNow": "2027-02-07T20:00",
+        "method": "GET",
+        "path": "/api/members/me",
+        "requestBody": null,
+        "expectedStatus": 403,
+        "actualStatus": 403,
+        "previewHeaderPresent": false,
+        "responseBody": {
+          "code": "PASSWORD_CHANGE_REQUIRED",
+          "message": "Please change your password before continuing"
+        }
+      },
+      {
+        "scenario": "selfProfileUsesOnlyOwnerFieldsAndProtectsConcurrentPatches",
+        "actor": "MEMBER_B",
+        "businessNow": "2027-02-07T20:00",
+        "method": "POST",
+        "path": "/api/auth/change-password",
+        "requestBody": {
+          "oldPassword": "[redacted]",
+          "newPassword": "[redacted]"
+        },
+        "expectedStatus": 204,
+        "actualStatus": 204,
+        "previewHeaderPresent": false,
+        "responseBody": ""
+      },
+      {
+        "scenario": "selfProfileUsesOnlyOwnerFieldsAndProtectsConcurrentPatches",
+        "actor": "MEMBER_B",
+        "businessNow": "2027-02-07T20:00",
+        "method": "GET",
+        "path": "/api/auth/me",
+        "requestBody": null,
+        "expectedStatus": 200,
+        "actualStatus": 200,
+        "previewHeaderPresent": false,
+        "responseBody": {
+          "userId": 3,
+          "email": "phase.other@example.test",
+          "fullName": "phase.other",
+          "role": "Member",
+          "authorities": [
+            "ROLE_MEMBER"
+          ],
+          "isFirstLogin": false,
+          "memberId": 3
+        }
+      },
+      {
+        "scenario": "selfProfileUsesOnlyOwnerFieldsAndProtectsConcurrentPatches",
+        "actor": "MEMBER_B",
+        "businessNow": "2027-02-07T20:00",
+        "method": "GET",
+        "path": "/api/members/me",
+        "requestBody": null,
+        "expectedStatus": 200,
+        "actualStatus": 200,
+        "previewHeaderPresent": false,
+        "responseBody": {
+          "name": "phase.other",
+          "phone": null,
+          "address": null,
+          "dateOfBirth": null,
+          "gender": null,
+          "goal": null,
+          "healthNote": null
+        }
+      },
+      {
+        "scenario": "selfProfileUsesOnlyOwnerFieldsAndProtectsConcurrentPatches",
+        "actor": "MEMBER_A",
+        "businessNow": "2027-02-07T20:00",
+        "method": "GET",
+        "path": "/api/members/me",
+        "requestBody": null,
+        "expectedStatus": 403,
+        "actualStatus": 403,
+        "previewHeaderPresent": false,
+        "responseBody": {
+          "timestamp": "2026-10-27T18:21:34.821552300Z",
+          "status": 403,
+          "error": "Forbidden",
+          "message": "Active Member account required"
+        }
+      },
+      {
+        "scenario": "selfProfileUsesOnlyOwnerFieldsAndProtectsConcurrentPatches",
+        "actor": "MEMBER_A",
+        "businessNow": "2027-02-07T20:00",
+        "method": "PATCH",
+        "path": "/api/members/me",
+        "requestBody": {
+          "name": "Must not persist"
+        },
+        "expectedStatus": 403,
+        "actualStatus": 403,
+        "previewHeaderPresent": false,
+        "responseBody": {
+          "timestamp": "2026-10-27T18:21:34.833495Z",
+          "status": 403,
+          "error": "Forbidden",
+          "message": "Active Member account required"
+        }
+      },
+      {
+        "scenario": "directoryRealSessionsRespectScopeContactsAndConstantQueries",
+        "actor": "MEMBER_A",
+        "businessNow": "2027-02-07T20:00",
+        "method": "GET",
+        "path": "/api/auth/me",
+        "requestBody": null,
+        "expectedStatus": 200,
+        "actualStatus": 200,
+        "previewHeaderPresent": false,
+        "responseBody": {
+          "userId": 1,
+          "email": "phase.member@example.test",
+          "fullName": "Profile updated",
+          "role": "Member",
+          "authorities": [
+            "ROLE_MEMBER"
+          ],
+          "isFirstLogin": false,
+          "memberId": 1
+        }
+      },
+      {
+        "scenario": "directoryRealSessionsRespectScopeContactsAndConstantQueries",
+        "actor": "PRIMARY_COACH",
+        "businessNow": "2027-02-07T20:00",
+        "method": "GET",
+        "path": "/api/auth/me",
+        "requestBody": null,
+        "expectedStatus": 200,
+        "actualStatus": 200,
+        "previewHeaderPresent": false,
+        "responseBody": {
+          "userId": 2,
+          "email": "phase.coach@example.test",
+          "fullName": "phase.coach",
+          "role": "Coach",
+          "authorities": [
+            "RECORD_RESULT",
+            "ROLE_COACH"
+          ],
+          "isFirstLogin": false,
+          "memberId": null
+        }
+      },
+      {
+        "scenario": "directoryRealSessionsRespectScopeContactsAndConstantQueries",
+        "actor": "CENTER_MANAGER",
+        "businessNow": "2027-02-07T20:00",
+        "method": "GET",
+        "path": "/api/auth/me",
+        "requestBody": null,
+        "expectedStatus": 200,
+        "actualStatus": 200,
+        "previewHeaderPresent": false,
+        "responseBody": {
+          "userId": 4,
+          "email": "phase.manager@example.test",
+          "fullName": "phase.manager",
+          "role": "CenterManager",
+          "authorities": [
+            "MANAGE_CLASSES",
+            "MANAGE_INVOICES",
+            "MANAGE_SUBSCRIPTIONS",
+            "ROLE_CENTERMANAGER",
+            "VIEW_REPORTS"
+          ],
+          "isFirstLogin": false,
+          "memberId": null
+        }
+      },
+      {
+        "scenario": "directoryRealSessionsRespectScopeContactsAndConstantQueries",
+        "actor": "RECEPTIONIST",
+        "businessNow": "2027-02-07T20:00",
+        "method": "GET",
+        "path": "/api/auth/me",
+        "requestBody": null,
+        "expectedStatus": 200,
+        "actualStatus": 200,
+        "previewHeaderPresent": false,
+        "responseBody": {
+          "userId": 5,
+          "email": "phase.cashier@example.test",
+          "fullName": "phase.cashier",
+          "role": "Receptionist",
+          "authorities": [
+            "MANAGE_INVOICES",
+            "ROLE_RECEPTIONIST"
+          ],
+          "isFirstLogin": false,
+          "memberId": null
+        }
+      },
+      {
+        "scenario": "directoryRealSessionsRespectScopeContactsAndConstantQueries",
+        "actor": "MEMBER_B",
+        "businessNow": "2027-02-07T20:00",
+        "method": "GET",
+        "path": "/api/auth/me",
+        "requestBody": null,
+        "expectedStatus": 200,
+        "actualStatus": 200,
+        "previewHeaderPresent": false,
+        "responseBody": {
+          "userId": 3,
+          "email": "phase.other@example.test",
+          "fullName": "phase.other",
+          "role": "Member",
+          "authorities": [
+            "ROLE_MEMBER"
+          ],
+          "isFirstLogin": false,
+          "memberId": 3
+        }
+      },
+      {
+        "scenario": "directoryRealSessionsRespectScopeContactsAndConstantQueries",
+        "actor": "phase.directoryadmin",
+        "businessNow": "2027-02-07T20:00",
+        "method": "GET",
+        "path": "/api/auth/me",
+        "requestBody": null,
+        "expectedStatus": 200,
+        "actualStatus": 200,
+        "previewHeaderPresent": false,
+        "responseBody": {
+          "userId": 15,
+          "email": "phase.directoryadmin@example.test",
+          "fullName": "phase.directoryadmin",
+          "role": "Admin",
+          "authorities": [
+            "MANAGE_USERS",
+            "ROLE_ADMIN"
+          ],
+          "isFirstLogin": false,
+          "memberId": null
+        }
+      },
+      {
+        "scenario": "directoryRealSessionsRespectScopeContactsAndConstantQueries",
+        "actor": "phase.directorycontact",
+        "businessNow": "2027-02-07T20:00",
+        "method": "GET",
+        "path": "/api/auth/me",
+        "requestBody": null,
+        "expectedStatus": 200,
+        "actualStatus": 200,
+        "previewHeaderPresent": false,
+        "responseBody": {
+          "userId": 16,
+          "email": "phase.directorycontact@example.test",
+          "fullName": "phase.directorycontact",
+          "role": "CenterManager",
+          "authorities": [
+            "MANAGE_CLASSES",
+            "MANAGE_INVOICES",
+            "MANAGE_SUBSCRIPTIONS",
+            "MANAGE_USERS",
+            "ROLE_CENTERMANAGER",
+            "VIEW_REPORTS"
+          ],
+          "isFirstLogin": false,
+          "memberId": null
+        }
+      },
+      {
+        "scenario": "directoryRealSessionsRespectScopeContactsAndConstantQueries",
+        "actor": "MEMBER_A",
+        "businessNow": "2027-02-07T20:00",
+        "method": "GET",
+        "path": "/api/coaches",
+        "requestBody": null,
+        "expectedStatus": 200,
+        "actualStatus": 200,
+        "previewHeaderPresent": false,
+        "responseBody": [
+          {
+            "id": 2,
+            "name": "phase.coach",
+            "avatarUrl": null,
+            "specializations": [
+              "phase-badminton",
+              "Directory extra"
+            ],
+            "email": null,
+            "phone": null,
+            "bio": null,
+            "certification": null,
+            "status": "Active"
+          },
+          {
+            "id": 8,
+            "name": "phase.unassigned",
+            "avatarUrl": null,
+            "specializations": [
+              "phase-badminton"
+            ],
+            "email": null,
+            "phone": null,
+            "bio": null,
+            "certification": null,
+            "status": "Active"
+          },
+          {
+            "id": 12,
+            "name": "phase.multisubject",
+            "avatarUrl": null,
+            "specializations": [
+              "phase-badminton",
+              "Acceptance Tennis"
+            ],
+            "email": null,
+            "phone": null,
+            "bio": null,
+            "certification": null,
+            "status": "Active"
+          },
+          {
+            "id": 13,
+            "name": "phase.directoryempty",
+            "avatarUrl": null,
+            "specializations": [],
+            "email": null,
+            "phone": null,
+            "bio": null,
+            "certification": null,
+            "status": "Active"
+          }
+        ]
+      },
+      {
+        "scenario": "directoryRealSessionsRespectScopeContactsAndConstantQueries",
+        "actor": "MEMBER_A",
+        "businessNow": "2027-02-07T20:00",
+        "method": "GET",
+        "path": "/api/coaches?specializationId=3&keyword=%20DiReCtOrY%20extra%20",
+        "requestBody": null,
+        "expectedStatus": 200,
+        "actualStatus": 200,
+        "previewHeaderPresent": false,
+        "responseBody": [
+          {
+            "id": 2,
+            "name": "phase.coach",
+            "avatarUrl": null,
+            "specializations": [
+              "phase-badminton",
+              "Directory extra"
+            ],
+            "email": null,
+            "phone": null,
+            "bio": null,
+            "certification": null,
+            "status": "Active"
+          }
+        ]
+      },
+      {
+        "scenario": "directoryRealSessionsRespectScopeContactsAndConstantQueries",
+        "actor": "MEMBER_A",
+        "businessNow": "2027-02-07T20:00",
+        "method": "GET",
+        "path": "/api/coaches?keyword=missing-directory-name",
+        "requestBody": null,
+        "expectedStatus": 200,
+        "actualStatus": 200,
+        "previewHeaderPresent": false,
+        "responseBody": []
+      },
+      {
+        "scenario": "directoryRealSessionsRespectScopeContactsAndConstantQueries",
+        "actor": "phase.directoryadmin",
+        "businessNow": "2027-02-07T20:00",
+        "method": "GET",
+        "path": "/api/coaches",
+        "requestBody": null,
+        "expectedStatus": 200,
+        "actualStatus": 200,
+        "previewHeaderPresent": false,
+        "responseBody": [
+          {
+            "id": 2,
+            "name": "phase.coach",
+            "avatarUrl": null,
+            "specializations": [
+              "phase-badminton",
+              "Directory extra"
+            ],
+            "email": "phase.coach@example.test",
+            "phone": null,
+            "bio": null,
+            "certification": null,
+            "status": "Active"
+          },
+          {
+            "id": 8,
+            "name": "phase.unassigned",
+            "avatarUrl": null,
+            "specializations": [
+              "phase-badminton"
+            ],
+            "email": "phase.unassigned@example.test",
+            "phone": null,
+            "bio": null,
+            "certification": null,
+            "status": "Active"
+          },
+          {
+            "id": 11,
+            "name": "phase.coach2",
+            "avatarUrl": null,
+            "specializations": [
+              "phase-badminton"
+            ],
+            "email": "phase.coach2@example.test",
+            "phone": null,
+            "bio": null,
+            "certification": null,
+            "status": "Active"
+          },
+          {
+            "id": 12,
+            "name": "phase.multisubject",
+            "avatarUrl": null,
+            "specializations": [
+              "phase-badminton",
+              "Acceptance Tennis"
+            ],
+            "email": "phase.multisubject@example.test",
+            "phone": null,
+            "bio": null,
+            "certification": null,
+            "status": "Active"
+          },
+          {
+            "id": 13,
+            "name": "phase.directoryempty",
+            "avatarUrl": null,
+            "specializations": [],
+            "email": "phase.directoryempty@example.test",
+            "phone": null,
+            "bio": null,
+            "certification": null,
+            "status": "Active"
+          },
+          {
+            "id": 14,
+            "name": "phase.directoryoutside",
+            "avatarUrl": null,
+            "specializations": [],
+            "email": "phase.directoryoutside@example.test",
+            "phone": null,
+            "bio": null,
+            "certification": null,
+            "status": "Active"
+          }
+        ]
+      },
+      {
+        "scenario": "directoryRealSessionsRespectScopeContactsAndConstantQueries",
+        "actor": "phase.directorycontact",
+        "businessNow": "2027-02-07T20:00",
+        "method": "GET",
+        "path": "/api/coaches",
+        "requestBody": null,
+        "expectedStatus": 200,
+        "actualStatus": 200,
+        "previewHeaderPresent": false,
+        "responseBody": [
+          {
+            "id": 2,
+            "name": "phase.coach",
+            "avatarUrl": null,
+            "specializations": [
+              "phase-badminton",
+              "Directory extra"
+            ],
+            "email": "phase.coach@example.test",
+            "phone": null,
+            "bio": null,
+            "certification": null,
+            "status": "Active"
+          },
+          {
+            "id": 8,
+            "name": "phase.unassigned",
+            "avatarUrl": null,
+            "specializations": [
+              "phase-badminton"
+            ],
+            "email": "phase.unassigned@example.test",
+            "phone": null,
+            "bio": null,
+            "certification": null,
+            "status": "Active"
+          },
+          {
+            "id": 12,
+            "name": "phase.multisubject",
+            "avatarUrl": null,
+            "specializations": [
+              "phase-badminton",
+              "Acceptance Tennis"
+            ],
+            "email": "phase.multisubject@example.test",
+            "phone": null,
+            "bio": null,
+            "certification": null,
+            "status": "Active"
+          },
+          {
+            "id": 13,
+            "name": "phase.directoryempty",
+            "avatarUrl": null,
+            "specializations": [],
+            "email": "phase.directoryempty@example.test",
+            "phone": null,
+            "bio": null,
+            "certification": null,
+            "status": "Active"
+          }
+        ]
+      },
+      {
+        "scenario": "directoryRealSessionsRespectScopeContactsAndConstantQueries",
+        "actor": "MEMBER_A",
+        "businessNow": "2027-02-07T20:00",
+        "method": "GET",
+        "path": "/api/coaches",
+        "requestBody": null,
+        "expectedStatus": 200,
+        "actualStatus": 200,
+        "previewHeaderPresent": false,
+        "responseBody": [
+          {
+            "id": 2,
+            "name": "phase.coach",
+            "avatarUrl": null,
+            "specializations": [
+              "phase-badminton",
+              "Directory extra"
+            ],
+            "email": null,
+            "phone": null,
+            "bio": null,
+            "certification": null,
+            "status": "Active"
+          },
+          {
+            "id": 8,
+            "name": "phase.unassigned",
+            "avatarUrl": null,
+            "specializations": [
+              "phase-badminton"
+            ],
+            "email": null,
+            "phone": null,
+            "bio": null,
+            "certification": null,
+            "status": "Active"
+          },
+          {
+            "id": 12,
+            "name": "phase.multisubject",
+            "avatarUrl": null,
+            "specializations": [
+              "phase-badminton",
+              "Acceptance Tennis"
+            ],
+            "email": null,
+            "phone": null,
+            "bio": null,
+            "certification": null,
+            "status": "Active"
+          },
+          {
+            "id": 13,
+            "name": "phase.directoryempty",
+            "avatarUrl": null,
+            "specializations": [],
+            "email": null,
+            "phone": null,
+            "bio": null,
+            "certification": null,
+            "status": "Active"
+          }
+        ]
+      },
+      {
+        "scenario": "directoryRealSessionsRespectScopeContactsAndConstantQueries",
+        "actor": "MEMBER_A",
+        "businessNow": "2027-02-07T20:00",
+        "method": "GET",
+        "path": "/api/coaches",
+        "requestBody": null,
+        "expectedStatus": 200,
+        "actualStatus": 200,
+        "previewHeaderPresent": false,
+        "responseBody": [
+          {
+            "id": 2,
+            "name": "phase.coach",
+            "avatarUrl": null,
+            "specializations": [
+              "phase-badminton",
+              "Directory extra"
+            ],
+            "email": null,
+            "phone": null,
+            "bio": null,
+            "certification": null,
+            "status": "Active"
+          },
+          {
+            "id": 8,
+            "name": "phase.unassigned",
+            "avatarUrl": null,
+            "specializations": [
+              "phase-badminton"
+            ],
+            "email": null,
+            "phone": null,
+            "bio": null,
+            "certification": null,
+            "status": "Active"
+          },
+          {
+            "id": 22,
+            "name": "phase.directoryextra5",
+            "avatarUrl": null,
+            "specializations": [],
+            "email": null,
+            "phone": null,
+            "bio": null,
+            "certification": null,
+            "status": "Active"
+          },
+          {
+            "id": 12,
+            "name": "phase.multisubject",
+            "avatarUrl": null,
+            "specializations": [
+              "phase-badminton",
+              "Acceptance Tennis"
+            ],
+            "email": null,
+            "phone": null,
+            "bio": null,
+            "certification": null,
+            "status": "Active"
+          },
+          {
+            "id": 13,
+            "name": "phase.directoryempty",
+            "avatarUrl": null,
+            "specializations": [],
+            "email": null,
+            "phone": null,
+            "bio": null,
+            "certification": null,
+            "status": "Active"
+          },
+          {
+            "id": 17,
+            "name": "phase.directoryextra0",
+            "avatarUrl": null,
+            "specializations": [],
+            "email": null,
+            "phone": null,
+            "bio": null,
+            "certification": null,
+            "status": "Active"
+          },
+          {
+            "id": 18,
+            "name": "phase.directoryextra1",
+            "avatarUrl": null,
+            "specializations": [],
+            "email": null,
+            "phone": null,
+            "bio": null,
+            "certification": null,
+            "status": "Active"
+          },
+          {
+            "id": 19,
+            "name": "phase.directoryextra2",
+            "avatarUrl": null,
+            "specializations": [],
+            "email": null,
+            "phone": null,
+            "bio": null,
+            "certification": null,
+            "status": "Active"
+          },
+          {
+            "id": 20,
+            "name": "phase.directoryextra3",
+            "avatarUrl": null,
+            "specializations": [],
+            "email": null,
+            "phone": null,
+            "bio": null,
+            "certification": null,
+            "status": "Active"
+          },
+          {
+            "id": 21,
+            "name": "phase.directoryextra4",
+            "avatarUrl": null,
+            "specializations": [],
+            "email": null,
+            "phone": null,
+            "bio": null,
+            "certification": null,
+            "status": "Active"
+          }
+        ]
+      },
+      {
+        "scenario": "directoryRealSessionsRespectScopeContactsAndConstantQueries",
+        "actor": "phase.directorycontact",
+        "businessNow": "2027-02-07T20:00",
+        "method": "GET",
+        "path": "/api/coaches",
+        "requestBody": null,
+        "expectedStatus": 403,
+        "actualStatus": 403,
+        "previewHeaderPresent": false,
+        "responseBody": {
+          "timestamp": "2026-10-27T18:21:36.553159700Z",
+          "status": 403,
+          "error": "Forbidden",
+          "message": "Account is not Active"
+        }
+      },
+      {
+        "scenario": "publishedOpenApiKeepsDistinctWorkflowDtosAndActualSuccessStatuses",
+        "actor": "MEMBER_A",
+        "businessNow": "2027-02-07T20:00",
+        "method": "GET",
+        "path": "/api/auth/me",
+        "requestBody": null,
+        "expectedStatus": 200,
+        "actualStatus": 200,
+        "previewHeaderPresent": false,
+        "responseBody": {
+          "userId": 1,
+          "email": "phase.member@example.test",
+          "fullName": "Profile updated",
           "role": "Member",
           "authorities": [
             "ROLE_MEMBER"
@@ -10149,7 +11242,7 @@
         }
       }
     ],
-    "rawRunOnThisMachine": "artifacts/runs/phases/20261027-authenticated"
+    "rawRunOnThisMachine": "artifacts/runs/phases/20261028-d01-d09"
   },
   "render": {
     "checkedAtUtc": "2026-10-27T15:20:39.639729+00:00",
@@ -10223,9 +11316,9 @@
   },
   "wireCompatibility": {
     "result": "PASS",
-    "localExchangeCount": 359,
-    "positiveExchangesChecked": 289,
-    "requestResponseBodyChecks": 434,
+    "localExchangeCount": 396,
+    "positiveExchangesChecked": 318,
+    "requestResponseBodyChecks": 469,
     "uniqueIssues": 0,
     "method": "Fresh local successful HTTP exchanges compared with the canonical OpenAPI snapshot; no live schema fetch",
     "limits": [
@@ -10234,7 +11327,7 @@
       "Null values are preserved as observations and are not rejected merely because SpringDoc omitted nullable metadata; FE must handle these fields",
       "Routes not exercised by these exchanges do not gain business-test coverage from this check"
     ],
-    "checkedAtUtc": "2026-10-27T17:24:31.251936+00:00"
+    "checkedAtUtc": "2026-10-27T18:30:41.133691+00:00"
   },
   "historicalProofs": {
     "communication": {
@@ -10342,28 +11435,28 @@
     }
   },
   "authenticatedAcceptance": {
-    "recordedAtUtc": "2026-10-27T17:24:30.894912+00:00",
-    "sourceCommit": "0a89ad95c88573f09af03fe07293788afd6acba6",
-    "backendChanged": false,
+    "recordedAtUtc": "2026-10-27T18:30:40.875138+00:00",
+    "sourceCommit": "cc7847f7238ce3084ee74be8373236d52ec55756",
+    "backendWorkingTreeMatchesRecordedCommit": true,
     "testedWorkingTreeFiles": {
-      "src/test/java/com/sportscenter/workflow/PhaseWorkflowHttpTest.java": "db49379c32b145c90d0967531f885a16abb824126f6df19b07d2f258a4a030e0"
+      "src/test/java/com/sportscenter/workflow/PhaseWorkflowHttpTest.java": "23c4b7da9a459b1355526d397966b830d885811db954518663529c2403fd307e"
     },
     "environment": "LOCAL_POSTGRESQL_17_HTTP_ISOLATED_LOOPBACK",
     "clean": {
-      "tests": 313,
+      "tests": 326,
       "failures": 0,
       "errors": 0,
       "skipped": 27
     },
     "postgres": {
-      "tests": 18,
+      "tests": 20,
       "failures": 0,
       "errors": 0,
       "skipped": 0
     },
-    "databaseUrl": "jdbc:postgresql://127.0.0.1:55440/scms_phases_acceptance_20261028_complete",
+    "databaseUrl": "jdbc:postgresql://127.0.0.1:55440/scms_phases_d01d09_final_20261028",
     "migrations": {
-      "database": "scms_phases_acceptance_20261028_complete",
+      "database": "scms_phases_d01d09_final_20261028",
       "localOnly": true,
       "migrationReplay": true,
       "invoiceEnrollmentSnapshotsPreserved": true,
@@ -10374,13 +11467,15 @@
     "actors": [
       {
         "user_id": 1,
-        "full_name": "phase.member",
+        "email": "phase.member@example.test",
+        "full_name": "Profile updated",
         "center_id": 1,
         "status": "Active",
         "expectedRole": "Member"
       },
       {
         "user_id": 2,
+        "email": "phase.coach@example.test",
         "full_name": "phase.coach",
         "center_id": 1,
         "status": "Active",
@@ -10388,6 +11483,7 @@
       },
       {
         "user_id": 3,
+        "email": "phase.other@example.test",
         "full_name": "phase.other",
         "center_id": 1,
         "status": "Active",
@@ -10395,6 +11491,7 @@
       },
       {
         "user_id": 4,
+        "email": "phase.manager@example.test",
         "full_name": "phase.manager",
         "center_id": 1,
         "status": "Active",
@@ -10402,6 +11499,7 @@
       },
       {
         "user_id": 5,
+        "email": "phase.cashier@example.test",
         "full_name": "phase.cashier",
         "center_id": 1,
         "status": "Active",
@@ -10409,6 +11507,7 @@
       },
       {
         "user_id": 6,
+        "email": "phase.cashier2@example.test",
         "full_name": "phase.cashier2",
         "center_id": 2,
         "status": "Active",
@@ -10416,6 +11515,7 @@
       },
       {
         "user_id": 7,
+        "email": "phase.manager2@example.test",
         "full_name": "phase.manager2",
         "center_id": 2,
         "status": "Active",
@@ -10423,6 +11523,7 @@
       },
       {
         "user_id": 8,
+        "email": "phase.unassigned@example.test",
         "full_name": "phase.unassigned",
         "center_id": 1,
         "status": "Active",
@@ -10430,6 +11531,7 @@
       },
       {
         "user_id": 9,
+        "email": "phase.noauthority@example.test",
         "full_name": "phase.noauthority",
         "center_id": 1,
         "status": "Active",
@@ -10437,6 +11539,7 @@
       },
       {
         "user_id": 10,
+        "email": "phase.member2@example.test",
         "full_name": "phase.member2",
         "center_id": 2,
         "status": "Active",
@@ -10444,6 +11547,7 @@
       },
       {
         "user_id": 11,
+        "email": "phase.coach2@example.test",
         "full_name": "phase.coach2",
         "center_id": 2,
         "status": "Active",
@@ -10451,7 +11555,88 @@
       },
       {
         "user_id": 12,
+        "email": "phase.multisubject@example.test",
         "full_name": "phase.multisubject",
+        "center_id": 1,
+        "status": "Active",
+        "expectedRole": "Coach"
+      },
+      {
+        "user_id": 13,
+        "email": "phase.directoryempty@example.test",
+        "full_name": "phase.directoryempty",
+        "center_id": 1,
+        "status": "Active",
+        "expectedRole": "Coach"
+      },
+      {
+        "user_id": 14,
+        "email": "phase.directoryoutside@example.test",
+        "full_name": "phase.directoryoutside",
+        "center_id": 2,
+        "status": "Active",
+        "expectedRole": "Coach"
+      },
+      {
+        "user_id": 15,
+        "email": "phase.directoryadmin@example.test",
+        "full_name": "phase.directoryadmin",
+        "center_id": null,
+        "status": "Active",
+        "expectedRole": "Admin"
+      },
+      {
+        "user_id": 16,
+        "email": "phase.directorycontact@example.test",
+        "full_name": "phase.directorycontact",
+        "center_id": 1,
+        "status": "Active",
+        "expectedRole": "CenterManager"
+      },
+      {
+        "user_id": 17,
+        "email": "phase.directoryextra0@example.test",
+        "full_name": "phase.directoryextra0",
+        "center_id": 1,
+        "status": "Active",
+        "expectedRole": "Coach"
+      },
+      {
+        "user_id": 18,
+        "email": "phase.directoryextra1@example.test",
+        "full_name": "phase.directoryextra1",
+        "center_id": 1,
+        "status": "Active",
+        "expectedRole": "Coach"
+      },
+      {
+        "user_id": 19,
+        "email": "phase.directoryextra2@example.test",
+        "full_name": "phase.directoryextra2",
+        "center_id": 1,
+        "status": "Active",
+        "expectedRole": "Coach"
+      },
+      {
+        "user_id": 20,
+        "email": "phase.directoryextra3@example.test",
+        "full_name": "phase.directoryextra3",
+        "center_id": 1,
+        "status": "Active",
+        "expectedRole": "Coach"
+      },
+      {
+        "user_id": 21,
+        "email": "phase.directoryextra4@example.test",
+        "full_name": "phase.directoryextra4",
+        "center_id": 1,
+        "status": "Active",
+        "expectedRole": "Coach"
+      },
+      {
+        "user_id": 22,
+        "email": "phase.directoryextra5@example.test",
+        "full_name": "phase.directoryextra5",
         "center_id": 1,
         "status": "Active",
         "expectedRole": "Coach"
@@ -10503,7 +11688,7 @@
         ],
         "status": "PASS",
         "environment": "LOCAL_POSTGRESQL_17_HTTP_ISOLATED_LOOPBACK",
-        "sourceCommit": "0a89ad95c88573f09af03fe07293788afd6acba6",
+        "sourceCommit": "cc7847f7238ce3084ee74be8373236d52ec55756",
         "actors": [
           "MEMBER_A",
           "PRIMARY_COACH"
@@ -10586,7 +11771,7 @@
         ],
         "status": "PASS",
         "environment": "LOCAL_POSTGRESQL_17_HTTP_ISOLATED_LOOPBACK",
-        "sourceCommit": "0a89ad95c88573f09af03fe07293788afd6acba6",
+        "sourceCommit": "cc7847f7238ce3084ee74be8373236d52ec55756",
         "actors": [
           "CENTER_MANAGER",
           "MEMBER_B"
@@ -10646,7 +11831,7 @@
         ],
         "status": "PASS",
         "environment": "LOCAL_POSTGRESQL_17_HTTP_ISOLATED_LOOPBACK",
-        "sourceCommit": "0a89ad95c88573f09af03fe07293788afd6acba6",
+        "sourceCommit": "cc7847f7238ce3084ee74be8373236d52ec55756",
         "actors": [
           "MEMBER_A",
           "MEMBER_B",
@@ -10721,7 +11906,7 @@
         ],
         "status": "PASS",
         "environment": "LOCAL_POSTGRESQL_17_HTTP_ISOLATED_LOOPBACK",
-        "sourceCommit": "0a89ad95c88573f09af03fe07293788afd6acba6",
+        "sourceCommit": "cc7847f7238ce3084ee74be8373236d52ec55756",
         "actors": [
           "MEMBER_A",
           "PRIMARY_COACH"
@@ -10819,7 +12004,7 @@
         ],
         "status": "PASS",
         "environment": "LOCAL_POSTGRESQL_17_HTTP_ISOLATED_LOOPBACK",
-        "sourceCommit": "0a89ad95c88573f09af03fe07293788afd6acba6",
+        "sourceCommit": "cc7847f7238ce3084ee74be8373236d52ec55756",
         "actors": [
           "MEMBER_A"
         ],
@@ -10885,7 +12070,7 @@
         ],
         "status": "PASS",
         "environment": "LOCAL_POSTGRESQL_17_HTTP_ISOLATED_LOOPBACK",
-        "sourceCommit": "0a89ad95c88573f09af03fe07293788afd6acba6",
+        "sourceCommit": "cc7847f7238ce3084ee74be8373236d52ec55756",
         "actors": [
           "MEMBER_A",
           "PRIMARY_COACH"
@@ -10998,7 +12183,7 @@
         ],
         "status": "PASS",
         "environment": "LOCAL_POSTGRESQL_17_HTTP_ISOLATED_LOOPBACK",
-        "sourceCommit": "0a89ad95c88573f09af03fe07293788afd6acba6",
+        "sourceCommit": "cc7847f7238ce3084ee74be8373236d52ec55756",
         "actors": [
           "MEMBER_A",
           "PRIMARY_COACH"
@@ -11085,7 +12270,7 @@
         ],
         "status": "PASS",
         "environment": "LOCAL_POSTGRESQL_17_HTTP_ISOLATED_LOOPBACK",
-        "sourceCommit": "0a89ad95c88573f09af03fe07293788afd6acba6",
+        "sourceCommit": "cc7847f7238ce3084ee74be8373236d52ec55756",
         "actors": [
           "CENTER_MANAGER",
           "MEMBER_A",
@@ -11175,7 +12360,7 @@
         ],
         "status": "PASS",
         "environment": "LOCAL_POSTGRESQL_17_HTTP_ISOLATED_LOOPBACK",
-        "sourceCommit": "0a89ad95c88573f09af03fe07293788afd6acba6",
+        "sourceCommit": "cc7847f7238ce3084ee74be8373236d52ec55756",
         "actors": [
           "MEMBER_A"
         ],
@@ -11234,7 +12419,7 @@
         ],
         "status": "PASS",
         "environment": "LOCAL_POSTGRESQL_17_HTTP_ISOLATED_LOOPBACK",
-        "sourceCommit": "0a89ad95c88573f09af03fe07293788afd6acba6",
+        "sourceCommit": "cc7847f7238ce3084ee74be8373236d52ec55756",
         "actors": [
           "MEMBER_A",
           "PRIMARY_COACH"
@@ -11284,7 +12469,7 @@
         ],
         "status": "PASS",
         "environment": "LOCAL_POSTGRESQL_17_HTTP_ISOLATED_LOOPBACK",
-        "sourceCommit": "0a89ad95c88573f09af03fe07293788afd6acba6",
+        "sourceCommit": "cc7847f7238ce3084ee74be8373236d52ec55756",
         "actors": [
           "CENTER_MANAGER"
         ],
@@ -11329,7 +12514,7 @@
         ],
         "status": "PASS",
         "environment": "LOCAL_POSTGRESQL_17_HTTP_ISOLATED_LOOPBACK",
-        "sourceCommit": "0a89ad95c88573f09af03fe07293788afd6acba6",
+        "sourceCommit": "cc7847f7238ce3084ee74be8373236d52ec55756",
         "actors": [
           "CENTER_MANAGER",
           "PRIMARY_COACH"
@@ -11408,7 +12593,7 @@
         ],
         "status": "PASS",
         "environment": "LOCAL_POSTGRESQL_17_HTTP_ISOLATED_LOOPBACK",
-        "sourceCommit": "0a89ad95c88573f09af03fe07293788afd6acba6",
+        "sourceCommit": "cc7847f7238ce3084ee74be8373236d52ec55756",
         "actors": [
           "CENTER_MANAGER"
         ],
@@ -11548,7 +12733,7 @@
         ],
         "status": "PASS",
         "environment": "LOCAL_POSTGRESQL_17_HTTP_ISOLATED_LOOPBACK",
-        "sourceCommit": "0a89ad95c88573f09af03fe07293788afd6acba6",
+        "sourceCommit": "cc7847f7238ce3084ee74be8373236d52ec55756",
         "actors": [
           "CENTER_MANAGER",
           "MEMBER_A",
@@ -11669,7 +12854,7 @@
         ],
         "status": "PASS",
         "environment": "LOCAL_POSTGRESQL_17_HTTP_ISOLATED_LOOPBACK",
-        "sourceCommit": "0a89ad95c88573f09af03fe07293788afd6acba6",
+        "sourceCommit": "cc7847f7238ce3084ee74be8373236d52ec55756",
         "actors": [
           "CENTER_MANAGER",
           "RECEPTIONIST"
@@ -11745,7 +12930,7 @@
         ],
         "status": "PASS",
         "environment": "LOCAL_POSTGRESQL_17_HTTP_ISOLATED_LOOPBACK",
-        "sourceCommit": "0a89ad95c88573f09af03fe07293788afd6acba6",
+        "sourceCommit": "cc7847f7238ce3084ee74be8373236d52ec55756",
         "actors": [
           "CENTER_MANAGER"
         ],
@@ -11797,7 +12982,7 @@
         ],
         "status": "PASS",
         "environment": "LOCAL_POSTGRESQL_17_HTTP_ISOLATED_LOOPBACK",
-        "sourceCommit": "0a89ad95c88573f09af03fe07293788afd6acba6",
+        "sourceCommit": "cc7847f7238ce3084ee74be8373236d52ec55756",
         "actors": [
           "CENTER_MANAGER",
           "MEMBER_A",
@@ -11910,7 +13095,7 @@
         ],
         "status": "PASS",
         "environment": "LOCAL_POSTGRESQL_17_HTTP_ISOLATED_LOOPBACK",
-        "sourceCommit": "0a89ad95c88573f09af03fe07293788afd6acba6",
+        "sourceCommit": "cc7847f7238ce3084ee74be8373236d52ec55756",
         "actors": [
           "CENTER_MANAGER",
           "MEMBER_A",
@@ -12037,7 +13222,7 @@
         ],
         "status": "PASS",
         "environment": "LOCAL_POSTGRESQL_17_HTTP_ISOLATED_LOOPBACK",
-        "sourceCommit": "0a89ad95c88573f09af03fe07293788afd6acba6",
+        "sourceCommit": "cc7847f7238ce3084ee74be8373236d52ec55756",
         "actors": [
           "CENTER_MANAGER",
           "PRIMARY_COACH"
@@ -12147,7 +13332,7 @@
         ],
         "status": "PASS",
         "environment": "LOCAL_POSTGRESQL_17_HTTP_ISOLATED_LOOPBACK",
-        "sourceCommit": "0a89ad95c88573f09af03fe07293788afd6acba6",
+        "sourceCommit": "cc7847f7238ce3084ee74be8373236d52ec55756",
         "actors": [
           "CENTER_MANAGER"
         ],
@@ -12213,7 +13398,7 @@
         ],
         "status": "PASS",
         "environment": "LOCAL_POSTGRESQL_17_HTTP_ISOLATED_LOOPBACK",
-        "sourceCommit": "0a89ad95c88573f09af03fe07293788afd6acba6",
+        "sourceCommit": "cc7847f7238ce3084ee74be8373236d52ec55756",
         "actors": [
           "CENTER_MANAGER",
           "PRIMARY_COACH"
@@ -12282,7 +13467,7 @@
         ],
         "status": "PASS",
         "environment": "LOCAL_POSTGRESQL_17_HTTP_ISOLATED_LOOPBACK",
-        "sourceCommit": "0a89ad95c88573f09af03fe07293788afd6acba6",
+        "sourceCommit": "cc7847f7238ce3084ee74be8373236d52ec55756",
         "actors": [
           "CENTER_MANAGER",
           "MEMBER_A",
@@ -12449,7 +13634,7 @@
         ],
         "status": "PASS",
         "environment": "LOCAL_POSTGRESQL_17_HTTP_ISOLATED_LOOPBACK",
-        "sourceCommit": "0a89ad95c88573f09af03fe07293788afd6acba6",
+        "sourceCommit": "cc7847f7238ce3084ee74be8373236d52ec55756",
         "actors": [
           "CENTER_MANAGER"
         ],
@@ -12509,7 +13694,7 @@
         ],
         "status": "PASS",
         "environment": "LOCAL_POSTGRESQL_17_HTTP_ISOLATED_LOOPBACK",
-        "sourceCommit": "0a89ad95c88573f09af03fe07293788afd6acba6",
+        "sourceCommit": "cc7847f7238ce3084ee74be8373236d52ec55756",
         "actors": [
           "CENTER_MANAGER"
         ],
@@ -12579,7 +13764,7 @@
         ],
         "status": "PASS",
         "environment": "LOCAL_POSTGRESQL_17_HTTP_ISOLATED_LOOPBACK",
-        "sourceCommit": "0a89ad95c88573f09af03fe07293788afd6acba6",
+        "sourceCommit": "cc7847f7238ce3084ee74be8373236d52ec55756",
         "actors": [
           "MEMBER_A",
           "PRIMARY_COACH",
@@ -12688,7 +13873,7 @@
         ],
         "status": "PASS",
         "environment": "LOCAL_POSTGRESQL_17_HTTP_ISOLATED_LOOPBACK",
-        "sourceCommit": "0a89ad95c88573f09af03fe07293788afd6acba6",
+        "sourceCommit": "cc7847f7238ce3084ee74be8373236d52ec55756",
         "actors": [
           "phase.manager2",
           "phase.unassigned"
@@ -12743,7 +13928,7 @@
         ],
         "status": "PASS",
         "environment": "LOCAL_POSTGRESQL_17_HTTP_ISOLATED_LOOPBACK",
-        "sourceCommit": "0a89ad95c88573f09af03fe07293788afd6acba6",
+        "sourceCommit": "cc7847f7238ce3084ee74be8373236d52ec55756",
         "actors": [
           "RECEPTIONIST"
         ],
@@ -12795,7 +13980,7 @@
         ],
         "status": "PASS",
         "environment": "LOCAL_POSTGRESQL_17_HTTP_ISOLATED_LOOPBACK",
-        "sourceCommit": "0a89ad95c88573f09af03fe07293788afd6acba6",
+        "sourceCommit": "cc7847f7238ce3084ee74be8373236d52ec55756",
         "actors": [
           "phase.unassigned"
         ],
@@ -12849,7 +14034,7 @@
         ],
         "status": "PASS",
         "environment": "LOCAL_POSTGRESQL_17_HTTP_ISOLATED_LOOPBACK",
-        "sourceCommit": "0a89ad95c88573f09af03fe07293788afd6acba6",
+        "sourceCommit": "cc7847f7238ce3084ee74be8373236d52ec55756",
         "actors": [
           "PRIMARY_COACH"
         ],
@@ -12914,7 +14099,7 @@
         ],
         "status": "PASS",
         "environment": "LOCAL_POSTGRESQL_17_HTTP_ISOLATED_LOOPBACK",
-        "sourceCommit": "0a89ad95c88573f09af03fe07293788afd6acba6",
+        "sourceCommit": "cc7847f7238ce3084ee74be8373236d52ec55756",
         "actors": [
           "MEMBER_B",
           "PRIMARY_COACH"
@@ -12960,7 +14145,7 @@
         ],
         "status": "PASS",
         "environment": "LOCAL_POSTGRESQL_17_HTTP_ISOLATED_LOOPBACK",
-        "sourceCommit": "0a89ad95c88573f09af03fe07293788afd6acba6",
+        "sourceCommit": "cc7847f7238ce3084ee74be8373236d52ec55756",
         "actors": [
           "MEMBER_A"
         ],
@@ -13013,7 +14198,7 @@
         ],
         "status": "PASS",
         "environment": "LOCAL_POSTGRESQL_17_HTTP_ISOLATED_LOOPBACK",
-        "sourceCommit": "0a89ad95c88573f09af03fe07293788afd6acba6",
+        "sourceCommit": "cc7847f7238ce3084ee74be8373236d52ec55756",
         "actors": [
           "PRIMARY_COACH"
         ],
@@ -13066,7 +14251,7 @@
         ],
         "status": "PASS",
         "environment": "LOCAL_POSTGRESQL_17_HTTP_ISOLATED_LOOPBACK",
-        "sourceCommit": "0a89ad95c88573f09af03fe07293788afd6acba6",
+        "sourceCommit": "cc7847f7238ce3084ee74be8373236d52ec55756",
         "actors": [
           "PRIMARY_COACH"
         ],
@@ -13133,7 +14318,7 @@
         ],
         "status": "PASS",
         "environment": "LOCAL_POSTGRESQL_17_HTTP_ISOLATED_LOOPBACK",
-        "sourceCommit": "0a89ad95c88573f09af03fe07293788afd6acba6",
+        "sourceCommit": "cc7847f7238ce3084ee74be8373236d52ec55756",
         "actors": [
           "MEMBER_A",
           "PRIMARY_COACH"
@@ -13243,7 +14428,7 @@
         ],
         "status": "PASS",
         "environment": "LOCAL_POSTGRESQL_17_HTTP_ISOLATED_LOOPBACK",
-        "sourceCommit": "0a89ad95c88573f09af03fe07293788afd6acba6",
+        "sourceCommit": "cc7847f7238ce3084ee74be8373236d52ec55756",
         "actors": [
           "MEMBER_A"
         ],
@@ -13309,7 +14494,7 @@
         ],
         "status": "PASS",
         "environment": "LOCAL_POSTGRESQL_17_HTTP_ISOLATED_LOOPBACK",
-        "sourceCommit": "0a89ad95c88573f09af03fe07293788afd6acba6",
+        "sourceCommit": "cc7847f7238ce3084ee74be8373236d52ec55756",
         "actors": [
           "MEMBER_A",
           "PRIMARY_COACH",
@@ -13418,7 +14603,7 @@
         ],
         "status": "PASS",
         "environment": "LOCAL_POSTGRESQL_17_HTTP_ISOLATED_LOOPBACK",
-        "sourceCommit": "0a89ad95c88573f09af03fe07293788afd6acba6",
+        "sourceCommit": "cc7847f7238ce3084ee74be8373236d52ec55756",
         "actors": [
           "PRIMARY_COACH"
         ],
@@ -13462,7 +14647,7 @@
         ],
         "status": "PASS",
         "environment": "LOCAL_POSTGRESQL_17_HTTP_ISOLATED_LOOPBACK",
-        "sourceCommit": "0a89ad95c88573f09af03fe07293788afd6acba6",
+        "sourceCommit": "cc7847f7238ce3084ee74be8373236d52ec55756",
         "actors": [
           "CENTER_MANAGER",
           "phase.noauthority"
@@ -13513,7 +14698,7 @@
         ],
         "status": "PASS",
         "environment": "LOCAL_POSTGRESQL_17_HTTP_ISOLATED_LOOPBACK",
-        "sourceCommit": "0a89ad95c88573f09af03fe07293788afd6acba6",
+        "sourceCommit": "cc7847f7238ce3084ee74be8373236d52ec55756",
         "actors": [
           "MEMBER_A",
           "PRIMARY_COACH"
@@ -13586,7 +14771,7 @@
         ],
         "status": "PASS",
         "environment": "LOCAL_POSTGRESQL_17_HTTP_ISOLATED_LOOPBACK",
-        "sourceCommit": "0a89ad95c88573f09af03fe07293788afd6acba6",
+        "sourceCommit": "cc7847f7238ce3084ee74be8373236d52ec55756",
         "actors": [
           "CENTER_MANAGER",
           "MEMBER_A",
@@ -13714,7 +14899,7 @@
         ],
         "status": "PASS",
         "environment": "LOCAL_POSTGRESQL_17_HTTP_ISOLATED_LOOPBACK",
-        "sourceCommit": "0a89ad95c88573f09af03fe07293788afd6acba6",
+        "sourceCommit": "cc7847f7238ce3084ee74be8373236d52ec55756",
         "actors": [
           "CENTER_MANAGER",
           "MEMBER_A",
@@ -13863,7 +15048,7 @@
         ],
         "status": "PASS",
         "environment": "LOCAL_POSTGRESQL_17_HTTP_ISOLATED_LOOPBACK",
-        "sourceCommit": "0a89ad95c88573f09af03fe07293788afd6acba6",
+        "sourceCommit": "cc7847f7238ce3084ee74be8373236d52ec55756",
         "actors": [
           "CENTER_MANAGER",
           "phase.cashier2",
@@ -14011,7 +15196,7 @@
         ],
         "status": "PASS",
         "environment": "LOCAL_POSTGRESQL_17_HTTP_ISOLATED_LOOPBACK",
-        "sourceCommit": "0a89ad95c88573f09af03fe07293788afd6acba6",
+        "sourceCommit": "cc7847f7238ce3084ee74be8373236d52ec55756",
         "actors": [
           "CENTER_MANAGER",
           "MEMBER_A",
@@ -14134,7 +15319,7 @@
         ],
         "status": "PASS",
         "environment": "LOCAL_POSTGRESQL_17_HTTP_ISOLATED_LOOPBACK",
-        "sourceCommit": "0a89ad95c88573f09af03fe07293788afd6acba6",
+        "sourceCommit": "cc7847f7238ce3084ee74be8373236d52ec55756",
         "actors": [
           "CENTER_MANAGER",
           "MEMBER_A",
@@ -14195,6 +15380,526 @@
             "httpStatus": 201
           }
         ]
+      },
+      {
+        "id": "PROFILE-OWNER-WHITELIST",
+        "decisions": [
+          "D01"
+        ],
+        "scenario": "selfProfileUsesOnlyOwnerFieldsAndProtectsConcurrentPatches",
+        "fixture": "Verified Member A session; forged Member B/role/center/status/credit/amount in PATCH; Coach valid session",
+        "expected": "Only supplied editable fields change; exactly 7 response fields; owner remains Active/Member/center1 and Member B unchanged; Coach and other-owner admin route 403",
+        "exchangeIndexes": [
+          354,
+          355,
+          356,
+          357,
+          358,
+          359,
+          360,
+          361,
+          362
+        ],
+        "businessNow": "2027-02-07T20:00",
+        "stateQuery": "SELECT u.user_id,u.full_name,u.email,u.phone,u.address,u.date_of_birth,u.gender,u.status,u.center_id,m.goal,m.health_note FROM users u JOIN members m ON m.user_id=u.user_id WHERE u.user_id=?",
+        "stateQueryParams": [
+          1
+        ],
+        "stateAfterCommit": [
+          {
+            "user_id": 1,
+            "full_name": "Profile updated",
+            "email": "phase.member@example.test",
+            "phone": "0901234567",
+            "address": null,
+            "date_of_birth": null,
+            "gender": null,
+            "status": "Active",
+            "center_id": 1,
+            "goal": "Run",
+            "health_note": null
+          }
+        ],
+        "status": "PASS",
+        "environment": "LOCAL_POSTGRESQL_17_HTTP_ISOLATED_LOOPBACK",
+        "sourceCommit": "cc7847f7238ce3084ee74be8373236d52ec55756",
+        "actors": [
+          "MEMBER_A",
+          "PRIMARY_COACH"
+        ],
+        "apis": [
+          "GET /api/members/3",
+          "GET /api/members/me",
+          "PATCH /api/members/me"
+        ],
+        "responseEvidence": [
+          {
+            "exchangeIndex": 354,
+            "httpStatus": 200
+          },
+          {
+            "exchangeIndex": 355,
+            "httpStatus": 200
+          },
+          {
+            "exchangeIndex": 356,
+            "httpStatus": 200
+          },
+          {
+            "exchangeIndex": 357,
+            "httpStatus": 200
+          },
+          {
+            "exchangeIndex": 358,
+            "httpStatus": 200
+          },
+          {
+            "exchangeIndex": 359,
+            "httpStatus": 200
+          },
+          {
+            "exchangeIndex": 360,
+            "httpStatus": 403
+          },
+          {
+            "exchangeIndex": 361,
+            "httpStatus": 200
+          },
+          {
+            "exchangeIndex": 362,
+            "httpStatus": 403
+          }
+        ]
+      },
+      {
+        "id": "PROFILE-NULL-DATE-ATOMIC",
+        "decisions": [
+          "D01"
+        ],
+        "scenario": "selfProfileUsesOnlyOwnerFieldsAndProtectsConcurrentPatches",
+        "fixture": "Nullable fields cleared; absent keys retained; empty PATCH; date of birth today/tomorrow using business Clock",
+        "expected": "Cleared values persist; no-op leaves name; invalid future date 400 rolls back supplied goal; today accepted",
+        "exchangeIndexes": [
+          363,
+          364,
+          365,
+          366,
+          367
+        ],
+        "businessNow": "2027-02-07T20:00",
+        "stateQuery": "SELECT u.user_id,u.full_name,u.email,u.phone,u.address,u.date_of_birth,u.gender,u.status,u.center_id,m.goal,m.health_note FROM users u JOIN members m ON m.user_id=u.user_id WHERE u.user_id=?",
+        "stateQueryParams": [
+          1
+        ],
+        "stateAfterCommit": [
+          {
+            "user_id": 1,
+            "full_name": "Profile updated",
+            "email": "phase.member@example.test",
+            "phone": null,
+            "address": null,
+            "date_of_birth": "2027-02-07",
+            "gender": null,
+            "status": "Active",
+            "center_id": 1,
+            "goal": null,
+            "health_note": null
+          }
+        ],
+        "status": "PASS",
+        "environment": "LOCAL_POSTGRESQL_17_HTTP_ISOLATED_LOOPBACK",
+        "sourceCommit": "cc7847f7238ce3084ee74be8373236d52ec55756",
+        "actors": [
+          "MEMBER_A"
+        ],
+        "apis": [
+          "PATCH /api/members/me"
+        ],
+        "responseEvidence": [
+          {
+            "exchangeIndex": 363,
+            "httpStatus": 200
+          },
+          {
+            "exchangeIndex": 364,
+            "httpStatus": 200
+          },
+          {
+            "exchangeIndex": 365,
+            "httpStatus": 400
+          },
+          {
+            "exchangeIndex": 366,
+            "httpStatus": 400
+          },
+          {
+            "exchangeIndex": 367,
+            "httpStatus": 200
+          }
+        ]
+      },
+      {
+        "id": "PROFILE-PATCH-RACE",
+        "decisions": [
+          "D01"
+        ],
+        "scenario": "selfProfileUsesOnlyOwnerFieldsAndProtectsConcurrentPatches",
+        "fixture": "Two concurrent PATCH requests on distinct fields of same owner; PostgreSQL row held before releasing both waiting requests",
+        "expected": "Both 200; phone and address updates both survive commit; no lost update",
+        "exchangeIndexes": [
+          368,
+          369
+        ],
+        "businessNow": "2027-02-07T20:00",
+        "stateQuery": "SELECT u.user_id,u.full_name,u.email,u.phone,u.address,u.date_of_birth,u.gender,u.status,u.center_id,m.goal,m.health_note FROM users u JOIN members m ON m.user_id=u.user_id WHERE u.user_id=?",
+        "stateQueryParams": [
+          1
+        ],
+        "stateAfterCommit": [
+          {
+            "user_id": 1,
+            "full_name": "Profile updated",
+            "email": "phase.member@example.test",
+            "phone": "Race phone",
+            "address": "Race address",
+            "date_of_birth": "2027-02-07",
+            "gender": null,
+            "status": "Active",
+            "center_id": 1,
+            "goal": null,
+            "health_note": null
+          }
+        ],
+        "status": "PASS",
+        "environment": "LOCAL_POSTGRESQL_17_HTTP_ISOLATED_LOOPBACK",
+        "sourceCommit": "cc7847f7238ce3084ee74be8373236d52ec55756",
+        "actors": [
+          "MEMBER_A"
+        ],
+        "apis": [
+          "PATCH /api/members/me"
+        ],
+        "responseEvidence": [
+          {
+            "exchangeIndex": 368,
+            "httpStatus": 200
+          },
+          {
+            "exchangeIndex": 369,
+            "httpStatus": 200
+          }
+        ]
+      },
+      {
+        "id": "PROFILE-FIRST-LOGIN",
+        "decisions": [
+          "D01"
+        ],
+        "scenario": "selfProfileUsesOnlyOwnerFieldsAndProtectsConcurrentPatches",
+        "fixture": "Member B already authenticated; firstLogin flag set; changes password through existing allowed route",
+        "expected": "Profile 403 PASSWORD_CHANGE_REQUIRED before change; password route 204 then profile 200; global filter unchanged",
+        "exchangeIndexes": [
+          370,
+          371,
+          372,
+          373
+        ],
+        "businessNow": "2027-02-07T20:00",
+        "stateQuery": "SELECT u.user_id,u.full_name,u.email,u.phone,u.address,u.date_of_birth,u.gender,u.status,u.center_id,m.goal,m.health_note FROM users u JOIN members m ON m.user_id=u.user_id WHERE u.user_id=?",
+        "stateQueryParams": [
+          3
+        ],
+        "stateAfterCommit": [
+          {
+            "user_id": 3,
+            "full_name": "phase.other",
+            "email": "phase.other@example.test",
+            "phone": null,
+            "address": null,
+            "date_of_birth": null,
+            "gender": null,
+            "status": "Active",
+            "center_id": 1,
+            "goal": null,
+            "health_note": null
+          }
+        ],
+        "status": "PASS",
+        "environment": "LOCAL_POSTGRESQL_17_HTTP_ISOLATED_LOOPBACK",
+        "sourceCommit": "cc7847f7238ce3084ee74be8373236d52ec55756",
+        "actors": [
+          "MEMBER_B"
+        ],
+        "apis": [
+          "GET /api/members/me",
+          "POST /api/auth/change-password"
+        ],
+        "responseEvidence": [
+          {
+            "exchangeIndex": 370,
+            "httpStatus": 403
+          },
+          {
+            "exchangeIndex": 371,
+            "httpStatus": 204
+          },
+          {
+            "exchangeIndex": 372,
+            "httpStatus": 200
+          },
+          {
+            "exchangeIndex": 373,
+            "httpStatus": 200
+          }
+        ]
+      },
+      {
+        "id": "PROFILE-INACTIVE-SESSION",
+        "decisions": [
+          "D01"
+        ],
+        "scenario": "selfProfileUsesOnlyOwnerFieldsAndProtectsConcurrentPatches",
+        "fixture": "Previously valid Member session after account is disabled in local fixture",
+        "expected": "Both GET/PATCH 403; account stays Inactive and profile unchanged; old session cannot bypass disable",
+        "exchangeIndexes": [
+          374,
+          375
+        ],
+        "businessNow": "2027-02-07T20:00",
+        "stateQuery": "SELECT u.user_id,u.full_name,u.email,u.phone,u.address,u.date_of_birth,u.gender,u.status,u.center_id,m.goal,m.health_note FROM users u JOIN members m ON m.user_id=u.user_id WHERE u.user_id=?",
+        "stateQueryParams": [
+          1
+        ],
+        "stateAfterCommit": [
+          {
+            "user_id": 1,
+            "full_name": "Profile updated",
+            "email": "phase.member@example.test",
+            "phone": "Race phone",
+            "address": "Race address",
+            "date_of_birth": "2027-02-07",
+            "gender": null,
+            "status": "Inactive",
+            "center_id": 1,
+            "goal": null,
+            "health_note": null
+          }
+        ],
+        "status": "PASS",
+        "environment": "LOCAL_POSTGRESQL_17_HTTP_ISOLATED_LOOPBACK",
+        "sourceCommit": "cc7847f7238ce3084ee74be8373236d52ec55756",
+        "actors": [
+          "MEMBER_A"
+        ],
+        "apis": [
+          "GET /api/members/me",
+          "PATCH /api/members/me"
+        ],
+        "responseEvidence": [
+          {
+            "exchangeIndex": 374,
+            "httpStatus": 403
+          },
+          {
+            "exchangeIndex": 375,
+            "httpStatus": 403
+          }
+        ]
+      },
+      {
+        "id": "DIRECTORY-SCOPE-CONTACT",
+        "decisions": [
+          "D09"
+        ],
+        "scenario": "directoryRealSessionsRespectScopeContactsAndConstantQueries",
+        "fixture": "Actual HTTP sessions: Member, Manager+MANAGE_USERS, Admin with null center; empty Coach and two specializations; invalid missing-center Member exists only in H2 (PostgreSQL guard rejects fixture)",
+        "expected": "Member sees only own center with contact null; combined filter keeps complete specialization set; empty Coach []; unmatched filter []; Admin sees both centers on PostgreSQL; MANAGE_USERS reveals contact; missing-center 400 is H2-only",
+        "exchangeIndexes": [
+          376,
+          377,
+          378,
+          379,
+          380,
+          381,
+          382,
+          383,
+          384,
+          385,
+          386,
+          387
+        ],
+        "businessNow": "2027-02-07T20:00",
+        "stateQuery": "SELECT u.user_id,u.center_id FROM coaches c JOIN users u ON u.user_id=c.user_id ORDER BY u.user_id",
+        "stateQueryParams": [],
+        "stateAfterCommit": [
+          {
+            "user_id": 2,
+            "center_id": 1
+          },
+          {
+            "user_id": 8,
+            "center_id": 1
+          },
+          {
+            "user_id": 11,
+            "center_id": 2
+          },
+          {
+            "user_id": 12,
+            "center_id": 1
+          },
+          {
+            "user_id": 13,
+            "center_id": 1
+          },
+          {
+            "user_id": 14,
+            "center_id": 2
+          }
+        ],
+        "status": "PASS",
+        "environment": "LOCAL_POSTGRESQL_17_HTTP_ISOLATED_LOOPBACK",
+        "sourceCommit": "cc7847f7238ce3084ee74be8373236d52ec55756",
+        "actors": [
+          "MEMBER_A",
+          "phase.directoryadmin",
+          "phase.directorycontact"
+        ],
+        "apis": [
+          "GET /api/coaches"
+        ],
+        "responseEvidence": [
+          {
+            "exchangeIndex": 376,
+            "httpStatus": 200
+          },
+          {
+            "exchangeIndex": 377,
+            "httpStatus": 200
+          },
+          {
+            "exchangeIndex": 378,
+            "httpStatus": 200
+          },
+          {
+            "exchangeIndex": 379,
+            "httpStatus": 200
+          },
+          {
+            "exchangeIndex": 380,
+            "httpStatus": 200
+          },
+          {
+            "exchangeIndex": 381,
+            "httpStatus": 200
+          },
+          {
+            "exchangeIndex": 382,
+            "httpStatus": 200
+          },
+          {
+            "exchangeIndex": 383,
+            "httpStatus": 200
+          },
+          {
+            "exchangeIndex": 384,
+            "httpStatus": 200
+          },
+          {
+            "exchangeIndex": 385,
+            "httpStatus": 200
+          },
+          {
+            "exchangeIndex": 386,
+            "httpStatus": 200
+          },
+          {
+            "exchangeIndex": 387,
+            "httpStatus": 200
+          }
+        ]
+      },
+      {
+        "id": "DIRECTORY-NPLUS1",
+        "decisions": [
+          "D09"
+        ],
+        "scenario": "directoryRealSessionsRespectScopeContactsAndConstantQueries",
+        "fixture": "Six additional same-center Coach profiles after first complete HTTP directory request; OSIV=false",
+        "expected": "No LazyInitializationException; prepared statement count stays constant as Coach count grows",
+        "exchangeIndexes": [
+          388,
+          389
+        ],
+        "businessNow": "2027-02-07T20:00",
+        "stateQuery": "SELECT count(*) AS coaches_in_center_1 FROM coaches c JOIN users u ON u.user_id=c.user_id WHERE u.center_id=1",
+        "stateQueryParams": [],
+        "stateAfterCommit": [
+          {
+            "coaches_in_center_1": 10
+          }
+        ],
+        "statementCounts": {
+          "before": 5,
+          "after": 5
+        },
+        "status": "PASS",
+        "environment": "LOCAL_POSTGRESQL_17_HTTP_ISOLATED_LOOPBACK",
+        "sourceCommit": "cc7847f7238ce3084ee74be8373236d52ec55756",
+        "actors": [
+          "MEMBER_A"
+        ],
+        "apis": [
+          "GET /api/coaches"
+        ],
+        "responseEvidence": [
+          {
+            "exchangeIndex": 388,
+            "httpStatus": 200
+          },
+          {
+            "exchangeIndex": 389,
+            "httpStatus": 200
+          }
+        ]
+      },
+      {
+        "id": "DIRECTORY-INACTIVE-SESSION",
+        "decisions": [
+          "D09"
+        ],
+        "scenario": "directoryRealSessionsRespectScopeContactsAndConstantQueries",
+        "fixture": "Manager with MANAGE_USERS has an old session after local account is disabled",
+        "expected": "Directory 403, account stays Inactive; no contact disclosure through inactive session",
+        "exchangeIndexes": [
+          390
+        ],
+        "businessNow": "2027-02-07T20:00",
+        "stateQuery": "SELECT user_id,status FROM users WHERE user_id=?",
+        "stateQueryParams": [
+          16
+        ],
+        "stateAfterCommit": [
+          {
+            "user_id": 16,
+            "status": "Inactive"
+          }
+        ],
+        "status": "PASS",
+        "environment": "LOCAL_POSTGRESQL_17_HTTP_ISOLATED_LOOPBACK",
+        "sourceCommit": "cc7847f7238ce3084ee74be8373236d52ec55756",
+        "actors": [
+          "phase.directorycontact"
+        ],
+        "apis": [
+          "GET /api/coaches"
+        ],
+        "responseEvidence": [
+          {
+            "exchangeIndex": 390,
+            "httpStatus": 403
+          }
+        ]
       }
     ],
     "remaining": [
@@ -14202,6 +15907,7 @@
         "id": "RENDER-AUTHENTICATED",
         "status": "BLOCKED",
         "decisions": [
+          "D01",
           "D02",
           "D03",
           "D04",
@@ -14209,6 +15915,7 @@
           "D06",
           "D07",
           "D08",
+          "D09",
           "D10",
           "D12",
           "D13",
@@ -14268,11 +15975,11 @@
         "expected": "Independently establish each baseline contract and authorized actor fixture, then verify response and committed state; route presence grants no business PASS",
         "responseEvidence": null,
         "stateAfterCommit": null,
-        "sourceCommit": "0a89ad95c88573f09af03fe07293788afd6acba6"
+        "sourceCommit": "cc7847f7238ce3084ee74be8373236d52ec55756"
       }
     ],
     "caseStatusCounts": {
-      "PASS": 44,
+      "PASS": 52,
       "FAIL": 0,
       "BLOCKED": 2,
       "NOT_RUN": 1
@@ -14280,27 +15987,25 @@
     "sessionVerification": "GET /api/auth/me validates identity/role/authorities after each login and the five baseline actors before every test group",
     "sessionFixtureValidation": {
       "result": "PASS",
-      "verifiedResponses": 105,
+      "verifiedResponses": 118,
       "method": "Recorded auth/me userId/memberId compared with committed actor rows; role and required authorities compared with explicit fixture roles, not merely with login DTO"
     },
     "stateVerification": "Response completed before separate JdbcTemplate read; request transactions commit independently; assertions and SQL snapshots retained",
     "raceMethod": "Two ready worker threads released by one latch, real concurrent HTTP requests and PostgreSQL; finite fixture proves observed invariants, not every interleaving",
     "excluded": [
       "P1.5",
-      "package T",
-      "D01",
-      "D09",
+      "package T beyond integrated D01/D09",
       "FE integration"
     ],
     "readiness": "Contract/schema available for scoped BE handoff; full Render authenticated/FE acceptance remains open",
     "setupAttempts": [
       {
         "status": "BLOCKED",
-        "reason": "Initial new center fixture omitted required center_name; dependent workflow results not accepted"
+        "reason": "Initial directory fixture lacked required join_date; fixed local fixture, not business expected"
       },
       {
         "status": "BLOCKED",
-        "reason": "Next last-seat fixture sent a non-UUID requestId; corrected fixture without changing expected business outcomes"
+        "reason": "PostgreSQL rejects non-Admin with null center; invalid-state HTTP case retained on H2 without disabling DB guard"
       }
     ],
     "limits": [
@@ -14308,5 +16013,99 @@
       "Unit/H2 regression skips are not PASS; historical cloud/communication/clone records retain their original SHA and dates",
       "API errors/formats/nullability/ranges and every implemented baseline CRUD authorization combination are not exhaustively validated"
     ]
+  },
+  "integrationReview": {
+    "recordedAtUtc": "2026-10-27T18:24:02.993777+00:00",
+    "scope": [
+      "D01",
+      "D09"
+    ],
+    "reviewedCommits": {
+      "D01": "053a5f2896f3e2d2744e21b298b376ecf5303fa2",
+      "D09": "1dabce57c15af2de8db36865a650287115ebcb1a"
+    },
+    "integrationMerge": "dda99ff",
+    "testedBackendCommit": "cc7847f",
+    "mergeMethod": "Non-fast-forward merge on isolated review branch preserves both original commits; fixes are separate commits; local main fast-forwarded after clean and PostgreSQL checks",
+    "findings": [
+      {
+        "id": "D01_LOST_UPDATE",
+        "severity": "P1",
+        "originalResult": "FAIL",
+        "fixture": "Two actual HTTP PATCH requests update phone and address while both wait on a controlled local PostgreSQL row lock",
+        "actual": "Both HTTP responses 200 but committed address was null, expected Race address",
+        "fix": "Lock User before read-modify-write and then Member using existing pessimistic lock methods; no migration",
+        "verifiedCase": "PROFILE-PATCH-RACE",
+        "evidence": "d01-original-pg.log"
+      },
+      {
+        "id": "D01_D09_INACTIVE_SESSION",
+        "severity": "P1",
+        "originalResult": "FAIL",
+        "fixture": "Manager with MANAGE_USERS retains cookie after local account becomes Inactive",
+        "actual": "D09 returned 200 including Coach email fields; D01 source likewise lacked persisted Active account check",
+        "fix": "Use ActorPolicy in directory service; require persisted Active Member for self profile; denied state is read before fixture cleanup",
+        "verifiedCase": "DIRECTORY-INACTIVE-SESSION",
+        "additionalVerifiedCase": "PROFILE-INACTIVE-SESSION",
+        "evidence": "d09-valid-pg.log"
+      },
+      {
+        "id": "D01_TIME_DEPENDENT_TEST",
+        "severity": "P2",
+        "originalResult": "FAIL",
+        "fixture": "Original H2 test calls 2026-10-28 a future date with system Clock on the same day",
+        "actual": "Expected 400, actual 200; current-day birth date is allowed by rule",
+        "fix": "Fixed fixture Clock at 2026-10-27 in Asia/Ho_Chi_Minh; keep future-date rule and expected rejection, verify today/tomorrow independently in HTTP workflow",
+        "verifiedCase": "PROFILE-NULL-DATE-ATOMIC",
+        "evidence": "original-target.log"
+      }
+    ],
+    "confirmedNotDefects": [
+      "PostgreSQL Admin-null-center query succeeds; kept original query",
+      "First-login profile 403 is existing password-change policy; filter unchanged",
+      "Response stays exactly seven editable fields; id/email remain in auth/me",
+      "Contact/filter semantics and constant query count preserved"
+    ],
+    "contractChecks": [
+      "PATCH schema declares all seven editable fields and ignored additional keys",
+      "Wire validator resolves literal /api/members/me before templated /api/members/{id}"
+    ],
+    "setupAttempts": [
+      {
+        "status": "BLOCKED",
+        "reason": "Initial directory fixture lacked required join_date; fixed local fixture, not business expected"
+      },
+      {
+        "status": "BLOCKED",
+        "reason": "PostgreSQL rejects non-Admin with null center; invalid-state HTTP case retained on H2 without disabling DB guard"
+      }
+    ],
+    "publication": {
+      "mainPushed": false,
+      "remoteFeatureBranchRetainedUntilMainPush": true,
+      "originMainAtReview": "0a89ad95c88573f09af03fe07293788afd6acba6"
+    },
+    "branchCleanup": {
+      "localAndRemoteDeleted": [
+        "audit/fe-api-handoff",
+        "docs/streamline-handoff",
+        "feat/advanced-phases",
+        "fix/backend-ci",
+        "fix/production-upgrade",
+        "fix/runtime-identity",
+        "test/communication-proof"
+      ],
+      "localDeleted": [
+        "merge/advanced-phases",
+        "lan-anh"
+      ],
+      "alreadyAbsentOnRemote": [
+        "lan-anh"
+      ],
+      "personalBranchesRetained": [
+        "LA",
+        "tai"
+      ]
+    }
   }
 }

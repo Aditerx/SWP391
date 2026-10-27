@@ -40,6 +40,8 @@ Cần Docker Desktop/PostgreSQL 17 container trên, bind **127.0.0.1:55440**, cr
 
 HTTP test dùng `--minimal-fixture`: schema/catalog local và actor mới trong test, không dùng dữ liệu demo hoặc tài khoản seed lịch sử. Mỗi login xác minh `/api/auth/me`; trước mỗi nhóm xác minh lại5actor chính. Các request race dùng2worker sẵn sàng rồi mở chung latch; kiểm cả response và DB qua connection khác sau HTTP commit. Test phụ thuộc fixture trước sẽ skip nếu nhóm trước thất bại; báo BLOCKED, không coi đó là chặn đúng vai trò.
 
+D01/D09: unit/MockMvc gốc chạy H2, còn `PhaseWorkflowHttpTest` kiểm HTTP login thật trên PG. Fixture ngày sinh dùng Clock cố định. Race PATCH giữ row User bằng connection riêng, chờ cả2request ở DB lock rồi thả; hai field khác nhau phải cùng còn sau commit. Directory kiểm Admin center null, scope/contact và query count không tăng theo số Coach. Snapshot account Inactive được đọc trước khi phục hồi fixture. Case Member thiếu center chỉ chạy H2 vì guard PG từ chối lưu trạng thái đó; lỗi setup không tính là pass403/400. Tích hợp này dùng schema hiện có, không thêm migration hay mở quyền cloud.
+
 Ngoài exchanges, runner giữ `acceptance-cases.json` (Dxx/fixture/expected/SQL state và index response), `actors.json` và XML trong raw run. Sau khi kiểm kết quả, ghi vào QA chuẩn bằng lệnh dưới; lấy checkout từ `verification.json`. Chỉ chạy với test đã commit hoặc bản test được copy có hash khớp; không gọi kết quả checkout cũ là kết quả working tree mới.
 
 ```powershell

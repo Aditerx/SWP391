@@ -77,6 +77,8 @@ for e in exchanges:
         e['statusValidation'] = 'Concurrent result set asserted by the scenario; see acceptance expected'
 cases = load(raw / 'acceptance-cases.json')
 actor_rows = load(raw / 'actors.json')
+review_file = run / 'integration-review.json'
+review = load(review_file) if review_file.exists() else {}
 fixture_roles = {
     'phase.member': 'Member', 'phase.other': 'Member', 'phase.member2': 'Member',
     'phase.coach': 'Coach', 'phase.unassigned': 'Coach', 'phase.coach2': 'Coach', 'phase.multisubject': 'Coach',
@@ -192,12 +194,20 @@ qa['authenticatedAcceptance'] = dict(
     raceMethod='Two ready worker threads released by one latch, real concurrent HTTP requests and PostgreSQL; finite fixture proves observed invariants, not every interleaving',
     excluded=['P1.5', 'package T beyond integrated D01/D09', 'FE integration'],
     readiness='Contract/schema available for scoped BE handoff; full Render authenticated/FE acceptance remains open',
-    setupAttempts=[dict(status='BLOCKED', reason='Initial new center fixture omitted required center_name; dependent workflow results not accepted'),
-                   dict(status='BLOCKED', reason='Next last-seat fixture sent a non-UUID requestId; corrected fixture without changing expected business outcomes')],
+    setupAttempts=review.get('setupAttempts', []),
     limits=['No cloud .env read, historical seed account, production login/mutation, browser FE or real VNPay gateway used',
             'Unit/H2 regression skips are not PASS; historical cloud/communication/clone records retain their original SHA and dates',
             'API errors/formats/nullability/ranges and every implemented baseline CRUD authorization combination are not exhaustively validated'])
 qa['ciAndDeployment']['evidenceKind'] = 'RETAINED_NOT_RERUN_BY_AUTHENTICATED_ACCEPTANCE'
+if review:
+    for finding in review.get('findings', []):
+        required_cases = [finding['verifiedCase']]
+        if finding.get('additionalVerifiedCase'):
+            required_cases.append(finding['additionalVerifiedCase'])
+        for required_case in required_cases:
+            if not any(c['id'] == required_case and c['status'] == 'PASS' for c in cases):
+                raise SystemExit('Review resolution lacks current PASS case: ' + finding['id'] + '/' + required_case)
+    qa['integrationReview'] = review
 qa['openApi']['sha256'] = hashlib.sha256((ROOT / 'artifacts/fe-handoff/openapi.json').read_bytes()).hexdigest()
 candidate = run / 'qa-candidate.json'
 candidate.write_text(json.dumps(qa, ensure_ascii=False, indent=2)+'\n', encoding='utf-8', newline='\n')
