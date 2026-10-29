@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "recordedAt": "2026-10-27T18:30:40.875138+00:00",
+  "recordedAt": "2026-10-29T14:16:27+07:00",
   "purpose": "FE handoff readiness: fresh local authenticated HTTP and post-commit acceptance; retained cloud evidence is not rerun",
   "historyCommit": "a4f3cd0df946963ee905c1f6a3263f941f1b8fa2",
   "results": {
@@ -16107,5 +16107,150 @@
         "tai"
       ]
     }
+  },
+  "demoSchemaCoachReview": {
+    "recordedAt": "2026-10-29T14:16:27+07:00",
+    "status": "PASS_LOCAL",
+    "sourceBase": "b59cf51ca1972e17b5337e169ee93d398047ea93",
+    "sourceState": "working tree; per-file hashes below, not a new committed SHA",
+    "environment": {
+      "database": "disposable PostgreSQL 17",
+      "host": "127.0.0.1",
+      "port": 55440,
+      "isolatedBuildWithoutEnv": true,
+      "supabaseAccess": false,
+      "renderAccess": false
+    },
+    "sourceHashes": {
+      "schema_postgres.sql": "d6b8c98c20f06bdba085ad9f3cd4f7f284629c0458e4d77c82147cc718cccd71",
+      "database/schema_postgres.sql": "28b386f97344fe836f48801f17201873bb42694bb87b4833807d5344d68d1fff",
+      "src/main/java/com/sportscenter/user/UserService.java": "16752333409b1dfee286ca888d575fed1dd93db2bd9ab4de3f50edbc4a2cc7a6",
+      "src/test/java/com/sportscenter/enrollment/EnrollmentServiceTest.java": "f826d65d3d9eaaa3aa7d69f329ad481e3e1fe141ebe0bc7ca8d11d78df43745d",
+      "src/test/java/com/sportscenter/session/SessionServiceTest.java": "7412a28168456d87be4dc22b3ec53118e62ba7efafd57d8208de22c5c33d2a5b",
+      "src/test/java/com/sportscenter/user/CoachRoleSpecializationTest.java": "c3fbbd5f2ddba6a734ab3c2cd8e7286d37e4217e4c468fb7417ef2a34ef6bbd6",
+      "src/test/java/com/sportscenter/auth/DemoSchemaLoginPostgresTest.java": "2de33fe42bda713650486d99407590531827f028f8512712d264e16d9300fdbd",
+      "scripts/test-phases-postgres.py": "caf2efbbf40df2c5568ebe00a39d1f04c91480e510a589438cb656b89d662d32"
+    },
+    "cleanTest": {
+      "tests": 331,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 28,
+      "passed": 303,
+      "command": ".\\mvnw.cmd clean test",
+      "skipIsPass": false
+    },
+    "targeted": {
+      "tests": 40,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "scope": "Coach creation/role transitions/selected-subject qualification; enrollment/session fixtures"
+    },
+    "schemaAcceptance": {
+      "groups": 11,
+      "cases": [
+        {
+          "case": "Clean rebuild and post-commit account/password result: catalog, IDs and history assertions",
+          "status": "PASS",
+          "database": "scms_schema_rebuild_140008"
+        },
+        {
+          "case": "Rebuild on existing data, then replay twice in the same SQL connection",
+          "status": "PASS",
+          "database": "scms_schema_rebuild_140008"
+        },
+        {
+          "case": "Root upgrade preserves the rebuilt transaction/attendance history",
+          "status": "PASS",
+          "database": "scms_schema_rebuild_140008"
+        },
+        {
+          "case": "Root replay preserves passwords, profile/status edits, price edits and revoked permissions",
+          "status": "PASS",
+          "database": "scms_schema_root_140008"
+        },
+        {
+          "case": "Root upgrades the legacy 34-table/28-account master and preserves all original protected columns",
+          "status": "PASS",
+          "database": "scms_schema_legacy_140008"
+        },
+        {
+          "case": "Database variant replaces legacy account IDs and every reference with the approved clean graph",
+          "status": "PASS",
+          "database": "scms_schema_legacy_140008"
+        },
+        {
+          "case": "Unlisted application tables with noncontiguous IDs remain untouched",
+          "status": "PASS",
+          "database": "scms_schema_legacy_140008"
+        },
+        {
+          "case": "External FK blocks destructive rebuild without cascade or partial changes",
+          "status": "PASS",
+          "database": "scms_schema_rebuild_140008"
+        },
+        {
+          "case": "Ambiguous old/new room IDs abort root upgrade atomically",
+          "status": "PASS",
+          "database": "scms_schema_guard_140008"
+        },
+        {
+          "case": "One-time v2 corrects all 33 prior random passwords/first-login/locks and preserves unrelated accounts/history",
+          "status": "PASS",
+          "database": "scms_schema_correction_140008"
+        },
+        {
+          "case": "Corrective v2 replay preserves later password/first-login/lock edits",
+          "status": "PASS",
+          "database": "scms_schema_correction_140008"
+        }
+      ]
+    },
+    "httpDemoAccounts": {
+      "rebuild": {
+        "tests": 1,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "accounts": 33,
+        "database": "scms_schema_login_rebuild_140353"
+      },
+      "root": {
+        "tests": 1,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "accounts": 33,
+        "database": "scms_schema_login_root_140403"
+      },
+      "criteria": "Each PDF account: shared Owner-approved password -> login -> auth/me identity and role -> role API -> logout -> anonymous auth/me rejected; no forced password change"
+    },
+    "minimalFixture": {
+      "database": "scms_phases_approved_demo_20261029_1411",
+      "localOnly": true,
+      "migrationReplay": true,
+      "invoiceEnrollmentSnapshotsPreserved": true,
+      "catalog": 9,
+      "priceReplayPreserved": true,
+      "exactSnapshotCleanupAndFkGuard": true,
+      "defaultRoleGrantsRemoved": true,
+      "wallClockDateGuardsOmittedInThisDisposableFixtureOnly": true,
+      "roleRoomCapacityForeignKeyGuardsPreserved": true,
+      "productionSqlDateGuardsUnchanged": true
+    },
+    "postgresWorkflow": {
+      "tests": 20,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "limits": [
+      "Local HTTP is not Supabase/Render/FE acceptance.",
+      "Phase workflow uses a controlled application Clock; only minimal disposable DB omits the two conflicting wall-clock date guards.",
+      "28 skips in clean are not passes; demo PostgreSQL tests were separately enabled."
+    ],
+    "rawRun": "artifacts/runs/approved-demo-20261029_135628",
+    "nextStep": "Owner reviews/runs exactly one approved SQL variant on Supabase and reports results; no cloud mutation/deploy executed."
   }
 }

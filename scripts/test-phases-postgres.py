@@ -27,12 +27,26 @@ def sql(text, database=None, success=True, expected_error=None):
     return r.stdout
 
 sql('CREATE DATABASE '+args.database+';', 'postgres')
-schema=(root/'database/schema_postgres.sql').read_text(encoding='utf-8')
+# The consolidated demo schema rebuilds accounts/history. Minimal workflow tests
+# use the existing empty-schema bootstrap instead of slicing seed SQL by text.
+schema_path = 'database/bootstrap/scms_structure_postgres.sql' if args.minimal_fixture else 'database/schema_postgres.sql'
+schema=(root/schema_path).read_text(encoding='utf-8')
 if args.minimal_fixture:
-    catalog_start=schema.index('INSERT INTO subjects ')
-    catalog=schema[catalog_start:schema.index(';',catalog_start)+1]
-    schema=schema[:schema.index('INSERT INTO roles ')]+catalog
+    # PhaseWorkflowHttpTest advances a fixed Spring Clock. A DB wall-clock date
+    # must not reject its historical fixtures. Keep every non-time DB guard;
+    # production schema files remain untouched and service Clock checks still run.
+    for pattern in [
+        r"    IF NEW.status = 'Open' AND NEW.start_date IS NOT NULL AND NEW.start_date < CURRENT_DATE THEN\n.*?^    END IF;\n",
+        r"    IF TG_OP = 'INSERT' AND NEW.session_date < CURRENT_DATE THEN\n.*?^    END IF;\n",
+    ]:
+        schema, count = re.subn(pattern, '', schema, count=1, flags=re.MULTILINE | re.DOTALL)
+        assert count == 1, 'Review minimal-fixture date guard after bootstrap changes'
 sql(schema)
+if args.minimal_fixture:
+    # Workflow tests own their role matrix, including an Admin without VIEW_REPORTS.
+    sql("DO $$ BEGIN IF EXISTS(SELECT 1 FROM users) THEN RAISE EXCEPTION 'Minimal fixture must not contain accounts'; END IF; END $$;")
+    sql('DELETE FROM role_permissions; DELETE FROM permissions; DELETE FROM roles;')
+
 def snapshots():
     return sql("""SELECT md5(string_agg((to_jsonb(i)-ARRAY['reconciliation_required','cash_note','cash_confirmation_reversed','resolution_status'])::text,',' ORDER BY invoice_id)) FROM invoices i;
     SELECT md5(string_agg((to_jsonb(c)-'eligibility_subscription_id')::text,',' ORDER BY enrollment_id)) FROM class_enrollments c;

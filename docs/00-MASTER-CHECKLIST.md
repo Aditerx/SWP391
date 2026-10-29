@@ -13,12 +13,29 @@
 | FE browser/CORS/cookie/camera QR | NOT_RUN | Nguồn FE hiện hành và môi trường tích hợp được xác định |
 | VNPay gateway sandbox live | BLOCKED; chưa gọi gateway | Thiếu Merchant/callback/fixture và quyền kiểm phù hợp; callback ký local không thay gateway |
 | SQLServer runtime | NOT_RUN | Môi trường kiểm riêng nếu được chọn |
+| Schema demo/Coach theo Owner29/10 | PASS local; chưa chạy Supabase | Owner review/chọn schema root bảo toàn hoặc `database/` dựng lại; xem nghiệm thu bên dưới |
 
 **Mức sẵn sàng FE:** contract/schema đủ để bàn giao phạm vi BE đã kiểm local có điều kiện; chưa ký full authenticated Render hoặc FE acceptance. Matrix và response/state chuẩn ở `authenticatedAcceptance` của [QA duy nhất](../artifacts/qa/latest.json).
 
 **Bước kế tiếp:** review bản tích hợp local trước push main (có thể kích hoạt Render auto-deploy); sau khi remote main chứa D01/D09 mới xóa remote feature branch. Khi có tài khoản/fixture/phạm vi live xác định mới kiểm Render theo matrix, xác minh phiên và state; mở rộng kiểm CRUD baseline theo rủi ro/contract. Không lấy số route làm mục tiêu gọi mọi mutation production. P1.5/phần còn lại gói T/FE integration tiếp tục ngoài phạm vi.
 
 Đọc: [AGENTS](../AGENTS.md) → [quyết định Dxx](04-DEBUG-NOTE.md) → [contract FE](01-API-CONTRACT-FE-BE.md) đúng luồng; [vận hành](02-DEPLOYMENT-GUIDE.md) khi cần.
+
+## Nghiệm thu schema demo/Coach — 29/10/2026
+
+**Source/môi trường:** working tree trên `b59cf51ca1972e17b5337e169ee93d398047ea93`; hash SQL/BE/test/runner trong `demoSchemaCoachReview` của [QA duy nhất](../artifacts/qa/latest.json). Maven chạy bản sao source hiện tại không.env; PostgreSQL17 riêng `127.0.0.1:55440`. Không gọi Supabase/Render/email/gateway.
+
+| Điều kiện nghiệm thu | Kết quả local |
+|---|---|
+| Account demo dùng mật khẩu Owner đã chốt, không bị ép đổi mật khẩu | PASS cả33account của mỗi schema qua HTTP login →`/auth/me`→API đúng role→logout; kiểm role và trạng thái khóa sau commit |
+| Root sửa bộ mật khẩu ngẫu nhiên v1 nhưng không reset mãi | PASS sửa đúng33email, bỏ first-login/khóa cũ; giữ account ngoài danh sách, ID/chứng từ/attendance; replay giữ mật khẩu/khóa/profile/giá/quyền đã sửa sau đó |
+| `database/` dựng lại danh sách và liên kết | PASS ID số độc lập từ1, PK subtype giữ user ID;9môn/8phòng; Normal12buổi hợp lệ; Paid/Pending/credit/attendance và chống trùng tài nguyên; FK ngoài phạm vi/phòng trùng làm rollback |
+| Coach không được tự gán chuyên môn | PASS tạo và hai đường đổi role; chuyên môn trống khi chưa chọn; chặn nhận đăng ký/tạo lịch dạy và không để lại dữ liệu sau commit; `specializationIds` chỉ cấp đúng môn đã chọn |
+| Runner PostgreSQL và regression | PASS bootstrap minimal không có account/demo grants; migration/replay/snapshot/FK guard; workflow HTTP đúng response và SQL state sau commit |
+
+**Kết quả:** clean331run =303pass/28skip/0failure/0error; test đích40/40. PostgreSQL:11nhóm SQL,2case HTTP demo (33account mỗi schema),20workflow HTTP đều PASS. Skip không là pass; hai case demo PG đã chạy riêng. Lần PG đầu vướng timezone JVM alias và fixture Clock27/10 so với wall-clock DB29/10; sửa setup bằng timezone chuẩn và bỏ riêng hai date guard trong DB minimal local, giữ guard role/phòng/sĩ số/FK và kiểm Clock ở service. Hai SQL bàn giao vẫn giữ date guard gốc; không đổi expected để xanh.
+
+**Bước tiếp:** Owner review và chạy toàn bộ đúng một file SQL trên Supabase, rồi báo kết quả. Bản root giữ dữ liệu; bản `database/` thay dữ liệu SCMS bằng bộ tham chiếu đã duyệt. Nghiệm thu local này không nâng trạng thái cloud/FE/gateway ở Active.
 
 ## Nghiệm thu API có phiên — 28/10/2026
 
@@ -65,6 +82,7 @@ Bằng chứng khi cần: [QA duy nhất](../artifacts/qa/latest.json). Bộ FE 
 
 | Ngày | Nhóm hoàn tất | Dấu vết |
 |---|---|---|
+| 29/10/2026 | Chốt hai biến thể schema, sửa mật khẩu/first-login demo một lần; bỏ mặc định chuyên môn Coach và đổi fixture Yoga; kiểm schema/HTTP/JPA/clean regression, sửa runner minimal | Nghiệm thu schema demo/Coach và QA; chỉ local, chưa ghi Supabase hoặc deploy |
 | 28/10/2026 | Review hai commit D01/D09, tái hiện lỗi Clock/race/Inactive, sửa và tích hợp main local; PG login/SQL state/N+1/contract; dọn branch merged và lan-anh | Source và kết quả mới phía trên/QA; chưa push main hoặc nghiệm thu Render; remote feature giữ tới khi publish |
 | 28/10/2026 | Lập matrix API có phiên và SQL state sau commit; thêm role/center/biên/race HTTP PostgreSQL, collector QA; làm rõ requestId UUID | Local mới theo mục nghiệm thu; Render/gateway BLOCKED, nhánh HTTP còn thiếu ở Active; không sửa BE hoặc ghi cloud |
 | 27/10/2026 | Chuẩn hóa bàn giao: tách trách nhiệm5docs, FE1contract+1 schema, gom QA; bỏ inventory/schema MD và trace trùng | Không sửa BE/DB/deploy; kết quả kiểm cũ giữ theo SHA |

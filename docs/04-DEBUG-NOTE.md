@@ -33,6 +33,8 @@ Bản rút gọn từ lịch sử chốt25–27/10/2026. D12 về45ngày sử d�
 
 GET/PATCH `/api/members/me`, DTO tự phục vụ riêng; danh tính từ Auth. Tự sửa đúng7trường: name,phone,address,dateOfBirth,gender,goal,healthNote. Email/password/avatar theo luồng riêng; không mở role/status/center/gói/credit/giá. Validation/null phải đặc tả khi triển khai, không tự mở thêm field. Trạng thái triển khai/nghiệm thu xem docs00.
 
+Owner29/10 chốt riêng bộ33account demo theo `System Account.pdf`: mật khẩu demo đã duyệt, Active, `is_first_login=false`, không còn khóa đăng nhập cũ. Luồng tạo/cấp lại mật khẩu của BE vẫn giữ first-login hiện hành; không bỏ filter toàn hệ thống.
+
 <a id="d02"></a>
 ## D02 — Danh mục và giá
 
@@ -53,6 +55,7 @@ Chỉ9môn, giá VND cho trọn12buổi Normal hoặc12credit Advanced:
 - Quyết định cleanup27/10 giữ canonical IDs19–27, bỏ8bản trùng và Bắn súng ngoài danh mục **khi không có tham chiếu**; gặp liên kết phải đối soát, không cascade/xóa lịch sử.
 - Invoice.amount bất biến. Không suy môn từ amount/tên gói hoặc seed lại để ghi đè giá đã thay có chủ đích.
 - ID là dữ liệu từng môi trường, không hardcode vào FE. Các quyền xử lý fixture cũ là phê duyệt lịch sử cụ thể, không mở quyền sửa mọi dữ liệu production.
+- Owner29/10 chốt hai biến thể SQL: schema root nâng cấp/bảo toàn ID và chứng từ; `database/schema_postgres.sql` được phép dựng lại dữ liệu SCMS tham chiếu cùng ID số độc lập từ1. PK subtype vẫn bằng `users.user_id`; không đổi UUID/khóa ghép sang số. Danh sách8phòng giữ Bóng rổ/Bóng chuyền chung một tài nguyên. Giữ `ai_consultations`/`support_requests` cho tương lai. Quyết định này không là quyền cho agent chạy reset Supabase.
 
 <a id="d03"></a>
 ## D03 — Mua Advanced
@@ -105,6 +108,8 @@ Job expiry lưu số credit thu hồi. Khi phục hồi chỉ restore balance ex
 ## D09 — Coach directory
 
 Log lịch sử đã xác nhận LazyInitializationException specialization ngoài Hibernate Session; không suy đã hết lỗi từ GET anonymous401. Nghiệm thu bằng JPA thật OSIV=false; service read-only transaction/DTO/batch query theo center, tránhN+1; giữ filter/contact theo quyền. Không mở rộng thành đổi capacity/admission workflow. Trạng thái triển khai/nghiệm thu xem docs00.
+
+Coach mới hoặc mới chuyển role không tự gán chuyên môn. Gán môn qua `specializationIds`; khi chưa gán, directory trả danh sách rỗng và kiểm qualification vẫn chặn nhận đăng ký/tạo lịch dạy môn đó.
 
 <a id="d10"></a>
 ## D10 — Thanh toán và đối soát

@@ -113,7 +113,7 @@ class SessionServiceTest {
 
         sampleClass = new SportsClass();
         sampleClass.setId(1); var subject = new Subject(); subject.setId(1); subject.setOutdoor(false); subject.setOutdoor(false); sampleClass.setSubject(subject);
-        sampleClass.setName("Yoga Buổi Sáng");
+        sampleClass.setName("Cầu lông Buổi Sáng");
         sampleClass.setCoach(sampleCoach);
         sampleClass.setMaxCapacity(20);
         sampleClass.setStatus("Open");
@@ -121,7 +121,7 @@ class SessionServiceTest {
 
         sampleRoom = new Room();
         sampleRoom.setId(1);
-        sampleRoom.setName("Phòng Yoga A");
+        sampleRoom.setName("Sân Cầu lông 01");
         sampleRoom.setCapacity(25);
         sampleRoom.setStatus("Available");
         sampleRoom.setFacilityType("Indoor");
@@ -158,8 +158,8 @@ class SessionServiceTest {
 
         assertNotNull(response);
         assertEquals(10, response.id());
-        assertEquals("Yoga Buổi Sáng", response.className());
-        assertEquals("Phòng Yoga A", response.roomName());
+        assertEquals("Cầu lông Buổi Sáng", response.className());
+        assertEquals("Sân Cầu lông 01", response.roomName());
         assertEquals("Trần Thị Hương", response.coachName());
         assertEquals(5, response.enrolledCount());
         verify(sessionRepository).save(any(Session.class));
