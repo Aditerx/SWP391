@@ -305,7 +305,6 @@ public class UserService {
             if (!coachRepository.existsById(user.getId())) {
                 Coach coach = new Coach();
                 coach.setUser(user);
-                coach.setSpecialization("Fitness");
                 coachRepository.save(coach);
             }
         } else if ("Receptionist".equalsIgnoreCase(roleName)) {

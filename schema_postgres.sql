@@ -1,30 +1,39 @@
--- schema_postgres.sql
--- PostgreSQL version of SQLQuery3_2609.sql (SQL Server original kept as-is).
--- Run this in Supabase SQL Editor (Project → SQL Editor → New query).
---
--- Changes from SQL Server:
---   INT IDENTITY(1,1)              → SERIAL
---   NVARCHAR(n) / NVARCHAR(MAX)   → VARCHAR(n) / TEXT
---   DATETIME                       → TIMESTAMP
---   GETDATE()                      → CURRENT_TIMESTAMP
---   CAST(GETDATE() AS DATE)        → CURRENT_DATE
---   BIT                            → BOOLEAN
---   N'...' string literals         → '...' (no N prefix)
---   [timestamp] reserved word     → "timestamp" (quoted)
---   GO                             → removed
---   CREATE OR ALTER TRIGGER        → CREATE OR REPLACE FUNCTION + trigger
---   DECLARE @var / SET @var        → standard SQL
---   HASHBYTES (SHA2_256)           → passwords inserted as BCrypt hash of '12345678'
---   THROW                          → RAISE EXCEPTION
---   IDENTITY INSERT / SET NOCOUNT  → not needed in PostgreSQL
---
--- Password for all demo accounts: Scms@2026
--- BCrypt hash used below: $2a$10$QBctKpWoGbyJxKd43TNSPemf2xsDeVUugnAhEEfkZH6pLU8ncMqMi
+-- ROOT VARIANT: additive upgrade; preserve existing IDs, payments, attendance and business history.
+-- Does not reset or renumber an existing database. Newly added PDF accounts have no fake transactions.
+-- SCMS PostgreSQL / Supabase - Owner-approved catalog and System Account.pdf.
+-- Copy and run this WHOLE file in one SQL Editor execution.
+-- Timezone: Asia/Ho_Chi_Minh. Never run the two schema variants in succession.
+-- Owner-approved learning/demo accounts use SWP391, stored as salted BCrypt.
+-- Only these 33 PDF identities skip the first-login password change.
+-- ROOT corrects the previous random-password seed once, then preserves later password edits.
+-- Subtype PKs equal users.user_id; composite/UUID/text keys are not integer sequences.
+BEGIN;
+SET LOCAL search_path = public, extensions, pg_catalog;
+SET LOCAL TIME ZONE 'Asia/Ho_Chi_Minh';
+SET LOCAL lock_timeout = '10s';
+SELECT pg_advisory_xact_lock(391, 20261029);
+CREATE SCHEMA IF NOT EXISTS extensions;
+CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA extensions;
+SET LOCAL scms.rebuild = 'false';
 
--- =====================================================================
--- 1. ROLES – PERMISSIONS
--- =====================================================================
-
+CREATE TEMP TABLE _scms_preserved(table_name TEXT,pk TEXT,columns TEXT[],digest TEXT) ON COMMIT DROP;
+DO $preserve$
+DECLARE r RECORD; cols TEXT[]; fingerprint TEXT;
+BEGIN
+ FOR r IN SELECT * FROM (VALUES
+  ('invoices','invoice_id'),('member_packages','subscription_id'),('sessions','session_id'),
+  ('attendances','attendance_id'),('training_results','result_id'),('class_enrollments','enrollment_id'),
+  ('system_logs','log_id'),('training_plans','plan_id'),('payment_resolutions','id')
+ ) AS protected(table_name,pk) LOOP
+  IF to_regclass('public.'||r.table_name) IS NOT NULL THEN
+   SELECT array_agg(column_name::TEXT ORDER BY ordinal_position) INTO cols FROM information_schema.columns
+    WHERE table_schema='public' AND table_name=r.table_name;
+   EXECUTE format('SELECT md5(coalesce(string_agg((SELECT jsonb_object_agg(e.key,e.value) FROM jsonb_each(to_jsonb(t)) e WHERE e.key=ANY($1))::text,E''\n'' ORDER BY %I),''[]'')) FROM public.%I t',r.pk,r.table_name)
+     INTO fingerprint USING cols;
+   INSERT INTO _scms_preserved VALUES(r.table_name,r.pk,cols,fingerprint);
+  END IF;
+ END LOOP;
+END $preserve$;
 CREATE TABLE IF NOT EXISTS roles (
     role_id     SERIAL PRIMARY KEY,
     role_name   VARCHAR(50)  NOT NULL UNIQUE,
@@ -321,13 +330,6 @@ CREATE INDEX IF NOT EXISTS idx_sessions_booked_member ON sessions(booked_member_
 CREATE INDEX IF NOT EXISTS idx_sessions_coach ON sessions(coach_id);
 
 ALTER TABLE sessions ADD COLUMN IF NOT EXISTS attendance_finalized BOOLEAN NOT NULL DEFAULT FALSE;
--- Mark sessions that already ended at migration time as finalized so the new job does not
--- retroactively penalize historical attendance gaps. The comparison uses Vietnam local time.
-UPDATE sessions
-SET attendance_finalized = TRUE
-WHERE attendance_finalized = FALSE
-  AND session_date + end_time < (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Ho_Chi_Minh');
-
 CREATE INDEX IF NOT EXISTS idx_session_class ON sessions(class_id);
 CREATE INDEX IF NOT EXISTS idx_session_room  ON sessions(room_id);
 
@@ -475,9 +477,8 @@ CREATE INDEX IF NOT EXISTS idx_mp_member  ON member_packages(member_id);
 CREATE INDEX IF NOT EXISTS idx_mp_package ON member_packages(package_id);
 
 -- Session subscription FK must follow creation of member_packages.
--- PostgreSQL/public schema only. Additive upgrade; never run the demo reset.
--- Run after 04 and 06. No historical subscription is inferred or backfilled.
-BEGIN;
+-- Consolidated FK validation; no historical subscription is inferred or backfilled.
+
 SET LOCAL lock_timeout = '5s';
 LOCK TABLE public.member_packages IN SHARE ROW EXCLUSIVE MODE;
 LOCK TABLE public.sessions IN ACCESS EXCLUSIVE MODE;
@@ -547,8 +548,6 @@ BEGIN
     END IF;
 END
 $migration$;
-COMMIT;
-
 
 CREATE TABLE IF NOT EXISTS class_enrollments (
     enrollment_id SERIAL PRIMARY KEY,
@@ -761,12 +760,135 @@ CREATE TABLE IF NOT EXISTS system_logs (
 CREATE INDEX IF NOT EXISTS idx_log_user      ON system_logs(user_id);
 CREATE INDEX IF NOT EXISTS idx_log_timestamp ON system_logs("timestamp");
 
--- =====================================================================
--- 12. TRIGGER FUNCTIONS (business-rule guards, PostgreSQL PL/pgSQL)
--- Placed after schema; seed data is inserted before triggers are
--- active so historical demo rows are not blocked.
--- =====================================================================
 
+
+-- Consolidated structure: 06_schedule_safety_postgres.sql
+-- PostgreSQL only. Apply after migration 04; do NOT run destructive demo reset 05.
+-- Additive, repeatable; no prices, invoices, credits or existing schedules are rewritten.
+
+ALTER TABLE subjects ADD COLUMN IF NOT EXISTS outdoor BOOLEAN;
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS reconciliation_required BOOLEAN NOT NULL DEFAULT FALSE;
+UPDATE subjects SET outdoor = TRUE WHERE outdoor IS NULL AND slug IN ('bong-da','quan-vot-tennis','boi-loi','ban-cung');
+UPDATE subjects SET outdoor = FALSE WHERE outdoor IS NULL AND slug IN ('cau-long','bong-ban','bong-ro','bong-chuyen','pickleball');
+-- Unclassified custom subjects remain NULL and must be configured by the Manager.
+CREATE TABLE IF NOT EXISTS normal_class_requests (
+    request_id VARCHAR(36) PRIMARY KEY,
+    request_hash VARCHAR(64) NOT NULL,
+    center_id INTEGER NOT NULL REFERENCES centers(center_id),
+    class_id INTEGER NOT NULL UNIQUE REFERENCES classes(class_id)
+);
+ALTER TABLE member_packages DROP CONSTRAINT IF EXISTS member_packages_status_check;
+ALTER TABLE member_packages ADD CONSTRAINT member_packages_status_check CHECK (status IN ('Pending','Active','Expired','Cancelled','Completed'));
+
+-- Consolidated structure: 08_advanced_entitlements_postgres.sql
+-- Additive upgrade. Run only after 06_schedule_safety and 07; no seed/reset/backfill guesses.
+
+-- New Advanced registrations do not use a generic package or start validity before Paid.
+ALTER TABLE member_packages ALTER COLUMN package_id DROP NOT NULL;
+ALTER TABLE member_packages ALTER COLUMN start_date DROP NOT NULL;
+ALTER TABLE member_packages ALTER COLUMN end_date DROP NOT NULL;
+ALTER TABLE member_packages ADD COLUMN IF NOT EXISTS subject_id INT REFERENCES subjects(subject_id);
+ALTER TABLE member_packages ADD COLUMN IF NOT EXISTS primary_coach_id INT REFERENCES users(user_id);
+ALTER TABLE member_packages ADD COLUMN IF NOT EXISTS purchase_amount NUMERIC(12,2);
+ALTER TABLE member_packages ADD COLUMN IF NOT EXISTS activated_at TIMESTAMP;
+ALTER TABLE member_packages ADD COLUMN IF NOT EXISTS expires_at TIMESTAMP;
+ALTER TABLE member_packages ADD COLUMN IF NOT EXISTS expiry_revoked_credit INT DEFAULT 0;
+ALTER TABLE member_packages ADD COLUMN IF NOT EXISTS expiry_processed_at TIMESTAMP;
+ALTER TABLE member_packages ADD COLUMN IF NOT EXISTS approved_extra_seconds BIGINT NOT NULL DEFAULT 0;
+ALTER TABLE invoices DROP CONSTRAINT IF EXISTS chk_invoice_target;
+ALTER TABLE invoices ADD CONSTRAINT chk_invoice_target CHECK (
+    (class_id IS NOT NULL AND package_id IS NULL AND subscription_id IS NULL) OR
+    (class_id IS NULL AND (package_id IS NOT NULL OR subscription_id IS NOT NULL))
+);
+CREATE INDEX IF NOT EXISTS idx_subscription_primary_coach ON member_packages(primary_coach_id);
+CREATE INDEX IF NOT EXISTS idx_subscription_deadline ON member_packages(status, expires_at);
+CREATE TABLE IF NOT EXISTS subscription_pauses (
+    id SERIAL PRIMARY KEY, subscription_id INT NOT NULL REFERENCES member_packages(subscription_id),
+    source_key VARCHAR(120) NOT NULL, starts_at TIMESTAMP NOT NULL, ends_at TIMESTAMP NOT NULL,
+    UNIQUE(subscription_id,source_key), CHECK(ends_at > starts_at)
+);
+CREATE TABLE IF NOT EXISTS coach_work_schedules (
+    coach_id INT PRIMARY KEY REFERENCES users(user_id), accepting_new BOOLEAN NOT NULL DEFAULT FALSE
+);
+CREATE TABLE IF NOT EXISTS coach_work_slots (
+    coach_id INT NOT NULL REFERENCES coach_work_schedules(coach_id), slot_key VARCHAR(20) NOT NULL,
+    PRIMARY KEY(coach_id,slot_key)
+);
+CREATE TABLE IF NOT EXISTS coach_days_off (
+    coach_id INT NOT NULL REFERENCES coach_work_schedules(coach_id), day_off DATE NOT NULL,
+    PRIMARY KEY(coach_id,day_off)
+);
+CREATE TABLE IF NOT EXISTS advanced_registrations (
+    id SERIAL PRIMARY KEY, member_id INT NOT NULL REFERENCES users(user_id),
+    subject_id INT NOT NULL REFERENCES subjects(subject_id), coach_id INT NOT NULL REFERENCES users(user_id),
+    request_key VARCHAR(80) NOT NULL, status VARCHAR(20) NOT NULL DEFAULT 'Requested', created_at TIMESTAMP NOT NULL,
+    accepted_by INT REFERENCES users(user_id), accepted_at TIMESTAMP, reason VARCHAR(2000),
+    subscription_id INT UNIQUE REFERENCES member_packages(subscription_id), UNIQUE(member_id,request_key)
+);
+
+-- Consolidated structure: 10_session_incidents_postgres.sql
+
+ALTER TABLE sessions ADD COLUMN IF NOT EXISTS booking_key VARCHAR(80);
+ALTER TABLE sessions ADD COLUMN IF NOT EXISTS booking_hash VARCHAR(64);
+ALTER TABLE sessions ADD COLUMN IF NOT EXISTS created_by INT REFERENCES users(user_id);
+ALTER TABLE sessions ADD COLUMN IF NOT EXISTS agreement_confirmed_at TIMESTAMP;
+ALTER TABLE sessions ADD COLUMN IF NOT EXISTS support_reason VARCHAR(2000);
+ALTER TABLE sessions ADD COLUMN IF NOT EXISTS credit_returned BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE sessions ADD COLUMN IF NOT EXISTS center_invalidated BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE sessions ADD COLUMN IF NOT EXISTS makeup_for_session_id INT REFERENCES sessions(session_id);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_session_booking_key ON sessions(subscription_id,booking_key) WHERE booking_key IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_session_makeup_original ON sessions(makeup_for_session_id) WHERE makeup_for_session_id IS NOT NULL;
+ALTER TABLE member_packages ADD COLUMN IF NOT EXISTS deferred_credit_return INT NOT NULL DEFAULT 0;
+ALTER TABLE member_packages ADD COLUMN IF NOT EXISTS approved_extra_nanos INT NOT NULL DEFAULT 0;
+CREATE TABLE IF NOT EXISTS session_absence_notices (
+    id SERIAL PRIMARY KEY, session_id INT NOT NULL REFERENCES sessions(session_id), member_id INT NOT NULL REFERENCES users(user_id),
+    reported_at TIMESTAMP NOT NULL, original_start TIMESTAMP NOT NULL, original_end TIMESTAMP NOT NULL,
+    reason VARCHAR(2000) NOT NULL, active BOOLEAN NOT NULL DEFAULT TRUE, superseded_at TIMESTAMP
+);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_active_absence_notice ON session_absence_notices(session_id) WHERE active;
+CREATE TABLE IF NOT EXISTS session_changes (
+    id SERIAL PRIMARY KEY, session_id INT NOT NULL REFERENCES sessions(session_id), request_key VARCHAR(80) NOT NULL,
+    request_hash VARCHAR(64) NOT NULL, actor_id INT NOT NULL REFERENCES users(user_id), changed_at TIMESTAMP NOT NULL,
+    cause VARCHAR(40) NOT NULL, reason VARCHAR(2000) NOT NULL, member_agreed BOOLEAN NOT NULL,
+    before_data VARCHAR(4000) NOT NULL, after_data VARCHAR(4000) NOT NULL, UNIQUE(session_id,request_key)
+);
+CREATE TABLE IF NOT EXISTS center_incidents (
+    id SERIAL PRIMARY KEY, session_id INT NOT NULL REFERENCES sessions(session_id), request_key VARCHAR(80) NOT NULL,
+    started_at TIMESTAMP NOT NULL, ended_at TIMESTAMP, reason VARCHAR(2000) NOT NULL, evidence VARCHAR(2000) NOT NULL,
+    status VARCHAR(30) NOT NULL DEFAULT 'WaitingForRecovery', created_by INT NOT NULL REFERENCES users(user_id), created_at TIMESTAMP NOT NULL,
+    resolved_by INT REFERENCES users(user_id), resolved_at TIMESTAMP, original_deadline TIMESTAMP, deadline_before TIMESTAMP, deadline_after TIMESTAMP,
+    recovered_credits INT NOT NULL DEFAULT 0, session_compensated BOOLEAN NOT NULL DEFAULT FALSE, UNIQUE(session_id,request_key),
+    CHECK(ended_at IS NULL OR ended_at>=started_at)
+);
+CREATE TABLE IF NOT EXISTS incident_affected_members (
+    incident_id INT NOT NULL REFERENCES center_incidents(id), member_id INT NOT NULL REFERENCES users(user_id), PRIMARY KEY(incident_id,member_id)
+);
+
+-- Consolidated structure: 11_holiday_history_postgres.sql
+
+ALTER TABLE holidays ADD COLUMN IF NOT EXISTS actual_closed_until TIMESTAMP;
+-- No guessed backfill. An active holiday's actual past interval is captured on deactivation.
+
+-- Consolidated structure: 12_payment_resolutions_postgres.sql
+
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS cash_note VARCHAR(2000);
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS cash_confirmation_reversed BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS resolution_status VARCHAR(30);
+ALTER TABLE class_enrollments ADD COLUMN IF NOT EXISTS eligibility_subscription_id INT REFERENCES member_packages(subscription_id);
+CREATE TABLE IF NOT EXISTS payment_resolutions (
+    id SERIAL PRIMARY KEY, invoice_id INT NOT NULL REFERENCES invoices(invoice_id), resolution_type VARCHAR(30) NOT NULL,
+    status VARCHAR(30) NOT NULL DEFAULT 'Open', amount NUMERIC(12,2) NOT NULL, reason VARCHAR(2000) NOT NULL,
+    evidence VARCHAR(2000), outcome_note VARCHAR(2000), created_by INT NOT NULL REFERENCES users(user_id), created_at TIMESTAMP NOT NULL,
+    approved_by INT REFERENCES users(user_id), approved_at TIMESTAMP, completed_by INT REFERENCES users(user_id), completed_at TIMESTAMP,
+    performed_at TIMESTAMP, UNIQUE(invoice_id,resolution_type), CHECK(amount>0)
+);
+
+CREATE TABLE IF NOT EXISTS scms_data_migration_audit (
+    migration_key VARCHAR(100) PRIMARY KEY,
+    captured_at TIMESTAMP NOT NULL,
+    before_data TEXT NOT NULL,
+    after_data TEXT NOT NULL
+);
 -- Guard: new Open class cannot start in the past
 CREATE OR REPLACE FUNCTION fn_classes_validate()
 RETURNS TRIGGER LANGUAGE plpgsql AS $$
@@ -874,9 +996,74 @@ CREATE TRIGGER trg_member_packages_validate
     FOR EACH ROW EXECUTE FUNCTION fn_member_packages_validate();
 
 -- =====================================================================
--- SEED DATA
--- =====================================================================
 
+-- TABLE PURPOSES: retained runtime, compatibility, audit and future tables.
+COMMENT ON TABLE public.roles IS 'Vai trò hệ thống: Admin, Member, Coach, Receptionist, CenterManager.';
+COMMENT ON TABLE public.permissions IS 'Danh mục quyền thao tác nghiệp vụ.';
+COMMENT ON TABLE public.role_permissions IS 'Ma trận quyền của từng vai trò; khóa ghép, không có ID riêng.';
+COMMENT ON TABLE public.centers IS 'Trung tâm và hàng khóa dùng để tuần tự hóa các thao tác tranh chấp lịch.';
+COMMENT ON TABLE public.users IS 'Danh tính đăng nhập và hồ sơ chung; mật khẩu chỉ lưu hash.';
+COMMENT ON TABLE public.email_otps IS 'OTP đăng ký/đặt lại mật khẩu, hạn dùng và chống thử lại.';
+COMMENT ON TABLE public.center_managers IS 'Hồ sơ subtype CenterManager; dùng chung user_id với users.';
+COMMENT ON TABLE public.receptionists IS 'Hồ sơ subtype Receptionist; dùng chung user_id với users.';
+COMMENT ON TABLE public.coaches IS 'Hồ sơ Coach, mô tả và chứng chỉ; chuyên môn chuẩn ở coach_specializations.';
+COMMENT ON TABLE public.members IS 'Hồ sơ Member, mục tiêu/sức khỏe và trạng thái QR/booking block.';
+COMMENT ON TABLE public.subjects IS '9 môn chuẩn, giá 12 buổi Normal/12 credit Advanced và phân loại Outdoor.';
+COMMENT ON TABLE public.specializations IS 'Danh mục chuyên môn Coach liên kết với môn học.';
+COMMENT ON TABLE public.coach_specializations IS 'Liên kết nhiều-nhiều Coach và chuyên môn; khóa ghép.';
+COMMENT ON TABLE public.rooms IS '8 tài nguyên sân/phòng; Bóng rổ và Bóng chuyền dùng chung một room_id.';
+COMMENT ON TABLE public.classes IS 'Khóa Normal 12 buổi cố định và template Advanced theo môn.';
+COMMENT ON TABLE public.training_plans IS 'Kế hoạch đào tạo cho một lớp hoặc một Member.';
+COMMENT ON TABLE public.sessions IS 'Buổi học, tài nguyên, người học 1:1 và liên kết quyền học/buổi bù.';
+COMMENT ON TABLE public.training_results IS 'Kết quả chuyên môn và trạng thái attendance đồng bộ cho từng buổi/Member.';
+COMMENT ON TABLE public.attendances IS 'Lịch sử điểm danh từng buổi, người ghi và lý do; không trừ credit lần hai.';
+COMMENT ON TABLE public.evaluations IS 'Đánh giá tiến bộ Member của Coach theo ngày.';
+COMMENT ON TABLE public.class_feedbacks IS 'Phản hồi Member về lớp và Coach, mỗi Member một phản hồi/lớp.';
+COMMENT ON TABLE public.membership_packages IS 'Danh mục gói chung/legacy còn được API và chứng từ tham chiếu; không seed gói tháng/VIP.';
+COMMENT ON TABLE public.member_packages IS 'Quyền Advanced từng đăng ký: môn, Primary Coach, giá mua đóng băng, credit và hạn.';
+COMMENT ON TABLE public.class_enrollments IS 'Ghi danh/waitlist Normal, trạng thái thanh toán và lịch sử hủy/thăng hạng.';
+COMMENT ON TABLE public.holidays IS 'Ngày nghỉ trung tâm và phần thời gian đóng cửa thực tế đã xảy ra.';
+COMMENT ON TABLE public.invoices IS 'Chứng từ thu tiền bất biến, holding, đối soát và liên kết lớp/quyền học.';
+COMMENT ON TABLE public.support_requests IS 'Dự phòng: phiếu hỗ trợ Member có trạng thái và Receptionist phụ trách.';
+COMMENT ON TABLE public.notifications IS 'Thông báo nghiệp vụ và khóa chống gửi trùng theo sự kiện.';
+COMMENT ON TABLE public.notification_recipients IS 'Trạng thái đọc của từng người nhận thông báo.';
+COMMENT ON TABLE public.chat_conversations IS 'Hội thoại hỗ trợ Member với nhân viên/AI.';
+COMMENT ON TABLE public.chat_messages IS 'Nội dung hội thoại, người gửi và khóa chống gửi lặp.';
+COMMENT ON TABLE public.chat_read_state IS 'Con trỏ tin nhắn đã đọc của mỗi người trong hội thoại.';
+COMMENT ON TABLE public.ai_consultations IS 'Dự phòng: lịch sử yêu cầu và phản hồi tư vấn AI độc lập.';
+COMMENT ON TABLE public.system_logs IS 'Audit actor/hành động/đối tượng; giữ nguyên lịch sử khi nâng cấp.';
+COMMENT ON TABLE public.normal_class_requests IS 'UUID/hash yêu cầu tạo Normal để retry không sinh lớp/lịch lần hai.';
+COMMENT ON TABLE public.subscription_pauses IS 'Khoảng gián đoạn có căn cứ dùng khi tính hạn Advanced.';
+COMMENT ON TABLE public.coach_work_schedules IS 'Trạng thái nhận đăng ký mới của từng Coach.';
+COMMENT ON TABLE public.coach_work_slots IS 'Các ca làm việc theo thứ/ngày của Coach; khóa ghép.';
+COMMENT ON TABLE public.coach_days_off IS 'Ngày nghỉ riêng của Coach; khóa ghép.';
+COMMENT ON TABLE public.advanced_registrations IS 'Yêu cầu chọn môn/Primary Coach, quyết định nhận và liên kết subscription.';
+COMMENT ON TABLE public.session_absence_notices IS 'Báo vắng sát giờ và lịch sử supersede; không tự hoàn credit.';
+COMMENT ON TABLE public.session_changes IS 'Audit dời/thay buổi với snapshot trước/sau, consent và idempotency.';
+COMMENT ON TABLE public.center_incidents IS 'Hồ sơ sự cố trung tâm, evidence và kết quả bù/phục hồi.';
+COMMENT ON TABLE public.incident_affected_members IS 'Danh sách Member bị ảnh hưởng bởi một sự cố.';
+COMMENT ON TABLE public.payment_resolutions IS 'Hồ sơ Refund/CashCorrection, phê duyệt, chứng cứ và kết quả thực hiện.';
+COMMENT ON TABLE public.scms_data_migration_audit IS 'Dấu migration một lần; replay không ghi đè quyết định giá/quyền đã thay sau đó.';
+
+-- Synchronize every owned SERIAL/IDENTITY sequence, including tables with zero rows.
+-- Empty table => next ID 1. Nonempty table => next ID MAX(id)+1 (no per-role renumbering).
+DO $sequences$
+DECLARE r RECORD; top_id BIGINT; seq_name TEXT; seq_last BIGINT; seq_called BOOLEAN;
+BEGIN
+ FOR r IN SELECT table_name,column_name FROM information_schema.columns
+          WHERE table_schema='public' AND table_name=ANY(ARRAY['roles','permissions','role_permissions','centers','users','email_otps','center_managers','receptionists','coaches','members','subjects','specializations','coach_specializations','rooms','classes','training_plans','sessions','training_results','attendances','evaluations','class_feedbacks','membership_packages','member_packages','class_enrollments','holidays','invoices','support_requests','notifications','notification_recipients','chat_conversations','chat_messages','chat_read_state','ai_consultations','system_logs','normal_class_requests','subscription_pauses','coach_work_schedules','coach_work_slots','coach_days_off','advanced_registrations','session_absence_notices','session_changes','center_incidents','incident_affected_members','payment_resolutions','scms_data_migration_audit'])
+            AND (column_default LIKE 'nextval(%' OR is_identity='YES')
+          ORDER BY table_name,column_name LOOP
+  seq_name:=pg_get_serial_sequence(format('public.%I',r.table_name),r.column_name);
+  IF seq_name IS NOT NULL THEN
+   EXECUTE format('SELECT max(%I) FROM public.%I',r.column_name,r.table_name) INTO top_id;
+   EXECUTE format('SELECT last_value,is_called FROM %s',seq_name) INTO seq_last,seq_called;
+   IF current_setting('scms.rebuild',true)='true' OR top_id IS NOT NULL AND (seq_last<top_id OR seq_last=top_id AND NOT seq_called) THEN
+    PERFORM setval(seq_name,coalesce(top_id,1),top_id IS NOT NULL);
+   END IF;
+  END IF;
+ END LOOP;
+END $sequences$;
 -- Roles
 INSERT INTO roles (role_name, description) VALUES
 ('CenterManager', 'Quan ly trung tam - van hanh lop hoc, goi tap, bao cao'),
@@ -941,298 +1128,276 @@ FROM (VALUES
 ) AS defaults(role_name, permission_name)
 JOIN roles r ON UPPER(r.role_name) = UPPER(defaults.role_name)
 JOIN permissions p ON p.permission_name = defaults.permission_name
+WHERE NOT EXISTS(SELECT 1 FROM scms_data_migration_audit WHERE migration_key='20261029_catalog_accounts_v1')
 ON CONFLICT DO NOTHING;
 
--- =====================================================================
--- SEED DATA (Chuẩn hóa toàn diện SCMS - Demo & Production Ready)
--- Mật khẩu mặc định toàn hệ thống: Scms@2026
--- BCrypt hash (Cost = 10): $2a$10$QBctKpWoGbyJxKd43TNSPemf2xsDeVUugnAhEEfkZH6pLU8ncMqMi
--- =====================================================================
 
--- Users (28 tài khoản: 5 Role đại diện + 18 HLV 9 môn + 5 Hội viên theo kịch bản)
-INSERT INTO users (user_id, role_id, full_name, email, phone, password_hash, address, gender, date_of_birth, status, center_id) VALUES
--- 1. Tài khoản đại diện cốt lõi (5 Roles)
-(1,  (SELECT role_id FROM roles WHERE role_name = 'CenterManager'), 'Nguyễn Văn An',          'manager@scms.com',          '0901234501', '$2a$10$QBctKpWoGbyJxKd43TNSPemf2xsDeVUugnAhEEfkZH6pLU8ncMqMi', '12 Nguyễn Huệ, Quận 1, TP.HCM',          'Male',   '1985-03-12', 'Active', 1),
-(2,  (SELECT role_id FROM roles WHERE role_name = 'Receptionist'),  'Phạm Thị Thu',           'receptionist@scms.com',     '0901234502', '$2a$10$QBctKpWoGbyJxKd43TNSPemf2xsDeVUugnAhEEfkZH6pLU8ncMqMi', '45 Lê Lợi, Quận 1, TP.HCM',              'Female', '1998-04-22', 'Active', 1),
-(3,  (SELECT role_id FROM roles WHERE role_name = 'Coach'),         'Nguyễn Văn Hùng',        'coach@scms.com',            '0901234503', '$2a$10$QBctKpWoGbyJxKd43TNSPemf2xsDeVUugnAhEEfkZH6pLU8ncMqMi', '78 CMT8, Quận 3, TP.HCM',                'Male',   '1990-05-15', 'Active', 1),
-(4,  (SELECT role_id FROM roles WHERE role_name = 'Member'),        'Nguyễn Văn Thành',       'member@scms.com',           '0901234504', '$2a$10$QBctKpWoGbyJxKd43TNSPemf2xsDeVUugnAhEEfkZH6pLU8ncMqMi', '23 NTM Khai, Quận 1, TP.HCM',            'Male',   '1995-08-20', 'Active', 1),
-(5,  (SELECT role_id FROM roles WHERE role_name = 'Admin'),         'Admin Hệ Thống',         'admin@scms.com',            '0901234500', '$2a$10$QBctKpWoGbyJxKd43TNSPemf2xsDeVUugnAhEEfkZH6pLU8ncMqMi', 'Văn phòng Trung tâm, Q1, TP.HCM',        'Other',  '1980-01-01', 'Active', 1),
+-- The following IDs are reference-list ordinals, not assumptions about an upgraded DB.
+CREATE TEMP TABLE _scms_subjects(
+    ordinal INT PRIMARY KEY, name TEXT, slug TEXT, normal_price NUMERIC, advanced_price NUMERIC,
+    outdoor BOOLEAN, room_ordinal INT, coach_code TEXT
+) ON COMMIT DROP;
+INSERT INTO _scms_subjects VALUES
+(1, 'Tennis', 'quan-vot-tennis', 2500000, 8000000, TRUE, 1, 'tennis'),
+(2, 'Bơi lội', 'boi-loi', 1500000, 4500000, TRUE, 2, 'swimming'),
+(3, 'Pickleball', 'pickleball', 1800000, 5000000, FALSE, 3, 'pickleball'),
+(4, 'Bắn cung', 'ban-cung', 2000000, 6000000, TRUE, 4, 'archery'),
+(5, 'Bóng rổ', 'bong-ro', 1200000, 3500000, FALSE, 5, 'basketball'),
+(6, 'Bóng đá', 'bong-da', 1000000, 3500000, TRUE, 6, 'football'),
+(7, 'Bóng chuyền', 'bong-chuyen', 1000000, 3500000, FALSE, 5, 'volleyball'),
+(8, 'Cầu lông', 'cau-long', 900000, 3000000, FALSE, 7, 'badminton'),
+(9, 'Bóng bàn', 'bong-ban', 800000, 2500000, FALSE, 8, 'tabletennis');
 
--- 2. Lễ tân phụ trợ (Khớp mock frontend thu.reception@scms.com)
-(6,  (SELECT role_id FROM roles WHERE role_name = 'Receptionist'),  'Phạm Thị Thu (Ca Chiều)','thu.reception@scms.com',   '0901234506', '$2a$10$QBctKpWoGbyJxKd43TNSPemf2xsDeVUugnAhEEfkZH6pLU8ncMqMi', '56 Điện Biên Phủ, Bình Thạnh, TP.HCM',  'Female', '1998-04-22', 'Active', 1),
+CREATE TEMP TABLE _scms_rooms(ordinal INT PRIMARY KEY,name TEXT,location TEXT,capacity INT,facility_type TEXT) ON COMMIT DROP;
+INSERT INTO _scms_rooms VALUES
+(1, 'Sân Tennis 01', 'Khu Tennis ngoài trời', 4, 'Outdoor'),
+(2, 'Hồ bơi 01', 'Khu bơi ngoài trời', 20, 'Outdoor'),
+(3, 'Sân Pickleball 01', 'Khu Pickleball trong nhà', 12, 'Indoor'),
+(4, 'Khu Bắn cung 01', 'Khu Bắn cung ngoài trời', 10, 'Outdoor'),
+(5, 'Sân đa năng 01', 'Nhà thi đấu dùng chung Bóng rổ/Bóng chuyền', 30, 'Indoor'),
+(6, 'Sân Bóng đá 01', 'Khu Bóng đá ngoài trời', 30, 'Outdoor'),
+(7, 'Sân Cầu lông 01', 'Nhà thi đấu Cầu lông', 20, 'Indoor'),
+(8, 'Khu Bóng bàn 01', 'Khu Bóng bàn trong nhà', 15, 'Indoor');
 
--- 3. Đội ngũ HLV cho 9 bộ môn chuẩn (Mỗi môn 2 HLV: coach.<sport>@scms.com & coach.<sport>2@scms.com)
--- Môn 1: Bóng đá (Football - Outdoor)
-(7,  (SELECT role_id FROM roles WHERE role_name = 'Coach'), 'Lê Trần Phi',           'coach.football@scms.com',   '0901234507', '$2a$10$QBctKpWoGbyJxKd43TNSPemf2xsDeVUugnAhEEfkZH6pLU8ncMqMi', 'Sân bóng đá trung tâm',                 'Male',   '1988-11-20', 'Active', 1),
-(8,  (SELECT role_id FROM roles WHERE role_name = 'Coach'), 'Nguyễn Tuấn Vũ',        'coach.football2@scms.com',  '0901234508', '$2a$10$QBctKpWoGbyJxKd43TNSPemf2xsDeVUugnAhEEfkZH6pLU8ncMqMi', 'Sân bóng đá trung tâm',                 'Male',   '1992-06-14', 'Active', 1),
+CREATE TEMP TABLE _scms_room_aliases(ordinal INT,old_name TEXT) ON COMMIT DROP;
+INSERT INTO _scms_room_aliases VALUES
+(1, 'Sân Tennis ngoài trời 1'),
+(2, 'Hồ bơi ngoài trời tiêu chuẩn'),
+(3, 'Sân Pickleball có mái che'),
+(4, 'Trường bắn ngoài trời'),
+(5, 'Nhà thi đấu đa năng (Bóng rổ & Chuyền)'),
+(6, 'Sân cỏ ngoài trời (Bóng đá)'),
+(7, 'Nhà thi đấu Cầu lông (Sàn thảm)'),
+(8, 'Phòng Bóng bàn tiêu chuẩn');
 
--- Môn 2: Quần vợt (Tennis - Outdoor)
-(9,  (SELECT role_id FROM roles WHERE role_name = 'Coach'), 'Huỳnh Diễm My',         'coach.tennis@scms.com',     '0901234509', '$2a$10$QBctKpWoGbyJxKd43TNSPemf2xsDeVUugnAhEEfkZH6pLU8ncMqMi', 'Khu sân Tennis ngoài trời',              'Female', '1993-09-12', 'Active', 1),
-(10, (SELECT role_id FROM roles WHERE role_name = 'Coach'), 'Trần Quốc Bảo',         'coach.tennis2@scms.com',    '0901234510', '$2a$10$QBctKpWoGbyJxKd43TNSPemf2xsDeVUugnAhEEfkZH6pLU8ncMqMi', 'Khu sân Tennis ngoài trời',              'Male',   '1989-03-25', 'Active', 1),
+CREATE TEMP TABLE _scms_accounts(ordinal INT PRIMARY KEY,role_name TEXT,name TEXT,email TEXT,phone TEXT,address TEXT,gender TEXT,birth DATE) ON COMMIT DROP;
+INSERT INTO _scms_accounts VALUES
+(1, 'Admin', 'Admin Account', 'admin@gmail.com', '0905000101', 'Văn phòng Trung tâm, Q1, TP.HCM', 'Male', '1985-08-12'),
+(2, 'Member', 'Nguyễn Minh An', 'an@gmail.com', '0901000101', 'Quận 1, TP.HCM', 'Male', '2003-05-12'),
+(3, 'Member', 'Trần Bảo Linh', 'linh@gmail.com', '0901000102', 'Quận 3, TP.HCM', 'Female', '2002-08-21'),
+(4, 'Member', 'Lê Gia Huy', 'huy@gmail.com', '0901000103', 'Quận 7, TP.HCM', 'Male', '2004-02-15'),
+(5, 'Member', 'Phạm Ngọc Mai', 'mai@gmail.com', '0901000104', 'Bình Thạnh, TP.HCM', 'Female', '2001-11-09'),
+(6, 'Member', 'Võ Đức Khang', 'khang@gmail.com', '0901000105', 'TP. Thủ Đức, TP.HCM', 'Male', '2003-07-24'),
+(7, 'Member', 'Đặng Thảo Vy', 'vy@gmail.com', '0901000106', 'Tân Bình, TP.HCM', 'Female', '2004-04-18'),
+(8, 'Member', 'Bùi Quốc Bảo', 'bao@gmail.com', '0901000107', 'Quận 10, TP.HCM', 'Male', '2002-12-03'),
+(9, 'Member', 'Hồ Khánh Nhi', 'nhi@gmail.com', '0901000108', 'Phú Nhuận, TP.HCM', 'Female', '2005-06-27'),
+(10, 'Member', 'Đỗ Tuấn Kiệt', 'kiet@gmail.com', '0901000109', 'Quận 11, TP.HCM', 'Male', '2001-09-14'),
+(11, 'Member', 'Phan Thu Hà', 'ha@gmail.com', '0901000110', 'Gò Vấp, TP.HCM', 'Female', '2003-03-30'),
+(12, 'Coach', 'Nguyễn Hoàng Quân', 'coach.tennis1@gmail.com', '0902000101', 'Quận 1, TP.HCM', 'Male', '1990-03-15'),
+(13, 'Coach', 'Huỳnh Diễm My', 'coach.tennis2@gmail.com', '0902000102', 'Quận 3, TP.HCM', 'Female', '1992-07-22'),
+(14, 'Coach', 'Lê Minh Duy', 'coach.swimming1@gmail.com', '0902000103', 'Quận 7, TP.HCM', 'Male', '1989-11-08'),
+(15, 'Coach', 'Lê Phương Anh', 'coach.swimming2@gmail.com', '0902000104', 'Bình Thạnh, TP.HCM', 'Female', '1993-05-17'),
+(16, 'Coach', 'Võ Thanh Long', 'coach.pickleball1@gmail.com', '0902000105', 'TP. Thủ Đức, TP.HCM', 'Male', '1994-09-26'),
+(17, 'Coach', 'Phạm Thị Lan', 'coach.pickleball2@gmail.com', '0902000106', 'Tân Bình, TP.HCM', 'Female', '1995-02-12'),
+(18, 'Coach', 'Lê Nguyễn Thiên Phúc', 'coach.archery1@gmail.com', '0902000107', 'Quận 10, TP.HCM', 'Male', '1991-12-04'),
+(19, 'Coach', 'Hồ Thảo My', 'coach.archery2@gmail.com', '0902000108', 'Phú Nhuận, TP.HCM', 'Female', '1996-06-19'),
+(20, 'Coach', 'Trần Anh Dũng', 'coach.basketball1@gmail.com', '0902000109', 'Quận 11, TP.HCM', 'Male', '1988-01-30'),
+(21, 'Coach', 'Phan Kim Ngân', 'coach.basketball2@gmail.com', '0902000110', 'Gò Vấp, TP.HCM', 'Female', '1992-08-14'),
+(22, 'Coach', 'Lê Trần Phi', 'coach.football1@gmail.com', '0902000111', 'Quận 12, TP.HCM', 'Male', '1987-04-25'),
+(23, 'Coach', 'Trần Ngọc Yến', 'coach.football2@gmail.com', '0902000112', 'Quận 6, TP.HCM', 'Female', '1993-10-09'),
+(24, 'Coach', 'Nguyễn Văn Hoàng', 'coach.volleyball1@gmail.com', '0902000113', 'Quận 5, TP.HCM', 'Male', '1989-02-21'),
+(25, 'Coach', 'Phạm Thanh Thư', 'coach.volleyball2@gmail.com', '0902000114', 'Quận 8, TP.HCM', 'Female', '1995-07-07'),
+(26, 'Coach', 'Võ Minh Đức', 'coach.badminton1@gmail.com', '0902000115', 'Quận 4, TP.HCM', 'Male', '1990-09-18'),
+(27, 'Coach', 'Trần Thị Hương', 'coach.badminton2@gmail.com', '0902000116', 'Tân Phú, TP.HCM', 'Female', '1996-01-11'),
+(28, 'Coach', 'Lê Minh Khoa', 'coach.tabletennis1@gmail.com', '0902000117', 'Bình Tân, TP.HCM', 'Male', '1988-05-23'),
+(29, 'Coach', 'Hồ Bích Oanh', 'coach.tabletennis2@gmail.com', '0902000118', 'Quận 3, TP.HCM', 'Female', '1994-12-16'),
+(30, 'Receptionist', 'Nguyễn Thị Ngọc Anh', 'receptionist1@gmail.com', '0903000101', 'Bình Thạnh, TP.HCM', 'Female', '1998-06-14'),
+(31, 'Receptionist', 'Trần Minh Khôi', 'receptionist2@gmail.com', '0903000102', 'TP. Thủ Đức, TP.HCM', 'Male', '1997-09-22'),
+(32, 'CenterManager', 'Nguyễn Thành Đạt', 'manager1@gmail.com', '0904000101', 'Quận 7, TP.HCM', 'Male', '1988-04-18'),
+(33, 'CenterManager', 'Trần Ngọc Diệp', 'manager2@gmail.com', '0904000102', 'Quận 3, TP.HCM', 'Female', '1990-09-25');
 
--- Môn 3: Bơi lội (Swimming - Outdoor)
-(11, (SELECT role_id FROM roles WHERE role_name = 'Coach'), 'Lê Phương Anh',         'coach.swimming@scms.com',   '0901234511', '$2a$10$QBctKpWoGbyJxKd43TNSPemf2xsDeVUugnAhEEfkZH6pLU8ncMqMi', 'Khu thể thao dưới nước',                'Female', '1995-07-08', 'Active', 1),
-(12, (SELECT role_id FROM roles WHERE role_name = 'Coach'), 'Đỗ Hải Đăng',           'coach.swimming2@scms.com',  '0901234512', '$2a$10$QBctKpWoGbyJxKd43TNSPemf2xsDeVUugnAhEEfkZH6pLU8ncMqMi', 'Khu thể thao dưới nước',                'Male',   '1991-12-30', 'Active', 1),
+-- The one-time root pass may add catalog/identity rows but never rewrite transaction rows.
+-- PDF identities are matched by EMAIL and role; names never identify an old account.
+DO $identities$
+DECLARE a RECORD; u RECORD; new_id INT; n INT; rebuild BOOLEAN:=current_setting('scms.rebuild',true)='true';
+BEGIN
+ IF NOT rebuild AND EXISTS(SELECT 1 FROM scms_data_migration_audit WHERE migration_key='20261029_catalog_accounts_v1') THEN RETURN; END IF;
+ FOR a IN SELECT * FROM _scms_accounts ORDER BY ordinal LOOP
+  IF (SELECT count(*) FROM users WHERE lower(email)=a.email)>1 THEN RAISE EXCEPTION 'PDF email % has multiple case-insensitive matches; reconcile identities first',a.email; END IF;
+  SELECT x.user_id,r.role_name INTO u FROM users x JOIN roles r ON r.role_id=x.role_id WHERE lower(x.email)=a.email;
+  IF FOUND THEN
+   IF u.role_name<>a.role_name THEN RAISE EXCEPTION 'PDF email % belongs to another role; reconcile identity instead of reusing an ID',a.email; END IF;
+   UPDATE users SET full_name=a.name,phone=a.phone,address=a.address,gender=a.gender,date_of_birth=a.birth,
+      status='Active',center_id=CASE WHEN a.role_name='Admin' THEN NULL ELSE 1 END WHERE user_id=u.user_id;
+   new_id:=u.user_id;
+  ELSE
+   IF rebuild THEN
+    INSERT INTO users(user_id,role_id,full_name,email,phone,password_hash,address,gender,date_of_birth,status,center_id,is_first_login)
+    SELECT a.ordinal,role_id,a.name,a.email,a.phone,crypt('SWP391',gen_salt('bf',10)),a.address,a.gender,a.birth,'Active',CASE WHEN a.role_name='Admin' THEN NULL ELSE 1 END,FALSE FROM roles WHERE role_name=a.role_name
+    RETURNING user_id INTO new_id;
+   ELSE
+    INSERT INTO users(role_id,full_name,email,phone,password_hash,address,gender,date_of_birth,status,center_id,is_first_login)
+    SELECT role_id,a.name,a.email,a.phone,crypt('SWP391',gen_salt('bf',10)),a.address,a.gender,a.birth,'Active',CASE WHEN a.role_name='Admin' THEN NULL ELSE 1 END,FALSE FROM roles WHERE role_name=a.role_name
+    RETURNING user_id INTO new_id;
+   END IF;
+  END IF;
+  IF a.role_name='CenterManager' THEN INSERT INTO center_managers VALUES(new_id) ON CONFLICT DO NOTHING;
+  ELSIF a.role_name='Receptionist' THEN INSERT INTO receptionists VALUES(new_id) ON CONFLICT DO NOTHING;
+  ELSIF a.role_name='Coach' THEN INSERT INTO coaches(user_id) VALUES(new_id) ON CONFLICT DO NOTHING;
+  ELSIF a.role_name='Member' THEN INSERT INTO members(user_id,goal,join_date,registered_by) VALUES(new_id,NULL,(CURRENT_DATE-30),NULL) ON CONFLICT DO NOTHING;
+  END IF;
+ END LOOP;
+ UPDATE users SET status='Inactive' WHERE lower(email) NOT IN(SELECT email FROM _scms_accounts);
+ FOR a IN SELECT * FROM _scms_subjects ORDER BY ordinal LOOP
+  SELECT count(*) INTO n FROM subjects WHERE slug=a.slug;
+  IF n=0 THEN
+   IF rebuild THEN
+    INSERT INTO subjects(subject_id,subject_name,slug,normal_price,advanced_price,outdoor,status) VALUES(a.ordinal,a.name,a.slug,a.normal_price,a.advanced_price,a.outdoor,'Active');
+   ELSE
+    INSERT INTO subjects(subject_name,slug,normal_price,advanced_price,outdoor,status) VALUES(a.name,a.slug,a.normal_price,a.advanced_price,a.outdoor,'Active');
+   END IF;
+  ELSE
+   UPDATE subjects SET subject_name=a.name,normal_price=a.normal_price,advanced_price=a.advanced_price,outdoor=a.outdoor,status='Active' WHERE slug=a.slug;
+  END IF;
+ END LOOP;
+END $identities$;
 
--- Môn 4: Bắn cung (Archery - Outdoor)
-(13, (SELECT role_id FROM roles WHERE role_name = 'Coach'), 'Lê Nguyễn Thiên Phúc',  'coach.archery@scms.com',    '0901234513', '$2a$10$QBctKpWoGbyJxKd43TNSPemf2xsDeVUugnAhEEfkZH6pLU8ncMqMi', 'Trường bắn ngoài trời',                  'Male',   '1994-04-18', 'Active', 1),
-(14, (SELECT role_id FROM roles WHERE role_name = 'Coach'), 'Hoàng Minh Tâm',        'coach.archery2@scms.com',   '0901234514', '$2a$10$QBctKpWoGbyJxKd43TNSPemf2xsDeVUugnAhEEfkZH6pLU8ncMqMi', 'Trường bắn ngoài trời',                  'Male',   '1990-10-05', 'Active', 1),
-
--- Môn 5: Cầu lông (Badminton - Indoor)
-(15, (SELECT role_id FROM roles WHERE role_name = 'Coach'), 'Trần Thị Hương',        'coach.badminton@scms.com',  '0901234515', '$2a$10$QBctKpWoGbyJxKd43TNSPemf2xsDeVUugnAhEEfkZH6pLU8ncMqMi', 'Nhà thi đấu Cầu lông',                  'Female', '1992-07-20', 'Active', 1),
-(16, (SELECT role_id FROM roles WHERE role_name = 'Coach'), 'Lê Minh Khang',         'coach.badminton2@scms.com', '0901234516', '$2a$10$QBctKpWoGbyJxKd43TNSPemf2xsDeVUugnAhEEfkZH6pLU8ncMqMi', 'Nhà thi đấu Cầu lông',                  'Male',   '1996-01-22', 'Active', 1),
-
--- Môn 6: Bóng bàn (Table Tennis - Indoor)
-(17, (SELECT role_id FROM roles WHERE role_name = 'Coach'), 'Lê Minh Khoa',          'coach.tabletennis@scms.com','0901234517', '$2a$10$QBctKpWoGbyJxKd43TNSPemf2xsDeVUugnAhEEfkZH6pLU8ncMqMi', 'Phòng Bóng bàn tiêu chuẩn',              'Male',   '1990-01-15', 'Active', 1),
-(18, (SELECT role_id FROM roles WHERE role_name = 'Coach'), 'Nguyễn Đức Trí',        'coach.tabletennis2@scms.com','0901234518','$2a$10$QBctKpWoGbyJxKd43TNSPemf2xsDeVUugnAhEEfkZH6pLU8ncMqMi', 'Phòng Bóng bàn tiêu chuẩn',              'Male',   '1993-08-19', 'Active', 1),
-
--- Môn 7: Bóng rổ (Basketball - Indoor)
-(19, (SELECT role_id FROM roles WHERE role_name = 'Coach'), 'Trần Anh Dũng',         'coach.basketball@scms.com', '0901234519', '$2a$10$QBctKpWoGbyJxKd43TNSPemf2xsDeVUugnAhEEfkZH6pLU8ncMqMi', 'Nhà thi đấu đa năng',                    'Male',   '1987-05-11', 'Active', 1),
-(20, (SELECT role_id FROM roles WHERE role_name = 'Coach'), 'Phan Hoàng Nam',        'coach.basketball2@scms.com','0901234520', '$2a$10$QBctKpWoGbyJxKd43TNSPemf2xsDeVUugnAhEEfkZH6pLU8ncMqMi', 'Nhà thi đấu đa năng',                    'Male',   '1994-09-02', 'Active', 1),
-
--- Môn 8: Bóng chuyền (Volleyball - Indoor)
-(21, (SELECT role_id FROM roles WHERE role_name = 'Coach'), 'Nguyễn Văn Hoàng',      'coach.volleyball@scms.com', '0901234521', '$2a$10$QBctKpWoGbyJxKd43TNSPemf2xsDeVUugnAhEEfkZH6pLU8ncMqMi', 'Nhà thi đấu đa năng',                    'Male',   '1989-12-10', 'Active', 1),
-(22, (SELECT role_id FROM roles WHERE role_name = 'Coach'), 'Đặng Tuấn Anh',         'coach.volleyball2@scms.com','0901234522', '$2a$10$QBctKpWoGbyJxKd43TNSPemf2xsDeVUugnAhEEfkZH6pLU8ncMqMi', 'Nhà thi đấu đa năng',                    'Male',   '1995-03-17', 'Active', 1),
-
--- Môn 9: Pickleball (Indoor)
-(23, (SELECT role_id FROM roles WHERE role_name = 'Coach'), 'Phan Thị Lan',          'coach.pickleball@scms.com', '0901234523', '$2a$10$QBctKpWoGbyJxKd43TNSPemf2xsDeVUugnAhEEfkZH6pLU8ncMqMi', 'Sân Pickleball có mái che',              'Female', '1994-11-05', 'Active', 1),
-(24, (SELECT role_id FROM roles WHERE role_name = 'Coach'), 'Vũ Thị Thảo',           'coach.pickleball2@scms.com','0901234524', '$2a$10$QBctKpWoGbyJxKd43TNSPemf2xsDeVUugnAhEEfkZH6pLU8ncMqMi', 'Sân Pickleball có mái che',              'Female', '1997-04-28', 'Active', 1),
-
--- 4. Hội viên đại diện theo các kịch bản demo
-(25, (SELECT role_id FROM roles WHERE role_name = 'Member'), 'Hoàng Thị Oanh',        'member.normal@scms.com',    '0901234525', '$2a$10$QBctKpWoGbyJxKd43TNSPemf2xsDeVUugnAhEEfkZH6pLU8ncMqMi', '12 Trần Hưng Đạo, Q5, TP.HCM',       'Female', '1996-06-18', 'Active', 1),
-(26, (SELECT role_id FROM roles WHERE role_name = 'Member'), 'Bùi Văn Phúc',          'member.new@scms.com',       '0901234526', '$2a$10$QBctKpWoGbyJxKd43TNSPemf2xsDeVUugnAhEEfkZH6pLU8ncMqMi', '34 Nguyễn Trãi, Q5, TP.HCM',         'Male',   '1993-02-27', 'Active', 1),
-(27, (SELECT role_id FROM roles WHERE role_name = 'Member'), 'Đặng Văn Sơn',          'member.expired@scms.com',   '0901234527', '$2a$10$QBctKpWoGbyJxKd43TNSPemf2xsDeVUugnAhEEfkZH6pLU8ncMqMi', '90 Ba Tháng Hai, Q10, TP.HCM',       'Male',   '1988-08-08', 'Active', 1),
-(28, (SELECT role_id FROM roles WHERE role_name = 'Member'), 'Ngô Thị Quyên',         'member.active2@scms.com',   '0901234528', '$2a$10$QBctKpWoGbyJxKd43TNSPemf2xsDeVUugnAhEEfkZH6pLU8ncMqMi', '67 Lý Thường Kiệt, Q10, TP.HCM',     'Female', '1999-12-01', 'Active', 1)
-ON CONFLICT (email) DO UPDATE SET password_hash = EXCLUDED.password_hash;
-
-SELECT setval(pg_get_serial_sequence('users', 'user_id'),
-              GREATEST((SELECT COALESCE(MAX(user_id), 1) FROM users), 1));
-
--- Subtypes phân quyền
-INSERT INTO center_managers (user_id) VALUES (1) ON CONFLICT (user_id) DO NOTHING;
-INSERT INTO receptionists   (user_id) VALUES (2), (6) ON CONFLICT (user_id) DO NOTHING;
-
-INSERT INTO coaches (user_id, specialization, certification, bio) VALUES
-(3,  'Fitness, Thể hình, Cầu lông', 'NASM-CPT',         'Hơn 8 năm kinh nghiệm huấn luyện thể hình và thể lực tổng quát.'),
-(7,  'Bóng đá',                     'AFC Pro Diploma',  'Cựu trợ lý HLV CLB V-League, chuyên chiến thuật và thể lực bóng đá.'),
-(8,  'Bóng đá',                     'AFC B Certificate','Cựu cầu thủ chuyên nghiệp, đào tạo bóng đá trẻ và kỹ năng căn bản.'),
-(9,  'Quần vợt (Tennis)',           'ITF Level 2',      'Hơn 6 năm đào tạo quần vợt phong trào và bán chuyên.'),
-(10, 'Quần vợt (Tennis)',           'ITF Level 1',      'Vận động viên thi đấu quốc gia, kỹ thuật giao bóng và bộ chân hiện đại.'),
-(11, 'Bơi lội',                     'FINA Coach L2',    'Kiện tướng bơi lội, chuyên kỹ thuật 4 kiểu bơi và bơi sinh tồn.'),
-(12, 'Bơi lội',                     'Cứu hộ & Bơi L1',  'Kinh nghiệm 5 năm dạy bơi trẻ em và người lớn sợ nước.'),
-(13, 'Bắn cung',                    'Kiện tướng QG',    'Vận động viên bắn cung quốc gia, chuyên cung 1 dây và cung 3 dây.'),
-(14, 'Bắn cung',                    'HLV Cấp 1',        'Đào tạo tư thế căn bản, rèn luyện sự tập trung và kiểm soát hơi thở.'),
-(15, 'Cầu lông',                    'BWF Level 2',      'Hơn 7 năm giảng dạy cầu lông, đào tạo phản xạ và kỹ thuật đập cầu.'),
-(16, 'Cầu lông',                    'BWF Level 1',      'Cựu VĐV đội tuyển trẻ TP.HCM, phong cách năng động nhiệt tình.'),
-(17, 'Bóng bàn',                    'ITTF Level 2',     'Chuyên kỹ thuật xoáy và phản xạ nhịp độ cao trong bóng bàn hiện đại.'),
-(18, 'Bóng bàn',                    'Kiện tướng BB',    'Kinh nghiệm huấn luyện đội tuyển trường đại học.'),
-(19, 'Bóng rổ',                     'FIBA Coach L1',    'Đào tạo ném rổ, chiến thuật chạy bài 5x5 và 3x3.'),
-(20, 'Bóng rổ',                     'VBA Veteran',      'Cựu VĐV giải bóng rổ chuyên nghiệp VBA.'),
-(21, 'Bóng chuyền',                 'FIVB Level 1',     'Chuyên kỹ thuật đệm bóng, phát bóng tấn công và chắn bóng trên lưới.'),
-(22, 'Bóng chuyền',                 'HLV Thể lực BC',   'Tập trung phát triển sức bật và phối hợp chiến thuật đồng đội.'),
-(23, 'Pickleball',                  'IPTPA Level 2',    'Huấn luyện viên Pickleball chuẩn quốc tế, kỹ thuật dink và third shot drop.'),
-(24, 'Pickleball',                  'PPR Certified',    'Đào tạo luật chơi, chiến thuật đôi và phản xạ lưới Pickleball.')
-ON CONFLICT (user_id) DO UPDATE SET
-    specialization = EXCLUDED.specialization,
-    certification  = EXCLUDED.certification,
-    bio            = EXCLUDED.bio;
-
-INSERT INTO specializations(name, status)
-SELECT DISTINCT trim(value), 'Active'
-FROM coaches c
-CROSS JOIN LATERAL regexp_split_to_table(c.specialization, '[,;]') AS value
-WHERE c.specialization IS NOT NULL AND trim(value) <> ''
-ON CONFLICT (name) DO NOTHING;
-
-INSERT INTO coach_specializations(coach_id, specialization_id)
-SELECT c.user_id, s.specialization_id
-FROM coaches c
-CROSS JOIN LATERAL regexp_split_to_table(c.specialization, '[,;]') AS value
-JOIN specializations s ON lower(s.name) = lower(trim(value))
-WHERE c.specialization IS NOT NULL AND trim(value) <> ''
-ON CONFLICT DO NOTHING;
-
-INSERT INTO members (user_id, goal, health_note, join_date, registered_by) VALUES
-(4,  'Tập luyện nâng cao 1:1, cải thiện thể lực toàn diện', NULL, '2026-08-01', 2),
-(25, 'Rèn luyện phản xạ, giảm căng thẳng qua môn Cầu lông', NULL, '2026-08-15', 2),
-(26, 'Làm quen môi trường thể thao, đăng ký môn mới', NULL, CURRENT_DATE, 2),
-(27, 'Hồi phục thể lực sau chấn thương nhẹ', 'Cần khởi động kỹ khớp gối', '2026-06-01', 2),
-(28, 'Yêu thích Pickleball, muốn thi đấu phong trào', NULL, '2026-09-01', 6)
-ON CONFLICT (user_id) DO UPDATE SET
-    goal = EXCLUDED.goal,
-    health_note = EXCLUDED.health_note;
-
--- Bảng giá chuẩn 9 môn thể thao Member.pdf & 01-API-CONTRACT-FE-BE.md
-INSERT INTO subjects (subject_name, description, normal_price, advanced_price, status, slug) VALUES
-('Bóng đá',            'Môn thể thao vua ngoài trời, rèn luyện thể lực và phối hợp',         1000000, 3500000, 'Active', 'bong-da'),
-('Quần vợt (Tennis)',  'Môn thể thao ngoài trời, rèn luyện phản xạ và thể lực',             2500000, 8000000, 'Active', 'quan-vot-tennis'),
-('Bơi lội',            'Môn thể thao dưới nước ngoài trời, phát triển toàn diện cơ thể',     1500000, 4500000, 'Active', 'boi-loi'),
-('Bắn cung',           'Môn ngoài trời, rèn luyện sự tập trung cao độ và tính kiên nhẫn',   2000000, 6000000, 'Active', 'ban-cung'),
-('Cầu lông',           'Môn thể thao nhanh nhẹn, linh hoạt trong nhà',                        900000, 3000000, 'Active', 'cau-long'),
-('Bóng bàn',           'Phản xạ nhanh, khéo léo với nhịp độ cao trong nhà',                   800000, 2500000, 'Active', 'bong-ban'),
-('Bóng rổ',            'Môn thể thao đồng đội tốc độ và sức bật trong nhà',                  1200000, 3500000, 'Active', 'bong-ro'),
-('Bóng chuyền',        'Phối hợp đồng đội và kỹ thuật phản xạ trên lưới trong nhà',          1000000, 3500000, 'Active', 'bong-chuyen'),
-('Pickleball',         'Môn thể thao thời thượng trong nhà, kết hợp tennis, bóng bàn',       1800000, 5000000, 'Active', 'pickleball')
-ON CONFLICT (slug) DO NOTHING;
-
-INSERT INTO rooms (room_name, location, capacity, status, facility_type, center_id) VALUES
-('Sân cỏ ngoài trời (Bóng đá)',    'Khu sân bóng đá cỏ nhân tạo',   30, 'Available', 'Outdoor', 1),
-('Sân Tennis ngoài trời 1',        'Khu thể thao ngoài trời',        4, 'Available', 'Outdoor', 1),
-('Hồ bơi ngoài trời tiêu chuẩn',   'Khu thể thao dưới nước',        20, 'Available', 'Outdoor', 1),
-('Trường bắn ngoài trời',          'Khu vực an toàn ngoài trời',    10, 'Available', 'Outdoor', 1),
-('Nhà thi đấu Cầu lông (Sàn thảm)','Tầng 1 Nhà thi đấu',            20, 'Available', 'Indoor',  1),
-('Phòng Bóng bàn tiêu chuẩn',      'Tầng 2 Khu trong nhà',          15, 'Available', 'Indoor',  1),
-('Nhà thi đấu đa năng (Bóng rổ & Chuyền)', 'Tầng 1 Nhà thi đấu lớn', 30, 'Available', 'Indoor',  1),
-('Sân Pickleball có mái che',      'Khu liên hợp thể thao',         12, 'Available', 'Indoor',  1)
-ON CONFLICT DO NOTHING;
-
--- Gói hội viên
-INSERT INTO membership_packages (package_id, package_name, price, duration_days, benefits, package_type, total_credit) VALUES
-(1, 'Gói Cơ Bản 1 Tháng',                   500000,   30,  'Tập tự do không giới hạn khung giờ, không kèm HLV', 'Normal', 12),
-(2, 'Gói Tiêu Chuẩn 3 Tháng',               1350000,  90,  'Tập tự do + tham gia tối đa 2 lớp nhóm/tuần', 'Normal', 12),
-(3, 'Gói Cao Cấp 6 Tháng',                  2500000,  180, 'Toàn quyền sử dụng tiện ích + tặng 2 buổi PT riêng/tháng', 'Normal', 12),
-(4, 'Gói VIP 12 Tháng',                     4800000,  365, 'Thẻ hội viên VIP 1 năm toàn hệ thống SCMS', 'Normal', 12),
-(5, 'Gói Khóa Học 1:1 (12 Buổi Linh Hoạt)', 3500000,  45,  '12 Credit đặt lịch linh hoạt 1:1 với HLV trong 45 ngày', 'Advanced', 12)
-ON CONFLICT (package_id) DO UPDATE SET
-    package_name = EXCLUDED.package_name,
-    price = EXCLUDED.price,
-    duration_days = EXCLUDED.duration_days,
-    package_type = EXCLUDED.package_type,
-    total_credit = EXCLUDED.total_credit;
-
-SELECT setval(pg_get_serial_sequence('membership_packages', 'package_id'),
-              GREATEST((SELECT COALESCE(MAX(package_id), 1) FROM membership_packages), 1));
-
-INSERT INTO member_packages (member_id, package_id, start_date, end_date, remaining_credit, validity_days, status) VALUES
-(4,  5, CURRENT_DATE, CURRENT_DATE + INTERVAL '45 days', 12, 45, 'Active'),
-(27, 5, CURRENT_DATE - INTERVAL '60 days', CURRENT_DATE - INTERVAL '15 days', 0, 45, 'Expired'),
-(28, 2, '2026-09-01', '2026-11-30', 0, 90, 'Active')
-ON CONFLICT DO NOTHING;
-
--- Lớp học mẫu
-ALTER TABLE classes DISABLE TRIGGER trg_classes_validate;
-
-INSERT INTO classes (class_name, subject_id, coach_id, max_capacity, tuition_fee, start_date, end_date, status, class_type, total_sessions, center_id)
-SELECT 'Lớp Cầu Lông Cơ Bản (K1)', s.subject_id, 15, 15, s.normal_price, CURRENT_DATE, CURRENT_DATE + INTERVAL '40 days', 'Ongoing', 'Normal', 12, 1
-FROM subjects s WHERE s.slug = 'cau-long'
-UNION ALL
-SELECT 'Lớp Quần Vợt Phong Trào', s.subject_id, 9, 15, s.normal_price, CURRENT_DATE, CURRENT_DATE + INTERVAL '40 days', 'Ongoing', 'Normal', 12, 1
-FROM subjects s WHERE s.slug = 'quan-vot-tennis'
-UNION ALL
-SELECT 'Lớp Bơi Lội Căn Bản', s.subject_id, 11, 15, s.normal_price, CURRENT_DATE, CURRENT_DATE + INTERVAL '40 days', 'Open', 'Normal', 12, 1
-FROM subjects s WHERE s.slug = 'boi-loi'
-UNION ALL
-SELECT 'Lớp Pickleball Nhập Môn', s.subject_id, 23, 15, s.normal_price, CURRENT_DATE, CURRENT_DATE + INTERVAL '40 days', 'Ongoing', 'Normal', 12, 1
-FROM subjects s WHERE s.slug = 'pickleball'
-UNION ALL
-SELECT 'Lớp Bóng Đá Căn Bản', s.subject_id, 7, 15, s.normal_price, CURRENT_DATE, CURRENT_DATE + INTERVAL '40 days', 'Open', 'Normal', 12, 1
-FROM subjects s WHERE s.slug = 'bong-da'
-UNION ALL
-SELECT 'Lớp Bóng Bàn Căn Bản', s.subject_id, 17, 15, s.normal_price, CURRENT_DATE, CURRENT_DATE + INTERVAL '40 days', 'Open', 'Normal', 12, 1
-FROM subjects s WHERE s.slug = 'bong-ban'
-ON CONFLICT DO NOTHING;
-
-ALTER TABLE classes ENABLE TRIGGER trg_classes_validate;
-
--- Ghi danh học viên
-INSERT INTO class_enrollments (member_id, class_id, status)
-SELECT 25, c.class_id, 'Registered'
-FROM classes c WHERE c.class_name = 'Lớp Cầu Lông Cơ Bản (K1)'
-ON CONFLICT DO NOTHING;
-
-INSERT INTO class_enrollments (member_id, class_id, status)
-SELECT 28, c.class_id, 'Registered'
-FROM classes c WHERE c.class_name = 'Lớp Pickleball Nhập Môn'
-ON CONFLICT DO NOTHING;
-
--- Buổi học mẫu
-ALTER TABLE sessions DISABLE TRIGGER trg_sessions_validate;
-
-INSERT INTO sessions (class_id, room_id, session_date, start_time, end_time, status)
-SELECT c.class_id, r.room_id, CURRENT_DATE + INTERVAL '1 day', '07:45:00', '09:15:00', 'Scheduled'
-FROM classes c, rooms r
-WHERE c.class_name = 'Lớp Cầu Lông Cơ Bản (K1)' AND r.room_name = 'Nhà thi đấu Cầu lông (Sàn thảm)'
-LIMIT 1;
-
-INSERT INTO sessions (class_id, room_id, session_date, start_time, end_time, status)
-SELECT c.class_id, r.room_id, CURRENT_DATE + INTERVAL '3 days', '07:45:00', '09:15:00', 'Scheduled'
-FROM classes c, rooms r
-WHERE c.class_name = 'Lớp Cầu Lông Cơ Bản (K1)' AND r.room_name = 'Nhà thi đấu Cầu lông (Sàn thảm)'
-LIMIT 1;
-
-ALTER TABLE sessions ENABLE TRIGGER trg_sessions_validate;
-
--- Hóa đơn mẫu
-INSERT INTO invoices (member_id, package_id, receptionist_id, amount, payment_method, payment_status, payment_date, gateway_transaction_ref) VALUES
-(4,  5, 2, 3500000, 'VNPay',        'Paid',    CURRENT_TIMESTAMP, 'VNPAY-TXN-20261001'),
-(28, 2, 2, 1350000, 'BankTransfer', 'Paid',    CURRENT_TIMESTAMP - INTERVAL '15 days', 'BANK-TXN-20261002'),
-(26, 1, 2, 500000,  NULL,           'Pending', NULL,              NULL)
-ON CONFLICT DO NOTHING;
-
-INSERT INTO invoices (member_id, class_id, receptionist_id, amount, payment_method, payment_status, payment_date, gateway_transaction_ref)
-SELECT 25, c.class_id, 2, c.tuition_fee, 'Cash', 'Paid', CURRENT_TIMESTAMP - INTERVAL '5 days', NULL
-FROM classes c WHERE c.class_name = 'Lớp Cầu Lông Cơ Bản (K1)'
-ON CONFLICT DO NOTHING;
-
--- Đồng bộ sequence
-SELECT setval(pg_get_serial_sequence('classes', 'class_id'), GREATEST((SELECT COALESCE(MAX(class_id), 1) FROM classes), 1));
-SELECT setval(pg_get_serial_sequence('sessions', 'session_id'), GREATEST((SELECT COALESCE(MAX(session_id), 1) FROM sessions), 1));
-SELECT setval(pg_get_serial_sequence('invoices', 'invoice_id'), GREATEST((SELECT COALESCE(MAX(invoice_id), 1) FROM invoices), 1));
-SELECT setval(pg_get_serial_sequence('member_packages', 'subscription_id'), GREATEST((SELECT COALESCE(MAX(subscription_id), 1) FROM member_packages), 1));
+-- Owner correction for the earlier random-password seed, scoped to the PDF identities.
+-- A separate key is required because catalog_accounts_v1 may already have been executed.
+-- Subsequent ROOT executions preserve password changes, lock state and first-login policy.
+DO $demo_passwords$
+DECLARE account_row RECORD; identity_row RECORD;
+BEGIN
+ IF EXISTS(SELECT 1 FROM scms_data_migration_audit WHERE migration_key='20261029_demo_passwords_v2') THEN RETURN; END IF;
+ FOR account_row IN SELECT * FROM _scms_accounts ORDER BY ordinal LOOP
+  IF (SELECT count(*) FROM users WHERE lower(email)=account_row.email)<>1 THEN RAISE EXCEPTION 'Expected one PDF identity for %',account_row.email; END IF;
+  SELECT x.user_id,r.role_name INTO identity_row FROM users x JOIN roles r ON r.role_id=x.role_id WHERE lower(x.email)=account_row.email;
+  IF identity_row.role_name<>account_row.role_name THEN RAISE EXCEPTION 'Demo password correction: role mismatch for %',account_row.email; END IF;
+  UPDATE users SET password_hash=crypt('SWP391',gen_salt('bf',10)),
+   is_first_login=FALSE,failed_login_attempts=0,locked_until=NULL WHERE user_id=identity_row.user_id;
+ END LOOP;
+ IF EXISTS(SELECT 1 FROM _scms_accounts a JOIN users u ON lower(u.email)=a.email
+  WHERE crypt('SWP391',u.password_hash)<>u.password_hash OR u.is_first_login OR u.failed_login_attempts<>0 OR u.locked_until IS NOT NULL) THEN
+  RAISE EXCEPTION 'Demo password/first-login/lock postflight failed';
+ END IF;
+ INSERT INTO scms_data_migration_audit VALUES('20261029_demo_passwords_v2',localtimestamp,
+  'Owner-approved correction of 33 PDF demo identities only; existing IDs and business history preserved',
+  'Salted BCrypt; no forced first-login change for demo seed; replay preserves later account changes');
+END $demo_passwords$;
 
 
--- =====================================================================
--- 13. HOLIDAYS SEED DATA (DANH MỤC NGÀY NGHỈ LỄ/TẾT 2026 - 2027)
--- =====================================================================
+-- Remove only unused, noncanonical subjects. Discover ALL actual FK references first.
+DO $catalog$
+DECLARE s RECORD; fk RECORD; used BOOLEAN;
+BEGIN
+ IF current_setting('scms.rebuild',true)<>'true' AND EXISTS(SELECT 1 FROM scms_data_migration_audit WHERE migration_key='20261029_catalog_accounts_v1') THEN RETURN; END IF;
+ FOR s IN SELECT subject_id FROM subjects WHERE slug IS NULL OR slug NOT IN(SELECT slug FROM _scms_subjects) LOOP
+  FOR fk IN SELECT c.conrelid::regclass AS tbl,a.attname AS col,cardinality(c.conkey) AS width FROM pg_constraint c JOIN pg_attribute a ON a.attrelid=c.conrelid AND a.attnum=c.conkey[1]
+    WHERE c.contype='f' AND c.confrelid='subjects'::regclass LOOP
+   IF fk.width<>1 THEN RAISE EXCEPTION 'Composite subject FK requires manual review'; END IF;
+   EXECUTE format('SELECT EXISTS(SELECT 1 FROM %s WHERE %I=$1)',fk.tbl,fk.col) INTO used USING s.subject_id;
+   IF used THEN RAISE EXCEPTION 'Noncanonical subject % referenced by %; transaction stopped without deleting history',s.subject_id,fk.tbl; END IF;
+  END LOOP;
+  DELETE FROM subjects WHERE subject_id=s.subject_id;
+ END LOOP;
+END $catalog$;
 
-INSERT INTO holidays (holiday_date, holiday_name, tag, is_active, description) VALUES
--- Ngày lễ dương lịch cố định (NATIONAL_FIXED) năm 2026 & 2027
-('2026-01-01', 'Tết Dương Lịch 2026', 'NATIONAL_FIXED', TRUE, 'Nghỉ Tết Dương Lịch toàn quốc'),
-('2026-04-30', 'Ngày Giải phóng miền Nam 2026', 'NATIONAL_FIXED', TRUE, 'Kỷ niệm ngày thống nhất đất nước'),
-('2026-05-01', 'Ngày Quốc tế Lao động 2026', 'NATIONAL_FIXED', TRUE, 'Ngày Quốc tế Lao động'),
-('2026-09-02', 'Ngày Quốc khánh 2026', 'NATIONAL_FIXED', TRUE, 'Kỷ niệm Quốc khánh Việt Nam'),
-('2026-09-03', 'Nghỉ liền kề Quốc khánh 2026', 'NATIONAL_FIXED', TRUE, 'Ngày nghỉ liền kề quy định'),
-('2027-01-01', 'Tết Dương Lịch 2027', 'NATIONAL_FIXED', TRUE, 'Nghỉ Tết Dương Lịch toàn quốc'),
-('2027-04-30', 'Ngày Giải phóng miền Nam 2027', 'NATIONAL_FIXED', TRUE, 'Kỷ niệm ngày thống nhất đất nước'),
-('2027-05-01', 'Ngày Quốc tế Lao động 2027', 'NATIONAL_FIXED', TRUE, 'Ngày Quốc tế Lao động'),
-('2027-09-02', 'Ngày Quốc khánh 2027', 'NATIONAL_FIXED', TRUE, 'Kỷ niệm Quốc khánh Việt Nam'),
-('2027-09-03', 'Nghỉ liền kề Quốc khánh 2027', 'NATIONAL_FIXED', TRUE, 'Ngày nghỉ liền kề quy định'),
+DO $resources$
+DECLARE r RECORD; n INT; rid INT; sid INT; spid INT; rebuild BOOLEAN:=current_setting('scms.rebuild',true)='true';
+BEGIN
+ IF NOT rebuild AND EXISTS(SELECT 1 FROM scms_data_migration_audit WHERE migration_key='20261029_catalog_accounts_v1') THEN RETURN; END IF;
+ FOR r IN SELECT * FROM _scms_rooms ORDER BY ordinal LOOP
+  SELECT count(*),min(room_id) INTO n,rid FROM rooms WHERE center_id=1 AND (room_name=r.name OR room_name IN(SELECT old_name FROM _scms_room_aliases WHERE ordinal=r.ordinal));
+  IF n>1 THEN RAISE EXCEPTION 'Room % has multiple old IDs; reconcile its sessions before consolidation',r.name; END IF;
+  IF n=0 THEN
+   IF rebuild THEN INSERT INTO rooms(room_id,room_name,location,capacity,status,facility_type,center_id) VALUES(r.ordinal,r.name,r.location,r.capacity,'Available',r.facility_type,1);
+   ELSE INSERT INTO rooms(room_name,location,capacity,status,facility_type,center_id) VALUES(r.name,r.location,r.capacity,'Available',r.facility_type,1); END IF;
+  ELSE UPDATE rooms SET room_name=r.name,location=r.location,facility_type=r.facility_type WHERE room_id=rid;
+  END IF;
+ END LOOP;
+ -- Closing an obsolete room with future sessions is rejected by its normal business trigger.
+ UPDATE rooms SET status='Closed' WHERE center_id=1 AND room_name NOT IN(SELECT name FROM _scms_rooms) AND status<>'Closed';
+ FOR r IN SELECT * FROM _scms_subjects ORDER BY ordinal LOOP
+  SELECT subject_id INTO sid FROM subjects WHERE slug=r.slug;
+  SELECT specialization_id INTO spid FROM specializations WHERE lower(name)=lower(r.name);
+  IF NOT FOUND AND r.ordinal=1 THEN SELECT specialization_id INTO spid FROM specializations WHERE name IN('Quần vợt (Tennis)','Quần vợt') ORDER BY specialization_id LIMIT 1; END IF;
+  IF spid IS NULL THEN
+   IF rebuild THEN INSERT INTO specializations(specialization_id,name,subject_id,status) VALUES(r.ordinal,r.name,sid,'Active') RETURNING specialization_id INTO spid;
+   ELSE INSERT INTO specializations(name,subject_id,status) VALUES(r.name,sid,'Active') RETURNING specialization_id INTO spid; END IF;
+  ELSE UPDATE specializations SET name=r.name,subject_id=sid,status='Active' WHERE specialization_id=spid; END IF;
+  DELETE FROM coach_specializations cs USING users u WHERE cs.coach_id=u.user_id AND u.email IN('coach.'||r.coach_code||'1@gmail.com','coach.'||r.coach_code||'2@gmail.com');
+  INSERT INTO coach_specializations SELECT user_id,spid FROM users WHERE email IN('coach.'||r.coach_code||'1@gmail.com','coach.'||r.coach_code||'2@gmail.com');
+  UPDATE coaches c SET specialization=r.name,certification=NULL,bio='Huấn luyện viên môn '||r.name||'.'
+   FROM users u WHERE c.user_id=u.user_id AND u.email IN('coach.'||r.coach_code||'1@gmail.com','coach.'||r.coach_code||'2@gmail.com');
+  SELECT count(*) INTO n FROM classes WHERE subject_id=sid AND class_type='Advanced' AND center_id=1;
+  IF n>1 THEN RAISE EXCEPTION 'Multiple Advanced templates for subject %; review class/session links',r.slug; END IF;
+  IF n=0 THEN
+   IF rebuild THEN INSERT INTO classes(class_id,class_name,subject_id,max_capacity,tuition_fee,status,class_type,total_sessions,center_id) VALUES(r.ordinal,r.name||' - Advanced (1:1)',sid,1,r.advanced_price,'Open','Advanced',12,1);
+   ELSE INSERT INTO classes(class_name,subject_id,max_capacity,tuition_fee,status,class_type,total_sessions,center_id) VALUES(r.name||' - Advanced (1:1)',sid,1,r.advanced_price,'Open','Advanced',12,1); END IF;
+  ELSE UPDATE classes SET class_name=r.name||' - Advanced (1:1)' WHERE subject_id=sid AND class_type='Advanced' AND center_id=1; END IF;
+ END LOOP;
+ -- Historical coach identity remains intact. Remove only the disallowed descriptive phrases.
+ UPDATE coaches SET specialization=trim(both ' ,;' from regexp_replace(coalesce(specialization,''),'(fitness|thể hình|gym|yoga|cardio)','', 'gi')),
+   bio=CASE WHEN coalesce(bio,'')~*'(fitness|thể hình|gym|yoga|cardio)' THEN NULL ELSE bio END
+ WHERE coalesce(specialization,'')~*'(fitness|thể hình|gym|yoga|cardio)' OR coalesce(bio,'')~*'(fitness|thể hình|gym|yoga|cardio)';
+ DELETE FROM coach_specializations WHERE specialization_id IN(SELECT specialization_id FROM specializations WHERE lower(name) IN('fitness','thể hình','gym','yoga','cardio'));
+ UPDATE specializations SET status='Inactive' WHERE lower(name) IN('fitness','thể hình','gym','yoga','cardio');
+ UPDATE membership_packages SET status='Inactive' WHERE package_name IN('Gói Cơ Bản 1 Tháng','Gói Tiêu Chuẩn 3 Tháng','Gói Cao Cấp 6 Tháng','Gói VIP 12 Tháng','Gói Khóa Học 1:1 (12 Buổi Linh Hoạt)');
+ UPDATE classes c SET class_name=s.name||' - Normal - K01' FROM subjects su JOIN _scms_subjects s ON su.slug=s.slug
+  WHERE c.subject_id=su.subject_id AND c.class_type='Normal' AND c.center_id=1 AND c.class_name IN('Lớp Cầu Lông Cơ Bản (K1)','Lớp Quần Vợt Phong Trào','Lớp Bơi Lội Căn Bản','Lớp Pickleball Nhập Môn','Lớp Bóng Đá Căn Bản','Lớp Bóng Bàn Căn Bản');
+END $resources$;
+ALTER TABLE subjects DROP CONSTRAINT IF EXISTS ck_approved_subject_slug;
+ALTER TABLE subjects ADD CONSTRAINT ck_approved_subject_slug CHECK(slug IS NOT NULL AND slug IN('quan-vot-tennis','boi-loi','pickleball','ban-cung','bong-ro','bong-da','bong-chuyen','cau-long','bong-ban'));
+ALTER TABLE subjects DROP CONSTRAINT IF EXISTS ck_subject_positive_prices;
+ALTER TABLE subjects ADD CONSTRAINT ck_subject_positive_prices CHECK(normal_price>0 AND advanced_price>0);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_scms_rooms_center_name ON rooms(center_id,lower(room_name)) WHERE status='Available';
 
--- Lễ hội âm lịch (LUNAR_FESTIVAL) năm 2026 & 2027
-('2026-04-26', 'Giỗ Tổ Hùng Vương 2026 (10/3 AL)', 'LUNAR_FESTIVAL', TRUE, 'Ngày Giỗ Tổ truyền thống'),
-('2026-02-15', 'Tết Nguyên Đán Bính Ngọ (28 Tết)', 'LUNAR_FESTIVAL', TRUE, 'Chuỗi nghỉ Tết Âm Lịch'),
-('2026-02-16', 'Tết Nguyên Đán Bính Ngọ (29 Tết)', 'LUNAR_FESTIVAL', TRUE, 'Chuỗi nghỉ Tết Âm Lịch'),
-('2026-02-17', 'Tết Nguyên Đán Bính Ngọ (Mùng 1)', 'LUNAR_FESTIVAL', TRUE, 'Tết Nguyên Đán'),
-('2026-02-18', 'Tết Nguyên Đán Bính Ngọ (Mùng 2)', 'LUNAR_FESTIVAL', TRUE, 'Tết Nguyên Đán'),
-('2026-02-19', 'Tết Nguyên Đán Bính Ngọ (Mùng 3)', 'LUNAR_FESTIVAL', TRUE, 'Tết Nguyên Đán'),
-('2026-02-20', 'Tết Nguyên Đán Bính Ngọ (Mùng 4)', 'LUNAR_FESTIVAL', TRUE, 'Chuỗi nghỉ Tết Âm Lịch'),
-('2026-02-21', 'Tết Nguyên Đán Bính Ngọ (Mùng 5)', 'LUNAR_FESTIVAL', TRUE, 'Chuỗi nghỉ Tết Âm Lịch')
-ON CONFLICT (holiday_date) DO UPDATE SET
-    holiday_name = EXCLUDED.holiday_name,
-    tag = EXCLUDED.tag,
-    is_active = EXCLUDED.is_active;
+DO $preserved$
+DECLARE r RECORD; fingerprint TEXT;
+BEGIN
+ FOR r IN SELECT * FROM _scms_preserved LOOP
+  EXECUTE format('SELECT md5(coalesce(string_agg((SELECT jsonb_object_agg(e.key,e.value) FROM jsonb_each(to_jsonb(t)) e WHERE e.key=ANY($1))::text,E''\n'' ORDER BY %I),''[]'')) FROM public.%I t',r.pk,r.table_name)
+    INTO fingerprint USING r.columns;
+  IF fingerprint IS DISTINCT FROM r.digest THEN RAISE EXCEPTION 'ROOT preservation guard: % changed; entire transaction rolled back',r.table_name; END IF;
+ END LOOP;
+END $preserved$;
 
--- =====================================================================
--- 14. TEMPLATE LỚP HỌC 1:1 CHO CÁC BỘ MÔN (ADVANCED CLASSES)
--- =====================================================================
+-- Validate every FK in these SCMS tables, including unvalidated preexisting FKs.
+DO $foreign_keys$
+DECLARE r RECORD;
+BEGIN
+ FOR r IN SELECT conrelid::regclass AS tbl,conname FROM pg_constraint WHERE contype='f' AND NOT convalidated
+  AND conrelid IN(SELECT oid FROM pg_class WHERE relnamespace='public'::regnamespace AND relname=ANY(ARRAY['roles','permissions','role_permissions','centers','users','email_otps','center_managers','receptionists','coaches','members','subjects','specializations','coach_specializations','rooms','classes','training_plans','sessions','training_results','attendances','evaluations','class_feedbacks','membership_packages','member_packages','class_enrollments','holidays','invoices','support_requests','notifications','notification_recipients','chat_conversations','chat_messages','chat_read_state','ai_consultations','system_logs','normal_class_requests','subscription_pauses','coach_work_schedules','coach_work_slots','coach_days_off','advanced_registrations','session_absence_notices','session_changes','center_incidents','incident_affected_members','payment_resolutions','scms_data_migration_audit'])) LOOP
+  EXECUTE format('ALTER TABLE %s VALIDATE CONSTRAINT %I',r.tbl,r.conname);
+ END LOOP;
+ IF (SELECT count(*) FROM subjects)<>9 THEN RAISE EXCEPTION 'Expected exactly nine canonical subjects'; END IF;
+ IF (current_setting('scms.rebuild',true)='true' OR NOT EXISTS(SELECT 1 FROM scms_data_migration_audit WHERE migration_key='20261029_catalog_accounts_v1')) AND EXISTS(SELECT 1 FROM _scms_accounts a LEFT JOIN users u ON lower(u.email)=a.email LEFT JOIN roles role_row ON role_row.role_id=u.role_id WHERE u.user_id IS NULL OR u.status<>'Active' OR role_row.role_name<>a.role_name OR (a.role_name='Admin' AND u.center_id IS NOT NULL) OR (a.role_name<>'Admin' AND u.center_id IS DISTINCT FROM 1)) THEN RAISE EXCEPTION 'PDF account/role/center postflight failed'; END IF;
+END $foreign_keys$;
 
-INSERT INTO classes (class_name, subject_id, coach_id, max_capacity, tuition_fee, status, center_id, class_type, total_sessions)
-SELECT 
-    s.subject_name || ' (1:1 Nâng Cao)',
-    s.subject_id,
-    NULL,
-    1,
-    s.advanced_price,
-    'Open',
-    1,
-    'Advanced',
-    12
-FROM subjects s
-WHERE s.slug IN (
-    'quan-vot-tennis', 'boi-loi', 'pickleball', 'ban-cung', 
-    'bong-ro', 'bong-da', 'bong-chuyen', 'cau-long', 'bong-ban'
-)
-AND NOT EXISTS (
-    SELECT 1 FROM classes c 
-    WHERE c.subject_id = s.subject_id AND c.class_type = 'Advanced'
-);
+INSERT INTO scms_data_migration_audit(migration_key,captured_at,before_data,after_data)
+SELECT '20261029_catalog_accounts_v1',CURRENT_TIMESTAMP::timestamp,'Preserved existing identity keys and all protected transaction columns',
+ json_build_object('subjects',(SELECT json_agg(subject_id ORDER BY subject_id) FROM subjects),'accounts',33,'variant','ROOT')::text
+WHERE NOT EXISTS(SELECT 1 FROM scms_data_migration_audit WHERE migration_key='20261029_catalog_accounts_v1');
+-- Prevent the historical catalog-only migration from resetting later authorized price changes.
+INSERT INTO scms_data_migration_audit VALUES('09_approved_catalog',CURRENT_TIMESTAMP::timestamp,'Superseded by consolidated catalog v1','Nine approved subjects; no transaction backfill') ON CONFLICT DO NOTHING;
+
+-- Synchronize every owned SERIAL/IDENTITY sequence, including tables with zero rows.
+-- Empty table => next ID 1. Nonempty table => next ID MAX(id)+1 (no per-role renumbering).
+DO $sequences$
+DECLARE r RECORD; top_id BIGINT; seq_name TEXT; seq_last BIGINT; seq_called BOOLEAN;
+BEGIN
+ FOR r IN SELECT table_name,column_name FROM information_schema.columns
+          WHERE table_schema='public' AND table_name=ANY(ARRAY['roles','permissions','role_permissions','centers','users','email_otps','center_managers','receptionists','coaches','members','subjects','specializations','coach_specializations','rooms','classes','training_plans','sessions','training_results','attendances','evaluations','class_feedbacks','membership_packages','member_packages','class_enrollments','holidays','invoices','support_requests','notifications','notification_recipients','chat_conversations','chat_messages','chat_read_state','ai_consultations','system_logs','normal_class_requests','subscription_pauses','coach_work_schedules','coach_work_slots','coach_days_off','advanced_registrations','session_absence_notices','session_changes','center_incidents','incident_affected_members','payment_resolutions','scms_data_migration_audit'])
+            AND (column_default LIKE 'nextval(%' OR is_identity='YES')
+          ORDER BY table_name,column_name LOOP
+  seq_name:=pg_get_serial_sequence(format('public.%I',r.table_name),r.column_name);
+  IF seq_name IS NOT NULL THEN
+   EXECUTE format('SELECT max(%I) FROM public.%I',r.column_name,r.table_name) INTO top_id;
+   EXECUTE format('SELECT last_value,is_called FROM %s',seq_name) INTO seq_last,seq_called;
+   IF current_setting('scms.rebuild',true)='true' OR top_id IS NOT NULL AND (seq_last<top_id OR seq_last=top_id AND NOT seq_called) THEN
+    PERFORM setval(seq_name,coalesce(top_id,1),top_id IS NOT NULL);
+   END IF;
+  END IF;
+ END LOOP;
+END $sequences$;
+
+COMMIT;
+-- Last statement deliberately returns the review result AFTER a successful commit.
+-- Demo seed password is SWP391; no passwords/hashes are returned by this review query.
+SELECT 'COMMITTED' AS result,u.user_id,r.role_name,u.full_name,u.email,u.status,u.center_id,
+       u.is_first_login,
+       (SELECT count(*) FROM subjects) AS subject_count,
+       (SELECT count(*) FROM rooms WHERE status='Available' AND center_id=1) AS available_room_count
+FROM users u JOIN roles r ON r.role_id=u.role_id
+WHERE lower(u.email) IN('admin@gmail.com','an@gmail.com','linh@gmail.com','huy@gmail.com','mai@gmail.com','khang@gmail.com','vy@gmail.com','bao@gmail.com','nhi@gmail.com','kiet@gmail.com','ha@gmail.com','coach.tennis1@gmail.com','coach.tennis2@gmail.com','coach.swimming1@gmail.com','coach.swimming2@gmail.com','coach.pickleball1@gmail.com','coach.pickleball2@gmail.com','coach.archery1@gmail.com','coach.archery2@gmail.com','coach.basketball1@gmail.com','coach.basketball2@gmail.com','coach.football1@gmail.com','coach.football2@gmail.com','coach.volleyball1@gmail.com','coach.volleyball2@gmail.com','coach.badminton1@gmail.com','coach.badminton2@gmail.com','coach.tabletennis1@gmail.com','coach.tabletennis2@gmail.com','receptionist1@gmail.com','receptionist2@gmail.com','manager1@gmail.com','manager2@gmail.com')
+ORDER BY u.user_id;

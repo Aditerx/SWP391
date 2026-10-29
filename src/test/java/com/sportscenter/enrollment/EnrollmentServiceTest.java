@@ -105,7 +105,7 @@ class EnrollmentServiceTest {
 
         sampleClass = new SportsClass();
         sampleClass.setId(1);
-        sampleClass.setName("Yoga Buổi Sáng");
+        sampleClass.setName("Cầu lông Buổi Sáng");
         sampleClass.setMaxCapacity(20);
         sampleClass.setStatus("Open");
         sampleClass.setClassType("Advanced");
@@ -141,7 +141,7 @@ class EnrollmentServiceTest {
         assertNotNull(response);
         assertEquals(50, response.id());
         assertEquals("Hoàng Thị Oanh", response.memberName());
-        assertEquals("Yoga Buổi Sáng", response.className());
+        assertEquals("Cầu lông Buổi Sáng", response.className());
         assertEquals("Registered", response.status());
         verify(enrollmentRepository).save(any(ClassEnrollment.class));
         verify(classRepository).findByIdForUpdate(1);

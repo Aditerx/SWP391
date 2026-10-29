@@ -30,14 +30,27 @@ database/
 
 ## 2. Hướng Dẫn Chạy Migration Mới Nhất Trên Supabase
 
-Đối chiếu lịch sử DB theo **tên file đầy đủ**, không chỉ số prefix: hai file 06 chat/schedule safety là hai nội dung độc lập; migration 07 vẫn cần cho Session–subscription. DB mới trống cần khởi tạo schema nền và fixture theo kế hoạch riêng; migration nâng cấp không thay schema nền. Hai bản schema_postgres.sql root/database được đồng bộ sau merge. Lượt xử lý conflict chưa chạy các migration mới trên DB.
+Hai bản schema hiện có **mục đích khác nhau**, không còn là bản sao đồng bộ:
 
-### File cần chạy trên Supabase SQL Editor:
+| File copy vào SQL Editor | Hành vi |
+|---|---|
+| [`../schema_postgres.sql`](../schema_postgres.sql) | Nâng cấp DB mới/đang có, giữ ID/chứng từ/attendance/lịch sử. Bước sửa mật khẩu demo cũ chỉ chạy một lần cho33email PDF; chạy lại giữ thay đổi mật khẩu về sau. |
+| [`schema_postgres.sql`](schema_postgres.sql) | Dựng lại46bảng SCMS và dữ liệu tham chiếu theo Owner; chạy lại sẽ thay dữ liệu/ID trong các bảng này. Giữ bảng Supabase và bảng ứng dụng ngoài danh sách; liên kết ngoài phạm vi khiến transaction dừng. |
+
+Mỗi bản đã gộp cấu trúc hiện hành; copy **toàn bộ một file** để chạy, không cần chạy thêm migration riêng sau đó. Account thường trực vẫn là `users`; `_scms_accounts` chỉ là danh sách tạm, tự xóa khi commit. Kết quả cuối không xuất mật khẩu/hash. Dữ liệu chứng từ/attendance dựng lại là dữ liệu tham chiếu, không phải chứng cứ giao dịch thực tế.
+
+`database/bootstrap/scms_structure_postgres.sql` phục vụ runner PostgreSQL riêng, không có account/giao dịch demo. Với DB dùng chuỗi migration cũ, đối chiếu **tên file đầy đủ**, không chỉ số prefix: hai file06 chat/schedule safety độc lập; migration07 vẫn cần cho Session–subscription. Không chạy script reset demo05 trên DB dùng chung/live.
+
+### Tham khảo nâng cấp riêng chat cho DB cũ
+
+Không cần bước này nếu đã chạy một trong hai schema gộp ở trên. Khi chỉ nâng cấp chat theo chuỗi migration cũ, file là:
 👉 `database/migrations/06_migration_chat.sql`
 
 Migration 06 tạo các bảng chat và hai quyền `CHAT_AS_MEMBER`, `HANDLE_CHAT`; không xóa, đổi tên hay ghi đè dữ liệu cũ. Migration an toàn khi chạy lại. `HANDLE_CHAT` chỉ được gán mặc định cho Receptionist và CenterManager; Coach không có quyền.
 
-### Các nội dung cập nhật trong file 04:
+### Tham khảo nội dung migration04 lịch sử
+
+Các mục dưới mô tả migration cũ; schema gộp và quyết định hiện hành là nguồn cho cấu trúc/default đang bàn giao.
 1. **`subjects`**: Thêm cột `normal_price`, `advanced_price` và seed bảng giá chuẩn 9 môn thể thao theo trang 7 `Member.pdf`.
 2. **`rooms`**: Thêm cột `facility_type` (`'Indoor'`, `'Outdoor'`) để áp dụng ràng buộc thời tiết chống nắng nóng.
 3. **`classes`**: Thêm `class_type` (`'Normal'`, `'Advanced'`), `total_sessions` (default 12), và cập nhật CHECK constraint `chk_class_capacity` (Normal $\le$ 15, Advanced = 1).
