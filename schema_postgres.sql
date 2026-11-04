@@ -1241,3 +1241,6 @@ AND NOT EXISTS (
     SELECT 1 FROM classes c 
     WHERE c.subject_id = s.subject_id AND c.class_type = 'Advanced'
 );
+
+ALTER TABLE users ADD COLUMN IF NOT EXISTS google_sub VARCHAR(255) NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_users_google_sub ON users (google_sub) WHERE google_sub IS NOT NULL;

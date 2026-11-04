@@ -63,6 +63,9 @@ public class User {
     @Column(name = "avatar_public_id")
     private String avatarPublicId;
 
+    @Column(name = "google_sub", length = 255, unique = true)
+    private String googleSub;
+
     @Column(name = "created_at", insertable = false, updatable = false)
     private LocalDateTime createdAt;
 

@@ -110,6 +110,48 @@ class TrainingResultServiceTest {
     }
 
     @Test
+    @DisplayName("Member can only search own training results")
+    void searchResults_MemberIsScopedToSelf() {
+        sampleMember.setEmail("member@example.test");
+        Authentication authentication = org.mockito.Mockito.mock(Authentication.class);
+        when(authentication.getName()).thenReturn("member@example.test");
+        when(authentication.getAuthorities()).thenAnswer(invocation -> List.of(new SimpleGrantedAuthority("ROLE_MEMBER")));
+        when(userRepository.findByEmailIgnoreCase("member@example.test")).thenReturn(Optional.of(sampleMember));
+        when(trainingResultRepository.searchResults(null, 7, null)).thenReturn(List.of());
+
+        assertTrue(trainingResultService.searchResults(null, null, null, authentication).isEmpty());
+        verify(trainingResultRepository).searchResults(null, 7, null);
+    }
+
+    @Test
+    @DisplayName("Member cannot search another member's training results")
+    void searchResults_MemberCannotSpoofMemberId() {
+        sampleMember.setEmail("member@example.test");
+        Authentication authentication = org.mockito.Mockito.mock(Authentication.class);
+        when(authentication.getName()).thenReturn("member@example.test");
+        when(authentication.getAuthorities()).thenAnswer(invocation -> List.of(new SimpleGrantedAuthority("ROLE_MEMBER")));
+        when(userRepository.findByEmailIgnoreCase("member@example.test")).thenReturn(Optional.of(sampleMember));
+
+        assertThrows(org.springframework.security.access.AccessDeniedException.class,
+                () -> trainingResultService.searchResults(null, 999, null, authentication));
+        verifyNoInteractions(trainingResultRepository);
+    }
+
+    @Test
+    @DisplayName("Member can search own training results with matching memberId")
+    void searchResults_MemberMayPassOwnMemberId() {
+        sampleMember.setEmail("member@example.test");
+        Authentication authentication = org.mockito.Mockito.mock(Authentication.class);
+        when(authentication.getName()).thenReturn("member@example.test");
+        when(authentication.getAuthorities()).thenAnswer(invocation -> List.of(new SimpleGrantedAuthority("ROLE_MEMBER")));
+        when(userRepository.findByEmailIgnoreCase("member@example.test")).thenReturn(Optional.of(sampleMember));
+        when(trainingResultRepository.searchResults(1, 7, null)).thenReturn(List.of());
+
+        assertTrue(trainingResultService.searchResults(1, 7, null, authentication).isEmpty());
+        verify(trainingResultRepository).searchResults(1, 7, null);
+    }
+
+    @Test
     @DisplayName("Bulk record results for whole session")
     void recordBulkResults_Success() {
         BulkTrainingResultRequest.Item item1 = new BulkTrainingResultRequest.Item(7, "Present", "Tốt", null);

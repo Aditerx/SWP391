@@ -32,6 +32,12 @@ Tài liệu này là chốt chặn quản lý tiến độ tổng thể và lị
 
 ## 📜 PHẦN II: LỊCH SỬ HOÀN THÀNH (HISTORY)
 
+### [04/11/2026] Sửa quyền Member đọc kết quả và đánh giá tập luyện
+
+- Mở `GET /api/training-results` cho MEMBER; service bắt buộc scope theo User lấy từ Authentication, tự áp memberId khi thiếu và từ chối ID khác. Member được xem toàn bộ `content` và `comment` theo Owner xác nhận.
+- Thêm service test cho scope/IDOR và HTTP authorization test cho Member, anonymous, Coach, Manager. `.\mvnw.cmd clean test`: 289 tests, 270 pass, 19 skipped, 0 failures/errors; BUILD SUCCESS.
+- Cập nhật API contract mục 17. Chưa xác minh source FE hiện hành, bản deploy/SHA Render hoặc trang “Chỉ số cơ thể”; không có xác nhận API riêng cho body metrics trong checkout.
+
 ### [27/10/2026] Xử lý conflict nhánh SMTP/OTP, chatbox và thông báo
 
 - Owner làm rõ phạm vi đồng đội là SMTP/OTP đăng ký, chatbox cơ bản và thông báo; D01/D09 vừa phân chưa làm. Giữ backlog/hai phase, tiếp tục session sau theo docs 04 mục 40.12.

@@ -20,11 +20,17 @@
 * **Headers bắt buộc:**
   * `Content-Type: application/json`
   * `Cookie: JSESSIONID=...` (Hệ thống dùng Session Cookie bảo mật; Axios/Fetch trên Frontend bắt buộc bật `withCredentials: true`).
+  * FE và BE khác domain trên Render cần cookie `SameSite=None; Secure`; bật credentials cho cả login Google và các request tiếp theo.
 
 ### 1.2. Nhóm API Xác Thực (Authentication Flow)
 * **Đăng nhập:** `POST /api/auth/login`
   * Body: `{ "email": "member@example.com", "password": "password123" }`
   * Response (200 OK): Trả về thông tin User, Role và gán Cookie `JSESSIONID`.
+* **Đăng nhập Google GIS:** `POST /api/auth/google`
+  * Body: `{ "credential": "<Google ID token>" }`. Backend xác minh chữ ký, hạn dùng và audience theo `GOOGLE_CLIENT_ID`; không gửi access token.
+  * Response `200`: cùng schema `LoginResponse` của đăng nhập thường (`userId`, `email`, `fullName`, `role`, `authorities`, `isFirstLogin`, `memberId`, `avatarUrl`) và session cookie `JSESSIONID`.
+  * Token sai, email chưa xác minh, tài khoản không Active hoặc Google `sub` không khớp trả `401` với thông báo chung. Khi `GOOGLE_AUTO_REGISTER=false`, email chưa có tài khoản trả `400` (`Tài khoản chưa đăng ký`). Mặc định tự tạo Member Active.
+  * Avatar trả về được tối ưu động: URL Cloudinary thêm `f_auto,q_auto`; URL Google giữ nguyên. Giá trị trong DB không bị thay đổi bởi tối ưu URL.
 * **Đăng ký hội viên:** `POST /api/auth/register`
   * Body: `{ "fullName": "Nguyễn Văn A", "email": "a@example.com", "password": "password123", "phone": "0912345678", "gender": "Male", "dateOfBirth": "2000-01-01" }`
   * Response (200 OK): Gửi mã OTP xác thực qua email.
@@ -1175,3 +1181,13 @@ Các mã lỗi chính: `CHAT_CONVERSATION_NOT_FOUND` (404), `CHAT_ACTIVE_CONVERS
 `ChatService` chỉ xử lý nghiệp vụ; thêm bean `ChatResponder` với `supports(ChatConversation)` và `respond(conversation, N tin gần nhất, memberUserId)`. `ChatResponderDispatcher` chạy nền và gọi responder đầu tiên hỗ trợ conversation khi `handler_type=AI`; lỗi hoặc timeout không rollback hay chặn response của tin member. Reply được lưu `sender_type=AI`, `sender_user_id=NULL`, cùng metadata tùy chọn (quy ước đề nghị: `model`, `latencyMs`, `sources`). Không có responder AI hoặc lời gọi dịch vụ ngoài được bật mặc định. `escalateToStaff(conversationId, reason)` chuyển handler về `STAFF`, lưu SYSTEM message và phát notification tới assigned staff hoặc các receptionist Active trong cùng center.
 
 Chat notification types persisted in `notification_type`: `CHAT_MEMBER_MESSAGE` (member message or escalation to staff) and `CHAT_STAFF_REPLY` (staff/AI reply to member). Notifications are emitted only on that viewer's unread transition from zero to one; storage failures do not roll back the chat message.
+
+## 17. Kết quả và đánh giá quá trình tập luyện
+
+| Method | Endpoint | Quyền và phạm vi |
+|---|---|---|
+| `GET` | `/api/training-results?sessionId={id}&memberId={id}&coachId={id}` | MANAGE_CLASSES, MANAGE_USERS, COACH hoặc MEMBER. Member chỉ đọc kết quả của chính mình; BE lấy User từ session Authentication, tự áp `memberId` hiện tại nếu bỏ trống và trả 403 nếu `memberId` khác. Coach giữ scope hiện có; quyền quản lý giữ hành vi hiện có. |
+| `GET` | `/api/training-plans?coachId={id}&classId={id}&memberId={id}` và `/api/training-plans/{id}` | Member được đọc kế hoạch của chính mình; service kiểm tra ownership. |
+| `GET` | `/api/evaluations?memberId={id}&coachId={id}` và `/api/evaluations/{id}` | Member được đọc đánh giá của chính mình; service kiểm tra ownership. |
+
+Member được xem toàn bộ `content` của training result và `comment` cùng `progressScore` của evaluation do Coach ghi nhận. Không dùng memberId, role hoặc actor từ client để xác định danh tính. Các GET danh sách trả `200` với danh sách rỗng khi không có kết quả phù hợp; truy cập dữ liệu của Member khác trả `403`.

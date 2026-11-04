@@ -22,7 +22,8 @@ public record UserResponse(
         LocalDateTime createdAt,
         Set<String> permissions,
         Boolean emailSent,
-        String warning
+        String warning,
+        String avatarUrl
 ) {
     public static UserResponse from(User user) {
         String roleName = user.getRole() != null ? user.getRole().getName() : null;
@@ -57,12 +58,13 @@ public record UserResponse(
                 user.getCreatedAt(),
                 perms,
                 null,
-                null
+                null,
+                com.sportscenter.media.AvatarUrlOptimizer.optimize(user.getAvatarUrl())
         );
     }
 
     public UserResponse withEmailDelivery(boolean sent, String warning) {
         return new UserResponse(id, code, fullName, email, phone, address, gender, dateOfBirth,
-                status, roleId, roleName, createdAt, permissions, sent, warning);
+                status, roleId, roleName, createdAt, permissions, sent, warning, avatarUrl);
     }
 }
