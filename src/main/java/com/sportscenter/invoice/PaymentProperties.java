@@ -33,4 +33,8 @@ public class PaymentProperties {
     private String vnpayQueryUrl;
     @Value("${vnpay.query-ip-address:}")
     private String vnpayQueryIpAddress;
+    @Value("${vnpay.query-connect-timeout-seconds:3}")
+    private int vnpayQueryConnectTimeoutSeconds = 3;
+    @Value("${vnpay.query-request-timeout-seconds:5}")
+    private int vnpayQueryRequestTimeoutSeconds = 5;
 }

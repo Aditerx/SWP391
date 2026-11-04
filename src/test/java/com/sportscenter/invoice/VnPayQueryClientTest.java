@@ -136,4 +136,27 @@ class VnPayQueryClientTest {
         assertEquals("INVALID_QUERY_CONFIGURATION",assertThrows(VnPayQueryException.class,()->client.query(attempt)).getMessage());
         verifyNoInteractions(http);
     }
+
+    @Test void timeoutConfigurationIsBoundedAndInvalidValuesNeverReachTransport() {
+        for(int[] limits:List.of(new int[]{0,5},new int[]{16,15},new int[]{10,5},new int[]{15,16})){
+            var p=properties();ReflectionTestUtils.setField(p,"vnpayQueryConnectTimeoutSeconds",limits[0]);
+            ReflectionTestUtils.setField(p,"vnpayQueryRequestTimeoutSeconds",limits[1]);
+            var client=new VnPayQueryClient(p,clock);var http=mock(HttpClient.class);ReflectionTestUtils.setField(client,"http",http);
+            assertEquals("INVALID_QUERY_TIMEOUT",assertThrows(VnPayQueryException.class,()->client.query(attempt)).getMessage());
+            verifyNoInteractions(http);
+        }
+    }
+
+    @Test @SuppressWarnings({"unchecked","rawtypes"})
+    void configuredTimeoutsReachClientAndRequestWithoutChangingSignedProtocol()throws Exception{
+        var p=properties();ReflectionTestUtils.setField(p,"vnpayQueryUrl","https://gateway.example/query");
+        ReflectionTestUtils.setField(p,"vnpayQueryConnectTimeoutSeconds",10);ReflectionTestUtils.setField(p,"vnpayQueryRequestTimeoutSeconds",15);
+        var client=new VnPayQueryClient(p,clock);
+        assertEquals(Duration.ofSeconds(10),((HttpClient)ReflectionTestUtils.getField(client,"http")).connectTimeout().orElseThrow());
+        var http=mock(HttpClient.class);var response=mock(HttpResponse.class);ReflectionTestUtils.setField(client,"http",http);
+        when(response.statusCode()).thenReturn(200);when(response.body()).thenReturn(json(signed(response("INV-Q-1","90000000","123456"))));
+        doAnswer(call->{HttpRequest request=call.getArgument(0);assertEquals(Duration.ofSeconds(15),request.timeout().orElseThrow());assertEquals("POST",request.method());return response;})
+                .when(http).send(any(HttpRequest.class),any(HttpResponse.BodyHandler.class));
+        assertTrue(client.query(attempt).successful());
+    }
 }
