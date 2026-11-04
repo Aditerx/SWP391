@@ -10,7 +10,7 @@
 
 **Chẩn đoán CORS/VNPay04/11 (trước QueryDR):** CORS/cookie và redirect Pages `/member/invoices` đã kiểm HTTP. URL/HMAC lỗi cũ khớp key ảnh Render, không có căn cứ sửa encoder/IP/trim. Owner xác nhận gateway thành công nhưng invoice20/22 chưa Paid; chưa có bằng chứng IPN thành công đã commit. Menu merchant chỉ email; Owner không muốn chờ hỗ trợ. Bằng chứng gốc giữ tại `vnpayCorsDiagnosticReview` trong [QA](../artifacts/qa/latest.json).
 
-**QueryDR04/11:** Owner xác nhận đã chạy migration15 thành công. Render báo commit `a03cc608c6a5ec3769a981da31b5ecc2fd5e4054`; code invoice/payment config của commit này khớp source local `1edb26dc877c25b46351ce8d95e0bae8d37a2562`. GET health/OpenAPI và preflight POST từ Pages PASS; endpoint verify-vnpay đã công bố. Owner đang đặt hai cờ true để demo sandbox; false chỉ là tùy chọn kiểm tra không ghi Paid. Owner đã POST xác minh đơn37/INV-2026-000024: HTTP200 QUERY_UNAVAILABLE, invoice Expired/paymentDate và gatewayRef null. Log cũ chỉ có reason chung cho attempt2/1; chưa xác định nguyên nhân Render. Local Java17 tái hiện lỗi dựng chuỗi chứng chỉ, bật AIA thì HTTPS tới được endpoint; Owner thử JVM rồi POST lại vẫn QUERY_UNAVAILABLE; nguyên nhân Render còn chưa rõ. Commit local2840629 đã kiểm xong, cần publish để lấy mã lỗi cụ thể. Bàn giao VNPay chuyển sang [04/11](../SCMS-BAN-GIAO-FE-2026-11-04.md), gỡ phần thêm nhầm khỏi02/11; chưa thêm nội dung OTP vào bản mới.
+**QueryDR04/11:** Owner xác nhận SQL15 đã chạy. Render đã có POST và mã lỗi transport; Owner POST37/INV-2026-000024 vẫn QUERY_UNAVAILABLE/Expired, log16:45 cho attempt2/1 xác nhận CONNECT_TIMEOUT ở giới hạn3giây. Chưa biết chậm TCP, TLS hay đường mạng/IP bị hạn chế; không kết luận sai chữ ký. Commit local `ea15e9712d3ea07e2134888e427a321b12ce9c0f` thêm probe runtime chỉ đọc, mặc định tắt, chạy một lần khi bật cờ; cho chỉnh timeout có chặn biên, giữ mặc định3/5 và toàn bộ kiểm tài chính. PASS local theo mục bên dưới; probe trên Render còn NOT_RUN. Bàn giao VNPay tại [04/11](../SCMS-BAN-GIAO-FE-2026-11-04.md); giữ riêng OTP.
 
 | Việc còn mở | Trạng thái | Điều kiện tiếp tục |
 |---|---|---|
@@ -19,7 +19,7 @@
 | OTP/email cloud | Đã hỗ trợ sender riêng ở source; chưa nghiệm thu Render | Owner04/11 báo đã xác minh sender/thêm env Brevo SMTP2525. Cần deploy BE mới rồi kiểm kết nối/STARTTLS, delivery OTP và xác minh tài khoản; HTTPS API là phương án dự phòng nếu2525 không kết nối được |
 | D01 hồ sơ Member; D09 Coach directory trên Render | PASS local; chưa publish | Main local đã tích hợp và kiểm PG có phiên; chưa push tại điểm review đã chốt, không gọi đó là nghiệm thu Render |
 | FE browser/CORS/cookie/camera QR | PASS CORS/cookie và redirect Pages HTTP04/11; browser/F5/QR chưa nghiệm thu đầy đủ | Cookie None/Secure/HttpOnly; Return đã trỏ Pages /member/invoices. Cần auth/me200 từ FE/F5, dữ liệu API sau thanh toán và scope QR để chốt phần liên quan |
-| VNPay gateway sandbox live | Endpoint/authenticated POST đã chạy; QUERY_UNAVAILABLE, chưa Paid | Publish commit log2840629, đợi Live rồi xác minh lại đơn37 để lấy mã transport cụ thể. Giữ kiểm chữ ký và cutoff, không thu thêm cùng đơn |
+| VNPay gateway sandbox live | CONNECT_TIMEOUT trên Render; chưa ghi Paid | Publish bản probe, bật VNPAY_NETWORK_PROBE_ENABLED=true và lấy log VNPAY_NET; không tạo thanh toán khác hoặc đổi secret/IP field để chữa kết nối |
 | SQLServer runtime | NOT_RUN | Môi trường kiểm riêng nếu được chọn |
 | Schema demo/Coach theo Owner29/10 | PASS local; báo cáo có snapshot Supabase29/10 | Snapshot do Owner xuất là bằng chứng lịch sử được báo cáo dẫn, chưa được session này kiểm độc lập hoặc xác minh lại live; không ghi chung là chưa từng chạy Supabase |
 | Báo vắng tự ghi Absent | PASS local; Owner xác nhận migration14 hoàn tất; chưa xác nhận deploy/live | Publish BE mới rồi kiểm workflow có phiên; schema sẵn sàng không thay nghiệm thu runtime |
@@ -29,11 +29,15 @@
 
 **Bản chạy tạm cho Owner:** đã xuất `0211-1.sql` và `0212-2.sql` ở root để chạy đúng hai lần theo docs02. Đã kiểm thứ tự, guard/rollback, chuyển đổi, postflight và replay trên PostgreSQL riêng ở working tree trên `ec2325df07df053257df09698857b27e36489820`; giữ nguyên SQL nguồn13/14, không chạy Supabase hoặc thêm kết quả BE mới. Bằng chứng/checksum tại `rootBundlePackaging` trong QA. Sau khi Owner chạy thành công và kiểm kết quả có thể xóa hai bản root; nguồn migration vẫn giữ.
 
-**Bước kế tiếp:** VNPay: Owner đã gửi lại POST37 sau bước thử JVM/AIA, vẫn QUERY_UNAVAILABLE. Publish commit sửa log `2840629` lên nhánh Render đang deploy, chờ Live rồi xác minh lại cùng đơn37 để lấy mã lỗi cụ thể. Render lần kiểm mới vẫn báo `a03cc608c6a5ec3769a981da31b5ecc2fd5e4054`; chưa chạy patch log. Không thanh toán lại cùng đơn. Chốt VNPay trong bàn giao04/11 sau kết quả thật; giữ riêng công việc OTP.
+**Bước kế tiếp:** VNPay: publish commit `ea15e9712d3ea07e2134888e427a321b12ce9c0f`, bật VNPAY_NETWORK_PROBE_ENABLED=true trên Render, chờ Live và log VNPAY_NET finished=true để tách DNS/TCP/TLS, không cần tạo đơn/POST để kích hoạt probe. Chỉ nâng timeout nếu phép đo15giây chứng minh hữu ích; nếu đường mạng không tới được thì xử lý egress/provider, không nới chữ ký hoặc đổi chứng từ. Giữ riêng công việc OTP.
 
 Đọc: [AGENTS](../AGENTS.md) → [quyết định Dxx](04-DEBUG-NOTE.md) → [contract FE](01-API-CONTRACT-FE-BE.md) đúng luồng; [vận hành](02-DEPLOYMENT-GUIDE.md) khi cần.
 
 ## Nghiệm thu QueryDR — 04/11/2026
+
+**Bổ sung kiểm mạng runtime:** commit local `ea15e9712d3ea07e2134888e427a321b12ce9c0f` đã kiểm trong bản sao không.env: clean368run=340pass/28skip/0failure/0error, Java17/H2/local HTTP. Client10case và network probe6case, gồm default-off, bật bean, chạy một lần, không chặn khởi động, lỗi DNS/TCP vẫn kiểm đối chứng, TLS3→15 và log không lộ exception message; toàn bộ signature/settlement regression giữ. Timeout mới mặc định3/5, chặn1..15 và request≥connect; chỉ client/config/probe thay đổi, không DB/migration. Bằng chứng ở `vnpayConnectTimeoutFollowup` trong QA. Chưa push/deploy hoặc chứng minh đường mạng Render bằng probe.
+
+**Cập nhật runtime chẩn đoán:** Render hiện báo `4e6a88ee536a064d3ba3d8929b2f0684e8ce9fea`; đã đối chiếu source client có CONNECT_TIMEOUT/TLS_FAILURE/DNS_FAILURE và khớp local. POST37 sau cập nhật vẫn QUERY_UNAVAILABLE; đang chờ log reason mới, chưa xác minh được tiền. Các ghi chú "chưa publish" ở các mốc kiểm trước là lịch sử.
 
 **Bổ sung chẩn đoán transport:** commit local `2840629` trên base `1edb26dc877c25b46351ce8d95e0bae8d37a2562` tách mã lỗi timeout/TLS/DNS/I/O/HTTP status, không xuất exception message/URL/body/key; chữ ký, settlement và timeout giữ nguyên. Chỉ commit client/test, giữ ngoài phần tài liệu/OTP. Test đích client8/8 và `clean test` mới trong bản sao không.env:360run=332pass/28skip/0failure/0error, Java17/H2/local HTTP; source khớp bản copy đã kiểm trước commit. Fingerprint và XML summary ở `vnpayTransportFollowup.diagnosticValidation` trong QA. Patch chưa push/deploy; probe Java cục bộ chỉ chứng minh AIA giúp kết nối TLS tại máy kiểm tra, chưa chốt lỗi Render. Owner đã gửi lại QUERY_UNAVAILABLE sau bước thử JVM; cần log mới sau publish patch.
 
@@ -188,6 +192,7 @@ Bằng chứng khi cần: [QA duy nhất](../artifacts/qa/latest.json). Bộ FE 
 
 | Ngày | Nhóm hoàn tất | Dấu vết |
 |---|---|---|
+| 04/11/2026 | Owner cung cấp CONNECT_TIMEOUT; thêm probe DNS/TCP/TLS runtime một lần, mặc định tắt và cấu hình timeout có giới hạn | Commit `ea15e9712d3ea07e2134888e427a321b12ce9c0f`; clean368run=340pass/28skip PASS local; ký/ghi Paid/schema giữ nguyên. Probe Render NOT_RUN, chờ publish/cờ bật |
 | 04/11/2026 | Phân loại lỗi QueryDR an toàn sau khi Owner cung cấp POST37 QUERY_UNAVAILABLE; kiểm probe TLS Java/AIA | Client8/8 và clean360run=332pass/28skip PASS local; không thay chữ ký/quyền/timeout, chưa publish patch. Kết quả sau JVM option trên Render còn chờ |
 | 04/11/2026 | Rút gọn hướng dẫn sandbox, giữ settlement=true theo bước Owner đang làm; chuyển bàn giao VNPay sang04/11 | Owner xác nhận SQL15; health/OpenAPI/CORS PASS trên Render; POST có phiên đơn37 còn chờ. Không sửa BE hoặc ghi cloud |
 | 04/11/2026 | Owner duyệt QueryDR: thêm POST verify, bảng pay attempt/migration15 và FE auto POST→GET; Return vẫn không ghi Paid | PASS local theo mục QueryDR/QA; chưa cloud/deploy/live; giữ riêng thay đổi email đồng thời |

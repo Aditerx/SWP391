@@ -2,12 +2,12 @@
 
 ## VNPay: tự kiểm tra thanh toán bằng QueryDR
 
-**Tình hình:** Owner xác nhận đã chạy migration15 thành công. BE Render đã công bố endpoint mới; CORS từ Pages cho phép POST kèm cookie. POST có phiên đã chạy; BE trả `QUERY_UNAVAILABLE` và chưa ghi Paid. Đang xử lý lỗi phía truy vấn VNPay; chưa nghiệm thu đồng bộ thanh toán live. Chưa xác nhận FE hiện hành đã ghép lời gọi dưới đây.
+**Tình hình:** Owner xác nhận đã chạy migration15 thành công. BE Render đã công bố endpoint mới; CORS từ Pages cho phép POST kèm cookie. POST có phiên đã chạy nhưng kết nối Render→VNPay đang `CONNECT_TIMEOUT`, chưa ghi Paid. Đang kiểm tra đường mạng ngay trên runtime; chưa nghiệm thu đồng bộ thanh toán live. Chưa xác nhận FE hiện hành đã ghép lời gọi dưới đây.
 
 **API:** `POST /api/members/me/invoices/{id}/verify-vnpay`
 
 - `{id}` là `invoiceId` từ API/URL quay về, không phải phần số cuối mã hóa đơn.
-- Body `{}`, `Content-Type: application/json`, gửi cookie (`credentials: 'include'` hoặc `withCredentials: true`), timeout ít nhất20giây.
+- Body `{}`, `Content-Type: application/json`, gửi cookie (`credentials: 'include'` hoặc `withCredentials: true`), timeout riêng cho POST này60giây; giữ một lời gọi đang chạy trên UI.
 - Trả200: `{verificationStatus, message, retryAfterSeconds, invoice}`. `invoice` có cùng cấu trúc với GET hóa đơn.
 
 **FE cần làm:**
