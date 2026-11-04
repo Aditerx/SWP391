@@ -1,6 +1,6 @@
 # SCMS — Bàn giao FE ngày 02/11/2026
 
-Tài liệu này tổng hợp thay đổi và kết luận sau hai báo cáo 29–31/10; FE dùng trực tiếp cho đợt tích hợp room, giới hạn lớp và báo vắng. Bổ sung QueryDR04/11 tại [mục7](#querydr).
+Tài liệu này tổng hợp thay đổi và kết luận sau hai báo cáo 29–31/10; FE dùng trực tiếp cho đợt tích hợp room, giới hạn lớp và báo vắng.
 
 ## 1. Trạng thái bàn giao
 
@@ -92,15 +92,3 @@ DB đã có `absence_notice_id` và `superseded_at`; unique index chỉ áp dụ
 2. FE tải lại rooms/classes, bỏ ID hoặc giới hạn lớp hardcode, cập nhật bộ chọn room và màn hình sĩ số theo mục 2–3.
 3. Kiểm có phiên: báo vắng hợp lệ → notice + Absent; retry; sai chủ ca; biên 0/12 giờ; Coach/QR Present; đổi giờ so với đổi riêng phòng; Manager correction và lịch sử.
 4. Kiểm browser/CORS/cookie/QR trên FE hiện hành. OTP/email cloud, VNPay live và các tổ hợp CRUD/role chưa kiểm vẫn cần nghiệm thu riêng; hai migration không xác nhận các mục này.
-
-
-<a id="querydr"></a>
-## 7. Bổ sung QueryDR — 04/11
-
-BE thêm **POST `/api/members/me/invoices/{id}/verify-vnpay`**, cookie phiên Member, JSON `{}`. `{id}` là `invoiceId` từ API. Trả200 `{verificationStatus,message,retryAfterSeconds,invoice}`; dành timeout client ít nhất20giây. Status/lỗi ở [contract thanh toán](docs/01-API-CONTRACT-FE-BE.md#payments).
-
-FE tự POST một lần cho đúng hóa đơn VNPay khi quay về từ thanh toán, sau đó GET `/api/members/me/invoices`. Tái sử dụng **Tải lại** để kiểm tra hóa đơn đang theo dõi rồi GET; tuân thủ retryAfterSeconds, không cần nút tự xác nhận đã trả tiền, không tự quét tất cả hóa đơn. Hiển thị theo invoice từ BE; Paid+reconciliationRequired phải báo đối soát. `status=00` trên URL không là chứng từ. GET danh sách vẫn chỉ đọc.
-
-Bảng mới **`vnpay_payment_attempts`** chỉ phục vụ BE, lưu dữ liệu gốc mỗi lần tạo link và cooldown; FE không đọc/ghi trực tiếp. Owner chạy nguyên [15_QueryDR.sql](database/migrations/15_QueryDR.sql) một lần trước deploy. File cộng thêm, không sửa/xóa bảng hoặc chứng từ hiện có. Đơn cũ thiếu attempt trả `ATTEMPT_MISSING`, không tự chữa hoặc mời trả thêm.
-
-**Tình hình:** source/contract đã bổ sung; kết quả local và giới hạn tại [Active docs00](docs/00-MASTER-CHECKLIST.md#active). Chưa deploy Render/chạy SQL cloud hoặc tích hợp FE Pages trong lượt này. Repo chỉ có dist của FE demo hiện tại; đội FE cần ghép lời gọi vào source đang dùng. Toggle và kiểm merchant thật theo [docs02](docs/02-DEPLOYMENT-GUIDE.md#querydr).
