@@ -41,13 +41,22 @@ public class VnPayQueryClient {
     private final PaymentProperties properties;
     private final Clock clock;
     private final ObjectMapper mapper = new ObjectMapper().enable(JsonParser.Feature.STRICT_DUPLICATE_DETECTION);
-    private final HttpClient http = HttpClient.newBuilder().connectTimeout(java.time.Duration.ofSeconds(3))
-            .followRedirects(HttpClient.Redirect.NEVER).build();
+    private final HttpClient http;
 
-    public VnPayQueryClient(PaymentProperties properties, Clock clock) { this.properties = properties; this.clock = clock; }
+    public VnPayQueryClient(PaymentProperties properties, Clock clock) {
+        this.properties = properties; this.clock = clock;
+        // Build safely even if a disabled feature has bad configuration; query() rejects it before I/O.
+        int connect = Math.max(1, Math.min(15, properties.getVnpayQueryConnectTimeoutSeconds()));
+        this.http = HttpClient.newBuilder().connectTimeout(java.time.Duration.ofSeconds(connect))
+                .followRedirects(HttpClient.Redirect.NEVER).build();
+    }
 
     public VerifiedVnPayQuery query(VnPayPaymentAttempt.Snapshot attempt) {
         try {
+            int connect = properties.getVnpayQueryConnectTimeoutSeconds();
+            int requestTimeout = properties.getVnpayQueryRequestTimeoutSeconds();
+            if (connect < 1 || connect > 15 || requestTimeout < connect || requestTimeout > 15)
+                throw new VnPayQueryException("INVALID_QUERY_TIMEOUT");
             if (properties.getVnpayHashSecret().isBlank() || !attempt.tmnCode().equals(properties.getVnpayTmnCode()))
                 throw new VnPayQueryException("MERCHANT_NOT_CONFIGURED");
             URI endpoint = URI.create(properties.getVnpayQueryUrl());
@@ -72,7 +81,7 @@ public class VnPayQueryClient {
             request.put("vnp_IpAddr", ip);
             request.put("vnp_OrderInfo", "Query " + attempt.txnRef());
             request.put("vnp_SecureHash", sign(request, REQUEST_FIELDS));
-            HttpRequest httpRequest = HttpRequest.newBuilder(endpoint).timeout(java.time.Duration.ofSeconds(5))
+            HttpRequest httpRequest = HttpRequest.newBuilder(endpoint).timeout(java.time.Duration.ofSeconds(requestTimeout))
                     .header("Content-Type", "application/json").header("Accept", "application/json")
                     .POST(HttpRequest.BodyPublishers.ofString(mapper.writeValueAsString(request))).build();
             HttpResponse<String> response = http.send(httpRequest, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));

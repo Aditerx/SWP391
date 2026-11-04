@@ -198,6 +198,21 @@ Chờ `retryAfterSeconds` trước khi chạy lại. Không lấy `status=00` tr
 
 **Nếu lỗi TLS/chứng chỉ Java:** có thể thử thêm Environment `JAVA_TOOL_OPTIONS=-Dcom.sun.security.enableAIAcaIssuers=true`, giữ các tùy chọn đã có nếu biến tồn tại, rồi Save/redeploy và kiểm lại **cùng đơn**. Java sẽ tìm chứng chỉ CA trung gian để dựng chuỗi tin cậy, vẫn xác minh TLS/hostname ([Oracle PKIX](https://docs.oracle.com/en/java/javase/17/security/java-pki-programmers-guide.html)). Lựa chọn này đã giúp probe HTTPS Java cục bộ kết nối được VNPay; chưa tự chứng minh nguyên nhân trên Render. Không đổi secret hoặc tạo thêm thanh toán để thử.
 
+<a id="querydr-network"></a>
+**Nếu log là CONNECT_TIMEOUT — kiểm tra trên chính Render:**
+
+1. Publish bản BE có `VnPayNetworkProbe`.
+2. Thêm Environment `VNPAY_NETWORK_PROBE_ENABLED=true`, lưu và deploy, chờ Live.
+3. Mở Logs, tìm `VNPAY_NET`, lấy các dòng tới `finished=true`. Probe tự chạy một lần mỗi lần khởi động khi bật cờ; không cần tạo đơn hoặc POST để kích hoạt. Sau chẩn đoán, tắt cờ.
+
+Probe chỉ kiểm DNS, TCP443 tối đa15giây và HTTPS HEAD ở ngưỡng kết nối3/15giây tới VNPay sandbox cùng `example.com` làm đối chứng. TLS/hostname vẫn được kiểm bình thường. Không có merchant, secret, cookie, dữ liệu hóa đơn hoặc body QueryDR; không xác nhận Paid.
+
+- TCP tới VNPay timeout nhưng đối chứng kết nối được: khoanh vùng đường mạng tới VNPay; chưa đủ để khẳng định VNPay chặn IP Render. Khi cần, IP outbound lấy tại Render → service → Connect → Outbound theo [Render](https://render.com/docs/outbound-ip-addresses).
+- TCP được nhưng HTTPS lỗi/timeout: kiểm tra TLS/handshake. HTTP405 từ HEAD chứng minh đã kết nối HTTPS, không là lỗi thanh toán vì đây không phải POST QueryDR.
+- HTTPS3giây thất bại nhưng15giây thành công: có thể thử `VNPAY_QUERY_CONNECT_TIMEOUT_SECONDS=10`, `VNPAY_QUERY_REQUEST_TIMEOUT_SECONDS=15`, deploy rồi xác minh lại **cùng đơn**. Mặc định vẫn3/5; mỗi giá trị phải từ1 tới15, request không nhỏ hơn connect. Sai cấu hình trả reason `INVALID_QUERY_TIMEOUT` và không gửi request. FE dành60giây riêng cho POST xác minh.
+
+`VNPAY_QUERY_IP_ADDR` chỉ là trường IP bên trong request, không thay đổi địa chỉ IP/đường mạng outbound của Render. Không sửa trường này để chữa TCP timeout.
+
 Bản vá log transport mới phân biệt `CONNECT_TIMEOUT`, `REQUEST_TIMEOUT`, `TLS_FAILURE`, `DNS_FAILURE`, `SERVER_IP_LOOKUP_FAILED`, `CONNECTION_FAILED`, `IO_FAILURE`, `PROVIDER_HTTP_<status>` và cấu hình sai. Phản hồi FE vẫn là `QUERY_UNAVAILABLE`; log không chứa exception message, body hoặc credential. Nếu runtime vẫn chỉ ghi reason chung thì bản vá chưa được publish hoặc lỗi chưa thuộc nhóm đã phân loại. Trạng thái publish theo docs00.
 
 <details>
@@ -207,7 +222,7 @@ Bản vá log transport mới phân biệt `CONNECT_TIMEOUT`, `REQUEST_TIMEOUT`,
 
 **Response:** kiểm HMAC-SHA512 theo thứ tự `ResponseId,Command,ResponseCode,Message,TmnCode,TxnRef,Amount,BankCode,PayDate,TransactionNo,TransactionType,TransactionStatus,OrderInfo,PromotionCode,PromotionAmount`; so sánh constant-time, giữ nguyên giá trị, tùy chọn thiếu là rỗng đúng vị trí. ResponseId không là RequestId. Chỉ ghi thành công nếu chữ ký hợp lệ, merchant khớp attempt/cấu hình, TxnRef đúng invoiceCode, Amount đúng số nguyên Invoice.amount×100 và snapshot, loại01, responseCode00/status00, TransactionNo hợp lệ/chưa gắn invoice khác. Lỗi/timeout/thiếu hash/chưa có kết quả không ghi Paid và không chứng minh khách chưa trả.
 
-**Khóa/giới hạn:** connect3giây, request5giây; tối đa3attempt/lượt, luân phiên để không bỏ link cũ; cooldown30giây/hóa đơn bằng DB lock. HTTP chạy ngoài transaction giữ khóa. Khi ghi, kiểm lại owner/role/center/amount/state dưới khóa center→invoice. IPN tới trước thì trả state hiện hành, không cấp thêm credit/thông báo. Biên5phút theo Clock lúc xử lý, không dùng PayDate bỏ cutoff: tới/quá hạn hoặc quyền không còn thì Paid+reconciliationRequired, không hồi sinh quyền. Đơn cũ thiếu metadata trả `ATTEMPT_MISSING`; deploy không tự sửa invoice20/22 đã báo trước đây.
+**Khóa/giới hạn:** mặc định connect3giây/request5giây, có cấu hình giới hạn tại mục kiểm mạng; tối đa3attempt/lượt, luân phiên để không bỏ link cũ; cooldown30giây/hóa đơn bằng DB lock. HTTP chạy ngoài transaction giữ khóa. Khi ghi, kiểm lại owner/role/center/amount/state dưới khóa center→invoice. IPN tới trước thì trả state hiện hành, không cấp thêm credit/thông báo. Biên5phút theo Clock lúc xử lý, không dùng PayDate bỏ cutoff: tới/quá hạn hoặc quyền không còn thì Paid+reconciliationRequired, không hồi sinh quyền. Đơn cũ thiếu metadata trả `ATTEMPT_MISSING`; deploy không tự sửa invoice20/22 đã báo trước đây.
 
 **Kiểm local:** chạy `python scripts/test-querydr-migration.py`, rồi `python scripts/test-querydr-local.py`. Migration runner chỉ dùng PostgreSQL Docker loopback55440 và DB tạm `scms_querydr_*`. BE runner tạo bản sao source không có.env, chạy `./mvnw.cmd clean test` rồi HTTP PostgreSQL `ddl-auto=none` trên DB behavior đã migration. Kết quả ở `artifacts/runs/querydr/validation.json`, tổng hợp vào QA duy nhất. Provider là HTTP giả lập cục bộ, không là VNPay live. Có kiểm chữ ký độc lập, sai merchant/ref/amount, timeout, owner/role/center, retry/IPN race, cutoff,12credit/thông báo không trùng và state sau commit. Các lần kiểm local không thay thế kiểm QueryDR có phiên trên Render; trạng thái hiện hành xem docs00.
 

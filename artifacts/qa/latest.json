@@ -20475,7 +20475,7 @@
     }
   },
   "vnpayTransportFollowup": {
-    "checkedAtUtc": "2026-11-04T09:32:13.012989+00:00",
+    "checkedAtUtc": "2026-11-04T09:49:16.012434+00:00",
     "ownerPostResult": {
       "invoiceId": 37,
       "httpStatus": 200,
@@ -20536,7 +20536,7 @@
       "reconciliationRequired": false
     },
     "backendDiagnosticChange": "Specific fixed transport/provider status codes; raw exception messages/bodies/URLs never logged; no signing or settlement changes",
-    "diagnosticPatchDeployed": false,
+    "diagnosticPatchDeployed": true,
     "cloudWritesByAgent": 0,
     "paymentOrQueryPayloadsSentByAgent": 0,
     "documentationScope": "VNPay only; OTP section not added",
@@ -20602,8 +20602,133 @@
     "diagnosticPatchCommit": "28406296638b23aa5a72cca186340c33f60481f8",
     "runtimeRecheck": {
       "httpStatus": 200,
-      "buildCommit": "a03cc608c6a5ec3769a981da31b5ecc2fd5e4054"
+      "buildCommit": "4e6a88ee536a064d3ba3d8929b2f0684e8ce9fea",
+      "specificTransportCodesPresent": true,
+      "clientSourceMatchesLocalCommit": "954211b7eb519958680ba25a8d94ca6814ad34ba"
     },
-    "nextStep": "Publish diagnostic commit to the branch Render deploys, wait Live, then retry same invoice37 and inspect the specific fixed reason"
+    "nextStep": "Get the latest Render log invoice37 reason from the deployed diagnostic patch; do not create another payment",
+    "ownerPostAfterDiagnosticDeployment": {
+      "httpStatus": 200,
+      "verificationStatus": "QUERY_UNAVAILABLE",
+      "invoiceId": 37,
+      "paymentStatus": "Expired",
+      "paymentDate": null,
+      "gatewayTransactionRef": null,
+      "reconciliationRequired": false
+    },
+    "latestReason": "CONNECT_TIMEOUT (owner logs16:45); network phase not yet determined"
+  },
+  "vnpayConnectTimeoutFollowup": {
+    "checkedAtUtc": "2026-11-04T13:01:11.099329+00:00",
+    "ownerLogs": [
+      {
+        "timestamp": "2026-11-04T16:45:17.936+07:00",
+        "invoiceId": 37,
+        "attemptId": 2,
+        "reason": "CONNECT_TIMEOUT"
+      },
+      {
+        "timestamp": "2026-11-04T16:45:20.942+07:00",
+        "invoiceId": 37,
+        "attemptId": 1,
+        "reason": "CONNECT_TIMEOUT"
+      }
+    ],
+    "confirmed": "HTTPS connection establishment exceeded the configured3second limit; no verified gateway payment result",
+    "notEstablished": [
+      "TCP versus TLS phase",
+      "IP blocking or routing failure",
+      "whether15seconds succeeds on Render"
+    ],
+    "networkDiagnosticCommit": "ea15e9712d3ea07e2134888e427a321b12ce9c0f",
+    "validation": {
+      "result": "PASS_LOCAL",
+      "checkedAtUtc": "2026-11-04T12:54:04.313027+00:00",
+      "baseCommit": "954211b7eb519958680ba25a8d94ca6814ad34ba",
+      "workingTree": true,
+      "sourceFingerprints": {
+        "src/main": "904ba8c2d6bdab84a8c7e3c4974600bcd998bf57302684ff2cbb1241bb8902b1",
+        "src/test": "5e231daa32765428bfa40c857cc1b5ef95a73ec93b00fb311f6659764f596747",
+        "database": "fcb87aca26143a4b49d19670fef1c86515fa57e856d5ad8ebbbd95d1463d3291",
+        "pom.xml": "aa5c4d1a1bb3e23860225b7aacd7341fe278430cd6148a8a9d66c9ebabc1864b",
+        "schema_postgres.sql": "7b3a0b5878335ddbeade70b9a4060aba6a097ace8ea561ad3f30baccfa824a0e",
+        "scripts/test-room-absence-postgres.py": "7144adb3689349a949c9ee702958f765fb5743433d8a285dcfc264af2a77c82c",
+        "scripts/test-phases-postgres.py": "365df6003bd90f65afe0593f195a733c25ae8c9abdca6848119555657be54eaa",
+        "scripts/prepare-phases-release.py": "e6c525b8a70562527d606b0017d72199865c838df31b6bbc995acb1405deb5a5"
+      },
+      "scope": "Opt-in one-shot network probe + bounded configurable timeouts; signing/settlement/default timeouts unchanged",
+      "command": "mvnw.cmd -Dvnpay.network-probe-enabled=false clean test",
+      "environment": "Java17, H2/local HTTP simulator, private source copy without .env; no live provider probes during suite",
+      "totals": {
+        "tests": 368,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 28,
+        "passed": 340
+      },
+      "cases": {
+        "com.sportscenter.invoice.VnPayNetworkProbeTest": [
+          "probeBeanIsDisabledByDefaultAndCanBeExplicitlyEnabled",
+          "exceptionMessagesNeverAppearInDiagnosticLog",
+          "failedTcpSkipsTlsForThatTargetAndStillChecksControl",
+          "shortHttpsTimeoutStillTestsLongerHandshakeAndControl",
+          "failedDnsSkipsTargetAndStillChecksControl",
+          "startupEventRunsOnceWithoutBlockingCaller"
+        ],
+        "com.sportscenter.invoice.VnPayQueryClientTest": [
+          "validSignatureDoesNotAuthorizeWrongMerchantReferenceAmountOrRefund",
+          "configuredTimeoutsReachClientAndRequestWithoutChangingSignedProtocol",
+          "rejectsTamperingMissingSignatureAndDuplicateJson",
+          "malformedEndpointDoesNotLeakConfigurationOrSendRequest",
+          "providerStatusAndResponseLimitHaveSafeDistinctCodes",
+          "querySuccessDoesNotMeanPaymentSuccessAndOptionalPromotionValuesAreSigned",
+          "sendsExactOriginalPayDateAndProtocolSpecificRequestHmacOverHttp",
+          "acceptsIndependentGoldenHmacIncludingEmptyPromotionSlots",
+          "transportFailuresHaveSpecificCodesWithoutLeakingExceptionDetails",
+          "timeoutConfigurationIsBoundedAndInvalidValuesNeverReachTransport"
+        ]
+      },
+      "testSandbox": "C:\\Users\\Admin\\AppData\\Local\\Temp\\scms_querydr_network_ixoz_orb",
+      "envFilePresent": false,
+      "runtimeProbeOutcome": "NOT_RUN; requires publishing new code and explicit env opt-in on Render",
+      "cloudWritesByAgent": 0,
+      "livePaymentOrQueryRequestsByAgent": 0
+    },
+    "probeSafety": {
+      "defaultEnabled": false,
+      "oncePerStartup": true,
+      "backgroundDaemon": true,
+      "fixedHosts": [
+        "sandbox.vnpayment.vn",
+        "example.com"
+      ],
+      "phases": [
+        "DNS",
+        "TCP443 max15s",
+        "HTTPS HEAD connect3s",
+        "HTTPS HEAD connect15s"
+      ],
+      "merchantOrKeyOrInvoiceDataUsed": false,
+      "queryPaymentOrRefundPayloadSent": false,
+      "tlsAndHostnameValidationDisabled": false
+    },
+    "timeouts": {
+      "defaultConnectSeconds": 3,
+      "defaultRequestSeconds": 5,
+      "maximumSeconds": 15,
+      "requestAtLeastConnect": true,
+      "connectEnv": "VNPAY_QUERY_CONNECT_TIMEOUT_SECONDS",
+      "requestEnv": "VNPAY_QUERY_REQUEST_TIMEOUT_SECONDS"
+    },
+    "clientGuidance": "60second timeout for verify POST only; single in-flight UI request",
+    "nextOwnerStep": "Publish code, enable VNPAY_NETWORK_PROBE_ENABLED=true, wait Live and VNPAY_NET finished=true; send probe logs; no new payment needed",
+    "runtimeProbe": "NOT_RUN",
+    "agentPushOrDeploy": false,
+    "agentCloudWrites": 0,
+    "paymentSigningOrSettlementOrSchemaChanged": false,
+    "officialReferences": [
+      "https://docs.oracle.com/en/java/javase/17/docs/api/java.net.http/java/net/http/HttpClient.Builder.html",
+      "https://render.com/docs/outbound-ip-addresses"
+    ]
   }
 }
