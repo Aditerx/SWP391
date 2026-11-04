@@ -27,7 +27,7 @@ Base Render: `https://scms-app-p1gy.onrender.com`; local thông thường `http:
 | POST `/api/auth/forgot-password` | email; phản hồi chung không tiết lộ account tồn tại |
 | POST `/api/auth/reset-password` | email,otp,newPassword →204 |
 
-OTP đăng ký10phút, tối đa5lần sai, dùng một lần. REGISTRATION_PENDING/EMAIL_ALREADY_REGISTERED/OTP_INVALID/OTP_EXPIRED/OTP_ATTEMPTS_EXCEEDED/OTP_RESEND_TOO_SOON/OTP_RESEND_LIMIT cần UI riêng. OTP cloud đang bị mail/Render Free chặn theo ghi nhận; không coi thông báo gửi là delivery đã nghiệm thu. Tài khoản demo lịch sử không phải credential production.
+OTP đăng ký10phút, tối đa5lần sai, dùng một lần. REGISTRATION_PENDING/EMAIL_ALREADY_REGISTERED/OTP_INVALID/OTP_EXPIRED/OTP_ATTEMPTS_EXCEEDED/OTP_RESEND_TOO_SOON/OTP_RESEND_LIMIT cần UI riêng. `OtpMessageResponse.code` là mã trạng thái tùy chọn, có thể null; không chứa mã OTP. HTTP200/thông báo gửi chung không chứng minh thư đã được nhận vì mail gửi bất đồng bộ sau commit. Trạng thái email cloud xem [docs00](00-MASTER-CHECKLIST.md#active). Tài khoản demo lịch sử không phải credential production.
 
 `auth/me` hiện không có `centerId`; thiết kế center1 giữ nguyên. Actor/center dùng để phân quyền được BE đọc từ phiên, không nhận mã C01 hoặc center do FE gửi làm căn cứ cấp quyền.
 
