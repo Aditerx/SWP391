@@ -7,10 +7,15 @@ import org.springframework.test.util.ReflectionTestUtils;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import java.net.InetSocketAddress;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.*;
 import java.util.*;
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
 
 class VnPayQueryClientTest {
     static final String SECRET = "test-query-secret";
@@ -89,5 +94,46 @@ class VnPayQueryClientTest {
             var p=properties();ReflectionTestUtils.setField(p,"vnpayQueryUrl","http://127.0.0.1:"+server.getAddress().getPort()+"/query");
             assertTrue(new VnPayQueryClient(p,clock).query(attempt).successful());assertNull(error.get());
         } finally {server.stop(0);}
+    }
+
+    @Test @SuppressWarnings({"unchecked","rawtypes"})
+    void transportFailuresHaveSpecificCodesWithoutLeakingExceptionDetails() throws Exception {
+        var errors=List.of(
+                Map.entry(new java.net.http.HttpConnectTimeoutException(SECRET),"CONNECT_TIMEOUT"),
+                Map.entry(new java.net.http.HttpTimeoutException(SECRET),"REQUEST_TIMEOUT"),
+                Map.entry(new javax.net.ssl.SSLHandshakeException(SECRET),"TLS_FAILURE"),
+                Map.entry(new java.net.UnknownHostException(SECRET),"DNS_FAILURE"),
+                Map.entry(new java.net.ConnectException(SECRET),"CONNECTION_FAILED"),
+                Map.entry(new java.io.IOException(SECRET),"IO_FAILURE"),
+                Map.entry(new java.io.IOException(SECRET,new javax.net.ssl.SSLHandshakeException(SECRET)),"TLS_FAILURE"),
+                Map.entry(new java.io.IOException(SECRET,new java.net.http.HttpConnectTimeoutException(SECRET)),"CONNECT_TIMEOUT"),
+                Map.entry(new java.io.IOException(SECRET,new java.nio.channels.UnresolvedAddressException()),"DNS_FAILURE"));
+        for(var entry:errors){
+            var p=properties();ReflectionTestUtils.setField(p,"vnpayQueryUrl","https://gateway.example/query");
+            var client=new VnPayQueryClient(p,clock);var http=mock(HttpClient.class);
+            ReflectionTestUtils.setField(client,"http",http);
+            doThrow(entry.getKey()).when(http).send(any(HttpRequest.class),any(HttpResponse.BodyHandler.class));
+            var error=assertThrows(VnPayQueryException.class,()->client.query(attempt));
+            assertEquals(entry.getValue(),error.getMessage());assertFalse(error.getMessage().contains(SECRET));
+        }
+    }
+
+    @Test @SuppressWarnings({"unchecked","rawtypes"})
+    void providerStatusAndResponseLimitHaveSafeDistinctCodes() throws Exception {
+        var p=properties();ReflectionTestUtils.setField(p,"vnpayQueryUrl","https://gateway.example/query");
+        var client=new VnPayQueryClient(p,clock);var http=mock(HttpClient.class);var response=mock(HttpResponse.class);
+        ReflectionTestUtils.setField(client,"http",http);
+        doReturn(response).when(http).send(any(HttpRequest.class),any(HttpResponse.BodyHandler.class));
+        when(response.statusCode()).thenReturn(405);when(response.body()).thenReturn(SECRET);
+        assertEquals("PROVIDER_HTTP_405",assertThrows(VnPayQueryException.class,()->client.query(attempt)).getMessage());
+        when(response.statusCode()).thenReturn(200);when(response.body()).thenReturn("x".repeat(65537));
+        assertEquals("RESPONSE_TOO_LARGE",assertThrows(VnPayQueryException.class,()->client.query(attempt)).getMessage());
+    }
+
+    @Test void malformedEndpointDoesNotLeakConfigurationOrSendRequest() {
+        var p=properties();ReflectionTestUtils.setField(p,"vnpayQueryUrl","https://gateway.example/"+SECRET+"\n");
+        var client=new VnPayQueryClient(p,clock);var http=mock(HttpClient.class);ReflectionTestUtils.setField(client,"http",http);
+        assertEquals("INVALID_QUERY_CONFIGURATION",assertThrows(VnPayQueryException.class,()->client.query(attempt)).getMessage());
+        verifyNoInteractions(http);
     }
 }
