@@ -23,6 +23,7 @@ class AuthorizationHttpTest {
     @MockBean AttendanceService attendance;
     @MockBean UserRepository users;
     @MockBean InvoiceService invoices;
+    @MockBean VnPayVerificationService verification;
     @MockBean PaymentProperties properties;
     static final String BOOK = "{\"subscriptionId\":1,\"coachId\":2,\"roomId\":1,\"sessionDate\":\"2026-12-01\",\"startTime\":\"06:00\",\"endTime\":\"07:30\",\"classId\":1}";
     @Test void anonymousScheduleRequestIs401() throws Exception { mvc.perform(get("/api/sessions")).andExpect(status().isUnauthorized()); }

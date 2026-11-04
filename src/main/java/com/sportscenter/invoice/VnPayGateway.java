@@ -28,8 +28,12 @@ public class VnPayGateway {
     }
 
     public String createPaymentUrl(Invoice invoice, String clientIp) {
+        return createPaymentLink(invoice, clientIp).url();
+    }
+
+    public PaymentLink createPaymentLink(Invoice invoice, String clientIp) {
         requireConfigured();
-        var now = java.time.ZonedDateTime.now(clock);
+        var now = java.time.ZonedDateTime.now(clock).withZoneSameInstant(VIETNAM_ZONE);
         TreeMap<String, String> params = new TreeMap<>();
         params.put("vnp_Version", "2.1.0");
         params.put("vnp_Command", "pay");
@@ -50,8 +54,11 @@ public class VnPayGateway {
         String query = params.entrySet().stream()
                 .map(entry -> urlEncode(entry.getKey()) + "=" + urlEncode(entry.getValue()))
                 .collect(Collectors.joining("&"));
-        return properties.getVnpayPayUrl() + "?" + query;
+        return new PaymentLink(properties.getVnpayPayUrl() + "?" + query, params.get("vnp_TmnCode"),
+                params.get("vnp_TxnRef"), params.get("vnp_CreateDate"), Long.parseLong(params.get("vnp_Amount")));
     }
+
+    public record PaymentLink(String url, String tmnCode, String txnRef, String createDate, long amountMinor) { }
 
     public boolean verifyCallback(Map<String, String> callbackParams) {
         if (properties.getVnpayTmnCode() == null || !properties.getVnpayTmnCode().equals(callbackParams.get("vnp_TmnCode"))) return false;

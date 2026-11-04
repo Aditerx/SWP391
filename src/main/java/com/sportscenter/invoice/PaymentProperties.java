@@ -24,4 +24,13 @@ public class PaymentProperties {
 
     @Value("${payment.frontend-result-url:http://localhost:5173/payment-result}")
     private String frontendResultUrl;
+
+    @Value("${vnpay.query-enabled:false}")
+    private boolean vnpayQueryEnabled;
+    @Value("${vnpay.query-settlement-enabled:false}")
+    private boolean vnpayQuerySettlementEnabled;
+    @Value("${vnpay.query-url:https://sandbox.vnpayment.vn/merchant_webapi/api/transaction}")
+    private String vnpayQueryUrl;
+    @Value("${vnpay.query-ip-address:}")
+    private String vnpayQueryIpAddress;
 }

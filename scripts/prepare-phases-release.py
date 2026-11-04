@@ -7,7 +7,8 @@ p.add_argument('--output',default='artifacts/runs/empty-schema/'+dt.datetime.now
 args=p.parse_args();out=(root/args.output).resolve();out.mkdir(parents=True,exist_ok=True)
 files=['database/bootstrap/scms_structure_postgres.sql']+['database/migrations/'+n for n in [
     '06_schedule_safety_postgres.sql','07_session_subscription_postgres.sql','08_advanced_entitlements_postgres.sql',
-    '09_approved_catalog_postgres.sql','10_session_incidents_postgres.sql','11_holiday_history_postgres.sql','12_payment_resolutions_postgres.sql']]
+    '09_approved_catalog_postgres.sql','10_session_incidents_postgres.sql','11_holiday_history_postgres.sql','12_payment_resolutions_postgres.sql',
+    '13_room_catalog_postgres.sql','14_absence_attendance_postgres.sql','15_QueryDR.sql']]
 chunks=['-- SCMS phases 1.0-1.4 and 2. P1.5 / T / FE excluded. Empty public schema only.','BEGIN;']
 manifest=[]
 for name in files:

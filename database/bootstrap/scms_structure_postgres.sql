@@ -206,6 +206,28 @@ ALTER TABLE rooms ADD COLUMN IF NOT EXISTS facility_type VARCHAR(20) NOT NULL DE
 ALTER TABLE rooms DROP CONSTRAINT IF EXISTS chk_facility_type;
 ALTER TABLE rooms ADD CONSTRAINT chk_facility_type CHECK (facility_type IN ('Indoor', 'Outdoor'));
 
+-- Room codes: additive and compatible with numeric IDs.
+ALTER TABLE rooms ADD COLUMN IF NOT EXISTS room_code VARCHAR(40);
+UPDATE rooms SET room_code='C'||lpad(center_id::text,greatest(2,length(center_id::text)),'0')||'-LEGACY-'||room_id WHERE room_code IS NULL;
+ALTER TABLE rooms ALTER COLUMN room_code SET NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_rooms_code ON rooms(room_code);
+DO $$ BEGIN
+ IF NOT EXISTS(SELECT 1 FROM pg_constraint WHERE conrelid='rooms'::regclass AND conname='chk_room_code') THEN
+  ALTER TABLE rooms ADD CONSTRAINT chk_room_code CHECK (
+   room_code ~ '^C[0-9]{2,}-[A-Z0-9]+-[A-Z0-9]+$'
+   AND split_part(room_code,'-',1)='C'||lpad(center_id::text,greatest(2,length(center_id::text)),'0'));
+ END IF;
+END $$;
+-- Allows a rolling deploy: old writers omit code; the numeric ID remains stable.
+CREATE OR REPLACE FUNCTION fn_room_code_default() RETURNS TRIGGER LANGUAGE plpgsql AS $$
+BEGIN
+ IF NEW.room_code IS NULL THEN NEW.room_code:='C'||lpad(NEW.center_id::text,greatest(2,length(NEW.center_id::text)),'0')||'-LEGACY-'||NEW.room_id; END IF;
+ RETURN NEW;
+END $$;
+DROP TRIGGER IF EXISTS trg_room_code_default ON rooms;
+CREATE TRIGGER trg_room_code_default BEFORE INSERT ON rooms FOR EACH ROW EXECUTE FUNCTION fn_room_code_default();
+
+
 CREATE TABLE IF NOT EXISTS classes (
     class_id       SERIAL PRIMARY KEY,
     class_name     VARCHAR(100) NOT NULL,
@@ -341,6 +363,8 @@ CREATE TABLE IF NOT EXISTS attendances (
     state          VARCHAR(20) NOT NULL DEFAULT 'Present'
         CHECK (state IN ('Present', 'Absent', 'Late', 'CheckedIn', 'Excused')),
     note           TEXT NULL,
+    absence_notice_id INT NULL,
+    superseded_at TIMESTAMP NULL,
     check_in_time  TIMESTAMP NULL,
     check_out_time TIMESTAMP NULL,
     CONSTRAINT fk_attendance_session  FOREIGN KEY (session_id)  REFERENCES sessions(session_id) ON DELETE CASCADE,
@@ -360,9 +384,11 @@ ALTER TABLE training_results ADD CONSTRAINT ck_training_results_attendance_statu
     CHECK (attendance_status IN ('Present', 'Absent', 'Late', 'Excused'));
 
 -- Partial unique index: only one attendance record per (session, member) when session_id IS NOT NULL
+ALTER TABLE attendances ADD COLUMN IF NOT EXISTS absence_notice_id INT;
+ALTER TABLE attendances ADD COLUMN IF NOT EXISTS superseded_at TIMESTAMP;
 CREATE UNIQUE INDEX IF NOT EXISTS ux_attendance_session_member
     ON attendances(session_id, member_id)
-    WHERE session_id IS NOT NULL;
+    WHERE session_id IS NOT NULL AND superseded_at IS NULL;
 
 CREATE INDEX IF NOT EXISTS idx_attendance_member ON attendances(member_id);
 
@@ -598,6 +624,24 @@ CREATE TABLE IF NOT EXISTS invoices (
     CONSTRAINT fk_invoice_subscription FOREIGN KEY (subscription_id) REFERENCES member_packages(subscription_id),
     CONSTRAINT fk_invoice_receptionist FOREIGN KEY (receptionist_id) REFERENCES receptionists(user_id),
     CONSTRAINT chk_invoice_target CHECK ((package_id IS NOT NULL AND class_id IS NULL) OR (package_id IS NULL AND class_id IS NOT NULL))
+);
+
+CREATE TABLE IF NOT EXISTS public.vnpay_payment_attempts (
+  attempt_id BIGSERIAL PRIMARY KEY,
+  invoice_id INTEGER NOT NULL,
+  tmn_code VARCHAR(32) NOT NULL,
+  txn_ref VARCHAR(100) NOT NULL,
+  transaction_date VARCHAR(14) NOT NULL,
+  amount_minor BIGINT NOT NULL,
+  created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL,
+  last_query_at TIMESTAMP WITHOUT TIME ZONE NULL,
+  CONSTRAINT fk_vnpay_attempt_invoice FOREIGN KEY(invoice_id)
+    REFERENCES public.invoices(invoice_id) ON DELETE RESTRICT,
+  CONSTRAINT uq_vnpay_attempt_request UNIQUE(invoice_id,tmn_code,txn_ref,transaction_date),
+  CONSTRAINT chk_vnpay_attempt_tmn CHECK(tmn_code ~ '^[A-Za-z0-9_-]{1,32}$'),
+  CONSTRAINT chk_vnpay_attempt_ref CHECK(length(txn_ref) BETWEEN 1 AND 100 AND txn_ref !~ '[[:cntrl:]]'),
+  CONSTRAINT chk_vnpay_attempt_date CHECK(transaction_date ~ '^[0-9]{14}$'),
+  CONSTRAINT chk_vnpay_attempt_amount CHECK(amount_minor BETWEEN 1 AND 999999999999)
 );
 
 CREATE INDEX IF NOT EXISTS idx_invoice_member       ON invoices(member_id);

@@ -16,7 +16,8 @@ public record AttendanceResponse(
         String recordedByName,
         String state,
         LocalDateTime checkInTime,
-        LocalDateTime checkOutTime
+        LocalDateTime checkOutTime,
+        Integer absenceNoticeId
 ) {
     public static AttendanceResponse from(Attendance att) {
         if (att == null) return null;
@@ -48,7 +49,8 @@ public record AttendanceResponse(
                 recordedByName,
                 att.getState(),
                 att.getCheckInTime(),
-                att.getCheckOutTime()
+                att.getCheckOutTime(),
+                att.getAbsenceNoticeId()
         );
     }
 }

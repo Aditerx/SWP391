@@ -17,14 +17,14 @@ public interface AttendanceRepository extends JpaRepository<Attendance, Integer>
            "LEFT JOIN FETCH s.sportsClass sc " +
            "LEFT JOIN FETCH a.member m " +
            "LEFT JOIN FETCH a.recordedBy r " +
-           "ORDER BY a.attendanceId DESC")
+           "WHERE a.supersededAt IS NULL ORDER BY a.attendanceId DESC")
     List<Attendance> findAllWithDetails();
 
     @Query("SELECT a FROM Attendance a " +
            "LEFT JOIN FETCH a.session s " +
            "LEFT JOIN FETCH a.member m " +
            "LEFT JOIN FETCH a.recordedBy r " +
-           "WHERE (:sessionId IS NULL OR (a.session IS NOT NULL AND a.session.id = :sessionId)) " +
+           "WHERE a.supersededAt IS NULL AND (:sessionId IS NULL OR (a.session IS NOT NULL AND a.session.id = :sessionId)) " +
            "AND (:memberId IS NULL OR a.member.id = :memberId) " +
            "AND (:recordedBy IS NULL OR (a.recordedBy IS NOT NULL AND a.recordedBy.id = :recordedBy)) " +
            "AND (:state IS NULL OR LOWER(a.state) = LOWER(:state)) " +
@@ -41,7 +41,7 @@ public interface AttendanceRepository extends JpaRepository<Attendance, Integer>
     );
 
     @Query("SELECT a FROM Attendance a " +
-           "WHERE a.session.id = :sessionId AND a.member.id = :memberId")
+           "WHERE a.session.id = :sessionId AND a.member.id = :memberId AND a.supersededAt IS NULL")
     Optional<Attendance> findBySessionIdAndMemberId(
             @Param("sessionId") Integer sessionId,
             @Param("memberId") Integer memberId
@@ -53,12 +53,13 @@ public interface AttendanceRepository extends JpaRepository<Attendance, Integer>
     List<Attendance> findOpenCheckInsByMemberId(@Param("memberId") Integer memberId);
 
     @Query("SELECT COUNT(a) FROM Attendance a WHERE a.member.id = :memberId AND a.state = 'Absent' " +
+            "AND a.supersededAt IS NULL AND (a.absenceNoticeId IS NULL OR a.session.attendanceFinalized = true) " +
             "AND a.session.centerInvalidated = false AND a.session.sessionDate >= :fromDate AND a.session.sessionDate < :toDate")
     long countAbsencesForMemberInRange(@Param("memberId") Integer memberId,
             @Param("fromDate") java.time.LocalDate fromDate, @Param("toDate") java.time.LocalDate toDate);
 
     @Query("SELECT CASE WHEN COUNT(a) > 0 THEN true ELSE false END FROM Attendance a WHERE a.member.id = :memberId " +
-            "AND a.state IN ('Present', 'Late', 'CheckedIn') AND a.checkInTime >= :since AND a.checkInTime <= :until")
+            "AND a.supersededAt IS NULL AND a.state IN ('Present', 'Late', 'CheckedIn') AND a.checkInTime >= :since AND a.checkInTime <= :until")
     boolean hasRecentAttendance(@Param("memberId") Integer memberId, @Param("since") LocalDateTime since,
             @Param("until") LocalDateTime until);
 }

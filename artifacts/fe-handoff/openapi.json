@@ -2276,6 +2276,48 @@
         }
       }
     },
+    "/api/members/me/invoices/{id}/verify-vnpay": {
+      "post": {
+        "tags": [
+          "invoice-controller"
+        ],
+        "operationId": "verifyVnpay",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "Empty JSON object only; all payment evidence is read by the backend",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/VnPayVerificationResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/member-packages/{id}/extend": {
       "post": {
         "tags": [
@@ -6891,6 +6933,12 @@
           "facilityType": {
             "pattern": "Indoor|Outdoor",
             "type": "string"
+          },
+          "roomCode": {
+            "maxLength": 40,
+            "minLength": 0,
+            "pattern": "C[0-9]{2,}-[A-Z0-9]+-[A-Z0-9]+",
+            "type": "string"
           }
         }
       },
@@ -6919,6 +6967,9 @@
           },
           "outdoor": {
             "type": "boolean"
+          },
+          "roomCode": {
+            "type": "string"
           }
         }
       },
@@ -8010,6 +8061,110 @@
           }
         }
       },
+      "InvoiceResponse": {
+        "type": "object",
+        "properties": {
+          "invoiceId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "memberId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "memberName": {
+            "type": "string"
+          },
+          "memberEmail": {
+            "type": "string"
+          },
+          "memberPhone": {
+            "type": "string"
+          },
+          "packageId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "packageName": {
+            "type": "string"
+          },
+          "durationDays": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "receptionistId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "receptionistName": {
+            "type": "string"
+          },
+          "amount": {
+            "type": "number"
+          },
+          "paymentMethod": {
+            "type": "string"
+          },
+          "paymentStatus": {
+            "type": "string"
+          },
+          "paymentDate": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "gatewayTransactionRef": {
+            "type": "string"
+          },
+          "invoiceCode": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "classId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "className": {
+            "type": "string"
+          },
+          "reconciliationRequired": {
+            "type": "boolean"
+          },
+          "cashNote": {
+            "type": "string"
+          },
+          "resolutionStatus": {
+            "type": "string"
+          },
+          "cashConfirmationReversed": {
+            "type": "boolean"
+          }
+        }
+      },
+      "VnPayVerificationResponse": {
+        "type": "object",
+        "properties": {
+          "verificationStatus": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "retryAfterSeconds": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "invoice": {
+            "$ref": "#/components/schemas/InvoiceResponse"
+          }
+        }
+      },
       "PackageExtensionRequest": {
         "required": [
           "extendDays"
@@ -8095,92 +8250,6 @@
         "properties": {
           "note": {
             "type": "string"
-          }
-        }
-      },
-      "InvoiceResponse": {
-        "type": "object",
-        "properties": {
-          "invoiceId": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "memberId": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "memberName": {
-            "type": "string"
-          },
-          "memberEmail": {
-            "type": "string"
-          },
-          "memberPhone": {
-            "type": "string"
-          },
-          "packageId": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "packageName": {
-            "type": "string"
-          },
-          "durationDays": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "receptionistId": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "receptionistName": {
-            "type": "string"
-          },
-          "amount": {
-            "type": "number"
-          },
-          "paymentMethod": {
-            "type": "string"
-          },
-          "paymentStatus": {
-            "type": "string"
-          },
-          "paymentDate": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "gatewayTransactionRef": {
-            "type": "string"
-          },
-          "invoiceCode": {
-            "type": "string"
-          },
-          "createdAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "expiresAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "classId": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "className": {
-            "type": "string"
-          },
-          "reconciliationRequired": {
-            "type": "boolean"
-          },
-          "cashNote": {
-            "type": "string"
-          },
-          "resolutionStatus": {
-            "type": "string"
-          },
-          "cashConfirmationReversed": {
-            "type": "boolean"
           }
         }
       },
@@ -8998,6 +9067,10 @@
           "checkOutTime": {
             "type": "string",
             "format": "date-time"
+          },
+          "absenceNoticeId": {
+            "type": "integer",
+            "format": "int32"
           }
         }
       },
@@ -9620,12 +9693,12 @@
           "autowireCapableBeanFactory": {
             "$ref": "#/components/schemas/AutowireCapableBeanFactory"
           },
+          "applicationName": {
+            "type": "string"
+          },
           "startupDate": {
             "type": "integer",
             "format": "int64"
-          },
-          "applicationName": {
-            "type": "string"
           },
           "environment": {
             "$ref": "#/components/schemas/Environment"
@@ -9995,13 +10068,13 @@
       "FilterRegistration": {
         "type": "object",
         "properties": {
-          "servletNameMappings": {
+          "urlPatternMappings": {
             "type": "array",
             "items": {
               "type": "string"
             }
           },
-          "urlPatternMappings": {
+          "servletNameMappings": {
             "type": "array",
             "items": {
               "type": "string"
@@ -10036,10 +10109,10 @@
           "is2xxSuccessful": {
             "type": "boolean"
           },
-          "is1xxInformational": {
+          "is3xxRedirection": {
             "type": "boolean"
           },
-          "is3xxRedirection": {
+          "is1xxInformational": {
             "type": "boolean"
           }
         }
@@ -10064,28 +10137,10 @@
       "JspPropertyGroupDescriptor": {
         "type": "object",
         "properties": {
-          "trimDirectiveWhitespaces": {
-            "type": "string"
-          },
-          "scriptingInvalid": {
-            "type": "string"
-          },
-          "errorOnELNotFound": {
-            "type": "string"
-          },
-          "errorOnUndeclaredNamespace": {
-            "type": "string"
-          },
-          "deferredSyntaxAllowedAsLiteral": {
-            "type": "string"
-          },
           "buffer": {
             "type": "string"
           },
-          "defaultContentType": {
-            "type": "string"
-          },
-          "urlPatterns": {
+          "includePreludes": {
             "type": "array",
             "items": {
               "type": "string"
@@ -10097,19 +10152,37 @@
               "type": "string"
             }
           },
-          "pageEncoding": {
-            "type": "string"
-          },
           "isXml": {
             "type": "string"
           },
-          "includePreludes": {
+          "elIgnored": {
+            "type": "string"
+          },
+          "pageEncoding": {
+            "type": "string"
+          },
+          "urlPatterns": {
             "type": "array",
             "items": {
               "type": "string"
             }
           },
-          "elIgnored": {
+          "defaultContentType": {
+            "type": "string"
+          },
+          "errorOnELNotFound": {
+            "type": "string"
+          },
+          "deferredSyntaxAllowedAsLiteral": {
+            "type": "string"
+          },
+          "scriptingInvalid": {
+            "type": "string"
+          },
+          "errorOnUndeclaredNamespace": {
+            "type": "string"
+          },
+          "trimDirectiveWhitespaces": {
             "type": "string"
           }
         }
@@ -10188,10 +10261,10 @@
               "type": "string"
             }
           },
-          "redirectView": {
+          "propagateQueryProperties": {
             "type": "boolean"
           },
-          "propagateQueryProperties": {
+          "redirectView": {
             "type": "boolean"
           },
           "attributes": {
@@ -10286,15 +10359,7 @@
           "attributeNames": {
             "type": "object"
           },
-          "effectiveMajorVersion": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "effectiveMinorVersion": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "defaultSessionTrackingModes": {
+          "effectiveSessionTrackingModes": {
             "uniqueItems": true,
             "type": "array",
             "items": {
@@ -10306,7 +10371,55 @@
               ]
             }
           },
-          "effectiveSessionTrackingModes": {
+          "requestCharacterEncoding": {
+            "type": "string"
+          },
+          "effectiveMinorVersion": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "effectiveMajorVersion": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "initParameterNames": {
+            "type": "object"
+          },
+          "servletContextName": {
+            "type": "string"
+          },
+          "sessionCookieConfig": {
+            "$ref": "#/components/schemas/SessionCookieConfig"
+          },
+          "jspConfigDescriptor": {
+            "$ref": "#/components/schemas/JspConfigDescriptor"
+          },
+          "responseCharacterEncoding": {
+            "type": "string"
+          },
+          "sessionTrackingModes": {
+            "uniqueItems": true,
+            "type": "array",
+            "writeOnly": true,
+            "items": {
+              "type": "string",
+              "enum": [
+                "COOKIE",
+                "URL",
+                "SSL"
+              ]
+            }
+          },
+          "filterRegistrations": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/FilterRegistration"
+            }
+          },
+          "virtualServerName": {
+            "type": "string"
+          },
+          "defaultSessionTrackingModes": {
             "uniqueItems": true,
             "type": "array",
             "items": {
@@ -10324,55 +10437,15 @@
               "$ref": "#/components/schemas/ServletRegistration"
             }
           },
-          "requestCharacterEncoding": {
-            "type": "string"
-          },
-          "sessionTrackingModes": {
-            "uniqueItems": true,
-            "type": "array",
-            "writeOnly": true,
-            "items": {
-              "type": "string",
-              "enum": [
-                "COOKIE",
-                "URL",
-                "SSL"
-              ]
-            }
-          },
-          "jspConfigDescriptor": {
-            "$ref": "#/components/schemas/JspConfigDescriptor"
-          },
-          "initParameterNames": {
-            "type": "object"
-          },
-          "virtualServerName": {
-            "type": "string"
-          },
-          "responseCharacterEncoding": {
-            "type": "string"
-          },
-          "servletContextName": {
-            "type": "string"
-          },
-          "sessionCookieConfig": {
-            "$ref": "#/components/schemas/SessionCookieConfig"
-          },
-          "filterRegistrations": {
-            "type": "object",
-            "additionalProperties": {
-              "$ref": "#/components/schemas/FilterRegistration"
-            }
-          },
-          "sessionTimeout": {
-            "type": "integer",
-            "format": "int32"
-          },
           "contextPath": {
             "type": "string"
           },
           "serverInfo": {
             "type": "string"
+          },
+          "sessionTimeout": {
+            "type": "integer",
+            "format": "int32"
           }
         }
       },
@@ -10427,12 +10500,12 @@
             "type": "string",
             "deprecated": true
           },
-          "secure": {
-            "type": "boolean"
-          },
           "maxAge": {
             "type": "integer",
             "format": "int32"
+          },
+          "secure": {
+            "type": "boolean"
           }
         }
       },
@@ -10503,13 +10576,13 @@
       "PageNotificationResponse": {
         "type": "object",
         "properties": {
-          "totalPages": {
-            "type": "integer",
-            "format": "int32"
-          },
           "totalElements": {
             "type": "integer",
             "format": "int64"
+          },
+          "totalPages": {
+            "type": "integer",
+            "format": "int32"
           },
           "first": {
             "type": "boolean"
@@ -10562,9 +10635,6 @@
               "$ref": "#/components/schemas/SortObject"
             }
           },
-          "unpaged": {
-            "type": "boolean"
-          },
           "pageSize": {
             "type": "integer",
             "format": "int32"
@@ -10574,6 +10644,9 @@
             "format": "int32"
           },
           "paged": {
+            "type": "boolean"
+          },
+          "unpaged": {
             "type": "boolean"
           }
         }
@@ -10823,13 +10896,13 @@
       "PageChatConversationResponse": {
         "type": "object",
         "properties": {
-          "totalPages": {
-            "type": "integer",
-            "format": "int32"
-          },
           "totalElements": {
             "type": "integer",
             "format": "int64"
+          },
+          "totalPages": {
+            "type": "integer",
+            "format": "int32"
           },
           "first": {
             "type": "boolean"

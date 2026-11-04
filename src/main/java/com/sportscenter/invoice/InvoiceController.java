@@ -22,6 +22,7 @@ import java.util.Map;
 public class InvoiceController {
     private final InvoiceService invoiceService;
     private final PaymentProperties paymentProperties;
+    private final VnPayVerificationService vnPayVerificationService;
 
     @GetMapping("/api/invoices")
     @PreAuthorize("hasAuthority('MANAGE_INVOICES')")
@@ -53,6 +54,20 @@ public class InvoiceController {
     @GetMapping("/api/members/me/invoices/{id}")
     @PreAuthorize("hasRole('MEMBER')")
     public InvoiceResponse ownInvoice(@PathVariable Integer id, Authentication authentication) { return invoiceService.findOwnById(id, authentication); }
+
+    @PostMapping(value = "/api/members/me/invoices/{id}/verify-vnpay", consumes = "application/json")
+    @PreAuthorize("hasRole('MEMBER')")
+    @io.swagger.v3.oas.annotations.Operation(requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
+            required = false, description = "Empty JSON object only; all payment evidence is read by the backend",
+            content = @io.swagger.v3.oas.annotations.media.Content(mediaType = "application/json",
+                    schema = @io.swagger.v3.oas.annotations.media.Schema(type = "object",
+                            additionalProperties = io.swagger.v3.oas.annotations.media.Schema.AdditionalPropertiesValue.FALSE))))
+    public VnPayVerificationResponse verifyVnpay(@PathVariable Integer id,
+            @RequestBody(required = false) Map<String, Object> body, Authentication authentication) {
+        if (body != null && !body.isEmpty())
+            throw new com.sportscenter.common.exception.BusinessException("EMPTY_BODY_REQUIRED: Send {} only");
+        return vnPayVerificationService.verify(id, authentication);
+    }
 
     @PostMapping("/api/invoices/{id}/confirm-cash")
     @PreAuthorize("hasAuthority('MANAGE_INVOICES') and hasRole('RECEPTIONIST')")

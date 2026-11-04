@@ -16,6 +16,16 @@ public class Room {
     @Column(name = "room_id")
     private Integer id;
 
+    @Column(name = "room_code", nullable = false, length = 40, unique = true)
+    private String roomCode;
+
+    @PrePersist
+    void assignCode() {
+        if (roomCode == null || roomCode.isBlank()) {
+            roomCode = "C%02d-RM-%s".formatted(centerId, java.util.UUID.randomUUID().toString().replace("-", "").substring(0, 12).toUpperCase(java.util.Locale.ROOT));
+        }
+    }
+
     @Column(name = "room_name")
     private String name;
 
