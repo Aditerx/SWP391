@@ -160,11 +160,34 @@ Nếu đã quay về đúng Pages `/member/invoices` nhưng còn “Chờ thanh 
 
 Nếu đọc được `Expired`, `paymentDate=null`, `gatewayTransactionRef=null`: chưa có bằng chứng IPN thành công đã commit. Không kết luận gateway chưa gọi chỉ từ ba field này; IPN có thể chưa tới, bị từ chối, lỗi hoặc giao dịch ngân hàng không thành công. Trong Network của **lần cũ**, chọn BE `return?vnp_...`302 → Payload → Query String Parameters (hoặc Headers → Request URL), lấy riêng `vnp_ResponseCode`, `vnp_TransactionStatus`, `vnp_TransactionNo`, `vnp_PayDate`; không cần gửi chữ ký/full URL. Kiểm IPN URL đã đăng ký với **VNPay**: `https://scms-app-p1gy.onrender.com/api/payments/vnpay/ipn`. Chỉ đặt biến Render không đăng ký IPN với gateway. Nếu cổng merchant không có nơi cấu hình thì gửi URL này cho hỗ trợ VNPay và nhờ đối chiếu lịch sử gọi IPN/RspCode của giao dịch cũ theo [hướng dẫn PAY](https://sandbox.vnpayment.vn/apis/docs/thanh-toan-pay/pay.html). Kiểm log đúng khoảng thời gian; không có dòng trong console ứng dụng chưa chứng minh không có request nếu access logging chưa bật. Theo D10, IPN thành công hợp lệ đến sau hạn vẫn phải ghi nhận Paid/cần đối soát và không hồi sinh quyền; không tăng thời gian giữ hoặc sửa Expired thành Paid bằng tay để vượt bước nghiệm thu. Chỉ thử sandbox mới sau khi chốt kết quả giao dịch cũ và cấu hình callback/redirect đúng.
 
-**Kiểm IPN khi chưa rõ giao diện merchant:** từ menu đã thấy trong ảnh Owner, mở **GD Thanh toán** và chi tiết đúng mã giao dịch gateway để đối chiếu kết quả; nếu có phần lịch sử thông báo/IPN thì lấy URL đích, thời gian gọi, HTTP status và RspCode. Owner đã mở **Cài đặt thông báo** và gửi ảnh xác nhận chỉ đăng ký email, không phải IPN; không đổi mục này để thử callback. Không suy URL IPN từ URL website đăng ký hoặc Return URL. Theo tài liệu PAY cần gửi IPN URL cho VNPay thiết lập khi chưa có cấu hình; dùng yêu cầu hỗ trợ bên dưới để xác nhận URL đang gắn với merchant, lịch sử gọi và RspCode. Không bịa đường dẫn menu “Cấu hình → Thông tin website” khi chưa kiểm được giao diện tài khoản thực tế.
+**Kiểm IPN sandbox trước khi thêm relay:** [hướng dẫn của SDK cộng đồng lehuygiang28/vnpay](https://vnpay.js.org/ipn/config-ipn) chỉ chỗ tự đặt IPN tại **Thông tin tài khoản** góc phải → danh sách website → biểu tượng sửa Terminal. Sau đăng nhập có thể mở [TerminalEdit](https://sandbox.vnpayment.vn/merchantv2/Account/TerminalEdit.htm). Owner đã mở được form và báo bấm Hoàn thành với IPN URL `https://scms-app-p1gy.onrender.com/api/payments/vnpay/ipn`, GET và HMACSHA512; tiếp tục kiểm lưu/callback theo mục bên dưới. Chọn đúng Terminal/TmnCode đang dùng. Menu **Cài đặt thông báo** Owner đã mở chỉ là email, khác Terminal. Nếu tài khoản khác không có quyền/trường này thì dùng hỗ trợ bên dưới. Không suy IPN từ website/Return URL; không đưa HashSecret lên ảnh/báo cáo. Cấu hình xong vẫn cần xác minh callback thật và state đã commit, không mặc định đã sửa xong.
+
+<a id="ipn-acceptance"></a>
+**Sau khi bấm Hoàn thành ở Terminal:** mở lại đúng Terminal để kiểm IPN URL còn giữ nguyên, giao thức GET và HMACSHA512. Không cần deploy BE, chạy SQL hoặc đổi env cho thao tác lưu phía VNPay. Lượt sandbox sau cấu hình đã được Owner gửi response Paid và thấy FE cập nhật ngay; bằng chứng/giới hạn tại [Active](00-MASTER-CHECKLIST.md#active). Checklist dưới dành cho lần nghiệm thu được phép khác, không yêu cầu tạo thêm đơn để lặp ca đã thành công.
+
+1. Dùng tài khoản/fixture sandbox được phép, xác minh `/api/auth/me`200 và mở F12 → Network → Preserve log. Tạo đúng một đơn thử riêng, không thu lại hóa đơn cũ đang chờ đối soát. Ghi invoiceId/code và expiresAt.
+2. Thanh toán trên `sandbox.vnpayment.vn` bằng [thẻ thử NCB do VNPay công bố](https://sandbox.vnpayment.vn/apis/vnpay-demo/); không dùng app ngân hàng/thẻ thật. Hoàn tất trong thời gian giữ5phút.
+3. Sau Return, đọc GET ownInvoice mới sau commit (hoặc tải lại danh sách), không dùng receipt trước Paid hay `status=00` làm kết quả. Cần paymentStatus=Paid, paymentDate/gatewayTransactionRef có giá trị; nếu xử lý muộn hoặc quyền không còn thì Paid+reconciliationRequired=true và không cấp lại quyền. Nếu còn Pending, chờ15–30giây và GET lại một lần, giữ nguyên đơn khi chẩn đoán.
+4. IPN là server→server, không có request IPN trong DevTools FE. Pending/Expired chưa chứng minh IPN không tới; cần kiểm provider delivery/HTTP/RspCode nếu chưa Paid. QueryDR vẫn có thể timeout độc lập; không sửa chữ ký/env hoặc thêm relay chỉ vì status cũ chưa đổi. Cấu hình mới không bảo đảm gateway gửi lại giao dịch cũ. GET hiện trạng các đơn cũ không tạo thanh toán mới.
+
+<a id="vnpay-options"></a>
+**Lựa chọn đường kết nối sau probe:** IPN là VNPay→BE, QueryDR là BE→VNPay; lỗi outbound hiện tại không tự chứng minh inbound cũng lỗi. Giữ IPN là kênh thông báo chính và QueryDR là xác minh chủ động theo D10; Return chỉ hiển thị.
+
+| Phương án | Đánh đổi và phạm vi BE |
+|---|---|
+| Tự cấu hình IPN sandbox | Kiểm trước: dùng endpoint BE hiện có, không cần relay hoặc migration mới. Không chữa đường QueryDR và không bảo đảm VNPay tự gửi lại giao dịch cũ. |
+| Khôi phục Render→VNPay trực tiếp | Ít thành phần vận hành; cần khoanh vùng mạng/provider, chưa có thời hạn xử lý. IP riêng chỉ cân nhắc khi có căn cứ allowlist; [Render yêu cầu Pro và phí riêng](https://render.com/docs/dedicated-ips), không bảo đảm mua gói sẽ hết lỗi. |
+| Relay local qua Cloudflare Tunnel | Giữ BE/DB hiện tại nhưng thêm transport có xác thực và giới hạn đích. Phải giữ máy/mạng/process chạy; [Quick Tunnel](https://developers.cloudflare.com/tunnel/get-started/quick-tunnels/) đổi hostname mỗi lần, không bảo đảm uptime; phù hợp demo tạm. |
+| Relay chạy cloud (Worker/VM) | Không phụ thuộc laptop; thêm dịch vụ, auth/token, giới hạn truy cập và vận hành. [Worker có fetch outbound](https://developers.cloudflare.com/workers/runtime-apis/fetch/) nhưng phải probe Worker→VNPay trước, chưa có bằng chứng tuyến này hoạt động. |
+| Chuyển BE sang host/region khác | Giữ QueryDR trực tiếp nhưng phải kiểm tuyến mạng trước, chuyển env/deploy và có thể cập nhật API base/CORS/Return/IPN. Phạm vi lớn hơn relay, chưa cần làm ngay. |
+
+Mọi relay chỉ chuyển tiếp request đã ký tới đích VNPay cố định và trả nguyên phản hồi; HashSecret, xác minh HMAC/merchant/reference/amount/status và nhánh ghi Paid vẫn ở BE. Cần thêm transport/auth có kiểm thử, không chỉ thay URL sang một proxy công khai. Endpoint FE và migration15 không cần thay vì lựa chọn đường mạng. Sau cấu hình Terminal, lượt sandbox đã ghi Paid; Owner chốt giữ nguyên phần đã triển khai, chưa chọn relay. Không thay SDK để chữa timeout: [SDK TypeScript](https://github.com/lehuygiang28/vnpay/blob/43627794aa4735e82d539831b81d53c8891cce19/src/services/query.service.ts) vẫn POST HTTP; [Omnipay PHP](https://github.com/phpviet/omnipay-vnpay/blob/91e2059838d44afa42f0173122fc499a709f7e7b/src/Message/QueryTransactionRequest.php) dùng GET/merchant.html cũ, khác [QueryDR2.1 POST JSON](https://sandbox.vnpayment.vn/apis/docs/truy-van-hoan-tien/querydr%26refund.html) của SCMS.
 
 <a id="querydr-proposal"></a>
 <a id="querydr"></a>
 **QueryDR — các bước cho demo sandbox**
+
+**Quyết định hiện hành:** Owner giữ nguyên code/endpoint, bảng `vnpay_payment_attempts`, migration15 và các env đã thêm. Không thực hiện đề xuất tắt QueryDR trước đó; bảng vẫn được dùng khi tạo link thanh toán. Các bước dưới là cấu hình/kiểm tra khi cần, không yêu cầu chạy lại SQL, đổi env hoặc deploy chỉ vì đổi tên tài liệu. QueryDR live vẫn chưa nghiệm thu; xem [D10](04-DEBUG-NOTE.md#d10).
 
 1. DB hiện có: chạy nguyên [15_QueryDR.sql](../database/migrations/15_QueryDR.sql) một lần trước deploy BE. File chỉ thêm bảng pay attempt và các ràng buộc liên quan, không sửa/xóa chứng từ cũ. Nếu đã chạy thành công thì chuyển bước2.
 2. Render → Environment: dùng cấu hình dưới đây, chọn **Save, rebuild, and deploy**, chờ **Live**.
@@ -194,16 +217,16 @@ const result = await fetch(api + "/api/members/me/invoices/" + id + "/verify-vnp
 console.log("HTTP", result.status, JSON.stringify(await result.json(), null, 2));
 ```
 
-Chờ `retryAfterSeconds` trước khi chạy lại. Không lấy `status=00` trên URL làm chứng từ. `ATTEMPT_MISSING` là đơn cũ thiếu metadata gốc; cần đối soát riêng. Nếu `QUERY_UNAVAILABLE`, xem log Render dòng `VNPay QueryDR invoice=... attempt=... reason=...`; chỉ chia sẻ lý do cố định, không gửi key/cookie. Contract/status đầy đủ tại [docs01](01-API-CONTRACT-FE-BE.md#payments), bàn giao ngày04/11 tại [đây](../SCMS-BAN-GIAO-FE-2026-11-04.md).
+Chờ `retryAfterSeconds` trước khi chạy lại. Không lấy `status=00` trên URL làm chứng từ. `ATTEMPT_MISSING` là đơn cũ thiếu metadata gốc; cần đối soát riêng. Nếu `QUERY_UNAVAILABLE`, xem log Render dòng `VNPay QueryDR invoice=... attempt=... reason=...`; chỉ chia sẻ lý do cố định, không gửi key/cookie. Contract/status đầy đủ tại [docs01](01-API-CONTRACT-FE-BE.md#payments), bàn giao VNPay ngày04/11 tại [đây](../SCMS-BAN-GIAO-FE-VNPAY-2026-11-04.md).
 
 **Nếu lỗi TLS/chứng chỉ Java:** có thể thử thêm Environment `JAVA_TOOL_OPTIONS=-Dcom.sun.security.enableAIAcaIssuers=true`, giữ các tùy chọn đã có nếu biến tồn tại, rồi Save/redeploy và kiểm lại **cùng đơn**. Java sẽ tìm chứng chỉ CA trung gian để dựng chuỗi tin cậy, vẫn xác minh TLS/hostname ([Oracle PKIX](https://docs.oracle.com/en/java/javase/17/security/java-pki-programmers-guide.html)). Lựa chọn này đã giúp probe HTTPS Java cục bộ kết nối được VNPay; chưa tự chứng minh nguyên nhân trên Render. Không đổi secret hoặc tạo thêm thanh toán để thử.
 
 <a id="querydr-network"></a>
 **Nếu log là CONNECT_TIMEOUT — kiểm tra trên chính Render:**
 
-1. Publish bản BE có `VnPayNetworkProbe`.
+1. Merge code có `VnPayNetworkProbe` vào đúng nhánh Render deploy rồi đợi bản mới Live. Với repo hiện tại, merge `tai → main`. Chỉ thêm env/redeploy commit cũ sẽ không có `VNPAY_NET`; xác minh bản deploy trước khi tìm log.
 2. Thêm Environment `VNPAY_NETWORK_PROBE_ENABLED=true`, lưu và deploy, chờ Live.
-3. Mở Logs, tìm `VNPAY_NET`, lấy các dòng tới `finished=true`. Probe tự chạy một lần mỗi lần khởi động khi bật cờ; không cần tạo đơn hoặc POST để kích hoạt. Sau chẩn đoán, tắt cờ.
+3. Mở Logs, tìm `VNPAY_NET`, lấy các dòng tới `finished=true`. Probe tự chạy một lần mỗi lần khởi động khi bật cờ; không cần tạo đơn hoặc POST để kích hoạt. Lượt hiện tại đã có log hoàn tất; Owner chốt giữ nguyên các env đã thêm, không tự tắt cờ hoặc redeploy chỉ để lặp chẩn đoán.
 
 Probe chỉ kiểm DNS, TCP443 tối đa15giây và HTTPS HEAD ở ngưỡng kết nối3/15giây tới VNPay sandbox cùng `example.com` làm đối chứng. TLS/hostname vẫn được kiểm bình thường. Không có merchant, secret, cookie, dữ liệu hóa đơn hoặc body QueryDR; không xác nhận Paid.
 
@@ -275,6 +298,16 @@ Backup public schema mã hóa DPAPI current Windows user ở `artifacts/private-
 Chế độ --target-fingerprint của script chuẩn bị đọc/backup remote và kiểm clone, không tự chạy remote DDL; output review vào `artifacts/runs/production-upgrade/<timestamp>`. Approval cũ không mở quyền bundle/target khác, seed/account/giao dịch hoặc live tests mới.
 
 ## 5. Hạn chế và lưu trữ
+
+### Chẩn đoán OTP SMTP
+
+Deploy source có `SMTP_SEND_START/SMTP_SEND_FAILED/SMTP_SEND_ACCEPTED`, chờ Live; không cần bật JavaMail debug hoặc thêm env để có log. Giữ nguyên provider/port/credential khi lấy bằng chứng ban đầu. Mở Render Logs, chờ ít nhất60giây từ lần gửi trước rồi bấm Gửi lại mã đúng1lần từ FE; tối đa3OTP/giờ theo contract. Đợi khoảng20giây và tìm `SMTP_SEND_`, lấy các dòng có cùng `attemptId` cùng dòng `OTP email delivery failed...` nếu có. Không chép key, OTP hoặc nội dung thư vào chat/báo cáo.
+
+`SMTP_SEND_START` ghi host/port, STARTTLS **được cấu hình** và ba cờ login/password/sender có giá trị; không ghi các giá trị nhạy cảm hoặc khẳng định TLS đã thương lượng. `SMTP_SEND_FAILED` ghi category, mã SMTP (`-1` là không có), tên loại exception và elapsedMs; không ghi raw message/stack trace, recipient hoặc failed-message map. Nhóm lỗi: DNS, TIMEOUT, CONNECTION, TLS, AUTHENTICATION, SMTP_REJECTED, MESSAGE_FORMAT, MISSING_SENDER hoặc UNKNOWN. TIMEOUT/CONNECTION chưa đủ chứng minh Render hay Brevo chặn; AUTHENTICATION cần kiểm SMTP login/key và chính sách tài khoản; SMTP_REJECTED cần đối chiếu smtpCode và trạng thái Brevo.
+
+`SMTP_SEND_ACCEPTED` chỉ chứng minh JavaMailSender trả về thành công, chưa chứng minh Inbox. Kiểm Brevo **Transactional → Logs** theo đúng thời gian/recipient, rồi Inbox/Spam và verify-registration. `code:null` của API là mã trạng thái tùy chọn, không phải OTP; POST/OPTIONS200 không là email delivery.
+
+### Cấu hình và lưu trữ
 
 Ghi nhận27/10: Render Free,dbUP/mailDOWN. [Render Free](https://render.com/docs/free) chặn SMTP25/465/587. Owner04/11 chọn thử Brevo SMTP2525 và báo đã xác minh sender/thêm env. Cấu hình `MAIL_HOST=smtp-relay.brevo.com`, `MAIL_PORT=2525`, `MAIL_USERNAME` là SMTP login Brevo cấp, `MAIL_APP_PASSWORD` là toàn bộ SMTP key (không phải API key), `MAIL_FROM_EMAIL` là sender đã xác minh; giữ STARTTLS đang bật và để trống `REGISTRATION_DEMO_OTP` khi kiểm OTP thật. Không chép credential vào Git. [Brevo hỗ trợ2525](https://help.brevo.com/hc/en-us/articles/10905415650322-Which-SMTP-port-should-I-use-Port-587-465-or-2525); vẫn phải kiểm kết nối/TLS và delivery từ Render, không suy thành công từ ảnh cấu hình. Nếu không kết nối được, phương án HTTPS email API vẫn cần adapter riêng. Các cổng SQLServer/browser/gateway/full authenticated business matrix ở docs00.
 
