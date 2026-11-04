@@ -20392,5 +20392,218 @@
     },
     "currentPaymentConfigurationMatchesSnapshot": true,
     "contractIdentityLimit": "Concurrent email source/config edits and DB README differ from tested snapshot; current QueryDR feature sources and payment configuration match"
+  },
+  "vnpayRolloutFollowup": {
+    "checkedAtUtc": "2026-11-04T08:58:53.606234+00:00",
+    "localCommit": "1edb26dc877c25b46351ce8d95e0bae8d37a2562",
+    "runtimeReportedCommit": "a03cc608c6a5ec3769a981da31b5ecc2fd5e4054",
+    "runtimeCommitFetchedFromOrigin": true,
+    "invoiceSourcesAndApplicationPropertiesMatch": true,
+    "publicChecks": {
+      "health": {
+        "httpStatus": 200,
+        "status": "UP"
+      },
+      "openApi": {
+        "httpStatus": 200,
+        "verifyVnpayPublished": true
+      },
+      "preflight": {
+        "httpStatus": 200,
+        "origin": "https://scms-demo-04nov.pages.dev",
+        "allowCredentials": "true",
+        "method": "POST"
+      }
+    },
+    "ownerReportedMigration15": "Completed successfully; not independently queried on Supabase",
+    "configurationScreenshot": {
+      "VNPAY_QUERY_ENABLED": "true",
+      "VNPAY_QUERY_SETTLEMENT_ENABLED": "true",
+      "VNPAY_QUERY_URL": "https://sandbox.vnpayment.vn/merchant_webapi/api/transaction",
+      "VNPAY_QUERY_IP_ADDR": "blank"
+    },
+    "configurationEffectiveValues": "Not verified with authenticated endpoint yet; screenshot alone does not prove env was saved/redeployed",
+    "guidance": "Keeping both flags true is acceptable for the authorized sandbox demo; read-only staging is optional; all signature/identity/amount/state checks remain",
+    "ownerProvidedInvoice": {
+      "invoiceId": 37,
+      "invoiceCode": "INV-2026-000024",
+      "paymentMethod": "VNPay",
+      "amount": 900000,
+      "paymentStatus": "Pending",
+      "paymentDate": null,
+      "gatewayTransactionRef": null,
+      "reconciliationRequired": false,
+      "createdAt": "2026-11-04T15:54:42.969529",
+      "expiresAt": "2026-11-04T15:59:42.969529"
+    },
+    "authenticatedQueryDrResult": "Owner POST37 returned HTTP200 QUERY_UNAVAILABLE / invoice Expired; not a confirmed gateway result",
+    "gatewayCallsByAgent": 0,
+    "ipnCallsByAgent": 0,
+    "cloudWritesByAgent": 0,
+    "browserInventory": {
+      "apps": 0,
+      "browsers": 0
+    },
+    "frontendSourceProbe": "Public Pages request returned403; automatic POST integration not determined",
+    "documentation": {
+      "handoff": "SCMS-BAN-GIAO-FE-2026-11-04.md",
+      "misplacedQueryDrSectionRemovedFrom": "SCMS-BAN-GIAO-FE-2026-11-02.md",
+      "otpAddedToNewHandoff": false
+    },
+    "backendChanged": false,
+    "newBackendTestsRun": false,
+    "ownerReadOnlyFollowup": {
+      "requests": [
+        {
+          "method": "GET",
+          "path": "/api/invoices/37/receipt",
+          "httpStatus": 409,
+          "message": "A receipt is available after payment is recorded",
+          "serverTimestampUtc": "2026-11-04T08:58:26.920798666Z"
+        },
+        {
+          "method": "GET",
+          "path": "/api/members/me/invoices/37",
+          "httpStatus": 200,
+          "paymentStatus": "Pending",
+          "paymentDate": null,
+          "gatewayTransactionRef": null
+        }
+      ],
+      "queryDrPostResponseProvided": false,
+      "nextAction": "Reuse invoice37; run authenticated POST verify-vnpay from browser Console; no new payment needed"
+    }
+  },
+  "vnpayTransportFollowup": {
+    "checkedAtUtc": "2026-11-04T09:32:13.012989+00:00",
+    "ownerPostResult": {
+      "invoiceId": 37,
+      "httpStatus": 200,
+      "verificationStatus": "QUERY_UNAVAILABLE",
+      "retryAfterSeconds": 30,
+      "paymentStatus": "Expired",
+      "paymentDate": null,
+      "gatewayTransactionRef": null,
+      "reconciliationRequired": false
+    },
+    "ownerRenderLogs": [
+      {
+        "timeUtc": "2026-11-04T09:09:12.571965293Z",
+        "attemptId": 2,
+        "reason": "QUERY_UNAVAILABLE"
+      },
+      {
+        "timeUtc": "2026-11-04T09:09:15.576989154Z",
+        "attemptId": 1,
+        "reason": "QUERY_UNAVAILABLE"
+      }
+    ],
+    "rootCauseOnRender": "UNCONFIRMED: old catch-all does not expose the transport cause",
+    "localReachability": {
+      "host": "sandbox.vnpayment.vn",
+      "ipv4": [
+        "103.220.84.173"
+      ],
+      "pythonVerifiedTlsIssuer": "ZeroSSL RSA DV SSL CA 2",
+      "certificateValidFromUtc": "2026-10-01T00:00:00Z",
+      "certificateValidToUtc": "2026-12-30T23:59:59Z",
+      "javaVersion": "Oracle Java17.0.12 Windows; not the Render runtime",
+      "javaDefaultHttp2": "SSLHandshakeException / ValidatorException / SunCertPathBuilderException",
+      "javaDefaultHttp11": "SSLHandshakeException / ValidatorException / SunCertPathBuilderException",
+      "javaWithAiaHttp2": {
+        "headStatus": 405,
+        "negotiated": "HTTP_1_1",
+        "elapsedMs": 1084
+      },
+      "javaWithAiaHttp11": {
+        "headStatus": 405,
+        "negotiated": "HTTP_1_1",
+        "elapsedMs": 125
+      },
+      "purpose": "HEAD and verified TLS certificate observations only; no merchant data, payment or QueryDR payload",
+      "limits": "Local Java behavior does not establish the same root cause on Render; successful HEAD is not successful QueryDR"
+    },
+    "ownerNextStep": "Try JAVA_TOOL_OPTIONS=-Dcom.sun.security.enableAIAcaIssuers=true, preserving existing options; redeploy and verify same invoice37",
+    "tlsValidationDisabled": false,
+    "liveQueryDrAfterAia": {
+      "evidence": "Owner console response after suggested JVM-option step; effective JVM value not independently inspected",
+      "httpStatus": 200,
+      "verificationStatus": "QUERY_UNAVAILABLE",
+      "invoiceId": 37,
+      "paymentStatus": "Expired",
+      "paymentDate": null,
+      "gatewayTransactionRef": null,
+      "reconciliationRequired": false
+    },
+    "backendDiagnosticChange": "Specific fixed transport/provider status codes; raw exception messages/bodies/URLs never logged; no signing or settlement changes",
+    "diagnosticPatchDeployed": false,
+    "cloudWritesByAgent": 0,
+    "paymentOrQueryPayloadsSentByAgent": 0,
+    "documentationScope": "VNPay only; OTP section not added",
+    "officialReferences": [
+      "https://docs.oracle.com/en/java/javase/17/security/java-pki-programmers-guide.html",
+      "https://docs.oracle.com/en/java/javase/17/docs/api/java.net.http/HttpClient.html"
+    ],
+    "diagnosticValidation": {
+      "result": "PASS_LOCAL",
+      "checkedAtUtc": "2026-11-04T09:25:18.312274+00:00",
+      "baseCommit": "1edb26dc877c25b46351ce8d95e0bae8d37a2562",
+      "workingTree": true,
+      "sourceFingerprints": {
+        "src/main": "0f1eb4481ff71fb0514488eddc76fbe978216d4cac116819b60f2185591847c0",
+        "src/test": "d002cd6a7879d57c827b028f3f45320e226b4f0f4b03e80cfb1f28ccec5399f1",
+        "database": "fcb87aca26143a4b49d19670fef1c86515fa57e856d5ad8ebbbd95d1463d3291",
+        "pom.xml": "aa5c4d1a1bb3e23860225b7aacd7341fe278430cd6148a8a9d66c9ebabc1864b",
+        "schema_postgres.sql": "7b3a0b5878335ddbeade70b9a4060aba6a097ace8ea561ad3f30baccfa824a0e",
+        "scripts/test-room-absence-postgres.py": "7144adb3689349a949c9ee702958f765fb5743433d8a285dcfc264af2a77c82c",
+        "scripts/test-phases-postgres.py": "365df6003bd90f65afe0593f195a733c25ae8c9abdca6848119555657be54eaa",
+        "scripts/prepare-phases-release.py": "e6c525b8a70562527d606b0017d72199865c838df31b6bbc995acb1405deb5a5"
+      },
+      "currentWorkspaceFingerprints": {
+        "src/main": "0f1eb4481ff71fb0514488eddc76fbe978216d4cac116819b60f2185591847c0",
+        "src/test": "d002cd6a7879d57c827b028f3f45320e226b4f0f4b03e80cfb1f28ccec5399f1",
+        "database": "fcb87aca26143a4b49d19670fef1c86515fa57e856d5ad8ebbbd95d1463d3291",
+        "pom.xml": "aa5c4d1a1bb3e23860225b7aacd7341fe278430cd6148a8a9d66c9ebabc1864b",
+        "schema_postgres.sql": "7b3a0b5878335ddbeade70b9a4060aba6a097ace8ea561ad3f30baccfa824a0e",
+        "scripts/test-room-absence-postgres.py": "7144adb3689349a949c9ee702958f765fb5743433d8a285dcfc264af2a77c82c",
+        "scripts/test-phases-postgres.py": "365df6003bd90f65afe0593f195a733c25ae8c9abdca6848119555657be54eaa",
+        "scripts/prepare-phases-release.py": "e6c525b8a70562527d606b0017d72199865c838df31b6bbc995acb1405deb5a5"
+      },
+      "scope": "Transport diagnostics only; no signing, settlement, timeout, schema or API response contract change",
+      "command": "mvnw.cmd clean test",
+      "environment": "Java17/H2/local HTTP protocol simulator, private source copy without .env",
+      "totals": {
+        "tests": 360,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 28,
+        "passed": 332
+      },
+      "queryClientCases": [
+        "validSignatureDoesNotAuthorizeWrongMerchantReferenceAmountOrRefund",
+        "rejectsTamperingMissingSignatureAndDuplicateJson",
+        "malformedEndpointDoesNotLeakConfigurationOrSendRequest",
+        "providerStatusAndResponseLimitHaveSafeDistinctCodes",
+        "querySuccessDoesNotMeanPaymentSuccessAndOptionalPromotionValuesAreSigned",
+        "sendsExactOriginalPayDateAndProtocolSpecificRequestHmacOverHttp",
+        "acceptsIndependentGoldenHmacIncludingEmptyPromotionSlots",
+        "transportFailuresHaveSpecificCodesWithoutLeakingExceptionDetails"
+      ],
+      "testSandbox": "C:\\Users\\Admin\\AppData\\Local\\Temp\\scms_querydr_transport_polkg3aw",
+      "envFilePresent": false,
+      "liveAuthenticatedQueryDrAfterFix": "PENDING_OWNER_RESPONSE",
+      "cloudWritesByAgent": 0,
+      "gatewayPaymentOrQueryRequestsByAgent": 0
+    },
+    "sourcePatchSha256": {
+      "src/main/java/com/sportscenter/invoice/VnPayQueryClient.java": "6348b63fdf84a8b800c9072adfd86feb6746586fd89b135581b076238249944e",
+      "src/test/java/com/sportscenter/invoice/VnPayQueryClientTest.java": "3d46da32862457c324f5edf6ab21f2ab667cabbb1e515f7d423c03317dc7586c"
+    },
+    "diagnosticPatchCommit": "28406296638b23aa5a72cca186340c33f60481f8",
+    "runtimeRecheck": {
+      "httpStatus": 200,
+      "buildCommit": "a03cc608c6a5ec3769a981da31b5ecc2fd5e4054"
+    },
+    "nextStep": "Publish diagnostic commit to the branch Render deploys, wait Live, then retry same invoice37 and inspect the specific fixed reason"
   }
 }

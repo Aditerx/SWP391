@@ -164,16 +164,44 @@ Nếu đọc được `Expired`, `paymentDate=null`, `gatewayTransactionRef=null
 
 <a id="querydr-proposal"></a>
 <a id="querydr"></a>
-**QueryDR — Owner đã duyệt triển khai04/11:** BE chủ động truy vấn [API QueryDR chính thức](https://sandbox.vnpayment.vn/apis/docs/truy-van-hoan-tien/querydr%26refund.html), xác minh kết quả rồi dùng chung nhánh ghi Paid với IPN theo D10. Return vẫn chỉ kiểm tra/redirect. Contract endpoint/status/UX tại [docs01](01-API-CONTRACT-FE-BE.md#payments); nghiệm thu tại docs00/QA. Không cần đợi IPN để triển khai nhánh này; merchant vẫn phải có khả năng gọi QueryDR và trả chữ ký hợp lệ.
+**QueryDR — các bước cho demo sandbox**
 
-**DB hiện có:** mở [15_QueryDR.sql](../database/migrations/15_QueryDR.sql), copy **toàn bộ file** và chạy một lần trong SQL Editor trên đúng DB SCMS đã cập nhật13/14. Kết quả cuối cần `migration_status=QUERYDR_SCHEMA_READY`; `preserved_attempt_rows` là số attempt, không là số invoice Paid. File chỉ thêm bảng `vnpay_payment_attempts`, FK/index/constraint và bảo vệ truy cập của bảng mới; không UPDATE/DELETE chứng từ hoặc reset bảng. Có transaction/guard/replay; nếu lỗi thì dừng và đọc thông báo, không xóa bảng/constraint để vượt guard. Không chạy schema dựng lại/hai bundle root để cài QueryDR. Bảng không chứa secret/fullURL; không backfill thời điểm giả cho đơn cũ.
+1. DB hiện có: chạy nguyên [15_QueryDR.sql](../database/migrations/15_QueryDR.sql) một lần trước deploy BE. File chỉ thêm bảng pay attempt và các ràng buộc liên quan, không sửa/xóa chứng từ cũ. Nếu đã chạy thành công thì chuyển bước2.
+2. Render → Environment: dùng cấu hình dưới đây, chọn **Save, rebuild, and deploy**, chờ **Live**.
 
-**Thứ tự bật:**
-1. Owner chạy nguyên file15, xác nhận kết quả. Review/commit/publish đúng source BE có QueryDR rồi deploy sau migration; luồng tạo link mới bắt đầu lưu attempt kể cả khi query chưa bật.
-2. Giữ `VNPAY_TMN_CODE`/`VNPAY_HASH_SECRET` đúng cặp merchant đang dùng; không thay bằng bộ demo trong repo. `VNPAY_RETURN_URL` vẫn là BE Return; `FRONTEND_PAYMENT_RESULT_URL` là Pages `/member/invoices`.
-3. Trên Render → service → Environment: đặt `VNPAY_QUERY_ENABLED=true`, `VNPAY_QUERY_SETTLEMENT_ENABLED=false`, `VNPAY_QUERY_URL=https://sandbox.vnpayment.vn/merchant_webapi/api/transaction`. `VNPAY_QUERY_IP_ADDR` là IP server phù hợp môi trường/đăng ký merchant; bỏ trống thì BE lấy địa chỉ host, không lấy từ FE/X-Forwarded-For. Nếu bị từ chối IP/merchant thì xử lý cấu hình, không sửa chứng cứ thành Paid. Hai toggle mặc định false. Save và redeploy.
-4. Với fixture sandbox mới được phép, lấy link sau deploy và kiểm QueryDR. `VERIFIED_ONLY` chỉ khi chữ ký/merchant/ref/amount/loại/status đều hợp lệ; giai đoạn này không ghi Paid nhưng vẫn có cooldown. Nếu thiếu/sai chữ ký hoặc merchant từ chối, giữ settlement=false; log chỉ ghi invoice/attempt/lý do cố định, không xuất key/full response/URL. Kiểm local giả lập không thay nghiệm thu merchant thật.
-5. Sau khi kiểm chứng merchant, bật `VNPAY_QUERY_SETTLEMENT_ENABLED=true` và redeploy. Sau cooldown kiểm lại cùng fixture nếu phù hợp, không thanh toán thêm để thử. Nếu lúc xác minh đã hết hạn thì theo đối soát, không cấp lại quyền. FE tự POST khi quay về rồi GET, tái sử dụng Tải lại theo contract. Kiểm `/api/auth/me`200 trước nhóm có phiên và đọc state sau commit. Rollback tính năng: tắt hai toggle; giữ bảng/attempt, không DROP hay khôi phục snapshot đè chứng từ.
+   | Biến | Giá trị |
+   |---|---|
+   | `VNPAY_QUERY_ENABLED` | `true` |
+   | `VNPAY_QUERY_SETTLEMENT_ENABLED` | `true` |
+   | `VNPAY_QUERY_URL` | `https://sandbox.vnpayment.vn/merchant_webapi/api/transaction` |
+   | `VNPAY_QUERY_IP_ADDR` | Để trống hoặc không thêm; BE tự lấy IP host |
+
+3. Tạo đúng một đơn VNPay mới sau deploy, thanh toán bằng thẻ thử NCB. Khi quay về, FE cần POST `verify-vnpay` cho đúng `invoiceId`, rồi GET lại hóa đơn. Chỉ tải lại GET sẽ không tự chạy QueryDR. Nếu FE chưa tích hợp, dùng Console theo đoạn dưới.
+4. Xem `verificationStatus`, `invoice.paymentStatus` và `reconciliationRequired`. `VERIFIED_PAID`/`ALREADY_PAID` mới xác nhận BE đã ghi nhận tiền. Lỗi/chưa xác minh được thì kiểm tra cùng đơn, không thanh toán thêm. Nếu xử lý đã tới/quá hạn5phút, Paid đi kèm đối soát và không cấp lại quyền học.
+
+`SETTLEMENT_ENABLED=false` là **tùy chọn chỉ kiểm tra**, trả `VERIFIED_ONLY` khi VNPay xác nhận nhưng không ghi Paid. Không bắt buộc phải đi qua chế độ này trước khi bật true cho demo sandbox. Dù true, BE vẫn kiểm chữ ký/merchant/reference/amount/type/status và chống lặp. Default hai cờ trong source vẫn false. Giữ nguyên cặp merchant/key đang tạo được link pay; `VNPAY_RETURN_URL` là BE Return, `FRONTEND_PAYMENT_RESULT_URL` là trang hóa đơn Pages.
+
+**Kiểm tra thủ công khi FE chưa tự POST:** mở trang hóa đơn vừa quay về, đăng nhập đúng Member → F12 → Console, chạy một lần:
+
+```javascript
+const api = "https://scms-app-p1gy.onrender.com";
+const id = new URL(location.href).searchParams.get("invoiceId");
+const me = await fetch(api + "/api/auth/me", {credentials: "include"});
+if (!me.ok || !/^[1-9]\d*$/.test(id || "")) throw new Error("Cần đăng nhập và mở URL hóa đơn vừa quay về");
+const result = await fetch(api + "/api/members/me/invoices/" + id + "/verify-vnpay", {
+  method: "POST", credentials: "include", headers: {"Content-Type": "application/json"}, body: "{}"
+});
+console.log("HTTP", result.status, JSON.stringify(await result.json(), null, 2));
+```
+
+Chờ `retryAfterSeconds` trước khi chạy lại. Không lấy `status=00` trên URL làm chứng từ. `ATTEMPT_MISSING` là đơn cũ thiếu metadata gốc; cần đối soát riêng. Nếu `QUERY_UNAVAILABLE`, xem log Render dòng `VNPay QueryDR invoice=... attempt=... reason=...`; chỉ chia sẻ lý do cố định, không gửi key/cookie. Contract/status đầy đủ tại [docs01](01-API-CONTRACT-FE-BE.md#payments), bàn giao ngày04/11 tại [đây](../SCMS-BAN-GIAO-FE-2026-11-04.md).
+
+**Nếu lỗi TLS/chứng chỉ Java:** có thể thử thêm Environment `JAVA_TOOL_OPTIONS=-Dcom.sun.security.enableAIAcaIssuers=true`, giữ các tùy chọn đã có nếu biến tồn tại, rồi Save/redeploy và kiểm lại **cùng đơn**. Java sẽ tìm chứng chỉ CA trung gian để dựng chuỗi tin cậy, vẫn xác minh TLS/hostname ([Oracle PKIX](https://docs.oracle.com/en/java/javase/17/security/java-pki-programmers-guide.html)). Lựa chọn này đã giúp probe HTTPS Java cục bộ kết nối được VNPay; chưa tự chứng minh nguyên nhân trên Render. Không đổi secret hoặc tạo thêm thanh toán để thử.
+
+Bản vá log transport mới phân biệt `CONNECT_TIMEOUT`, `REQUEST_TIMEOUT`, `TLS_FAILURE`, `DNS_FAILURE`, `SERVER_IP_LOOKUP_FAILED`, `CONNECTION_FAILED`, `IO_FAILURE`, `PROVIDER_HTTP_<status>` và cấu hình sai. Phản hồi FE vẫn là `QUERY_UNAVAILABLE`; log không chứa exception message, body hoặc credential. Nếu runtime vẫn chỉ ghi reason chung thì bản vá chưa được publish hoặc lỗi chưa thuộc nhóm đã phân loại. Trạng thái publish theo docs00.
+
+<details>
+<summary>Chi tiết kỹ thuật và kiểm thử local — không phải bước cấu hình Render</summary>
 
 **Request tới provider:** HTTP client chỉ POST JSON `vnp_Command=querydr`, không gọi refund. UUID32 RequestId và CreateDate do BE sinh theo Clock/HCM; TransactionDate lấy đúng vnp_CreateDate gốc trong attempt. Chuỗi HMAC-SHA512 nối `|` theo thứ tự `RequestId,Version,Command,TmnCode,TxnRef,TransactionDate,CreateDate,IpAddr,OrderInfo` (JSON có tiền tố `vnp_`), không dùng query string của pay URL. Key chỉ tính HMAC, không gửi trong request.
 
@@ -181,7 +209,9 @@ Nếu đọc được `Expired`, `paymentDate=null`, `gatewayTransactionRef=null
 
 **Khóa/giới hạn:** connect3giây, request5giây; tối đa3attempt/lượt, luân phiên để không bỏ link cũ; cooldown30giây/hóa đơn bằng DB lock. HTTP chạy ngoài transaction giữ khóa. Khi ghi, kiểm lại owner/role/center/amount/state dưới khóa center→invoice. IPN tới trước thì trả state hiện hành, không cấp thêm credit/thông báo. Biên5phút theo Clock lúc xử lý, không dùng PayDate bỏ cutoff: tới/quá hạn hoặc quyền không còn thì Paid+reconciliationRequired, không hồi sinh quyền. Đơn cũ thiếu metadata trả `ATTEMPT_MISSING`; deploy không tự sửa invoice20/22 đã báo trước đây.
 
-**Kiểm local:** chạy `python scripts/test-querydr-migration.py`, rồi `python scripts/test-querydr-local.py`. Migration runner chỉ dùng PostgreSQL Docker loopback55440 và DB tạm `scms_querydr_*`. BE runner tạo bản sao source không có.env, chạy `./mvnw.cmd clean test` rồi HTTP PostgreSQL `ddl-auto=none` trên DB behavior đã migration. Kết quả ở `artifacts/runs/querydr/validation.json`, tổng hợp vào QA duy nhất. Provider là HTTP giả lập cục bộ, không là VNPay live. Có kiểm chữ ký độc lập, sai merchant/ref/amount, timeout, owner/role/center, retry/IPN race, cutoff,12credit/thông báo không trùng và state sau commit. Agent chưa chạy SQL/deploy/giao dịch cloud trong lượt này.
+**Kiểm local:** chạy `python scripts/test-querydr-migration.py`, rồi `python scripts/test-querydr-local.py`. Migration runner chỉ dùng PostgreSQL Docker loopback55440 và DB tạm `scms_querydr_*`. BE runner tạo bản sao source không có.env, chạy `./mvnw.cmd clean test` rồi HTTP PostgreSQL `ddl-auto=none` trên DB behavior đã migration. Kết quả ở `artifacts/runs/querydr/validation.json`, tổng hợp vào QA duy nhất. Provider là HTTP giả lập cục bộ, không là VNPay live. Có kiểm chữ ký độc lập, sai merchant/ref/amount, timeout, owner/role/center, retry/IPN race, cutoff,12credit/thông báo không trùng và state sau commit. Các lần kiểm local không thay thế kiểm QueryDR có phiên trên Render; trạng thái hiện hành xem docs00.
+
+</details>
 
 Có thể gửi yêu cầu qua kênh hỗ trợ trong email cấp merchant hoặc `hotrovnpay@vnpay.vn` (địa chỉ được [VNPay công bố](https://sandbox.vnpayment.vn/paymentv2/)); Owner tự gửi, không đính kèm HashSecret/cookie/mật khẩu. Mẫu nội dung:
 
