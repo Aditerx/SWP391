@@ -17,6 +17,7 @@ Java 17/Spring Boot 3.3.5, Maven wrapper, PostgreSQL/Supabase; Dockerfile ở ro
 | VNPAY_TMN_CODE,VNPAY_HASH_SECRET | Merchant/key trong secret store |
 | VNPAY_PAY_URL,VNPAY_RETURN_URL,FRONTEND_PAYMENT_RESULT_URL | Gateway/HTTPS BE return/trang kết quả FE đúng môi trường |
 | MAIL_HOST,MAIL_PORT,MAIL_USERNAME,MAIL_APP_PASSWORD | smtp.gmail.com/587 mặc định; credential ngoài Git |
+| MAIL_FROM_EMAIL | Địa chỉ người gửi đã xác minh; nếu không đặt dùng spring.mail.username. Tách khỏi SMTP login khi dùng Brevo |
 | REGISTRATION_DEMO_OTP | Để trống production; mã cố định chỉ cho demo đăng ký được chọn rõ |
 | CLOUDINARY_CLOUD_NAME,CLOUDINARY_API_KEY,CLOUDINARY_API_SECRET | Nếu dùng avatar, secret ngoài Git |
 
@@ -66,6 +67,51 @@ Báo cáo đủ: `Dxx/case →actor/fixture →expected →response+state →PAS
 
 ## 3. Deploy
 
+Chọn script DB theo [database/README](../database/README.md#2-chọn-đúng-script): schema root bảo toàn ID/lịch sử, còn `database/schema_postgres.sql` dựng lại dữ liệu SCMS mỗi lần chạy. Khi chỉ cần sửa thiết kế trên DB cần giữ dữ liệu, chuẩn bị migration riêng thay vì chạy bản dựng lại. Schema gộp đã bao gồm migration01–14; không chạy nối tiếp hai schema hoặc chạy lại toàn thư mục migration sau đó.
+
+**Bundle room/báo vắng02/11:** baseline29/10 dùng `13_room_catalog_postgres.sql`→`14_absence_attendance_postgres.sql` trước BE mới. Dừng ghi lịch trong cửa sổ migration, backup/restore proof và kiểm DB đích; không dùng bản dựng lại. Preflight đọc rooms, classes.max_capacity, số ghi danh, sessions Scheduled từ hôm nay và môn liên quan. Đối soát lớp vượt sức chứa mới theo danh mục README, ca đang diễn ra, phòng tùy chỉnh, code/tên trùng và sân01 trùng lịch trước khi chạy. Guard lỗi thì transaction rollback; không sửa lớp ngoài7giới hạn được duyệt hoặc tắt trigger để vượt. Bản trước/sau chuyển room và marker lưu trong scms_data_migration_audit; lịch đã diễn ra/chứng từ/attendance không chuyển/xóa. Postflight:20phòng mới Available,8phòng chuẩn cũ Closed nếu nâng cấp từ fixture8phòng; lịch tương lai dùng room Available/đủ sức chứa/không trùng; kiểm marker và unique current attendance. Replay giữ metadata phòng đã chỉnh về sau. BE mới cần đủ hai migration; code cũ chưa hiểu attendance superseded nên không rollback riêng BE sau khi đã phát sinh luồng mới.
+
+**Hai file tạm ở root theo yêu cầu Owner:** chạy toàn bộ `0211-1.sql` (preflight+7giới hạn đã duyệt+migration room13) trong một lần SQL Editor; chỉ khi thành công mới chạy toàn bộ `0212-2.sql` (migration14+postflight) lần thứ hai. File2 kiểm marker của file1 và dừng nếu sai thứ tự. Không cần chạy riêng truy vấn preflight hoặc chạy thêm hai migration nguồn khi dùng cặp này. Nếu guard lỗi, dừng để đối soát; không tự giảm sức chứa/sĩ số hoặc bỏ guard. Sau hai lần thành công và kiểm kết quả, có thể xóa hai bản tạm; migration13/14 trong database/migrations vẫn là nguồn bảo trì. Không dùng cặp file này để dựng lại DB hoặc thay schema gộp ở môi trường chưa có baseline29/10.
+
+Owner đã duyệt điều chỉnh7lớp bên dưới: bản0211-1 hiện gộp `13_owner_class_capacity_20261102_postgres.sql` **trước**13_room_catalog, cùng BEGIN/COMMIT. Bước này chỉ cập nhật max_capacity của7ID đúng môn/center1/Normal, chấp nhận giá trị cũ đã duyệt hoặc đã bằng mức mới; trạng thái khác làm dừng. Registered+Pending được đếm lại dưới lock, không được vượt mức mới. Audit `20261102_owner_normal_class_capacity_v1` giữ đầy đủ hàng lớp và held_seats trước/sau; lỗi chuyển phòng phía sau rollback cả cập nhật lớp/audit. Replay bỏ qua bước đã có marker để không reset thay đổi về sau. File2 mới kiểm cả marker giới hạn lớp và marker phòng. Không nhúng bước theo ID riêng này vào schema gộp/empty release cho mọi DB.
+
+**Sửa lỗi CUSTOM_ROOM02/11:** inventory Owner gửi có9phòng, thêm room9 Sân Tennis02 so với fixture8phòng ban đầu. Bản sửa nhận cả tên trong20phòng đã duyệt và alias cũ; vẫn chặn tên lạ, trả DETAIL room_id/tên/trạng thái. Lịch Tennis02 chuyển đúng C01-TEN-02 để không bị dồn sang Tennis01. Chạy lại toàn bộ bản mới `0211-1.sql`; không chạy file2 nếu file1 lỗi. Với bộ9phòng này, kết quả lần nâng cấp đầu là20phòng mới và9phòng legacy Closed, không buộc tổng bảng chỉ20dòng. ROOM_CATALOG_SCHEDULE_REVIEW vẫn có thể dừng hợp lệ nếu lớp/lịch vượt sức chứa mới; module room không tự giảm max_capacity; bước Owner-specific chỉ đổi đúng7giới hạn đã duyệt và không xóa ghi danh. Lỗi ở trong transaction của cả file nên lần bị chặn không commit cập nhật phòng.
+
+**Chẩn đoán SCHEDULE_REVIEW:** DETAIL của0211-1 mới liệt kê tối đa20buổi bị chặn với session_id/class_id, center_id, target_code, session_start, max_capacity, target_capacity, held_seats (Registered+Pending) và reasons. `CLASS_CAPACITY_EXCEEDS_ROOM` là cấu hình số chỗ tối đa vượt sân, kể cả số người thực tế còn ít; `ENROLLMENTS_EXCEED_ROOM` là số chỗ đã giữ vượt sân; ngoài ra có STARTED_OR_PAST_SCHEDULED, UNKNOWN_SUBJECT_OR_TARGET, WRONG_CENTER và MISSING_CLASS_CAPACITY. Guard không đổi điều kiện hoặc tự xử lý dữ liệu. Đề xuất để Owner chốt sau khi xem DETAIL: nếu chỉ max_capacity vượt nhưng held_seats còn vừa sân, điều chỉnh max_capacity của đúng lớp có audit; nếu số đăng ký vượt sân thì cần phương án lớp/phòng/lịch phù hợp, không tự xóa/hủy ghi danh. Ca đã bắt đầu/đã qua còn Scheduled và liên kết môn/center thiếu/sai phải đối soát theo lịch sử thực tế, không đổi giờ/trạng thái để né guard. Chỉ chạy file2 sau khi file1 thành công.
+
+**Giới hạn7lớp Owner đã duyệt02/11:** các dòng DETAIL được gửi đều CLASS_CAPACITY_EXCEEDS_ROOM, mỗi lớp giữ1chỗ. Đồng bộ max_capacity theo bảng dưới trong transaction trước khi chuyển phòng, có kiểm/audit như trên. Không tăng sức chứa phòng đã chốt; không đổi người học, giá, chứng từ hoặc attendance. Giờ buổi học giữ nguyên; phòng của lịch tương lai chuyển theo migration13. Đây là đúng7lớp được duyệt, không cho phép tự thu nhỏ lớp khác; guard vẫn kiểm mọi lịch trước commit. Agent chỉ chuẩn bị/kiểm local, chưa chạy Supabase.
+
+| class_id | Lớp Normal K01 | max_capacity cũ → đã duyệt |
+|---:|---|---:|
+|11|Bơi lội|15 → 10|
+|12|Pickleball|12 → 4|
+|13|Bắn cung|10 → 5|
+|14|Bóng rổ|15 → 8|
+|16|Bóng chuyền|15 → 8|
+|17|Cầu lông|15 → 4|
+|18|Bóng bàn|15 → 2|
+
+Kiểm đích bundle có phê duyệt: `python scripts/test-owner-class-capacity-postgres.py --prefix scms_phases_owner_caps_<mã_mới> --output artifacts/runs/<run>/owner-capacity.json`. Runner chỉ dùng PostgreSQL local được ghim, kiểm sai danh tính/giới hạn/held seats, rollback qua lỗi chuyển phòng, đúng7giới hạn, giữ chứng từ/attendance/lịch đã diễn ra, audit và replay. Kết quả chuẩn ở docs00/QA; không tự gán nghiệm thu cloud.
+
+Kiểm local riêng: `python scripts/test-room-absence-postgres.py --prefix scms_phases_room_<mã_mới> --output artifacts/runs/<run>/migration.json`; runner từ chối DB ngoài container/port local được ghim, tạo DB mới và kiểm fresh/rebuild/upgrade/replay/guard/history. Fixture nâng cấp lấy schema trước thay đổi tại commit baseline đã ghim trong runner, không đọc .env. Sau đó kiểm HTTP PostgreSQL bằng PhaseWorkflowHttpTest với fixture mới và SHA256 test như hướng dẫn ở mục2. Kết quả chuẩn nằm ở docs00/QA, không suy từ kiểm H2.
+
+Truy vấn preflight chỉ đọc dưới đây liệt kê lớp/phòng/sĩ số cần so với [sức chứa mới](../database/README.md#room-catalog); kết quả không tự cho phép sửa lớp hoặc chuyển lịch:
+
+```sql
+SELECT c.class_id,c.class_name,su.slug,c.max_capacity,r.room_id,r.room_name,
+       count(*) AS scheduled_sessions,min(s.session_date+s.start_time) AS next_start,
+       (SELECT count(*) FROM class_enrollments e WHERE e.class_id=c.class_id
+        AND e.status IN ('Registered','Pending')) AS held_seats
+FROM sessions s JOIN classes c USING(class_id) JOIN subjects su USING(subject_id)
+JOIN rooms r USING(room_id)
+WHERE r.center_id=1 AND s.status='Scheduled' AND NOT s.center_invalidated
+  AND s.session_date>=(clock_timestamp() AT TIME ZONE 'Asia/Ho_Chi_Minh')::date
+GROUP BY c.class_id,c.class_name,su.slug,c.max_capacity,r.room_id,r.room_name
+ORDER BY next_start,c.class_id;
+```
+
+Ghi bằng chứng mới bằng `scripts/record-room-absence-review.py --run artifacts/runs/<run> --checkout <bản_source_đã_kiểm>` sau khi lưu clean XML vào `clean-xml`, PG XML vào `postgres-workflow.xml`, HTTP/SQL vào `postgres-http`, migration vào `migration-final.json`. Collector kiểm fingerprint source/schema/fixture và hash test đã chạy trước khi cập nhật QA duy nhất/OpenAPI; không nâng trạng thái cloud hay ghi đè bằng chứng lịch sử.
+
 Kiểm source/SHA/CI/schema tương thích và quyền migration trước push nhánh Render theo dõi. Owner đã xác nhận main; kiểm lại cấu hình khi bắt đầu vận hành mới. Khi cần schema: backup/restore proof →duyệt bundle cụ thể →atomic migration/guard →postflight →deploy code tương thích. Không reset/restore đè dữ liệu để chữa code lỗi.
 
 Theo dõi Live identity, không coi Git merge/dashboard Live là nghiệm thu nghiệp vụ. Nếu yêu cầu kiểm sau5phút, runner từ chối chạy sớm:
@@ -77,6 +123,101 @@ python scripts/check-render-production.py --output artifacts/runs/render/check.j
 `/api/health` chỉ liveness/identity, không mở DB connection; `/actuator/health` kiểm db/mail/... và giữ show-details=never. Ghi nhận27/10: Owner dùng `/api/health` trong dashboard, render.yaml khai `/actuator/health`; không giả hai cấu hình giống nhau hoặc đổi path để che dependency hỏng.
 
 CORS/cookie cần browser FE hiện hành kiểm preflight/Set-Cookie/cookie gửi lại. Gateway live cần Merchant/callback/fixture được phép; FE không gọi IPN. Commit chỉ docs/evidence có thể dùng `[skip render]` tránh deploy không cần thiết, theo [Render deploy docs](https://render.com/docs/deploys#skipping-an-auto-deploy).
+
+<a id="vnpay-diagnostics"></a>
+### Chẩn đoán VNPay báo sai chữ ký — D10
+
+Không đổi thuật toán ký chỉ dựa vào ảnh lỗi. Đối chiếu source đúng `buildCommit` từ `/api/health`, cấu hình hiệu lực và URL thực tế trước. Không nhập HashSecret vào website kiểm hash, tham số dòng lệnh, chat hoặc báo cáo.
+
+**Nếu không có bộ thông tin VNPay cấp:** ảnh Environment chỉ chứng minh đã nhập giá trị, không chứng minh merchant/key thuộc cùng bộ hoặc còn hiệu lực. Tìm email của người đã đăng ký merchant trong nhóm với từ khóa `VNPAY`, `TmnCode`, `HashSecret`, `thông tin kết nối`, cả Spam. Nếu chưa từng đăng ký hoặc không khôi phục được, Owner tự đăng ký [merchant sandbox](https://sandbox.vnpayment.vn/devreg/) bằng email đang dùng và URL FE; tự đặt mật khẩu/nhập CAPTCHA. Theo [VNPay](https://sandbox.vnpayment.vn/apis/docs/thanh-toan-pay/pay.html), hệ thống gửi thông tin kết nối về email đăng ký. Thay cả mã và key trên Render bằng đúng bộ nhận được; không suy key từ TmnCode hoặc dùng ngẫu nhiên key trong tutorial. Cookie/login lỗi thì xử lý trước theo [hướng dẫn CORS/phiên](../SCMS-HUONG-DAN-CORS-DEMO-CLOUDFLARE.md).
+
+`note.md` có đoạn gọi cặp cấu hình cũ là “Sandbox chung”; đây không phải bằng chứng VNPay cấp cho nhóm. `.env` local cũng không chứng minh cặp nào đang hiệu lực ở gateway. Không thay cấu hình Render bằng cặp tìm được trong ghi chú chỉ vì nó khác cặp đang lỗi; cần nguồn cấp/email hoặc xác nhận từ VNPay. Không chép key từ các file này sang tài liệu/Git.
+
+**Điền form đăng ký hiện hành:** mở [Đăng ký Merchant môi trường test](https://sandbox.vnpayment.vn/devreg/), điền theo bảng dưới rồi tự gửi form:
+
+| Trường | Giá trị cho project |
+|---|---|
+| Tên website | `SCMS Demo` |
+| Địa chỉ URL | `https://scms-demo-04nov.pages.dev` — website FE công khai, không phải endpoint Return/IPN |
+| Email đăng ký | Email thật Owner/nhóm kiểm soát và nhận được thư; không dùng email account demo `@scms.com` |
+| Mật khẩu | Owner tự đặt; form hiện giới hạn6–15ký tự. Dùng chữ hoa, chữ thường và số; đây là mật khẩu merchant, không phải HashSecret |
+| Nhập lại mật khẩu | Nhập lại đúng mật khẩu vừa đặt |
+| Nhập mã xác nhận | Nhập CAPTCHA đang hiện trên chính form |
+
+Kiểm Inbox/Spam sau khi đăng ký; nếu báo email đã tồn tại thì dùng luồng khôi phục trên cổng VNPay hoặc liên hệ hỗ trợ, không đoán key. Khi nhận bộ kết nối, lấy `vnp_TmnCode` và `vnp_HashSecret` điền vào hai biến Render cùng tên tương ứng ở bước1 bên dưới. Nếu bước tiếp theo yêu cầu callback: Return=`https://scms-app-p1gy.onrender.com/api/payments/vnpay/return`; IPN=`https://scms-app-p1gy.onrender.com/api/payments/vnpay/ipn`. `FRONTEND_PAYMENT_RESULT_URL` có thể dùng trang hóa đơn đang tồn tại `https://scms-demo-04nov.pages.dev/member/invoices`; đây chỉ là trang đọc trạng thái, không cập nhật Paid. Deploy xong lấy URL thanh toán mới vì link cũ có chữ ký/key và hạn cũ.
+
+**Nếu nhập OTP xong bị chuyển tới localhost/payment-result:** `payment.frontend-result-url` đang dùng giá trị local (mặc định khi thiếu `FRONTEND_PAYMENT_RESULT_URL`, hoặc bị override). Thêm/sửa biến dưới đây trên đúng service Render, Save/rebuild/deploy rồi chờ Live:
+
+```text
+FRONTEND_PAYMENT_RESULT_URL=https://scms-demo-04nov.pages.dev/member/invoices
+```
+
+Giữ `VNPAY_RETURN_URL` trỏ endpoint BE như trên; không thay nó bằng trang hóa đơn FE. Trong DevTools, request BE `/api/payments/vnpay/return?...` trả302 thì xem Headers → Response Headers → `Location`; body có thể trống. Request tiếp theo tới localhost bị `ERR_CONNECTION_REFUSED` không có HTTP response nên không thể đọc Response. Backend có thể kiểm riêng cấu hình redirect bằng GET Return không tham số, chặn follow redirect: signature bị từ chối97 và chỉ xem Location, không gọi gateway/IPN hoặc xác nhận giao dịch.
+
+Đối soát **hóa đơn cũ trước khi thanh toán lại**: đăng nhập FE bằng đúng Member, xác minh `/api/auth/me`200, mở `/member/invoices` và đọc `GET /api/members/me/invoices` hoặc `/{invoiceId}`. Xem `paymentStatus`, `reconciliationRequired`, `paymentDate`, `gatewayTransactionRef`. `status=00` do BE gắn vào URL kết quả hiện chỉ xác nhận chữ ký Return và tìm thấy hóa đơn; không chứng nhận Paid hay transaction response thành công. Nếu hóa đơn vẫn Pending/Expired sau lần sandbox đã xác nhận thành công ở ngân hàng, kiểm merchant IPN URL và log server; IPN là server-to-server nên không xuất hiện trong Network FE. Không sửa DB/tự gọi IPN hoặc suy Paid từ redirect; Paid cần đối soát theo D10 khi quyền giữ/hạn không còn.
+
+Nếu đã quay về đúng Pages `/member/invoices` nhưng còn “Chờ thanh toán”, không đổi FRONTEND_PAYMENT_RESULT_URL lần nữa. Bấm **Tải lại**, kiểm response mới nhất của ownInvoice sau khi có phiên: API Paid nhưng UI chưa đổi thì kiểm FE refresh/cache; API Pending/Expired thì kiểm IPN chưa ghi nhận/đã bị từ chối/lỗi. Không lấy nhãn UI hay query `status=00` làm bằng chứng trạng thái DB. Nhánh IPN hiện không có log nhận request/RspCode riêng; log console trống không thay được lịch sử gọi từ VNPay hoặc access log thực tế. Chờ xác minh cấu hình IPN phía VNPay trước khi tạo thêm giao dịch sandbox.
+
+Nếu đọc được `Expired`, `paymentDate=null`, `gatewayTransactionRef=null`: chưa có bằng chứng IPN thành công đã commit. Không kết luận gateway chưa gọi chỉ từ ba field này; IPN có thể chưa tới, bị từ chối, lỗi hoặc giao dịch ngân hàng không thành công. Trong Network của **lần cũ**, chọn BE `return?vnp_...`302 → Payload → Query String Parameters (hoặc Headers → Request URL), lấy riêng `vnp_ResponseCode`, `vnp_TransactionStatus`, `vnp_TransactionNo`, `vnp_PayDate`; không cần gửi chữ ký/full URL. Kiểm IPN URL đã đăng ký với **VNPay**: `https://scms-app-p1gy.onrender.com/api/payments/vnpay/ipn`. Chỉ đặt biến Render không đăng ký IPN với gateway. Nếu cổng merchant không có nơi cấu hình thì gửi URL này cho hỗ trợ VNPay và nhờ đối chiếu lịch sử gọi IPN/RspCode của giao dịch cũ theo [hướng dẫn PAY](https://sandbox.vnpayment.vn/apis/docs/thanh-toan-pay/pay.html). Kiểm log đúng khoảng thời gian; không có dòng trong console ứng dụng chưa chứng minh không có request nếu access logging chưa bật. Theo D10, IPN thành công hợp lệ đến sau hạn vẫn phải ghi nhận Paid/cần đối soát và không hồi sinh quyền; không tăng thời gian giữ hoặc sửa Expired thành Paid bằng tay để vượt bước nghiệm thu. Chỉ thử sandbox mới sau khi chốt kết quả giao dịch cũ và cấu hình callback/redirect đúng.
+
+**Kiểm IPN khi chưa rõ giao diện merchant:** từ menu đã thấy trong ảnh Owner, mở **GD Thanh toán** và chi tiết đúng mã giao dịch gateway để đối chiếu kết quả; nếu có phần lịch sử thông báo/IPN thì lấy URL đích, thời gian gọi, HTTP status và RspCode. Owner đã mở **Cài đặt thông báo** và gửi ảnh xác nhận chỉ đăng ký email, không phải IPN; không đổi mục này để thử callback. Không suy URL IPN từ URL website đăng ký hoặc Return URL. Theo tài liệu PAY cần gửi IPN URL cho VNPay thiết lập khi chưa có cấu hình; dùng yêu cầu hỗ trợ bên dưới để xác nhận URL đang gắn với merchant, lịch sử gọi và RspCode. Không bịa đường dẫn menu “Cấu hình → Thông tin website” khi chưa kiểm được giao diện tài khoản thực tế.
+
+<a id="querydr-proposal"></a>
+<a id="querydr"></a>
+**QueryDR — Owner đã duyệt triển khai04/11:** BE chủ động truy vấn [API QueryDR chính thức](https://sandbox.vnpayment.vn/apis/docs/truy-van-hoan-tien/querydr%26refund.html), xác minh kết quả rồi dùng chung nhánh ghi Paid với IPN theo D10. Return vẫn chỉ kiểm tra/redirect. Contract endpoint/status/UX tại [docs01](01-API-CONTRACT-FE-BE.md#payments); nghiệm thu tại docs00/QA. Không cần đợi IPN để triển khai nhánh này; merchant vẫn phải có khả năng gọi QueryDR và trả chữ ký hợp lệ.
+
+**DB hiện có:** mở [15_QueryDR.sql](../database/migrations/15_QueryDR.sql), copy **toàn bộ file** và chạy một lần trong SQL Editor trên đúng DB SCMS đã cập nhật13/14. Kết quả cuối cần `migration_status=QUERYDR_SCHEMA_READY`; `preserved_attempt_rows` là số attempt, không là số invoice Paid. File chỉ thêm bảng `vnpay_payment_attempts`, FK/index/constraint và bảo vệ truy cập của bảng mới; không UPDATE/DELETE chứng từ hoặc reset bảng. Có transaction/guard/replay; nếu lỗi thì dừng và đọc thông báo, không xóa bảng/constraint để vượt guard. Không chạy schema dựng lại/hai bundle root để cài QueryDR. Bảng không chứa secret/fullURL; không backfill thời điểm giả cho đơn cũ.
+
+**Thứ tự bật:**
+1. Owner chạy nguyên file15, xác nhận kết quả. Review/commit/publish đúng source BE có QueryDR rồi deploy sau migration; luồng tạo link mới bắt đầu lưu attempt kể cả khi query chưa bật.
+2. Giữ `VNPAY_TMN_CODE`/`VNPAY_HASH_SECRET` đúng cặp merchant đang dùng; không thay bằng bộ demo trong repo. `VNPAY_RETURN_URL` vẫn là BE Return; `FRONTEND_PAYMENT_RESULT_URL` là Pages `/member/invoices`.
+3. Trên Render → service → Environment: đặt `VNPAY_QUERY_ENABLED=true`, `VNPAY_QUERY_SETTLEMENT_ENABLED=false`, `VNPAY_QUERY_URL=https://sandbox.vnpayment.vn/merchant_webapi/api/transaction`. `VNPAY_QUERY_IP_ADDR` là IP server phù hợp môi trường/đăng ký merchant; bỏ trống thì BE lấy địa chỉ host, không lấy từ FE/X-Forwarded-For. Nếu bị từ chối IP/merchant thì xử lý cấu hình, không sửa chứng cứ thành Paid. Hai toggle mặc định false. Save và redeploy.
+4. Với fixture sandbox mới được phép, lấy link sau deploy và kiểm QueryDR. `VERIFIED_ONLY` chỉ khi chữ ký/merchant/ref/amount/loại/status đều hợp lệ; giai đoạn này không ghi Paid nhưng vẫn có cooldown. Nếu thiếu/sai chữ ký hoặc merchant từ chối, giữ settlement=false; log chỉ ghi invoice/attempt/lý do cố định, không xuất key/full response/URL. Kiểm local giả lập không thay nghiệm thu merchant thật.
+5. Sau khi kiểm chứng merchant, bật `VNPAY_QUERY_SETTLEMENT_ENABLED=true` và redeploy. Sau cooldown kiểm lại cùng fixture nếu phù hợp, không thanh toán thêm để thử. Nếu lúc xác minh đã hết hạn thì theo đối soát, không cấp lại quyền. FE tự POST khi quay về rồi GET, tái sử dụng Tải lại theo contract. Kiểm `/api/auth/me`200 trước nhóm có phiên và đọc state sau commit. Rollback tính năng: tắt hai toggle; giữ bảng/attempt, không DROP hay khôi phục snapshot đè chứng từ.
+
+**Request tới provider:** HTTP client chỉ POST JSON `vnp_Command=querydr`, không gọi refund. UUID32 RequestId và CreateDate do BE sinh theo Clock/HCM; TransactionDate lấy đúng vnp_CreateDate gốc trong attempt. Chuỗi HMAC-SHA512 nối `|` theo thứ tự `RequestId,Version,Command,TmnCode,TxnRef,TransactionDate,CreateDate,IpAddr,OrderInfo` (JSON có tiền tố `vnp_`), không dùng query string của pay URL. Key chỉ tính HMAC, không gửi trong request.
+
+**Response:** kiểm HMAC-SHA512 theo thứ tự `ResponseId,Command,ResponseCode,Message,TmnCode,TxnRef,Amount,BankCode,PayDate,TransactionNo,TransactionType,TransactionStatus,OrderInfo,PromotionCode,PromotionAmount`; so sánh constant-time, giữ nguyên giá trị, tùy chọn thiếu là rỗng đúng vị trí. ResponseId không là RequestId. Chỉ ghi thành công nếu chữ ký hợp lệ, merchant khớp attempt/cấu hình, TxnRef đúng invoiceCode, Amount đúng số nguyên Invoice.amount×100 và snapshot, loại01, responseCode00/status00, TransactionNo hợp lệ/chưa gắn invoice khác. Lỗi/timeout/thiếu hash/chưa có kết quả không ghi Paid và không chứng minh khách chưa trả.
+
+**Khóa/giới hạn:** connect3giây, request5giây; tối đa3attempt/lượt, luân phiên để không bỏ link cũ; cooldown30giây/hóa đơn bằng DB lock. HTTP chạy ngoài transaction giữ khóa. Khi ghi, kiểm lại owner/role/center/amount/state dưới khóa center→invoice. IPN tới trước thì trả state hiện hành, không cấp thêm credit/thông báo. Biên5phút theo Clock lúc xử lý, không dùng PayDate bỏ cutoff: tới/quá hạn hoặc quyền không còn thì Paid+reconciliationRequired, không hồi sinh quyền. Đơn cũ thiếu metadata trả `ATTEMPT_MISSING`; deploy không tự sửa invoice20/22 đã báo trước đây.
+
+**Kiểm local:** chạy `python scripts/test-querydr-migration.py`, rồi `python scripts/test-querydr-local.py`. Migration runner chỉ dùng PostgreSQL Docker loopback55440 và DB tạm `scms_querydr_*`. BE runner tạo bản sao source không có.env, chạy `./mvnw.cmd clean test` rồi HTTP PostgreSQL `ddl-auto=none` trên DB behavior đã migration. Kết quả ở `artifacts/runs/querydr/validation.json`, tổng hợp vào QA duy nhất. Provider là HTTP giả lập cục bộ, không là VNPay live. Có kiểm chữ ký độc lập, sai merchant/ref/amount, timeout, owner/role/center, retry/IPN race, cutoff,12credit/thông báo không trùng và state sau commit. Agent chưa chạy SQL/deploy/giao dịch cloud trong lượt này.
+
+Có thể gửi yêu cầu qua kênh hỗ trợ trong email cấp merchant hoặc `hotrovnpay@vnpay.vn` (địa chỉ được [VNPay công bố](https://sandbox.vnpayment.vn/paymentv2/)); Owner tự gửi, không đính kèm HashSecret/cookie/mật khẩu. Mẫu nội dung:
+
+```text
+Nhờ hỗ trợ kiểm tra/thiết lập IPN cho merchant sandbox [TmnCode].
+Website: https://scms-demo-04nov.pages.dev
+IPN URL (GET): https://scms-app-p1gy.onrender.com/api/payments/vnpay/ipn
+Return URL: https://scms-app-p1gy.onrender.com/api/payments/vnpay/return
+Giao dịch: [vnp_TransactionNo], mã đơn [vnp_TxnRef], số tiền [VND].
+Thời gian thành công: [vnp_PayDate theo GMT+7]. Merchant báo thành công
+nhưng hóa đơn SCMS chưa ghi nhận thanh toán. Nhờ xác nhận IPN URL đang
+hiệu lực, lịch sử gọi/HTTP status/RspCode, và khả năng gửi lại IPN
+cho giao dịch này sau khi khắc phục nếu được hỗ trợ.
+```
+
+1. Trong Render → service `scms-app-p1gy` → Environment, đối chiếu `VNPAY_TMN_CODE` và `VNPAY_HASH_SECRET` với **cùng bộ sandbox** VNPay cấp. Không kèm dấu nháy hoặc khoảng trắng/xuống dòng đầu-cuối. Kiểm thêm Environment Groups và cấu hình Spring override nếu có; `.env` local không chứng minh cấu hình Render. Nếu sửa giá trị, chọn **Save, rebuild, and deploy**, đợi deploy Live rồi lấy URL mới; Restart service giữ cấu hình của lần deploy đang chạy. [Render Environment](https://render.com/docs/configure-environment-variables), [Deploys](https://render.com/docs/deploys).
+2. Đối chiếu `VNPAY_PAY_URL=https://sandbox.vnpayment.vn/paymentv2/vpcpay.html` và `VNPAY_RETURN_URL=https://scms-app-p1gy.onrender.com/api/payments/vnpay/return`. Return trỏ BE; IPN gateway trỏ `/api/payments/vnpay/ipn`, không gọi tay để thử. `FRONTEND_PAYMENT_RESULT_URL` là trang FE đọc trạng thái hóa đơn, không thay BE Return. FE hiện hành cần có route thật; `/member/invoices` là trang hóa đơn đang phát hành, không tự mặc định FE đã có `/payment-result`.
+3. Trong Chrome/Edge: F12 → Network → bật **Preserve log** trước thao tác trên giao dịch demo được phép. Trong request `pay-online` hoặc `order`, mở Response, lấy **giá trị chuỗi** `paymentUrl` nguyên vẹn, không kèm dấu nháy JSON. Chọn request đầu tiên tới `vpcpay.html`, lấy **Headers → General → Request URL**. URL trang `Error.html` không thay được hai URL này. Không cần hoàn tất thanh toán để lấy dữ liệu; ưu tiên request còn trong log, không tạo hàng loạt đơn hay dùng account seed lịch sử. [Network reference](https://developer.chrome.com/docs/devtools/network/reference/).
+4. Có thể gửi riêng hai URL cho người kiểm tra, không gửi HAR/cookie/password. Hoặc tự kiểm offline tại root repo:
+
+   ```powershell
+   python scripts/check-vnpay-payment-url.py --compare-browser --check-secret
+   ```
+
+   Dán URL theo hai lời nhắc; nhập TmnCode và HashSecret **VNPay cấp** khi được hỏi. HashSecret nhập ẩn, không lưu hoặc gửi mạng; không đặt secret vào lệnh. Chỉ gửi JSON kết quả. Muốn kiểm cấu trúc/so sánh mà chưa kiểm key thì bỏ `--check-secret`. Công cụ không đọc `.env`, không gọi gateway và không thay invoice/credit.
+
+| Kết quả offline | Hướng xử lý |
+|---|---|
+| Chữ ký khớp key trong ảnh/cấu hình Render và hai URL giống nhau, nhưng gateway vẫn sai chữ ký | Chứng minh request nhất quán với key cấu hình, chưa chứng minh key thuộc merchant ở VNPay. Lấy lại bộ thông tin cấp hoặc nhờ VNPay kiểm merchant/key đang hiệu lực; không đổi encoder/IP/trim chỉ để thử. Khi liên hệ gửi mã tra cứu, thời gian, TmnCode và ảnh lỗi; không gửi HashSecret. |
+| `signatureMatchesEnteredSecret=true`, merchant đúng, gateway sandbox đúng | Link khớp key vừa nhập; tiếp tục đối chiếu merchant được VNPay kích hoạt và bộ key đúng môi trường, rồi báo VNPay kèm mã tra cứu nếu gateway vẫn từ chối. Không tự gọi đó là PASS gateway. |
+| Chữ ký không khớp key VNPay cấp | Đối chiếu key **hiệu lực trên Render** và source deployed; chưa đủ để kết luận encoder sai. |
+| `browserComparison.decodedFieldsEqual=false` | Xem `changedParameters`, tìm đoạn FE/redirect thay dữ liệu. Khác cách biểu diễn nhưng decoded/canonical vẫn giống chưa chứng minh lỗi. |
+| `enteredSecretHasEdgeWhitespace=true` | Kiểm tra thao tác copy key; sửa cấu hình sai ở nguồn. Không tự trim riêng hàm HMAC và bỏ quên callback. |
+| Return URL sai BE hoặc FE result sai route | Sửa đúng cấu hình điều hướng; đây là lỗi riêng, chưa chứng minh nguyên nhân sai chữ ký. |
+
+Giữ HMAC-SHA512 và encoding nhất quán cho URL/chuỗi ký theo [VNPay 2.1](https://sandbox.vnpayment.vn/apis/docs/thanh-toan-pay/pay.html); không thay IPv6 hợp lệ thành localhost chỉ vì có dấu `:`. Kiểm local không thay giao dịch sandbox được gateway chấp nhận, IPN và trạng thái sau commit. Bằng chứng hiện hành xem docs00/QA, không ghi key hoặc URL giao dịch thật vào Git.
 
 ## 4. Bundle và backup
 
@@ -90,6 +231,6 @@ Chế độ --target-fingerprint của script chuẩn bị đọc/backup remote 
 
 ## 5. Hạn chế và lưu trữ
 
-Ghi nhận27/10: Render Free,dbUP/mailDOWN. [Render Free](https://render.com/docs/free) chặn SMTP25/465/587; JavaMailSender587 hiện tại chưa gửi OTP cloud. Giữ Free cần HTTPS email provider/sender/domain/API key/adapter và delivery test được phép. Đợt chuẩn hóa không chọn provider/đổi plan. Các cổng SQLServer/browser/gateway/full authenticated business matrix ở docs00.
+Ghi nhận27/10: Render Free,dbUP/mailDOWN. [Render Free](https://render.com/docs/free) chặn SMTP25/465/587. Owner04/11 chọn thử Brevo SMTP2525 và báo đã xác minh sender/thêm env. Cấu hình `MAIL_HOST=smtp-relay.brevo.com`, `MAIL_PORT=2525`, `MAIL_USERNAME` là SMTP login Brevo cấp, `MAIL_APP_PASSWORD` là toàn bộ SMTP key (không phải API key), `MAIL_FROM_EMAIL` là sender đã xác minh; giữ STARTTLS đang bật và để trống `REGISTRATION_DEMO_OTP` khi kiểm OTP thật. Không chép credential vào Git. [Brevo hỗ trợ2525](https://help.brevo.com/hc/en-us/articles/10905415650322-Which-SMTP-port-should-I-use-Port-587-465-or-2525); vẫn phải kiểm kết nối/TLS và delivery từ Render, không suy thành công từ ảnh cấu hình. Nếu không kết nối được, phương án HTTPS email API vẫn cần adapter riêng. Các cổng SQLServer/browser/gateway/full authenticated business matrix ở docs00.
 
 FE nhận docs01 + `artifacts/fe-handoff/openapi.json`. QA ở `artifacts/qa/latest.json`; bundle ở artifacts/releases; raw mới ở artifacts/runs (ignored); private backup giữ nguyên. Lịch sử đầy đủ trước chuẩn hóa truy qua Git `a4f3cd0`, ví dụ `git show a4f3cd0:artifacts/fe-handoff/2026-10-27/render-get-checks.json`. Không phải mọi raw log đều từng commit; raw run cuối còn local như mục2. Không tạo lại inventory/schema MD/HTML trace để tăng số file bàn giao.

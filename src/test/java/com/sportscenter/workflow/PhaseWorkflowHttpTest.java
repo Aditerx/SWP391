@@ -88,6 +88,7 @@ public class PhaseWorkflowHttpTest {
     @Autowired InvoiceService invoiceService;
     @Autowired com.sportscenter.training.AttendanceFinalizationProcessor finalizer;
     @Autowired SessionRepository sessionRepository;
+    @Autowired com.sportscenter.training.AttendanceRepository attendanceRepository;
     @Autowired PasswordEncoder passwords;
     @Autowired ObjectMapper json;
     @Autowired jakarta.persistence.EntityManagerFactory entityManagerFactory;
@@ -298,9 +299,14 @@ public class PhaseWorkflowHttpTest {
         clock.current=LocalDateTime.of(2026,10,28,0,0).atZone(clock.getZone()).toInstant();
         var notice=call(member,"POST","/api/sessions/"+scheduledId+"/absence",Map.of("reason","Unexpected personal issue"),200);
         assertTrue(notice.get("active").asBoolean());assertEquals(11,credit());
-        assertEquals(0,jdbc.queryForObject("SELECT count(*) FROM attendances WHERE session_id=?",Integer.class,scheduledId));
+        assertEquals(1,jdbc.queryForObject("SELECT count(*) FROM attendances WHERE session_id=? AND member_id=? AND state='Absent' AND absence_notice_id=? AND superseded_at IS NULL",Integer.class,scheduledId,memberId,notice.path("id").asInt()));
+        assertEquals(memberId,jdbc.queryForObject("SELECT recorded_by FROM attendances WHERE session_id=? AND superseded_at IS NULL",Integer.class,scheduledId));
+        var repeated=call(member,"POST","/api/sessions/"+scheduledId+"/absence",Map.of("reason","Retry"),200);
+        assertEquals(notice.path("id"),repeated.path("id"));assertEquals(11,credit());
+        assertEquals(1,jdbc.queryForObject("SELECT count(*) FROM attendances WHERE session_id=?",Integer.class,scheduledId));
+        call(other,"POST","/api/sessions/"+scheduledId+"/absence",Map.of("reason","Not mine"),403);
         call(member,"POST","/api/sessions/"+scheduledId+"/cancel-private",null,400);
-        proof("ABSENCE-UNDER-12H","D05","Member A notice 7h45 before session; credit already consumed","Notice active; no attendance; session Scheduled; no refund, cancel 400",rightsSql(),subscriptionId);
+        proof("ABSENCE-UNDER-12H","D05,D15","Owner31/10 replaces notice-only; Member A reports 7h45 before session","Notice + one linked Absent committed; retry same notice/credit; wrong owner403; Scheduled, no refund",rightsSql(),subscriptionId);
         int secondRoom=tx.execute(t->{Room r=new Room();r.setName("Phase alternate room");r.setCapacity(15);r.setStatus("Available");r.setCenterId(1);r.setFacilityType("Indoor");return rooms.save(r).getId();});
         var incident=call(manager,"POST","/api/center-incidents",Map.of("sessionId",scheduledId,"startedAt","2026-10-28T00:00:00","reason","Room issue","evidence","Verified maintenance record","requestKey","room-incident"),200);
         var move=new HashMap<String,Object>();move.put("newDate","2026-10-28");move.put("newStartTime","07:45");move.put("newEndTime","09:15");move.put("newRoomId",secondRoom);move.put("cause","CENTER_INCIDENT");move.put("reason","Agreed room replacement");move.put("memberAgreed",true);move.put("requestKey","room-change");move.put("incidentId",incident.get("id").asInt());
@@ -312,6 +318,11 @@ public class PhaseWorkflowHttpTest {
         call(manager,"POST","/api/sessions/"+scheduledId+"/reschedule",move,200);
         call(manager,"POST","/api/sessions/"+scheduledId+"/reschedule",move,200);
         assertFalse(jdbc.queryForObject("SELECT active FROM session_absence_notices WHERE id=?",Boolean.class,notice.get("id").asInt()));
+        assertEquals(1,jdbc.queryForObject("SELECT count(*) FROM attendances WHERE session_id=? AND superseded_at IS NOT NULL",Integer.class,scheduledId));
+        assertEquals(0,jdbc.queryForObject("SELECT count(*) FROM attendances WHERE session_id=? AND superseded_at IS NULL",Integer.class,scheduledId));
+        assertEquals(0,call(member,"GET","/api/attendances?sessionId="+scheduledId,null,200).size());
+        int archived=jdbc.queryForObject("SELECT attendance_id FROM attendances WHERE session_id=? AND superseded_at IS NOT NULL",Integer.class,scheduledId);
+        assertEquals("ATTENDANCE_SUPERSEDED",call(manager,"POST","/api/attendances/correct",Map.of("attendanceId",archived,"newState","Present","reason","Cannot correct superseded notice"),400).path("code").asText());
         assertEquals(11,credit());
         proof("EMERGENCY-MOVE-NOTICE","D05,D07","Old session <12h, new session >=12h; Coach then Manager with consent/reason","Coach 403; Manager/retry 200; actual time change supersedes notice; credit remains 11","SELECT active FROM session_absence_notices WHERE id=?",notice.get("id").asInt());
     }
@@ -345,6 +356,8 @@ public class PhaseWorkflowHttpTest {
     }
     @Test @Order(6) void qrAttendanceHonorsExactWindowReplayAndManagerCorrection() throws Exception {
         call(coach,"GET","/api/reports/dashboard",null,403);
+        at("2026-10-31T05:00:00");
+        var absence=call(member,"POST","/api/sessions/"+scheduledId+"/absence",Map.of("reason","Plans changed; Member later attends"),200);
         at("2026-10-31T05:59:59");var oldCode=call(member,"GET","/api/attendances/me/checkin-code",null,200);
         assertEquals(1,oldCode.get("expiresInSeconds").asInt());
         call(coach,"POST","/api/attendances/scan",Map.of("memberId",memberId,"sessionId",scheduledId,"code",oldCode.get("payload").asText()),400);
@@ -353,6 +366,7 @@ public class PhaseWorkflowHttpTest {
         var code=call(member,"GET","/api/attendances/me/checkin-code",null,200);assertEquals(30,code.get("expiresInSeconds").asInt());
         var attendance=call(coach,"POST","/api/attendances/scan",Map.of("memberId",memberId,"sessionId",scheduledId,"code",code.get("payload").asText()),200);
         assertEquals("Present",attendance.get("state").asText());int aid=attendance.get("attendanceId").asInt();
+        assertEquals(absence.path("id"),attendance.path("absenceNoticeId"));assertEquals(coachId,attendance.path("recordedBy").asInt());
         call(coach,"POST","/api/attendances/scan",Map.of("memberId",memberId,"sessionId",scheduledId,"code",code.get("payload").asText()),400);
         at("2026-10-31T07:30:00");var ended=call(member,"GET","/api/attendances/me/checkin-code",null,200);
         call(coach,"POST","/api/attendances/scan",Map.of("memberId",memberId,"sessionId",scheduledId,"code",ended.get("payload").asText()),400);
@@ -362,7 +376,8 @@ public class PhaseWorkflowHttpTest {
         call(manager,"POST","/api/attendances/correct",Map.of("attendanceId",aid,"newState","Late","reason","Unsupported new state"),400);
         call(manager,"POST","/api/attendances/correct",Map.of("attendanceId",aid,"newState","Absent","reason","Manager verified recorded result"),200);
         call(manager,"POST","/api/attendances/correct",Map.of("attendanceId",aid,"newState","Present","reason","Manager verified actual attendance"),200);
-        assertEquals(11,credit());assertEquals(1,jdbc.queryForObject("SELECT count(*) FROM attendances WHERE session_id=?",Integer.class,scheduledId));
+        assertEquals(11,credit());assertEquals(1,jdbc.queryForObject("SELECT count(*) FROM attendances WHERE session_id=? AND superseded_at IS NULL",Integer.class,scheduledId));
+        assertEquals(2,jdbc.queryForObject("SELECT count(*) FROM attendances WHERE session_id=?",Integer.class,scheduledId));
         proof("QR-WINDOW-REPLAY-CORRECTION","D15,D17,D18","Assigned Coach and Member QR; start-1s/start/end; Manager correction after finalizer","TTL 1 then 30; early/old step/replay/end rejected; one Present attendance; only Manager corrects Present/Absent; credit unchanged; Coach report 403","SELECT attendance_id,state FROM attendances WHERE session_id=?",scheduledId);
     }
     @Test @Order(7) void externalRefundAndNarrowCashCorrectionKeepOriginalReceiptsAndMoneyPeriods() throws Exception {
@@ -757,6 +772,70 @@ public class PhaseWorkflowHttpTest {
         try {call(contact,"GET","/api/coaches",null,403);
             proof("DIRECTORY-INACTIVE-SESSION","D09","Manager with MANAGE_USERS has an old session after local account is disabled","Directory 403, account stays Inactive; no contact disclosure through inactive session","SELECT user_id,status FROM users WHERE user_id=?",ids[4]);}
         finally {tx.executeWithoutResult(t->users.findById(ids[4]).orElseThrow().setStatus("Active"));}
+    }
+
+    @Test @Order(20) void absenceRacesFinalizeAndCoachRecordingKeepOneCurrentResult() throws Exception {
+        at("2027-06-01T00:00:00");
+        var order=requestOrder("absence-lifecycle","Cash",member);subscriptionId=order.path("subscriptionId").asInt();
+        call(cashier,"POST","/api/invoices/"+order.path("invoiceId").asInt()+"/confirm-cash",null,200);
+        int first=call(coach,"POST","/api/sessions/book-private",booking("absence-finalize",LocalDate.of(2027,6,3),"07:45","09:15"),201).path("id").asInt();
+        int second=call(coach,"POST","/api/sessions/book-private",booking("absence-coach",LocalDate.of(2027,6,4),"07:45","09:15"),201).path("id").asInt();
+        int rollback=call(coach,"POST","/api/sessions/book-private",booking("absence-rollback",LocalDate.of(2027,6,5),"07:45","09:15"),201).path("id").asInt();
+        at("2027-06-03T01:45:00");
+        tx.executeWithoutResult(t->{User outside=user("phase.absenceoutside",roles.findAll().stream().filter(r->"Member".equals(r.getName())).findFirst().orElseThrow());outside.setCenterId(2);Member m=new Member();m.setUser(outside);m.setJoinDate(LocalDate.now(clock));members.save(m);});
+        call(login("phase.absenceoutside"),"POST","/api/sessions/"+first+"/absence",Map.of("reason","Other center"),403);
+        tx.executeWithoutResult(t->{User outside=user("phase.absencemanageroutside",roles.findAll().stream().filter(r->"CenterManager".equals(r.getName())).findFirst().orElseThrow());outside.setCenterId(2);});
+        int archived=jdbc.queryForObject("SELECT min(attendance_id) FROM attendances WHERE superseded_at IS NOT NULL",Integer.class);
+        call(login("phase.absencemanageroutside"),"POST","/api/attendances/correct",Map.of("attendanceId",archived,"newState","Present","reason","Other center cannot inspect archived result"),403);
+        call(other,"POST","/api/sessions/"+first+"/absence",Map.of("reason","Wrong owner"),403);
+        call(coach,"POST","/api/sessions/"+first+"/absence",Map.of("reason","Wrong role"),403);
+        var race=race(new HttpClient[]{member,member},"/api/sessions/"+first+"/absence",new Object[]{Map.of("reason","Cannot attend"),Map.of("reason","Cannot attend")},List.of(200,200));
+        assertEquals(race.get(0).path("id"),race.get(1).path("id"));
+        assertEquals(1,jdbc.queryForObject("SELECT count(*) FROM session_absence_notices WHERE session_id=?",Integer.class,first));
+        int aid=jdbc.queryForObject("SELECT attendance_id FROM attendances WHERE session_id=? AND state='Absent' AND superseded_at IS NULL",Integer.class,first);
+        assertEquals("Scheduled",jdbc.queryForObject("SELECT status FROM sessions WHERE session_id=?",String.class,first));assertEquals(9,credit());
+        assertEquals(0,attendanceRepository.countAbsencesForMemberInRange(memberId,LocalDate.of(2027,6,1),LocalDate.of(2027,7,1)));
+        at("2027-06-03T09:15:00");finalizer.process(first);finalizer.process(first);
+        assertEquals(1,jdbc.queryForObject("SELECT count(*) FROM attendances WHERE session_id=?",Integer.class,first));
+        assertTrue(jdbc.queryForObject("SELECT attendance_finalized FROM sessions WHERE session_id=?",Boolean.class,first));
+        assertEquals(1,attendanceRepository.countAbsencesForMemberInRange(memberId,LocalDate.of(2027,6,1),LocalDate.of(2027,7,1)));
+        call(manager,"POST","/api/attendances/correct",Map.of("attendanceId",aid,"newState","Present","reason","Verified actual attendance"),200);
+        at("2027-06-04T01:45:00");call(member,"POST","/api/sessions/"+second+"/absence",Map.of("reason","Plans may change"),200);
+        at("2027-06-04T07:45:00");
+        call(coach,"POST","/api/training-results",Map.of("sessionId",second,"memberId",memberId,"coachId",coachId,"attendanceStatus","Present","content","Attended after reporting absence"),200);
+        assertEquals("Present",jdbc.queryForObject("SELECT state FROM attendances WHERE session_id=? AND superseded_at IS NULL",String.class,second));
+        assertEquals(1,jdbc.queryForObject("SELECT count(*) FROM attendances WHERE session_id=?",Integer.class,second));
+        at("2027-06-04T09:15:00");finalizer.process(second);
+        int secondAid=jdbc.queryForObject("SELECT attendance_id FROM attendances WHERE session_id=?",Integer.class,second);
+        call(manager,"POST","/api/attendances/correct",Map.of("attendanceId",secondAid,"newState","Absent","reason","Reconciled result"),200);
+        assertEquals("Absent",jdbc.queryForObject("SELECT attendance_status FROM training_results WHERE session_id=? AND member_id=?",String.class,second,memberId));assertEquals(9,credit());
+        proof("ABSENCE-LIFECYCLE","D05,D15","Concurrent Member requests, assigned Coach manual result, finalizer twice and Manager correction","One linked Absent per session; Scheduled/resources/credit retained; wrong role/owner403; finalizer completes; Coach Present and correction sync result", "SELECT attendance_id,session_id,state,recorded_by,absence_notice_id,superseded_at FROM attendances WHERE session_id IN (?,?) ORDER BY attendance_id",first,second);
+        if(!System.getProperty("scms.phases.pg-url","").isBlank()) {
+            at("2027-06-05T01:45:00");
+            jdbc.execute("CREATE FUNCTION qa_reject_absence() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.session_id="+rollback+" THEN RAISE EXCEPTION USING ERRCODE='23514',MESSAGE='Injected isolated attendance failure'; END IF; RETURN NEW; END $$");
+            jdbc.execute("CREATE TRIGGER qa_reject_absence BEFORE INSERT ON attendances FOR EACH ROW EXECUTE FUNCTION qa_reject_absence()");
+            try {call(member,"POST","/api/sessions/"+rollback+"/absence",Map.of("reason","Must roll back atomically"),409);}
+            finally {jdbc.execute("DROP TRIGGER qa_reject_absence ON attendances");jdbc.execute("DROP FUNCTION qa_reject_absence()");}
+            assertEquals(0,jdbc.queryForObject("SELECT count(*) FROM session_absence_notices WHERE session_id=?",Integer.class,rollback));
+            assertEquals(0,jdbc.queryForObject("SELECT count(*) FROM attendances WHERE session_id=?",Integer.class,rollback));assertEquals(9,credit());
+            proof("ABSENCE-ATOMIC-ROLLBACK","D05,D15","Disposable PG trigger rejects attendance insert after notice insert","409; no notice or attendance committed; booked credit unchanged", "SELECT status,credit_returned FROM sessions WHERE session_id=?",rollback);
+        }
+    }
+
+    @Test @Order(21) void roomCodeKeepsNumericApiAndRejectsDuplicateOrWrongCenterCodes() throws Exception {
+        var body=new HashMap<String,Object>(Map.of("name","QA coded room","roomCode","C01-QA-01","location","QA","capacity",4,"facilityType","Indoor"));
+        var created=call(manager,"POST","/api/rooms",body,201);assertTrue(created.path("id").isIntegralNumber());assertEquals("C01-QA-01",created.path("roomCode").asText());
+        int id=created.path("id").asInt();assertEquals("C01-QA-01",jdbc.queryForObject("SELECT room_code FROM rooms WHERE room_id=?",String.class,id));
+        body.put("name","QA duplicate");call(manager,"POST","/api/rooms",body,409);
+        body.put("roomCode","C02-QA-01");call(manager,"POST","/api/rooms",body,400);
+        body.put("roomCode","invalid");call(manager,"POST","/api/rooms",body,400);
+        body.remove("roomCode");body.put("name","QA coded room renamed");
+        assertEquals("C01-QA-01",call(manager,"PUT","/api/rooms/"+id,body,200).path("roomCode").asText());
+        body.put("name","QA compatible omitted code");assertTrue(call(manager,"POST","/api/rooms",body,201).path("roomCode").asText().startsWith("C01-RM-"));
+        int legacy=tx.execute(t->{Room r=new Room();r.setName("Retired QA resource");r.setRoomCode("C01-LEGACY-QA");r.setCapacity(4);r.setStatus("Closed");return rooms.save(r).getId();});
+        assertFalse(java.util.stream.StreamSupport.stream(call(manager,"GET","/api/rooms",null,200).spliterator(),false).anyMatch(r->r.path("id").asInt()==legacy));
+        call(member,"POST","/api/rooms",body,403);
+        proof("ROOM-CODE-API","D02","Manager CRUD; Member denied; explicit code, omitted code, duplicate and wrong-center code","Numeric id/path retained; roomCode persisted; omitted PUT retains; omitted POST generates; duplicate409, invalid/center400, Member403", "SELECT room_id,room_code,room_name,capacity,status FROM rooms WHERE room_id=?",id);
     }
 
     @Test @Order(99) void publishedOpenApiKeepsDistinctWorkflowDtosAndActualSuccessStatuses() throws Exception {

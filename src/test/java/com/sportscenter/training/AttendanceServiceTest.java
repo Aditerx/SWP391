@@ -150,6 +150,42 @@ class AttendanceServiceTest {
         assertTrue(assertThrows(com.sportscenter.common.exception.BusinessException.class,()->absenceService.report(88,"Reason",memberAuth)).getMessage().startsWith("NORMAL_CLASS_NON_CANCELLABLE:"));
         verifyNoInteractions(attendanceRepository);
     }
+    @Test void requestAbsence_CreatesLinkedAbsentWithMemberProvenance() {
+        var session=noticeSession(88);
+        when(sessionRepository.findByIdForUpdate(88)).thenReturn(Optional.of(session));
+        when(noticeRepository.save(any())).thenAnswer(i->{com.sportscenter.session.SessionAbsenceNotice n=i.getArgument(0);n.setId(41);return n;});
+        var result=absenceService.report(88,"Cannot attend",memberAuth);
+        assertEquals(41,result.id());
+        verify(attendanceRepository).save(argThat(a->"Absent".equals(a.getState()) && a.getMember()==sampleMember
+                && a.getRecordedBy()==sampleMember && Integer.valueOf(41).equals(a.getAbsenceNoticeId()) && a.getCheckInTime()==null));
+        assertEquals("Scheduled",session.getStatus());
+    }
+    @Test void requestAbsence_RetryDoesNotOverwriteRecordedAttendance() {
+        var session=noticeSession(88);var notice=new com.sportscenter.session.SessionAbsenceNotice();notice.setId(41);notice.setSession(session);notice.setMemberId(7);
+        var current=new Attendance();current.setState("Present");
+        when(sessionRepository.findByIdForUpdate(88)).thenReturn(Optional.of(session));
+        when(noticeRepository.findFirstBySessionIdAndActiveTrue(88)).thenReturn(Optional.of(notice));
+        when(attendanceRepository.findBySessionIdAndMemberId(88,7)).thenReturn(Optional.of(current));
+        assertEquals(41,absenceService.report(88,"Retry",memberAuth).id());
+        verify(attendanceRepository,never()).save(any());verify(noticeRepository,never()).save(any());assertEquals("Present",current.getState());
+    }
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(ints={0,12})
+    void requestAbsence_ExactStartAndTwelveHoursRejected(int hours) {
+        var session=noticeSession(88);session.setStartTime(java.time.LocalTime.of(10,0).plusHours(hours));
+        when(sessionRepository.findByIdForUpdate(88)).thenReturn(Optional.of(session));
+        assertThrows(com.sportscenter.common.exception.BusinessException.class,()->absenceService.report(88,"Reason",memberAuth));
+        verifyNoInteractions(attendanceRepository,noticeRepository);
+    }
+    @Test void supersedeNoticeArchivesAutomaticAttendanceWithoutDeletingIt() {
+        var session=noticeSession(88);var notice=new com.sportscenter.session.SessionAbsenceNotice();notice.setId(41);notice.setMemberId(7);
+        var current=new Attendance();current.setAttendanceId(90);current.setState("Absent");current.setAbsenceNoticeId(41);current.setRecordedBy(sampleMember);
+        when(noticeRepository.findFirstBySessionIdAndActiveTrue(88)).thenReturn(Optional.of(notice));
+        when(attendanceRepository.findBySessionIdAndMemberId(88,7)).thenReturn(Optional.of(current));
+        absenceService.supersedeForTimeChange(session);
+        assertFalse(notice.isActive());assertNotNull(current.getSupersededAt());assertEquals("Absent",current.getState());
+        verify(attendanceRepository).save(current);verify(attendanceRepository,never()).delete(any());
+    }
     @Test void requestAbsence_AfterStartIsRejected() {
         var session=noticeSession(89);session.setStartTime(java.time.LocalTime.of(9,0));when(sessionRepository.findByIdForUpdate(89)).thenReturn(Optional.of(session));
         assertThrows(com.sportscenter.common.exception.BusinessException.class,()->absenceService.report(89,"Reason",memberAuth));verifyNoInteractions(attendanceRepository);

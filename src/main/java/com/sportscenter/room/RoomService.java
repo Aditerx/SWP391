@@ -18,7 +18,9 @@ public class RoomService {
 
     @Transactional(readOnly = true)
     public List<RoomResponse> findAll() {
-        return repository.findAll().stream().map(RoomResponse::from).toList();
+        return repository.findAll().stream()
+                .filter(r -> !("Closed".equals(r.getStatus()) && r.getRoomCode()!=null && r.getRoomCode().contains("-LEGACY-")))
+                .map(RoomResponse::from).toList();
     }
 
     @Transactional
@@ -66,6 +68,12 @@ public class RoomService {
     }
 
     private void apply(Room room, RoomRequest request) {
+        if (request.roomCode() != null) {
+            if (!request.roomCode().matches("C%02d-[A-Z0-9]+-[A-Z0-9]+".formatted(room.getCenterId()))) {
+                throw new BusinessException("ROOM_CODE_CENTER_MISMATCH: Room code must match the room center");
+            }
+            room.setRoomCode(request.roomCode());
+        }
         room.setName(request.name());
         room.setLocation(request.location());
         room.setCapacity(request.capacity());

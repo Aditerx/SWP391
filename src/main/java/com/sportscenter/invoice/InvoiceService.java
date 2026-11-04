@@ -50,6 +50,8 @@ public class InvoiceService {
     private final com.sportscenter.membership.EntitlementTimePolicy entitlementTimePolicy;
     private final com.sportscenter.membership.CoachCapacityService coachCapacityService;
     private final com.sportscenter.user.MemberRepository memberRepository;
+    private final VnPayPaymentAttemptRepository paymentAttemptRepository;
+    @jakarta.persistence.PersistenceContext private jakarta.persistence.EntityManager entityManager;
 
     @Transactional
     public InvoiceOrderResponse createAdvancedOrder(MemberPackage subscription, String method, String clientIp) {
@@ -59,13 +61,16 @@ public class InvoiceService {
         return orderResponse(invoiceRepository.save(invoice), clientIp);
     }
 
+    @Transactional
     public InvoiceOrderResponse existingOrder(Invoice invoice, String clientIp) {
+        scheduleWriteLock.acquire(invoice.getMember().getCenterId());
+        entityManager.refresh(invoice, jakarta.persistence.LockModeType.PESSIMISTIC_WRITE);
         if (!"Pending".equals(invoice.getPaymentStatus()) || expired(invoice))
             return new InvoiceOrderResponse(invoice.getInvoiceId(),invoice.getInvoiceCode(),invoice.getAmount(),invoice.getPaymentMethod(),invoice.getPaymentStatus(),invoice.getExpiresAt(),null);
         return orderResponse(invoice,clientIp);
     }
 
-    /** Browser Return verifies the protocol only. IPN is the sole payment writer. */
+    /** Browser Return verifies the protocol only. Verified IPN/QueryDR are payment writers. */
     @Transactional(readOnly = true)
     public VnPayResult inspectVnpayReturn(Map<String,String> params) {
         if (!vnPayGateway.isValid(params)) return new VnPayResult("97", "Invalid signature", null);
@@ -172,7 +177,7 @@ public class InvoiceService {
     }
 
     private InvoiceOrderResponse orderResponse(Invoice invoice, String clientIp) {
-        String url = "VNPay".equals(invoice.getPaymentMethod()) ? vnPayGateway.createPaymentUrl(invoice, clientIp) : null;
+        String url = "VNPay".equals(invoice.getPaymentMethod()) ? issueVnpayLink(invoice, clientIp) : null;
         return new InvoiceOrderResponse(invoice.getInvoiceId(), invoice.getInvoiceCode(), invoice.getAmount(),
                 invoice.getPaymentMethod(), invoice.getPaymentStatus(), invoice.getExpiresAt(), url);
     }
@@ -213,15 +218,30 @@ public class InvoiceService {
         return InvoiceResponse.from(invoice);
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public String payOnline(Integer invoiceId, Authentication authentication, String clientIp) {
-        Invoice invoice = invoiceRepository.findById(invoiceId)
+        User actor = currentUser(authentication);
+        scheduleWriteLock.acquire(actor.getCenterId());
+        Invoice invoice = invoiceRepository.findByIdForUpdate(invoiceId)
                 .orElseThrow(() -> new ResourceNotFoundException("Invoice not found: " + invoiceId));
-        if (!invoice.getMember().getId().equals(currentUser(authentication).getId())) throw new ResourceNotFoundException("Invoice not found: " + invoiceId);
+        if (!invoice.getMember().getId().equals(actor.getId())) throw new ResourceNotFoundException("Invoice not found: " + invoiceId);
         if (!"VNPay".equals(invoice.getPaymentMethod()) || !"Pending".equals(invoice.getPaymentStatus()) || expired(invoice)) {
             throw new InvoiceConflictException("Invoice is not payable online");
         }
-        return vnPayGateway.createPaymentUrl(invoice, clientIp);
+        return issueVnpayLink(invoice, clientIp);
+    }
+
+    private String issueVnpayLink(Invoice invoice, String clientIp) {
+        VnPayGateway.PaymentLink link = vnPayGateway.createPaymentLink(invoice, clientIp);
+        if (!paymentAttemptRepository.existsByInvoiceInvoiceIdAndTmnCodeAndTxnRefAndTransactionDate(
+                invoice.getInvoiceId(), link.tmnCode(), link.txnRef(), link.createDate())) {
+            VnPayPaymentAttempt attempt = new VnPayPaymentAttempt();
+            attempt.setInvoice(invoice); attempt.setTmnCode(link.tmnCode()); attempt.setTxnRef(link.txnRef());
+            attempt.setTransactionDate(link.createDate()); attempt.setAmountMinor(link.amountMinor());
+            attempt.setCreatedAt(LocalDateTime.now(clock));
+            paymentAttemptRepository.save(attempt);
+        }
+        return link.url();
     }
 
     @Transactional
@@ -242,17 +262,7 @@ public class InvoiceService {
 
         boolean success = "00".equals(params.get("vnp_ResponseCode")) && "00".equals(params.get("vnp_TransactionStatus"));
         if (success) {
-            String activationProblem=!"Pending".equals(invoice.getPaymentStatus())||expired(invoice)?null:activationProblem(invoice);
-            boolean paidAfterExpiry = !"Pending".equals(invoice.getPaymentStatus()) || expired(invoice)||activationProblem!=null;
-            invoice.setGatewayTransactionRef(params.get("vnp_TransactionNo"));
-            if (paidAfterExpiry) {
-                // Preserve evidence of money received without selling a released seat again.
-                invoice.setPaymentStatus("Paid");
-                invoice.setReconciliationRequired(true);
-                invoice.setPaymentDate(LocalDateTime.now(clock));
-                cancelLinked(invoice);
-                auditService.log(null, "PAYMENT_RECONCILIATION_REQUIRED", "invoices", invoice.getInvoiceId(), "Verified money received without an available entitlement; "+activationProblem);
-            } else markPaidAndActivate(invoice, null, false);
+            recordVnpaySuccess(invoice, params.get("vnp_TransactionNo"));
             return new VnPayResult("00", "Confirm Success", invoice);
         }
         if ("Pending".equals(invoice.getPaymentStatus()) || "Expired".equals(invoice.getPaymentStatus())) {
@@ -261,6 +271,106 @@ public class InvoiceService {
             auditService.log(null, "PAYMENT_FAILED", "invoices", invoice.getInvoiceId(), "VNPay response " + params.get("vnp_ResponseCode"));
         }
         return new VnPayResult("00", "Confirm Success", invoice);
+    }
+
+    private void recordVnpaySuccess(Invoice invoice, String transactionNo) {
+        String problem = !"Pending".equals(invoice.getPaymentStatus()) || expired(invoice) ? null : activationProblem(invoice);
+        boolean reconcile = !"Pending".equals(invoice.getPaymentStatus()) || expired(invoice) || problem != null;
+        invoice.setGatewayTransactionRef(transactionNo);
+        if (reconcile) {
+            invoice.setPaymentStatus("Paid"); invoice.setReconciliationRequired(true);
+            invoice.setPaymentDate(LocalDateTime.now(clock)); cancelLinked(invoice);
+            auditService.log(null, "PAYMENT_RECONCILIATION_REQUIRED", "invoices", invoice.getInvoiceId(),
+                    "Verified money received without an available entitlement; " + problem);
+        } else markPaidAndActivate(invoice, null, false);
+    }
+
+    @Transactional
+    public VnPayVerificationService.Claim claimVnpayVerification(Integer id, Authentication auth) {
+        Invoice invoice = lockOwnVnpayInvoice(id, auth);
+        if ("Paid".equals(invoice.getPaymentStatus())) return queryClaim(invoice, "ALREADY_PAID", "Hóa đơn đã được ghi nhận thanh toán.", 0);
+        if ("Refunded".equals(invoice.getPaymentStatus())) return queryClaim(invoice, "NOT_APPLICABLE", "Hóa đơn đã hoàn tiền; cần theo dõi hồ sơ đối soát.", 0);
+        if (!paymentProperties.isVnpayQueryEnabled()) return queryClaim(invoice, "DISABLED", "Kiểm tra VNPay chưa được bật trên backend.", 0);
+        List<VnPayPaymentAttempt> attempts = paymentAttemptRepository.findByInvoiceInvoiceIdOrderByIdDesc(id);
+        if (attempts.isEmpty()) return queryClaim(invoice, "ATTEMPT_MISSING", "Đơn cũ thiếu dữ liệu tạo link VNPay; cần đối soát giao dịch gốc.", 0);
+        LocalDateTime now = LocalDateTime.now(clock);
+        var last = attempts.stream().map(VnPayPaymentAttempt::getLastQueryAt).filter(java.util.Objects::nonNull).max(LocalDateTime::compareTo);
+        if (last.isPresent() && last.get().plusSeconds(30).isAfter(now)) {
+            int seconds = Math.max(1, (int) java.time.Duration.between(now, last.get().plusSeconds(30)).toSeconds() + 1);
+            return queryClaim(invoice, "RETRY_LATER", "Vui lòng chờ trước khi kiểm tra lại VNPay.", seconds);
+        }
+        // Rotate through old requests as well: reissuing a URL must not hide a paid older request.
+        attempts.sort(java.util.Comparator.comparing(VnPayPaymentAttempt::getLastQueryAt,
+                java.util.Comparator.nullsFirst(java.util.Comparator.naturalOrder())));
+        var selected = attempts.stream().limit(3).toList();
+        selected.forEach(attempt -> attempt.setLastQueryAt(now));
+        paymentAttemptRepository.saveAll(selected);
+        return new VnPayVerificationService.Claim(null, selected.stream().map(VnPayPaymentAttempt::snapshot).toList());
+    }
+
+    @Transactional
+    public VnPayVerificationResponse settleVnpayQuery(Integer id, Authentication auth, Long attemptId, VerifiedVnPayQuery result) {
+        Invoice invoice = lockOwnVnpayInvoice(id, auth);
+        if ("Paid".equals(invoice.getPaymentStatus())) return queryResponse(invoice, "ALREADY_PAID", "Hóa đơn đã được ghi nhận thanh toán.", 0);
+        if ("Refunded".equals(invoice.getPaymentStatus())) return queryResponse(invoice, "NOT_APPLICABLE", "Hóa đơn đã hoàn tiền.", 0);
+        VnPayPaymentAttempt attempt = paymentAttemptRepository.findById(attemptId)
+                .orElseThrow(() -> new BusinessException("PAYMENT_ATTEMPT_NOT_FOUND"));
+        if (!attempt.getInvoice().getInvoiceId().equals(id) || !result.successful()
+                || !attempt.getTmnCode().equals(result.tmnCode()) || !paymentProperties.getVnpayTmnCode().equals(result.tmnCode())
+                || !invoice.getInvoiceCode().equals(result.txnRef()) || !attempt.getTxnRef().equals(result.txnRef())
+                || attempt.getAmountMinor() != result.amountMinor() || invoice.getAmount().movePointRight(2).longValueExact() != result.amountMinor()
+                || result.transactionNo() == null || !result.transactionNo().matches("[0-9]{1,15}"))
+            throw new BusinessException("PAYMENT_EVIDENCE_MISMATCH");
+        if (invoiceRepository.existsByGatewayTransactionRefAndInvoiceIdNot(result.transactionNo(), id))
+            throw new InvoiceConflictException("PAYMENT_EVIDENCE_CONFLICT: Transaction already recorded");
+        if (!paymentProperties.isVnpayQuerySettlementEnabled())
+            return queryResponse(invoice, "VERIFIED_ONLY", "VNPay đã xác nhận; chế độ kiểm chứng chưa cập nhật hóa đơn.", 30);
+        recordVnpaySuccess(invoice, result.transactionNo());
+        auditService.log(invoice.getMember().getId(), "VERIFY_VNPAY_QUERY", "invoices", id,
+                "Verified QueryDR response " + result.responseId());
+        return queryResponse(invoice, "VERIFIED_PAID", "Đã xác minh thanh toán với VNPay.", 0);
+    }
+
+    @Transactional(readOnly = true)
+    public VnPayVerificationResponse vnpayVerificationState(Integer id, Authentication auth, String status, String message, int retry) {
+        User actor = queryActor(auth);
+        Invoice invoice = invoiceRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Invoice not found"));
+        checkOwnInvoice(invoice, actor);
+        if ("Paid".equals(invoice.getPaymentStatus())) return queryResponse(invoice, "ALREADY_PAID", "Hóa đơn đã được ghi nhận thanh toán.", 0);
+        return queryResponse(invoice, status, message, retry);
+    }
+
+    private Invoice lockOwnVnpayInvoice(Integer id, Authentication auth) {
+        User actor = queryActor(auth);
+        Integer center = invoiceRepository.findCenterIdById(id).orElseThrow(() -> new ResourceNotFoundException("Invoice not found"));
+        if (!java.util.Objects.equals(center, actor.getCenterId())) throw new ResourceNotFoundException("Invoice not found");
+        scheduleWriteLock.acquire(center);
+        Invoice invoice = invoiceRepository.findByIdForUpdate(id).orElseThrow(() -> new ResourceNotFoundException("Invoice not found"));
+        checkOwnInvoice(invoice, actor);
+        return invoice;
+    }
+
+    private User queryActor(Authentication auth) {
+        User actor = currentUser(auth);
+        if (!"Active".equalsIgnoreCase(actor.getStatus()) || actor.getCenterId() == null
+                || actor.getRole() == null || !"Member".equalsIgnoreCase(actor.getRole().getName())
+                || memberRepository.findById(actor.getId()).isEmpty())
+            throw new AccessDeniedException("Active Member account is required");
+        return actor;
+    }
+
+    private void checkOwnInvoice(Invoice invoice, User actor) {
+        if (!invoice.getMember().getId().equals(actor.getId()) || !java.util.Objects.equals(invoice.getMember().getCenterId(), actor.getCenterId()))
+            throw new ResourceNotFoundException("Invoice not found");
+        if (!"VNPay".equals(invoice.getPaymentMethod())) throw new BusinessException("VNPAY_INVOICE_REQUIRED");
+    }
+
+    private VnPayVerificationService.Claim queryClaim(Invoice invoice, String status, String message, int retry) {
+        return new VnPayVerificationService.Claim(queryResponse(invoice, status, message, retry), List.of());
+    }
+
+    private VnPayVerificationResponse queryResponse(Invoice invoice, String status, String message, int retry) {
+        return new VnPayVerificationResponse(status, message, retry, InvoiceResponse.from(invoice));
     }
 
     @Transactional(readOnly = true)

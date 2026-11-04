@@ -1,5 +1,5 @@
 -- DATABASE VARIANT: OWNER-AUTHORIZED FULL SCMS REBUILD, INCLUDING AN EXISTING DATABASE.
--- Each execution REPLACES all rows in the 46 listed SCMS tables and restarts owned integer IDs.
+-- Each execution REPLACES all rows in the 47 listed SCMS tables and restarts owned integer IDs.
 -- This intentionally recreates reference business history; it does NOT migrate real transactions.
 -- All history below is SYNTHETIC reference data, NOT evidence of actual payment or attendance.
 -- Supabase auth/storage/realtime tables and unlisted application tables are never dropped.
@@ -39,6 +39,7 @@ DROP TABLE IF EXISTS public.scms_data_migration_audit,
  public.notification_recipients,
  public.notifications,
  public.support_requests,
+ public.vnpay_payment_attempts,
  public.invoices,
  public.holidays,
  public.class_enrollments,
@@ -264,6 +265,28 @@ ALTER TABLE rooms ADD COLUMN IF NOT EXISTS facility_type VARCHAR(20) NOT NULL DE
 ALTER TABLE rooms DROP CONSTRAINT IF EXISTS chk_facility_type;
 ALTER TABLE rooms ADD CONSTRAINT chk_facility_type CHECK (facility_type IN ('Indoor', 'Outdoor'));
 
+-- Room codes: additive and compatible with numeric IDs.
+ALTER TABLE rooms ADD COLUMN IF NOT EXISTS room_code VARCHAR(40);
+UPDATE rooms SET room_code='C'||lpad(center_id::text,greatest(2,length(center_id::text)),'0')||'-LEGACY-'||room_id WHERE room_code IS NULL;
+ALTER TABLE rooms ALTER COLUMN room_code SET NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_rooms_code ON rooms(room_code);
+DO $$ BEGIN
+ IF NOT EXISTS(SELECT 1 FROM pg_constraint WHERE conrelid='rooms'::regclass AND conname='chk_room_code') THEN
+  ALTER TABLE rooms ADD CONSTRAINT chk_room_code CHECK (
+   room_code ~ '^C[0-9]{2,}-[A-Z0-9]+-[A-Z0-9]+$'
+   AND split_part(room_code,'-',1)='C'||lpad(center_id::text,greatest(2,length(center_id::text)),'0'));
+ END IF;
+END $$;
+-- Allows a rolling deploy: old writers omit code; the numeric ID remains stable.
+CREATE OR REPLACE FUNCTION fn_room_code_default() RETURNS TRIGGER LANGUAGE plpgsql AS $$
+BEGIN
+ IF NEW.room_code IS NULL THEN NEW.room_code:='C'||lpad(NEW.center_id::text,greatest(2,length(NEW.center_id::text)),'0')||'-LEGACY-'||NEW.room_id; END IF;
+ RETURN NEW;
+END $$;
+DROP TRIGGER IF EXISTS trg_room_code_default ON rooms;
+CREATE TRIGGER trg_room_code_default BEFORE INSERT ON rooms FOR EACH ROW EXECUTE FUNCTION fn_room_code_default();
+
+
 CREATE TABLE IF NOT EXISTS classes (
     class_id       SERIAL PRIMARY KEY,
     class_name     VARCHAR(100) NOT NULL,
@@ -392,6 +415,8 @@ CREATE TABLE IF NOT EXISTS attendances (
     state          VARCHAR(20) NOT NULL DEFAULT 'Present'
         CHECK (state IN ('Present', 'Absent', 'Late', 'CheckedIn', 'Excused')),
     note           TEXT NULL,
+    absence_notice_id INT NULL,
+    superseded_at TIMESTAMP NULL,
     check_in_time  TIMESTAMP NULL,
     check_out_time TIMESTAMP NULL,
     CONSTRAINT fk_attendance_session  FOREIGN KEY (session_id)  REFERENCES sessions(session_id) ON DELETE CASCADE,
@@ -411,9 +436,11 @@ ALTER TABLE training_results ADD CONSTRAINT ck_training_results_attendance_statu
     CHECK (attendance_status IN ('Present', 'Absent', 'Late', 'Excused'));
 
 -- Partial unique index: only one attendance record per (session, member) when session_id IS NOT NULL
+ALTER TABLE attendances ADD COLUMN IF NOT EXISTS absence_notice_id INT;
+ALTER TABLE attendances ADD COLUMN IF NOT EXISTS superseded_at TIMESTAMP;
 CREATE UNIQUE INDEX IF NOT EXISTS ux_attendance_session_member
     ON attendances(session_id, member_id)
-    WHERE session_id IS NOT NULL;
+    WHERE session_id IS NOT NULL AND superseded_at IS NULL;
 
 CREATE INDEX IF NOT EXISTS idx_attendance_member ON attendances(member_id);
 
@@ -650,6 +677,24 @@ CREATE TABLE IF NOT EXISTS invoices (
     CONSTRAINT chk_invoice_target CHECK ((package_id IS NOT NULL AND class_id IS NULL) OR (package_id IS NULL AND class_id IS NOT NULL))
 );
 
+CREATE TABLE IF NOT EXISTS public.vnpay_payment_attempts (
+  attempt_id BIGSERIAL PRIMARY KEY,
+  invoice_id INTEGER NOT NULL,
+  tmn_code VARCHAR(32) NOT NULL,
+  txn_ref VARCHAR(100) NOT NULL,
+  transaction_date VARCHAR(14) NOT NULL,
+  amount_minor BIGINT NOT NULL,
+  created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL,
+  last_query_at TIMESTAMP WITHOUT TIME ZONE NULL,
+  CONSTRAINT fk_vnpay_attempt_invoice FOREIGN KEY(invoice_id)
+    REFERENCES public.invoices(invoice_id) ON DELETE RESTRICT,
+  CONSTRAINT uq_vnpay_attempt_request UNIQUE(invoice_id,tmn_code,txn_ref,transaction_date),
+  CONSTRAINT chk_vnpay_attempt_tmn CHECK(tmn_code ~ '^[A-Za-z0-9_-]{1,32}$'),
+  CONSTRAINT chk_vnpay_attempt_ref CHECK(length(txn_ref) BETWEEN 1 AND 100 AND txn_ref !~ '[[:cntrl:]]'),
+  CONSTRAINT chk_vnpay_attempt_date CHECK(transaction_date ~ '^[0-9]{14}$'),
+  CONSTRAINT chk_vnpay_attempt_amount CHECK(amount_minor BETWEEN 1 AND 999999999999)
+);
+
 CREATE INDEX IF NOT EXISTS idx_invoice_member       ON invoices(member_id);
 CREATE INDEX IF NOT EXISTS idx_invoice_receptionist ON invoices(receptionist_id);
 CREATE UNIQUE INDEX IF NOT EXISTS uq_invoices_invoice_code ON invoices(invoice_code);
@@ -878,6 +923,21 @@ CREATE TABLE IF NOT EXISTS session_absence_notices (
     reason VARCHAR(2000) NOT NULL, active BOOLEAN NOT NULL DEFAULT TRUE, superseded_at TIMESTAMP
 );
 CREATE UNIQUE INDEX IF NOT EXISTS uq_active_absence_notice ON session_absence_notices(session_id) WHERE active;
+-- Owner31/10, implemented02/11: Absent + notice atomically; retain superseded history.
+LOCK TABLE attendances IN SHARE ROW EXCLUSIVE MODE;
+ALTER TABLE attendances ADD COLUMN IF NOT EXISTS absence_notice_id INT;
+ALTER TABLE attendances ADD COLUMN IF NOT EXISTS superseded_at TIMESTAMP;
+DO $$ BEGIN
+ IF NOT EXISTS(SELECT 1 FROM pg_constraint WHERE conrelid='attendances'::regclass AND conname='fk_attendance_absence_notice') THEN
+  ALTER TABLE attendances ADD CONSTRAINT fk_attendance_absence_notice FOREIGN KEY(absence_notice_id) REFERENCES session_absence_notices(id);
+ END IF;
+END $$;
+-- Exactly one current attendance; archived automatic records remain traceable.
+DROP INDEX IF EXISTS ux_attendance_session_member;
+CREATE UNIQUE INDEX ux_attendance_session_member ON attendances(session_id,member_id)
+ WHERE session_id IS NOT NULL AND superseded_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_attendance_absence_notice ON attendances(absence_notice_id) WHERE absence_notice_id IS NOT NULL;
+
 CREATE TABLE IF NOT EXISTS session_changes (
     id SERIAL PRIMARY KEY, session_id INT NOT NULL REFERENCES sessions(session_id), request_key VARCHAR(80) NOT NULL,
     request_hash VARCHAR(64) NOT NULL, actor_id INT NOT NULL REFERENCES users(user_id), changed_at TIMESTAMP NOT NULL,
@@ -936,7 +996,7 @@ COMMENT ON TABLE public.members IS 'Hồ sơ Member, mục tiêu/sức khỏe v�
 COMMENT ON TABLE public.subjects IS '9 môn chuẩn, giá 12 buổi Normal/12 credit Advanced và phân loại Outdoor.';
 COMMENT ON TABLE public.specializations IS 'Danh mục chuyên môn Coach liên kết với môn học.';
 COMMENT ON TABLE public.coach_specializations IS 'Liên kết nhiều-nhiều Coach và chuyên môn; khóa ghép.';
-COMMENT ON TABLE public.rooms IS '8 tài nguyên sân/phòng; Bóng rổ và Bóng chuyền dùng chung một room_id.';
+COMMENT ON TABLE public.rooms IS '20 tài nguyên center1 theo room.jpg; room_id số, room_code riêng; phòng legacy giữ lịch sử.';
 COMMENT ON TABLE public.classes IS 'Khóa Normal 12 buổi cố định và template Advanced theo môn.';
 COMMENT ON TABLE public.training_plans IS 'Kế hoạch đào tạo cho một lớp hoặc một Member.';
 COMMENT ON TABLE public.sessions IS 'Buổi học, tài nguyên, người học 1:1 và liên kết quyền học/buổi bù.';
@@ -1049,20 +1109,32 @@ INSERT INTO _scms_subjects VALUES
 (4, 'Bắn cung', 'ban-cung', 2000000, 6000000, TRUE, 4, 'archery'),
 (5, 'Bóng rổ', 'bong-ro', 1200000, 3500000, FALSE, 5, 'basketball'),
 (6, 'Bóng đá', 'bong-da', 1000000, 3500000, TRUE, 6, 'football'),
-(7, 'Bóng chuyền', 'bong-chuyen', 1000000, 3500000, FALSE, 5, 'volleyball'),
+(7, 'Bóng chuyền', 'bong-chuyen', 1000000, 3500000, FALSE, 13, 'volleyball'),
 (8, 'Cầu lông', 'cau-long', 900000, 3000000, FALSE, 7, 'badminton'),
 (9, 'Bóng bàn', 'bong-ban', 800000, 2500000, FALSE, 8, 'tabletennis');
 
-CREATE TEMP TABLE _scms_rooms(ordinal INT PRIMARY KEY,name TEXT,location TEXT,capacity INT,facility_type TEXT) ON COMMIT DROP;
+CREATE TEMP TABLE _scms_rooms(ordinal INT PRIMARY KEY,code TEXT,name TEXT,location TEXT,capacity INT,facility_type TEXT) ON COMMIT DROP;
 INSERT INTO _scms_rooms VALUES
-(1, 'Sân Tennis 01', 'Khu Tennis ngoài trời', 4, 'Outdoor'),
-(2, 'Hồ bơi 01', 'Khu bơi ngoài trời', 20, 'Outdoor'),
-(3, 'Sân Pickleball 01', 'Khu Pickleball trong nhà', 12, 'Indoor'),
-(4, 'Khu Bắn cung 01', 'Khu Bắn cung ngoài trời', 10, 'Outdoor'),
-(5, 'Sân đa năng 01', 'Nhà thi đấu dùng chung Bóng rổ/Bóng chuyền', 30, 'Indoor'),
-(6, 'Sân Bóng đá 01', 'Khu Bóng đá ngoài trời', 30, 'Outdoor'),
-(7, 'Sân Cầu lông 01', 'Nhà thi đấu Cầu lông', 20, 'Indoor'),
-(8, 'Khu Bóng bàn 01', 'Khu Bóng bàn trong nhà', 15, 'Indoor');
+(1,'C01-TEN-01','Sân Tennis 01','Khu A – Ngoài trời',4,'Outdoor'),
+(2,'C01-SWIM-01','Hồ bơi 01','Khu hồ bơi',10,'Outdoor'),
+(3,'C01-PICK-01','Sân Pickleball 01','Nhà thi đấu B',4,'Indoor'),
+(4,'C01-ARC-01','Khu Bắn cung 01','Khu C – Ngoài trời',5,'Outdoor'),
+(5,'C01-BR-01','Sân Bóng rổ 01','Nhà thi đấu A',8,'Indoor'),
+(6,'C01-FOOT-01','Sân Bóng đá 01','Khu B – Ngoài trời',15,'Outdoor'),
+(7,'C01-BAD-01','Sân Cầu lông 01','Nhà thi đấu B',4,'Indoor'),
+(8,'C01-TT-01','Bàn Bóng bàn 01','Phòng Bóng bàn',2,'Indoor'),
+(9,'C01-TEN-02','Sân Tennis 02','Khu A – Ngoài trời',4,'Outdoor'),
+(10,'C01-FOOT-02','Sân Bóng đá 02','Khu B – Ngoài trời',15,'Outdoor'),
+(11,'C01-ARC-02','Khu Bắn cung 02','Khu C – Ngoài trời',5,'Outdoor'),
+(12,'C01-BR-02','Sân Bóng rổ 02','Nhà thi đấu A',8,'Indoor'),
+(13,'C01-BC-01','Sân Bóng chuyền 01','Nhà thi đấu A',8,'Indoor'),
+(14,'C01-BC-02','Sân Bóng chuyền 02','Nhà thi đấu A',8,'Indoor'),
+(15,'C01-PICK-02','Sân Pickleball 02','Nhà thi đấu B',4,'Indoor'),
+(16,'C01-BAD-02','Sân Cầu lông 02','Nhà thi đấu B',4,'Indoor'),
+(17,'C01-TT-02','Bàn Bóng bàn 02','Phòng Bóng bàn',2,'Indoor'),
+(18,'C01-TT-03','Bàn Bóng bàn 03','Phòng Bóng bàn',2,'Indoor'),
+(19,'C01-TT-04','Bàn Bóng bàn 04','Phòng Bóng bàn',2,'Indoor'),
+(20,'C01-SWIM-02','Hồ bơi 02','Khu hồ bơi',10,'Outdoor');
 
 CREATE TEMP TABLE _scms_room_aliases(ordinal INT,old_name TEXT) ON COMMIT DROP;
 INSERT INTO _scms_room_aliases VALUES
@@ -1202,16 +1274,9 @@ DECLARE r RECORD; n INT; rid INT; sid INT; spid INT; rebuild BOOLEAN:=current_se
 BEGIN
  IF NOT rebuild AND EXISTS(SELECT 1 FROM scms_data_migration_audit WHERE migration_key='20261029_catalog_accounts_v1') THEN RETURN; END IF;
  FOR r IN SELECT * FROM _scms_rooms ORDER BY ordinal LOOP
-  SELECT count(*),min(room_id) INTO n,rid FROM rooms WHERE center_id=1 AND (room_name=r.name OR room_name IN(SELECT old_name FROM _scms_room_aliases WHERE ordinal=r.ordinal));
-  IF n>1 THEN RAISE EXCEPTION 'Room % has multiple old IDs; reconcile its sessions before consolidation',r.name; END IF;
-  IF n=0 THEN
-   IF rebuild THEN INSERT INTO rooms(room_id,room_name,location,capacity,status,facility_type,center_id) VALUES(r.ordinal,r.name,r.location,r.capacity,'Available',r.facility_type,1);
-   ELSE INSERT INTO rooms(room_name,location,capacity,status,facility_type,center_id) VALUES(r.name,r.location,r.capacity,'Available',r.facility_type,1); END IF;
-  ELSE UPDATE rooms SET room_name=r.name,location=r.location,facility_type=r.facility_type WHERE room_id=rid;
-  END IF;
+  INSERT INTO rooms(room_id,room_code,room_name,location,capacity,status,facility_type,center_id)
+  VALUES(r.ordinal,r.code,r.name,r.location,r.capacity,'Available',r.facility_type,1);
  END LOOP;
- -- Closing an obsolete room with future sessions is rejected by its normal business trigger.
- UPDATE rooms SET status='Closed' WHERE center_id=1 AND room_name NOT IN(SELECT name FROM _scms_rooms) AND status<>'Closed';
  FOR r IN SELECT * FROM _scms_subjects ORDER BY ordinal LOOP
   SELECT subject_id INTO sid FROM subjects WHERE slug=r.slug;
   SELECT specialization_id INTO spid FROM specializations WHERE lower(name)=lower(r.name);
@@ -1302,7 +1367,7 @@ CROSS JOIN (VALUES('MONDAY'),('TUESDAY'),('WEDNESDAY'),('THURSDAY'),('FRIDAY'),(
 CROSS JOIN generate_series(1,7) slot;
 
 -- Nine Normal courses, each with twelve VALID sessions and an independent subject price.
--- Tennis capacity is four; Archery ten; no Normal capacity exceeds its physical room.
+-- Tennis capacity is four; Archery five; no Normal capacity exceeds its physical room.
 INSERT INTO classes(class_id,class_name,subject_id,coach_id,max_capacity,tuition_fee,start_date,end_date,status,class_type,total_sessions,center_id)
 SELECT s.ordinal+9,s.name||' - Normal - K01',s.ordinal,12+2*(s.ordinal-1),least(15,r.capacity),
  s.normal_price,d.course_anchor,d.course_anchor+60,'Ongoing','Normal',12,1
@@ -1438,6 +1503,7 @@ FROM (
  UNION ALL
  SELECT session_id,booked_member_id,coach_id FROM sessions WHERE booked_member_id IS NOT NULL AND status='Completed' AND NOT center_invalidated
 ) x;
+UPDATE attendances SET absence_notice_id=1 WHERE session_id=111 AND member_id=11;
 INSERT INTO training_results(result_id,session_id,member_id,coach_id,content,attendance_status,recorded_at)
 SELECT a.attendance_id,a.session_id,a.member_id,a.recorded_by,
  CASE WHEN a.state='Present' THEN 'Hoàn thành nội dung kỹ thuật theo kế hoạch của môn '||su.subject_name||'.'
@@ -1494,7 +1560,7 @@ INSERT INTO scms_data_migration_audit VALUES
 DO $reference_checks$
 DECLARE seq_row RECORD; n BIGINT; lo BIGINT; hi BIGINT;
 BEGIN
- IF (SELECT count(*) FROM users)<>33 OR (SELECT count(*) FROM coaches)<>18 OR (SELECT count(*) FROM members)<>10 OR (SELECT count(*) FROM rooms)<>8 THEN RAISE EXCEPTION 'Reference identity/resource counts differ from the approved lists'; END IF;
+ IF (SELECT count(*) FROM users)<>33 OR (SELECT count(*) FROM coaches)<>18 OR (SELECT count(*) FROM members)<>10 OR (SELECT count(*) FROM rooms)<>20 THEN RAISE EXCEPTION 'Reference identity/resource counts differ from the approved lists'; END IF;
  IF EXISTS(SELECT 1 FROM member_packages p JOIN invoices i ON i.subscription_id=p.subscription_id WHERE p.purchase_amount<>i.amount OR p.status='Pending' AND (p.remaining_credit<>0 OR p.activated_at IS NOT NULL OR p.expires_at IS NOT NULL)) THEN RAISE EXCEPTION 'Advanced purchase amount or Pending entitlement is inconsistent'; END IF;
  IF EXISTS(SELECT 1 FROM invoices i JOIN member_packages p ON p.subscription_id=i.subscription_id WHERE i.member_id<>p.member_id) THEN RAISE EXCEPTION 'Invoice and Advanced subscription owners differ'; END IF;
  IF EXISTS(SELECT 1 FROM member_packages p WHERE p.status='Active' AND p.remaining_credit<>12-(SELECT count(*) FROM sessions s WHERE s.subscription_id=p.subscription_id AND s.status<>'Cancelled' AND NOT s.center_invalidated)) THEN RAISE EXCEPTION 'Advanced credit ledger does not balance'; END IF;
@@ -1506,7 +1572,7 @@ BEGIN
  IF EXISTS(SELECT 1 FROM sessions s JOIN rooms r ON r.room_id=s.room_id JOIN classes c ON c.class_id=s.class_id JOIN subjects su ON su.subject_id=c.subject_id WHERE c.max_capacity>r.capacity OR s.status<>'Cancelled' AND NOT s.center_invalidated AND (EXISTS(SELECT 1 FROM holidays h WHERE h.holiday_date=s.session_date AND h.is_active) OR su.outdoor AND s.start_time IN(TIME '09:30',TIME '13:00'))) THEN RAISE EXCEPTION 'Capacity/holiday/outdoor rule mismatch'; END IF;
  IF EXISTS(SELECT 1 FROM sessions s JOIN member_packages p ON p.subscription_id=s.subscription_id JOIN classes c ON c.class_id=s.class_id WHERE s.booked_member_id<>p.member_id OR c.subject_id<>p.subject_id OR s.coach_id<>p.primary_coach_id OR s.status<>'Cancelled' AND s.session_date+s.end_time>p.expires_at) THEN RAISE EXCEPTION 'Private session owner/subject/Coach/deadline mismatch'; END IF;
  IF EXISTS(SELECT 1 FROM attendances a JOIN training_results t ON t.session_id=a.session_id AND t.member_id=a.member_id JOIN sessions s ON s.session_id=a.session_id WHERE a.state<>t.attendance_status OR t.recorded_at<s.session_date+s.start_time OR t.recorded_at>=s.session_date+s.end_time OR s.center_invalidated OR a.recorded_by<>s.coach_id) THEN RAISE EXCEPTION 'Attendance/result history is inconsistent'; END IF;
- FOR seq_row IN SELECT table_name,column_name FROM information_schema.columns WHERE table_schema='public' AND column_default LIKE 'nextval(%' AND table_name=ANY(ARRAY['roles','permissions','role_permissions','centers','users','email_otps','center_managers','receptionists','coaches','members','subjects','specializations','coach_specializations','rooms','classes','training_plans','sessions','training_results','attendances','evaluations','class_feedbacks','membership_packages','member_packages','class_enrollments','holidays','invoices','support_requests','notifications','notification_recipients','chat_conversations','chat_messages','chat_read_state','ai_consultations','system_logs','normal_class_requests','subscription_pauses','coach_work_schedules','coach_work_slots','coach_days_off','advanced_registrations','session_absence_notices','session_changes','center_incidents','incident_affected_members','payment_resolutions','scms_data_migration_audit']) LOOP
+ FOR seq_row IN SELECT table_name,column_name FROM information_schema.columns WHERE table_schema='public' AND column_default LIKE 'nextval(%' AND table_name=ANY(ARRAY['roles','permissions','role_permissions','centers','users','email_otps','center_managers','receptionists','coaches','members','subjects','specializations','coach_specializations','rooms','classes','training_plans','sessions','training_results','attendances','evaluations','class_feedbacks','membership_packages','member_packages','class_enrollments','holidays','invoices','vnpay_payment_attempts','support_requests','notifications','notification_recipients','chat_conversations','chat_messages','chat_read_state','ai_consultations','system_logs','normal_class_requests','subscription_pauses','coach_work_schedules','coach_work_slots','coach_days_off','advanced_registrations','session_absence_notices','session_changes','center_incidents','incident_affected_members','payment_resolutions','scms_data_migration_audit']) LOOP
   EXECUTE format('SELECT count(*),min(%I),max(%I) FROM public.%I',seq_row.column_name,seq_row.column_name,seq_row.table_name) INTO n,lo,hi;
   IF n>0 AND (lo<>1 OR hi<>n) THEN RAISE EXCEPTION 'Rebuilt integer ID sequence is not contiguous: %.%',seq_row.table_name,seq_row.column_name; END IF;
  END LOOP;
@@ -1624,7 +1690,7 @@ DO $foreign_keys$
 DECLARE r RECORD;
 BEGIN
  FOR r IN SELECT conrelid::regclass AS tbl,conname FROM pg_constraint WHERE contype='f' AND NOT convalidated
-  AND conrelid IN(SELECT oid FROM pg_class WHERE relnamespace='public'::regnamespace AND relname=ANY(ARRAY['roles','permissions','role_permissions','centers','users','email_otps','center_managers','receptionists','coaches','members','subjects','specializations','coach_specializations','rooms','classes','training_plans','sessions','training_results','attendances','evaluations','class_feedbacks','membership_packages','member_packages','class_enrollments','holidays','invoices','support_requests','notifications','notification_recipients','chat_conversations','chat_messages','chat_read_state','ai_consultations','system_logs','normal_class_requests','subscription_pauses','coach_work_schedules','coach_work_slots','coach_days_off','advanced_registrations','session_absence_notices','session_changes','center_incidents','incident_affected_members','payment_resolutions','scms_data_migration_audit'])) LOOP
+  AND conrelid IN(SELECT oid FROM pg_class WHERE relnamespace='public'::regnamespace AND relname=ANY(ARRAY['roles','permissions','role_permissions','centers','users','email_otps','center_managers','receptionists','coaches','members','subjects','specializations','coach_specializations','rooms','classes','training_plans','sessions','training_results','attendances','evaluations','class_feedbacks','membership_packages','member_packages','class_enrollments','holidays','invoices','vnpay_payment_attempts','support_requests','notifications','notification_recipients','chat_conversations','chat_messages','chat_read_state','ai_consultations','system_logs','normal_class_requests','subscription_pauses','coach_work_schedules','coach_work_slots','coach_days_off','advanced_registrations','session_absence_notices','session_changes','center_incidents','incident_affected_members','payment_resolutions','scms_data_migration_audit'])) LOOP
   EXECUTE format('ALTER TABLE %s VALIDATE CONSTRAINT %I',r.tbl,r.conname);
  END LOOP;
  IF (SELECT count(*) FROM subjects)<>9 THEN RAISE EXCEPTION 'Expected exactly nine canonical subjects'; END IF;
@@ -1637,7 +1703,7 @@ DO $sequences$
 DECLARE r RECORD; top_id BIGINT; seq_name TEXT; seq_last BIGINT; seq_called BOOLEAN;
 BEGIN
  FOR r IN SELECT table_name,column_name FROM information_schema.columns
-          WHERE table_schema='public' AND table_name=ANY(ARRAY['roles','permissions','role_permissions','centers','users','email_otps','center_managers','receptionists','coaches','members','subjects','specializations','coach_specializations','rooms','classes','training_plans','sessions','training_results','attendances','evaluations','class_feedbacks','membership_packages','member_packages','class_enrollments','holidays','invoices','support_requests','notifications','notification_recipients','chat_conversations','chat_messages','chat_read_state','ai_consultations','system_logs','normal_class_requests','subscription_pauses','coach_work_schedules','coach_work_slots','coach_days_off','advanced_registrations','session_absence_notices','session_changes','center_incidents','incident_affected_members','payment_resolutions','scms_data_migration_audit'])
+          WHERE table_schema='public' AND table_name=ANY(ARRAY['roles','permissions','role_permissions','centers','users','email_otps','center_managers','receptionists','coaches','members','subjects','specializations','coach_specializations','rooms','classes','training_plans','sessions','training_results','attendances','evaluations','class_feedbacks','membership_packages','member_packages','class_enrollments','holidays','invoices','vnpay_payment_attempts','support_requests','notifications','notification_recipients','chat_conversations','chat_messages','chat_read_state','ai_consultations','system_logs','normal_class_requests','subscription_pauses','coach_work_schedules','coach_work_slots','coach_days_off','advanced_registrations','session_absence_notices','session_changes','center_incidents','incident_affected_members','payment_resolutions','scms_data_migration_audit'])
             AND (column_default LIKE 'nextval(%' OR is_identity='YES')
           ORDER BY table_name,column_name LOOP
   seq_name:=pg_get_serial_sequence(format('public.%I',r.table_name),r.column_name);
@@ -1650,6 +1716,131 @@ BEGIN
   END IF;
  END LOOP;
 END $sequences$;
+
+-- Owner02/11 room catalog; guarded, replay preserves subsequent edits.
+-- Owner02/11: numeric room_id + room_code; 20 center1 resources from room.jpg.
+-- Additive/atomic. Existing history remains on legacy rooms. No subject_id.
+SELECT center_id FROM centers WHERE center_id=1 FOR UPDATE;
+LOCK TABLE rooms, sessions, classes, class_enrollments IN SHARE ROW EXCLUSIVE MODE;
+ALTER TABLE rooms ADD COLUMN IF NOT EXISTS room_code VARCHAR(40);
+UPDATE rooms SET room_code='C'||lpad(center_id::text,greatest(2,length(center_id::text)),'0')||'-LEGACY-'||room_id WHERE room_code IS NULL;
+ALTER TABLE rooms ALTER COLUMN room_code SET NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_rooms_code ON rooms(room_code);
+DO $$ BEGIN
+ IF NOT EXISTS(SELECT 1 FROM pg_constraint WHERE conrelid='rooms'::regclass AND conname='chk_room_code') THEN
+  ALTER TABLE rooms ADD CONSTRAINT chk_room_code CHECK (
+   room_code ~ '^C[0-9]{2,}-[A-Z0-9]+-[A-Z0-9]+$'
+   AND split_part(room_code,'-',1)='C'||lpad(center_id::text,greatest(2,length(center_id::text)),'0'));
+ END IF;
+END $$;
+-- Allows a rolling deploy: old writers omit code; the numeric ID remains stable.
+CREATE OR REPLACE FUNCTION fn_room_code_default() RETURNS TRIGGER LANGUAGE plpgsql AS $$
+BEGIN
+ IF NEW.room_code IS NULL THEN NEW.room_code:='C'||lpad(NEW.center_id::text,greatest(2,length(NEW.center_id::text)),'0')||'-LEGACY-'||NEW.room_id; END IF;
+ RETURN NEW;
+END $$;
+DROP TRIGGER IF EXISTS trg_room_code_default ON rooms;
+CREATE TRIGGER trg_room_code_default BEFORE INSERT ON rooms FOR EACH ROW EXECUTE FUNCTION fn_room_code_default();
+
+-- Catalog: guarded once; replay preserves later authorized edits.
+CREATE TABLE IF NOT EXISTS scms_data_migration_audit (
+ migration_key VARCHAR(100) PRIMARY KEY,captured_at TIMESTAMP NOT NULL,before_data TEXT NOT NULL,after_data TEXT NOT NULL);
+DO $catalog$
+DECLARE old_ids INT[]; before_state TEXT; unknown_rooms TEXT; schedule_issues TEXT; now_at TIMESTAMP:=clock_timestamp() AT TIME ZONE 'Asia/Ho_Chi_Minh';
+BEGIN
+ IF EXISTS(SELECT 1 FROM scms_data_migration_audit WHERE migration_key='20261102_room_catalog_v1') THEN RETURN; END IF;
+ IF NOT EXISTS(SELECT 1 FROM centers WHERE center_id=1) THEN RAISE EXCEPTION 'ROOM_CATALOG_CENTER_MISSING: center1 must exist'; END IF;
+ CREATE TEMP TABLE _room_catalog(code TEXT PRIMARY KEY,name TEXT,location TEXT,kind TEXT,capacity INT) ON COMMIT DROP;
+ INSERT INTO _room_catalog VALUES
+ ('C01-TEN-01','Sân Tennis 01','Khu A – Ngoài trời','Outdoor',4),
+ ('C01-TEN-02','Sân Tennis 02','Khu A – Ngoài trời','Outdoor',4),
+ ('C01-FOOT-01','Sân Bóng đá 01','Khu B – Ngoài trời','Outdoor',15),
+ ('C01-FOOT-02','Sân Bóng đá 02','Khu B – Ngoài trời','Outdoor',15),
+ ('C01-ARC-01','Khu Bắn cung 01','Khu C – Ngoài trời','Outdoor',5),
+ ('C01-ARC-02','Khu Bắn cung 02','Khu C – Ngoài trời','Outdoor',5),
+ ('C01-BR-01','Sân Bóng rổ 01','Nhà thi đấu A','Indoor',8),
+ ('C01-BR-02','Sân Bóng rổ 02','Nhà thi đấu A','Indoor',8),
+ ('C01-BC-01','Sân Bóng chuyền 01','Nhà thi đấu A','Indoor',8),
+ ('C01-BC-02','Sân Bóng chuyền 02','Nhà thi đấu A','Indoor',8),
+ ('C01-PICK-01','Sân Pickleball 01','Nhà thi đấu B','Indoor',4),
+ ('C01-PICK-02','Sân Pickleball 02','Nhà thi đấu B','Indoor',4),
+ ('C01-BAD-01','Sân Cầu lông 01','Nhà thi đấu B','Indoor',4),
+ ('C01-BAD-02','Sân Cầu lông 02','Nhà thi đấu B','Indoor',4),
+ ('C01-TT-01','Bàn Bóng bàn 01','Phòng Bóng bàn','Indoor',2),
+ ('C01-TT-02','Bàn Bóng bàn 02','Phòng Bóng bàn','Indoor',2),
+ ('C01-TT-03','Bàn Bóng bàn 03','Phòng Bóng bàn','Indoor',2),
+ ('C01-TT-04','Bàn Bóng bàn 04','Phòng Bóng bàn','Indoor',2),
+ ('C01-SWIM-01','Hồ bơi 01','Khu hồ bơi','Outdoor',10),
+ ('C01-SWIM-02','Hồ bơi 02','Khu hồ bơi','Outdoor',10);
+ SELECT coalesce(array_agg(room_id),'{}'::INT[]) INTO old_ids FROM rooms WHERE center_id=1 AND room_code NOT IN(SELECT code FROM _room_catalog);
+ -- A resource already named in the approved 20-room catalog is not a custom room.
+ -- In particular the existing Tennis02 must be accepted alongside the old eight.
+ SELECT jsonb_agg(to_jsonb(blocked) ORDER BY room_id)::text INTO unknown_rooms FROM (
+ SELECT room_id,room_name,status FROM rooms WHERE room_id=ANY(old_ids) AND status<>'Closed'
+ AND room_name NOT IN(SELECT name FROM _room_catalog) AND room_name NOT IN(
+  'Sân Tennis 01','Sân Tennis ngoài trời 1','Hồ bơi 01','Hồ bơi ngoài trời tiêu chuẩn',
+  'Sân Pickleball 01','Sân Pickleball có mái che','Khu Bắn cung 01','Trường bắn ngoài trời',
+  'Sân đa năng 01','Nhà thi đấu đa năng (Bóng rổ & Chuyền)','Sân Bóng đá 01','Sân cỏ ngoài trời (Bóng đá)',
+  'Sân Cầu lông 01','Nhà thi đấu Cầu lông (Sàn thảm)','Khu Bóng bàn 01','Phòng Bóng bàn tiêu chuẩn')
+ ORDER BY room_id LIMIT 20) blocked;
+ IF unknown_rooms IS NOT NULL THEN
+  RAISE EXCEPTION 'ROOM_CATALOG_CUSTOM_ROOM: reconcile noncanonical active rooms before replacing catalog'
+   USING DETAIL=unknown_rooms,HINT='Only approved catalog names and known old aliases may be retired automatically; reconcile the listed rooms without removing this guard.';
+ END IF;
+ IF EXISTS(SELECT 1 FROM rooms r JOIN _room_catalog c ON c.code=r.room_code WHERE
+  r.center_id<>1 OR r.room_name<>c.name OR r.location IS DISTINCT FROM c.location OR r.capacity IS DISTINCT FROM c.capacity OR r.facility_type<>c.kind OR r.status<>'Available') THEN
+  RAISE EXCEPTION 'ROOM_CATALOG_CODE_CONFLICT: a requested code already has different metadata';
+ END IF;
+ CREATE TEMP TABLE _room_moves(session_id INT PRIMARY KEY,target_code TEXT) ON COMMIT DROP;
+ INSERT INTO _room_moves
+ SELECT planned.session_id,coalesce(named.code,planned.default_code)
+ FROM (SELECT s.session_id,old_room.room_name,CASE su.slug
+  WHEN 'quan-vot-tennis' THEN 'C01-TEN-01' WHEN 'boi-loi' THEN 'C01-SWIM-01' WHEN 'pickleball' THEN 'C01-PICK-01'
+  WHEN 'ban-cung' THEN 'C01-ARC-01' WHEN 'bong-ro' THEN 'C01-BR-01' WHEN 'bong-chuyen' THEN 'C01-BC-01'
+  WHEN 'bong-da' THEN 'C01-FOOT-01' WHEN 'cau-long' THEN 'C01-BAD-01' WHEN 'bong-ban' THEN 'C01-TT-01' END AS default_code
+ FROM sessions s JOIN classes c ON c.class_id=s.class_id LEFT JOIN subjects su ON su.subject_id=c.subject_id
+ JOIN rooms old_room ON old_room.room_id=s.room_id
+ WHERE s.room_id=ANY(old_ids) AND s.status='Scheduled' AND NOT s.center_invalidated AND s.session_date>=now_at::date) planned
+ LEFT JOIN _room_catalog named ON named.name=planned.room_name
+  AND split_part(named.code,'-',2)=split_part(planned.default_code,'-',2);
+ SELECT jsonb_agg(to_jsonb(issue) ORDER BY session_id)::text INTO schedule_issues FROM (
+ SELECT s.session_id,cl.class_id,cl.class_name,cl.center_id,m.target_code,
+  s.session_date+s.start_time AS session_start,cl.max_capacity,c.capacity AS target_capacity,seats.held_seats,
+  array_remove(ARRAY[
+   CASE WHEN c.code IS NULL THEN 'UNKNOWN_SUBJECT_OR_TARGET' END,
+   CASE WHEN cl.center_id<>1 THEN 'WRONG_CENTER' END,
+   CASE WHEN s.session_date+s.start_time<=now_at THEN 'STARTED_OR_PAST_SCHEDULED' END,
+   CASE WHEN cl.max_capacity IS NULL THEN 'MISSING_CLASS_CAPACITY' END,
+   CASE WHEN cl.max_capacity>c.capacity THEN 'CLASS_CAPACITY_EXCEEDS_ROOM' END,
+   CASE WHEN seats.held_seats>c.capacity THEN 'ENROLLMENTS_EXCEED_ROOM' END
+  ],NULL) AS reasons
+ FROM _room_moves m JOIN sessions s USING(session_id) JOIN classes cl ON cl.class_id=s.class_id LEFT JOIN _room_catalog c ON c.code=m.target_code
+ CROSS JOIN LATERAL(SELECT count(*) AS held_seats FROM class_enrollments e WHERE e.class_id=cl.class_id AND e.status IN ('Registered','Pending')) seats
+  WHERE c.code IS NULL OR cl.center_id<>1 OR s.session_date+s.start_time<=now_at OR cl.max_capacity IS NULL OR cl.max_capacity>c.capacity
+   OR seats.held_seats>c.capacity
+ ORDER BY s.session_id LIMIT 20) issue;
+ IF schedule_issues IS NOT NULL THEN
+  RAISE EXCEPTION 'ROOM_CATALOG_SCHEDULE_REVIEW: resolve in-progress/unknown-subject/over-capacity classes before migration'
+   USING DETAIL=schedule_issues,HINT='Resolve the listed reasons first. This migration never shrinks classes, removes members or rewrites past sessions automatically.';
+ END IF;
+ SELECT jsonb_build_object('rooms',(SELECT jsonb_agg(to_jsonb(r) ORDER BY r.room_id) FROM rooms r WHERE room_id=ANY(old_ids)),
+  'sessions',(SELECT jsonb_agg(to_jsonb(s) ORDER BY s.session_id) FROM sessions s JOIN _room_moves m USING(session_id)))::text INTO before_state;
+ DROP INDEX IF EXISTS uq_scms_rooms_center_name;
+ INSERT INTO rooms(room_code,room_name,location,capacity,status,facility_type,center_id)
+ SELECT code,name,location,capacity,'Available',kind,1 FROM _room_catalog ORDER BY code ON CONFLICT(room_code) DO NOTHING;
+ IF EXISTS(SELECT 1 FROM _room_moves m JOIN sessions a ON a.session_id=m.session_id JOIN rooms target ON target.room_code=m.target_code
+  JOIN sessions b ON b.session_id<>a.session_id AND b.session_date=a.session_date AND a.start_time<b.end_time AND b.start_time<a.end_time
+  LEFT JOIN _room_moves mb ON mb.session_id=b.session_id
+  WHERE b.status<>'Cancelled' AND NOT b.center_invalidated AND (b.room_id=target.room_id OR mb.target_code=m.target_code)) THEN
+  RAISE EXCEPTION 'ROOM_CATALOG_OVERLAP: resolve target-room conflicts before migration';
+ END IF;
+ UPDATE sessions s SET room_id=r.room_id FROM _room_moves m JOIN rooms r ON r.room_code=m.target_code WHERE s.session_id=m.session_id;
+ UPDATE rooms SET status='Closed' WHERE room_id=ANY(old_ids) AND status<>'Closed';
+ CREATE UNIQUE INDEX uq_scms_rooms_center_name ON rooms(center_id,lower(room_name)) WHERE status='Available';
+ INSERT INTO scms_data_migration_audit VALUES('20261102_room_catalog_v1',now_at,before_state,
+  jsonb_build_object('rooms',(SELECT jsonb_agg(to_jsonb(r) ORDER BY r.room_id) FROM rooms r WHERE center_id=1),
+  'sessions',(SELECT jsonb_agg(to_jsonb(s) ORDER BY s.session_id) FROM sessions s JOIN _room_moves m USING(session_id)))::text);
+END $catalog$;
 
 COMMIT;
 -- Last statement deliberately returns the review result AFTER a successful commit.

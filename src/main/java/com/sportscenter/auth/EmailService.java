@@ -18,13 +18,17 @@ public class EmailService {
     private static final Logger log = LoggerFactory.getLogger(EmailService.class);
     private final JavaMailSender mailSender;
 
-    @Value("${spring.mail.username:}")
+    @Value("${scms.mail.from-address:${spring.mail.username:}}")
     private String fromAddress;
+    @Value("${spring.mail.username:}")
+    private String smtpUsername;
     @Value("${spring.mail.password:}")
     private String appPassword;
 
     public boolean isConfigured() {
-        return fromAddress != null && !fromAddress.isBlank() && appPassword != null && !appPassword.isBlank();
+        return fromAddress != null && !fromAddress.isBlank()
+                && smtpUsername != null && !smtpUsername.isBlank()
+                && appPassword != null && !appPassword.isBlank();
     }
 
     @Async("mailExecutor")

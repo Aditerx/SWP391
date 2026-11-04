@@ -135,6 +135,7 @@ public class AttendanceService {
         Attendance att = attendanceRepository.findById(request.attendanceId())
                 .orElseThrow(() -> new ResourceNotFoundException("Attendance record not found: " + request.attendanceId()));
         if (att.getMember() != null && !java.util.Objects.equals(actor.getCenterId(), att.getMember().getCenterId())) throw new AccessDeniedException("Attendance belongs to another center");
+        if(att.getSupersededAt()!=null)throw new BusinessException("ATTENDANCE_SUPERSEDED: Correct the current session attendance, not a superseded notice");
         if(att.getSession()==null)throw new BusinessException("SESSION_REQUIRED: This correction flow applies to session attendance");
         Session locked=sessionRepository.findByIdForUpdate(att.getSession().getId()).orElseThrow(()->new ResourceNotFoundException("Session not found"));
         if(LocalDateTime.now(clock).isBefore(locked.getSessionDate().atTime(locked.getEndTime())))throw new BusinessException("USE_SESSION_ATTENDANCE: Record in-session attendance before session end");
@@ -174,7 +175,7 @@ public class AttendanceService {
         return AttendanceResponse.from(saved);
     }
 
-    /** Compatibility entry point: absence is now a separate session notice, never attendance. */
+    /** Compatibility entry point: use the transactional notice + Absent workflow. */
     @Deprecated
     public AttendanceResponse requestAbsence(Integer sessionId,String reason,String actorEmail) {
         throw new BusinessException("USE_ABSENCE_NOTICE: Report absence through /api/sessions/{id}/absence");
@@ -258,6 +259,7 @@ public class AttendanceService {
                 attendance.setRecordedBy(recorder);
             }
             attendance.setState("Present");
+            attendance.setRecordedBy(recorder);
             if (attendance.getCheckInTime() == null) attendance.setCheckInTime(now);
             trainingResultRepository.findBySessionIdAndMemberId(sessionId, memberId).ifPresent(result -> {
                 result.setAttendanceStatus(attendance.getState());

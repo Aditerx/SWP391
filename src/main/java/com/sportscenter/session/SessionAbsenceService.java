@@ -3,6 +3,8 @@ import com.sportscenter.common.ActorPolicy;
 import com.sportscenter.common.exception.*;
 import com.sportscenter.audit.AuditService;
 import com.sportscenter.user.User;
+import com.sportscenter.training.Attendance;
+import com.sportscenter.training.AttendanceRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,6 +21,7 @@ public class SessionAbsenceService {
     private final ActorPolicy actors;
     private final AuditService audit;
     private final Clock clock;
+    private final AttendanceRepository attendances;
     public record Notice(Integer id,Integer sessionId,Integer memberId,LocalDateTime reportedAt,String reason,boolean active,LocalDateTime supersededAt) {
         static Notice from(SessionAbsenceNotice n){return new Notice(n.getId(),n.getSession().getId(),n.getMemberId(),n.getReportedAt(),n.getReason(),n.isActive(),n.getSupersededAt());}
     }
@@ -32,13 +35,17 @@ public class SessionAbsenceService {
         if(!ActorPolicy.role(member,"Member") || s.getBookedMember()==null || !s.getBookedMember().getId().equals(member.getId()))
             throw new AccessDeniedException("Only the booked Member may report absence");
         Duration notice=Duration.between(LocalDateTime.now(clock),s.getSessionDate().atTime(s.getStartTime()));
-        if(!"Scheduled".equals(s.getStatus()) || s.isAttendanceFinalized() || notice.isNegative() || notice.isZero() || notice.compareTo(Duration.ofHours(12))>=0)
+        if(!"Scheduled".equals(s.getStatus()) || s.isCenterInvalidated() || s.isAttendanceFinalized() || notice.isNegative() || notice.isZero() || notice.compareTo(Duration.ofHours(12))>=0)
             throw new BusinessException("ABSENCE_WINDOW_CLOSED: Absence notice requires 0 < time to session < 12 hours");
         ActorPolicy.reason(reason);
         var previous=notices.findFirstBySessionIdAndActiveTrue(id);
-        if(previous.isPresent()) return Notice.from(previous.get());
+        if(previous.isPresent()) {
+            recordAbsence(s,member,previous.get());
+            return Notice.from(previous.get());
+        }
         SessionAbsenceNotice n=new SessionAbsenceNotice();n.setSession(s);n.setMemberId(member.getId());n.setReason(reason);n.setReportedAt(LocalDateTime.now(clock));
         n.setOriginalStart(s.getSessionDate().atTime(s.getStartTime()));n.setOriginalEnd(s.getSessionDate().atTime(s.getEndTime()));notices.save(n);
+        recordAbsence(s,member,n);
         audit.log(member.getId(),"REPORT_SESSION_ABSENCE","SESSION",id,reason);
         return Notice.from(n);
     }
@@ -51,6 +58,22 @@ public class SessionAbsenceService {
         return notices.findBySessionIdOrderByIdAsc(id).stream().map(Notice::from).toList();
     }
     public void supersedeForTimeChange(Session s) {
-        notices.findFirstBySessionIdAndActiveTrue(s.getId()).ifPresent(n->{n.setActive(false);n.setSupersededAt(LocalDateTime.now(clock));});
+        notices.findFirstBySessionIdAndActiveTrue(s.getId()).ifPresent(n->{
+            LocalDateTime now=LocalDateTime.now(clock);
+            n.setActive(false);n.setSupersededAt(now);
+            attendances.findBySessionIdAndMemberId(s.getId(),n.getMemberId())
+                    .filter(a->Objects.equals(a.getAbsenceNoticeId(),n.getId()))
+                    .filter(a->"Absent".equals(a.getState()) && a.getRecordedBy()!=null && Objects.equals(a.getRecordedBy().getId(),n.getMemberId()))
+                    .ifPresent(a->{a.setSupersededAt(now);attendances.save(a);
+                        audit.log(null,"SUPERSEDE_ABSENCE_ATTENDANCE","attendances",a.getAttendanceId(),"Notice "+n.getId()+" superseded by session time change; original attendance retained");});
+        });
+    }
+
+    private void recordAbsence(Session session,User member,SessionAbsenceNotice notice) {
+        if(attendances.findBySessionIdAndMemberId(session.getId(),member.getId()).isPresent())return;
+        Attendance attendance=new Attendance();
+        attendance.setSession(session);attendance.setMember(member);attendance.setRecordedBy(member);
+        attendance.setState("Absent");attendance.setNote(notice.getReason());attendance.setAbsenceNoticeId(notice.getId());
+        attendances.save(attendance);
     }
 }

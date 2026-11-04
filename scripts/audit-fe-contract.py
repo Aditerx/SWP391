@@ -1,6 +1,7 @@
 """Offline verification of the one FE schema and retained QA record. No network, login, DB or document generation."""
 from pathlib import Path
 import argparse,datetime as dt,hashlib,json,re,subprocess
+from qa_fingerprint import source_fingerprints
 ROOT=Path(__file__).resolve().parents[1]
 METHODS={'get','post','put','patch','delete','head','options'}
 p=argparse.ArgumentParser(description=__doc__)
@@ -11,7 +12,8 @@ a=p.parse_args()
 openapi_path=(ROOT/a.openapi).resolve();qa_path=(ROOT/a.qa).resolve()
 spec=json.loads(openapi_path.read_text(encoding='utf-8-sig'))
 qa=json.loads(qa_path.read_text(encoding='utf-8-sig'))
-exchanges=qa['local']['exchanges']
+fresh=qa.get('roomAbsenceReview')
+exchanges=fresh['postgresHttp']['exchanges'] if fresh else qa['local']['exchanges']
 def canonical(path): return re.sub(r'\{[^}]+\}','{}',path.rstrip('/'))
 
 def annotation(text,start):
@@ -109,13 +111,31 @@ for e in exchanges:
 operations=[(m.upper(),canonical(path)) for path,item in spec['paths'].items() for m in item if m in METHODS]
 missing=[m+' '+path for m,path in operations if (m,path) not in handlers]
 extra=[m+' '+h['path'] for (m,path),h in handlers.items() if (m,path) not in operations]
-reference=qa['results']['sourceCommit']
-backend_match=subprocess.run(['git','diff','--quiet',reference,'--','src/main','pom.xml','database'],cwd=ROOT).returncode==0
+reference=fresh['sourceCommit'] if fresh else qa['results']['sourceCommit']
+backend_match=(source_fingerprints(ROOT)==fresh['sourceFingerprints']) if fresh else subprocess.run(['git','diff','--quiet',reference,'--','src/main','pom.xml','database'],cwd=ROOT).returncode==0
+source_verification='tested working-tree fingerprints' if fresh else 'Git backend diff against evidence commit'
+sql_fix=qa.get('roomCatalogCompatibilityFix')
+if fresh and sql_fix and sql_fix.get('result')=='PASS':
+    baseline={key:fresh['sourceFingerprints'][key] for key in ('src/main','src/test','pom.xml')}
+    proof=sql_fix.get('migrationProof',{})
+    if sql_fix.get('unchangedBackendFingerprints')==baseline and proof.get('checks') and all(value=='PASS' for value in proof['checks'].values()):
+        current=source_fingerprints(ROOT)
+        backend_match=current==sql_fix['sourceFingerprints'] and all(current[key]==value for key,value in baseline.items())
+        source_verification='unchanged retained BE/test source + fresh local SQL compatibility proof'
+query_review=qa.get('queryDrImplementation')
+if query_review and query_review.get('result')=='PASS_LOCAL':
+    proof=query_review.get('validation',{})
+    if (proof.get('cleanTest',{}).get('failures')==0 and proof.get('cleanTest',{}).get('errors')==0
+            and proof.get('postgresHttp',{}).get('failures')==0 and proof.get('postgresHttp',{}).get('errors')==0
+            and proof.get('migration',{}).get('result')=='PASS'):
+        backend_match=source_fingerprints(ROOT)==query_review.get('sourceFingerprints')
+        source_verification='QueryDR snapshot tested locally; concurrent workspace edits require separate verification; prior wire exchanges remain historical evidence'
 schema_hash=hashlib.sha256(openapi_path.read_bytes()).hexdigest()
 hash_match=schema_hash==qa['openApi']['sha256']
 result={'result':'PASS' if not issues and not missing and not extra and hash_match and backend_match else 'REVIEW_REQUIRED',
         'mode':'OFFLINE_RETAINED_EVIDENCE_CHECK','checkedAtUtc':dt.datetime.now(dt.timezone.utc).isoformat(),
         'backendTestsExecuted':False,'liveProbePerformed':False,'evidenceSourceCommit':reference,
+        'sourceVerification':source_verification,
         'retainedBackendTreeMatchesSource':backend_match,'openApiHashMatchesRecord':hash_match,
         'operations':len(operations),'sourceRoutesMatched':len(operations)-len(missing),'missingSourceRoutes':missing,'extraSourceRoutes':extra,
         'positiveRecordedExchanges':positive,'bodyTypePropertyChecks':body_checks,'wireIssues':sorted(set(tuple(x) for x in issues)),

@@ -38,6 +38,12 @@ public class Attendance {
     @Column(name = "note")
     private String note;
 
+    @Column(name = "absence_notice_id")
+    private Integer absenceNoticeId;
+
+    @Column(name = "superseded_at")
+    private LocalDateTime supersededAt;
+
     @Column(name = "check_in_time")
     private LocalDateTime checkInTime;
 

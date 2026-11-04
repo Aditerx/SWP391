@@ -5,6 +5,7 @@
 1. Đọc file này và **phần Active** của [docs/00-MASTER-CHECKLIST.md](docs/00-MASTER-CHECKLIST.md).
 2. Đọc bảng quyết định trong [docs/04-DEBUG-NOTE.md](docs/04-DEBUG-NOTE.md), rồi đúng Dxx thuộc nhiệm vụ.
 3. Chỉ mở phần API liên quan trong docs01; docs02 khi cần test/môi trường/deploy.
+   Khi debug/sửa DB, đọc [database/README.md](database/README.md) để chọn schema root bảo toàn hay bản `database/` dựng lại; mở đúng bảng/trigger và source BE liên quan.
 4. Kiểm git status/diff và source thực tế trước khi sửa. Không đọc hàng loạt artifacts/log/history hoặc old-docs.
 
 Mỗi nguồn có vai trò riêng: quyết định Owner mô tả điều phải làm; contract mô tả giao tiếp đã công bố; code mô tả implementation; test/log là quan sát trong một môi trường. Không mặc định nguồn nào đúng100%. Khi chúng lệch nhau, xác định nguyên nhân trước; hỏi Owner nếu phát sinh lựa chọn nghiệp vụ mới. Không hỏi lại quyết định đã chốt chỉ vì code hoặc tài liệu lịch sử chưa cập nhật.
@@ -47,6 +48,7 @@ Mỗi nguồn có vai trò riêng: quyết định Owner mô tả điều phải
 | docs01 | Contract bàn giao FE theo luồng, field/state/error/ví dụ |
 | docs02 | Cấu hình, test runner, migration/deploy/recovery |
 | docs04 | Quyết định D01–D19 và lý do; không ghi nhật ký deploy ở đây |
+| database/README.md | Chọn script DB, giải thích mô hình và phân biệt schema hiện hành với migration lịch sử |
 | artifacts/fe-handoff/openapi.json | Một snapshot schema máy đọc cho FE |
 | artifacts/qa/latest.json | Một bản bằng chứng máy đọc; mở theo câu hỏi, không nạp mặc định |
 

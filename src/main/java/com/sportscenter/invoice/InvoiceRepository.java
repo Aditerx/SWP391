@@ -15,6 +15,7 @@ import java.util.List;
 public interface InvoiceRepository extends JpaRepository<Invoice, Integer>, org.springframework.data.jpa.repository.JpaSpecificationExecutor<Invoice>, InvoiceSequence {
     boolean existsByMemberIdAndSportsClassIdAndPaymentStatusAndReconciliationRequiredFalseAndCashConfirmationReversedFalse(Integer memberId,Integer classId,String status);
     java.util.Optional<Invoice> findByInvoiceCode(String code);
+    boolean existsByGatewayTransactionRefAndInvoiceIdNot(String reference, Integer invoiceId);
     boolean existsBySubscriptionSubscriptionIdAndPaymentStatusAndReconciliationRequiredFalseAndCashConfirmationReversedFalse(Integer id,String status);
     @org.springframework.data.jpa.repository.EntityGraph(attributePaths={"member","membershipPackage","receptionist","subscription"})
     List<Invoice> findByMemberCenterId(Integer centerId);

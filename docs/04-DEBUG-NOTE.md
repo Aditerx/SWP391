@@ -52,10 +52,12 @@ Chỉ9môn, giá VND cho trọn12buổi Normal hoặc12credit Advanced:
 | Cầu lông | 900.000 | 3.000.000 | Indoor |
 | Bóng bàn | 800.000 | 2.500.000 | Indoor |
 
-- Quyết định cleanup27/10 giữ canonical IDs19–27, bỏ8bản trùng và Bắn súng ngoài danh mục **khi không có tham chiếu**; gặp liên kết phải đối soát, không cascade/xóa lịch sử.
+- Quyết định cleanup27/10 trên fixture khi đó giữ canonical IDs19–27, bỏ8bản trùng và Bắn súng ngoài danh mục **khi không có tham chiếu**; gặp liên kết phải đối soát, không cascade/xóa lịch sử. Dải ID19–27 không là yêu cầu ID chung cho mọi DB hoặc bản dựng lại29/10.
 - Invoice.amount bất biến. Không suy môn từ amount/tên gói hoặc seed lại để ghi đè giá đã thay có chủ đích.
 - ID là dữ liệu từng môi trường, không hardcode vào FE. Các quyền xử lý fixture cũ là phê duyệt lịch sử cụ thể, không mở quyền sửa mọi dữ liệu production.
 - Owner29/10 chốt hai biến thể SQL: schema root nâng cấp/bảo toàn ID và chứng từ; `database/schema_postgres.sql` được phép dựng lại dữ liệu SCMS tham chiếu cùng ID số độc lập từ1. PK subtype vẫn bằng `users.user_id`; không đổi UUID/khóa ghép sang số. Danh sách8phòng giữ Bóng rổ/Bóng chuyền chung một tài nguyên. Giữ `ai_consultations`/`support_requests` cho tương lai. Quyết định này không là quyền cho agent chạy reset Supabase.
+- Owner02/11 thay danh mục8phòng bằng20tài nguyên theo `room.jpg`: tách Bóng rổ/Bóng chuyền, giữ `room_id` số và thêm `room_code` C01; không thêm `subject_id`. Migration giữ phòng/lịch sử cũ, đối soát lịch và sức chứa trước chuyển; danh mục duy nhất xem database/README.
+- Owner02/11 đã duyệt riêng bảng max_capacity cũ→mới của7lớp Normal center1 trong DB đang đối soát (ID11/12/13/14/16/17/18; bảng tại docs02). Cho phép điều chỉnh đúng7giới hạn trong cùng transaction chuyển phòng, kiểm lại danh tính lớp và Registered+Pending không vượt mức mới, lưu audit trước/sau; không đổi đăng ký, giá/chứng từ/attendance hoặc tự chia/hủy lớp. Đây là phạm vi theo ID đã được Owner xác nhận, không là quy tắc áp dụng các ID này cho mọi DB. Replay không ghi đè thay đổi có chủ đích về sau.
 
 <a id="d03"></a>
 ## D03 — Mua Advanced
@@ -77,8 +79,9 @@ Kiểm Paid/Active, member active/block, đúng môn/Coach, credit, notice>=12h,
 ## D05 — Hủy và báo vắng
 
 - Member hủy ca Advanced của mình khi còn **>=12h**, gồm đúng12h: giải phóng tài nguyên, hoàn đúng1credit gói gốc. Không gia hạn; retry/race không hoàn thêm. Dưới12h không hủy hoàn thường, không trừ thêm credit đã book.
-- Báo vắng riêng khi **0<notice<12h**; giữ Scheduled/tài nguyên/credit, lưu actor/time/reason. Không tự tạo Absent/Excused hoặc hoàn tiền/credit. Đúng/sau start không báo trước hồi tố.
+- Báo vắng riêng khi **0<notice<12h**; giữ Scheduled/tài nguyên/credit, lưu actor/time/reason. Theo Owner31/10 và xác nhận02/11, **notice và attendance Absent của đúng Member phải cùng commit**, không hoàn tiền/credit. Đây là ngoại lệ ghi trước buổi của D15, thay rule notice-only cũ; test cũ expected0attendance cần thay theo quyết định này. Đúng/sau start không báo trước hồi tố.
 - Coach điểm danh thực tế: vẫn đến thì Present, vắng thì Absent; finalizer không bỏ qua vì có notice.
+- Đổi thời gian ca làm notice hết hiệu lực: lưu nguyên attendance tự động cũ với superseded_at và tạo/ghi attendance hiện hành riêng; chỉ đổi phòng không làm notice hết hiệu lực. Không ghi đè kết quả Coach đã xác nhận.
 - Normal không hủy/báo vắng vì lý do Member. Ngoại lệ TT theo D06/D08/D15.
 
 <a id="d06"></a>
@@ -115,8 +118,9 @@ Coach mới hoặc mới chuyển role không tự gán chuyên môn. Gán môn 
 ## D10 — Thanh toán và đối soát
 
 - Holding **5 phút**. Pending thiếu method/deadline hoặc dữ kiện legacy phải đối soát, không mở lại đơn hoặc thu thêm khi khoản cũ chưa xử lý.
-- Return kiểm chữ ký/hiển thị, không ghi Paid. IPN hợp lệ kiểm merchant/reference/amount/chữ ký/idempotency rồi ghi; FE đọc ownInvoice, poll hữu hạn và có Kiểm tra lại.
-- IPN thành công nhưng lúc BE xử lý đã tới/quá deadline hoặc quyền giữ không còn: Paid+reconciliationRequired, không hồi sinh suất/quyền. Không suy khách trả trễ từ IPN tới muộn; không dùng vnp_PayDate để bỏ cutoff.
+- Return kiểm chữ ký/hiển thị, không ghi Paid. IPN hợp lệ kiểm merchant/reference/amount/chữ ký/idempotency rồi ghi. Owner04/11 duyệt thêm QueryDR: BE tự truy vấn VNPay bằng dữ liệu pay gốc đã lưu, xác minh chữ ký phản hồi và merchant/reference/amount/loại01/response00/status00 trước khi dùng chung nhánh ghi Paid. Không tin trạng thái/amount do FE gửi; lỗi hoặc thiếu chứng cứ không xác nhận chưa trả tiền.
+- FE tự POST xác minh hóa đơn VNPay khi quay về, rồi GET ownInvoice; tái sử dụng Tải lại để kiểm tra có giới hạn, không bắt Member tự xác nhận đã trả. GET danh sách chỉ đọc. Đơn cũ thiếu metadata pay không được đoán/backfill thời điểm.
+- IPN/QueryDR thành công nhưng lúc BE xử lý đã tới/quá deadline hoặc quyền giữ không còn: Paid+reconciliationRequired, không hồi sinh suất/quyền. Không suy khách trả trễ từ callback/truy vấn tới muộn; không dùng vnp_PayDate để bỏ cutoff.
 - CenterManager duyệt hoàn đủ khoản đã nhận nhưng chưa cấp quyền, thực hiện **ngoài SCMS**, lưu evidence/kết quả riêng; Receptionist hỗ trợ. Approved chưa là đã hoàn; chỉ Completed có chứng cứ mới tính hoàn.
 - Giữ Invoice.Paid/amount gốc, không refund API gateway hoặc cấp lại quyền từ tiền đang đối soát trong MVP. Muốn học lại đi đăng ký mới sau xử lý khoản cũ. Email nghiệp vụ là hướng mở rộng, không tự thêm kênh.
 
@@ -149,7 +153,7 @@ Manager xem preview ảnh hưởng, xử lý từng lịch riêng qua workflow p
 <a id="d15"></a>
 ## D15 — Attendance và bù Normal
 
-- Record mới chỉ Present/Absent, ghi **[start,end)**, không Late/scan sớm. Giữ lịch sử Late/Excused cũ. Điểm danh không trừ lần hai credit đã book.
+- Record mới chỉ Present/Absent, ghi **[start,end)**, không Late/scan sớm; ngoại lệ Member báo vắng tự ghi Absent trước buổi theo D05. Giữ lịch sử Late/Excused và attendance superseded; superseded không tính là kết quả hiện hành. Điểm danh không trừ lần hai credit đã book.
 - Coach được giao ghi trong buổi; CenterManager sửa sau buổi có reason/audit, đồng bộ result và giữ credit. Finalizer sau end chốt thiếu theo policy, bỏ buổi centerInvalidated.
 - Normal gồm12buổi hợp lệ, tối đa15Member, Paid mới Registered. Member nghỉ cá nhân mất buổi, không bù.
 - Sự cố TT thật có thể báo sau khi đã finalise nhưng phải xác minh buổi **thực sự không tổ chức**, có evidence, không dùng để sửa vắng cá nhân. Giữ buổi gốc không hợp lệ, liên kết đúng1makeup, chống bù lặp;13 record vật lý có thể chỉ12buổi hợp lệ.

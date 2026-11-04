@@ -4,6 +4,8 @@
 
 Gói FE gồm **file này** và [OpenAPI snapshot](../artifacts/fe-handoff/openapi.json). Danh sách đầy đủ method/path/query/body/schema tra bằng Swagger hoặc import snapshot; không có bản inventory/schema Markdown riêng.
 
+Bản tóm tắt đợt tích hợp02/11 để gửi riêng một file: [SCMS-BAN-GIAO-FE-2026-11-02.md](../SCMS-BAN-GIAO-FE-2026-11-02.md), gồm room,7giới hạn lớp và báo vắng. Contract đầy đủ vẫn giữ tại đây; trạng thái triển khai theo docs00.
+
 - Rule Owner: [D01–D19](04-DEBUG-NOTE.md). Trạng thái nghiệm thu và phần còn mở: [docs00](00-MASTER-CHECKLIST.md#active).
 - Snapshot/QA là ghi nhận có thời điểm, không cam kết server hiện tại vẫn cùng trạng thái. Khi tích hợp kiểm lại Live identity và tài khoản thực tế.
 - D01 hồ sơ Member và D09 Coach directory có trong bản tích hợp; trạng thái local/Render theo docs00. Không dùng API quản trị thay self-service hoặc coi GET401 chứng minh directory hết lỗi lazy.
@@ -27,6 +29,8 @@ Base Render: `https://scms-app-p1gy.onrender.com`; local thông thường `http:
 
 OTP đăng ký10phút, tối đa5lần sai, dùng một lần. REGISTRATION_PENDING/EMAIL_ALREADY_REGISTERED/OTP_INVALID/OTP_EXPIRED/OTP_ATTEMPTS_EXCEEDED/OTP_RESEND_TOO_SOON/OTP_RESEND_LIMIT cần UI riêng. OTP cloud đang bị mail/Render Free chặn theo ghi nhận; không coi thông báo gửi là delivery đã nghiệm thu. Tài khoản demo lịch sử không phải credential production.
 
+`auth/me` hiện không có `centerId`; thiết kế center1 giữ nguyên. Actor/center dùng để phân quyền được BE đọc từ phiên, không nhận mã C01 hoặc center do FE gửi làm căn cứ cấp quyền.
+
 Cross-site HTTPS cần CORS exact FE origin, credentials và cookie SameSite=None/Secure=true. Source default lax/false; phải kiểm browser thực, không suy từ Swagger/Postman. Không có phiên hợp lệ thì kết quả kiểm role/owner là BLOCKED.
 
 FE xử lý **200/201/204** theo route;204 không có body. Lỗi có thể `{code,message}` hoặc `{timestamp,status,error,message}`/body framework: ưu tiên code→message→HTTP fallback.401 đăng nhập lại;403 thiếu quyền;404 có thể che tài nguyên không thuộc chủ;409 tải lại trạng thái/preview. Không lặp vô hạn hoặc tự đổi trạng thái local để vượt lỗi BE.
@@ -46,6 +50,8 @@ FE xử lý **200/201/204** theo route;204 không có body. Lỗi có thể `{co
 | POST/DELETE `/api/users/me/avatar` | Luồng avatar hiện có, tách D01; upload multipart theo schema |
 
 Các group quản trị users/members/staff/roles/permissions/specializations/packages/rooms/classes và training-plan/evaluation/feedback xem OpenAPI. Quyền có thể gồm role+authority+owner/center trong service; snapshot không thay full role matrix. Nhóm baseline chưa có acceptance business đầy đủ chỉ vì route xuất hiện.
+
+**Room — Owner02/11.** `id`/`roomId` vẫn là số trong path/request lịch; response thêm `roomCode` (ví dụ `C01-TEN-01`) để hiển thị/tìm trong danh sách. Không đổi ID thành mã, không thêm `subjectId`. POST/PUT `/api/rooms` nhận thêm `roomCode` tùy chọn: tối đa40ký tự, chữ hoa, dạng `C[ít nhất2chữ số]-[chữ/số]-[chữ/số]`, tiền tố phải đúng center. POST thiếu mã tự sinh `C01-RM-...`; PUT thiếu mã giữ mã cũ. POST201, PUT200; mã trùng409, sai định dạng400, sai center400 `ROOM_CODE_CENTER_MISMATCH`. Tên/khu vực/loại/sức chứa20tài nguyên theo [danh mục room](../database/README.md#room-catalog); không hardcode ID fixture. GET rooms ẩn phòng `Closed` có mã `LEGACY`, vẫn giữ phòng Maintenance và phòng đóng khác; lịch sử DB không bị xóa.
 
 **D01 — hồ sơ của Member.** GET và PATCH đều trả đúng `name,phone,address,dateOfBirth,gender,goal,healthNote`; không có id/email/role/credit/giá. Lấy định danh và email từ `/api/auth/me`. PATCH giữ field vắng mặt, `null` xóa6field nullable, `{}` không đổi dữ liệu. `name` nếu gửi phải là string khác null/rỗng/trắng. Key ngoài7field được bỏ qua, gồm memberId/role/status/centerId/packageId/credit/amount/email/password/avatarUrl; không dùng chúng chọn người hay cấp quyền.
 
@@ -85,6 +91,8 @@ Ngày `YYYY-MM-DD`, giờ **string** `HH:mm` hoặc `HH:mm:ss[.fraction]`. Busin
 | Có phiên đúng phạm vi | GET `/api/advanced-registrations` | Registration+subscription state cho Member chủ/Primary Coach/Manager |
 | Member chủ hoặc staff có quyền | GET `/api/members/{memberId}/subscriptions` | MemberPackageResponse; Member không được chọn người khác |
 
+GET `/api/members/me/subscriptions` không được định nghĩa; lỗi400 khi dùng `me` thay ID số không phải lỗi đọc quyền. Tuyến `/members/me/subscriptions` chỉ có POST mua gói tương thích, không thay GET ở bảng trên.
+
 Chưa accepted thì COACH_ACCEPTANCE_REQUIRED. Order kiểm lại năng lực/center lock và snapshot Subject price. requestKey1–80ký tự `[A-Za-z0-9_.:-]`: retry cùng nội dung trả kết quả cũ; khác nội dung409 IDEMPOTENCY_CONFLICT. Không gửi amount/actor/time để thay dữ kiện BE.
 
 Advanced mua qua subscribe gói chung bị USE_ADVANCED_REGISTRATION. Sau Paid tải ownInvoice và subscriptions; generic status/extend không được cấp lại quyền hoặc thay incident recovery. Các lỗi cần xử lý: COACH_NOT_ACCEPTING/COACH_SCHEDULE_REQUIRED/COACH_CAPACITY_INSUFFICIENT/COACH_SUBJECT_MISMATCH/MEMBER_NOT_ACTIVE/BOOKING_BLOCKED/INVALID_PRICE; tra response thực để lấy message.
@@ -96,12 +104,31 @@ Advanced mua qua subscribe gói chung bị USE_ADVANCED_REGISTRATION. Sau Paid t
 |---|---|
 | POST `/api/invoices/{id}/confirm-cash` — Receptionist+MANAGE_INVOICES | Cash Pending còn hạn, đủ điều kiện mới Paid/cấp quyền; note optional;200 |
 | POST `/api/invoices/{id}/pay-online` — Member chủ | Trả paymentUrl; kiểm lại Pending/deadline/method, không nhận giá |
+| POST `/api/members/me/invoices/{id}/verify-vnpay` — Active Member chủ, cùng center | JSON `{}`; BE gọi QueryDR bằng attempt đã lưu;200 `VnPayVerificationResponse` bên dưới |
 | GET `/api/members/me/invoices`, `/{id}` | Nguồn tiền chính thức của Member; dùng sau Return/poll hữu hạn |
 | GET `/api/invoices/{id}/receipt` | Paid receipt; Member chủ hoặc staff có MANAGE_INVOICES đúng center |
 | GET `/api/payments/vnpay/return` | Kiểm chữ ký/redirect; không ghi Paid |
 | GET `/api/payments/vnpay/ipn` | Callback gateway có chữ ký, **không gọi từ FE**; có side effect |
 
 Manager chỉ có MANAGE_INVOICES chưa đủ ROLE_RECEPTIONIST để confirm Cash. Paid+reconciliationRequired là đã ghi nhận tiền nhưng cần xử lý, không tự coi quyền Active. FE hiển thị Pending/chờ xác nhận, cập nhật hữu hạn rồi Kiểm tra lại; không lấy redirect làm chứng từ hoặc mời trả thêm khi đang đối soát.
+
+**QueryDR:** `{id}` là `invoiceId` từ API, không phải phần số cuối `invoiceCode`. Gửi cookie phiên, `Content-Type: application/json`, body `{}`; không gửi amount, merchant, chữ ký hoặc kết quả gateway. Response200 có `verificationStatus` (bảng dưới), `message`, `retryAfterSeconds` (số giây tối thiểu chờ trước khi kiểm tra lại;0 khi không đề nghị retry) và `invoice` (đầy đủ `InvoiceResponse` như GET hiện hành).
+
+| verificationStatus | FE xử lý |
+|---|---|
+| `VERIFIED_PAID`, `ALREADY_PAID` | Đọc `invoice.paymentStatus` và `reconciliationRequired`; nếu cần đối soát thì không thông báo đã cấp quyền |
+| `NOT_CONFIRMED` | Chưa có xác nhận thành công; không suy là chưa trả hoặc mời thanh toán lại |
+| `QUERY_UNAVAILABLE` | Chưa xác minh được (timeout/lỗi/chữ ký/dữ liệu không hợp lệ); giữ trạng thái hóa đơn |
+| `RETRY_LATER` | Chờ `retryAfterSeconds`; BE giới hạn một lượt kiểm tra/30giây/hóa đơn, tối đa3attempt/lượt |
+| `ATTEMPT_MISSING` | Đơn cũ thiếu dữ liệu pay gốc; hướng dẫn đối soát, không tự tạo đơn/thanh toán lại |
+| `DISABLED`, `VERIFIED_ONLY` | Tính năng chưa bật hoặc đang kiểm chứng chỉ đọc; chưa đồng nghĩa invoice Paid |
+| `NOT_APPLICABLE` | Đơn Refunded; theo hồ sơ xử lý hiện hành |
+
+Khi quay lại trang hóa đơn, lấy `invoiceId` từ URL, đọc ownInvoice để kiểm đúng hóa đơn VNPay rồi tự POST xác minh một lần và GET lại danh sách. Có thể tái sử dụng nút **Tải lại** cho POST của hóa đơn đang theo dõi rồi GET; không cần nút “xác nhận đã trả”. Không tự POST tất cả hóa đơn, không poll vô hạn, không dùng `status=00` trên URL để tô Paid. GET `/me/invoices` vẫn chỉ đọc. Nếu IPN đã ghi Paid thì POST trả `ALREADY_PAID` và không query/cấp quyền lại. Xác minh tới/quá hạn vẫn có thể ghi Paid+đối soát nhưng không cấp lại suất/quyền.
+
+Client nên dành ít nhất20giây cho POST: một lượt có thể thử3attempt với timeout5giây/attempt. Nếu client timeout/mất kết nối, đọc lại hóa đơn và chờ cooldown trước kiểm tra tiếp; không suy là thanh toán thất bại.
+
+Lỗi:401 chưa đăng nhập;403 sai role/không Active/thiếu hồ sơ Member;404 không có hoặc không sở hữu/khác center;400 hóa đơn không phải VNPay hoặc body có field;415 sai Content-Type;409 một mã giao dịch đã gắn hóa đơn khác. Schema mới phải migration trước khi deploy. Contract này là BE local; trạng thái deploy/kiểm live theo docs00.
 
 <a id="booking"></a>
 ## 6. Coach tạo Advanced — D04/D12
@@ -120,10 +147,12 @@ Tra ca bằng GET `/api/coaches/{coachId}/available-slots?date=YYYY-MM-DD&subjec
 | API | Điều kiện / refresh |
 |---|---|
 | POST `/api/sessions/{id}/cancel-private` | Member chủ, Scheduled,>=12h;200 Cancelled, hoàn1credit gốc; refresh sessions/subscriptions |
-| POST `/api/sessions/{id}/absence` body reason |0<notice<12h;200notice, không attendance/credit refund |
+| POST `/api/sessions/{id}/absence` body reason |Member chủ,0<notice<12h;200notice và cùng commit tạo attendance Absent; không hoàn credit |
 | GET `/api/sessions/{id}/absence-notices` | Chủ/Coach được giao/Manager theo phạm vi; hiển thị notice tách kết quả attendance |
 
 CANCEL_TOO_LATE/SESSION_ALREADY_CANCELLED/ADVANCED_PACKAGE_EXPIRED/OUT_OF_CREDIT cần thông báo phù hợp; retry hủy không hoàn thêm. Normal không hỗ trợ hủy/notice cá nhân (NORMAL_CLASS_NON_CANCELLABLE). FE không bỏ notice trước khi BE xác nhận kết quả dời.
+
+Báo vắng trả `id,sessionId,memberId,reportedAt,reason,active,supersededAt` như trước; refresh notice và attendance sau200. Retry trong cửa sổ trả cùng notice, không nhân attendance hoặc đổi credit. Absent tự động ghi người báo là Member, có `absenceNoticeId` trong attendance; không ghi checkInTime hoặc tạo đánh giá giả của Coach. Coach/QR trong buổi có thể cập nhật Present; Manager correction sau buổi đồng bộ result hiện có. Đổi thời gian làm notice hết hiệu lực và lưu attendance tự động cũ với `superseded_at`; API attendance chỉ trả bản hiện hành, correction bản cũ400 `ATTENDANCE_SUPERSEDED`. Đổi phòng cùng giờ giữ notice/Absent. Sai owner/role/center403; ngoài cửa sổ400 `ABSENCE_WINDOW_CLOSED`. Không backfill hàng loạt notice lịch sử khi migration.
 
 <a id="reschedule"></a>
 ## 8. Dời/thay Coach — D06/D07
@@ -161,6 +190,8 @@ HOLIDAY_PREVIEW_REQUIRED/HOLIDAY_PREVIEW_STALE/HOLIDAY_IMPACT_UNRESOLVED/HOLIDAY
 <a id="normal"></a>
 ## 11. Normal — 12 buổi cố định
 
+Sĩ số tối đa là `maxCapacity` của lớp và phải vừa phòng, đồng thời không quá15; FE không hardcode mọi Normal đều15chỗ. Owner đã duyệt đồng bộ7lớp hiện có xuống sức chứa room mới qua bundle DB trong docs02. Không thay field/API, giá hay số buổi vì điều chỉnh này.
+
 Ưu tiên POST `/api/classes/normal-with-sessions` với requestId,sportsClass,roomId,daysOfWeek,startTime,endTime →201 SportsClassResponse và12buổi cùng transaction. **requestId là UUID chuẩn36ký tự**, ví dụ `94edc3d1-697a-46fc-9475-c0f9828586cb`; không dùng nhãn tự đặt. sportsClass gồm name/subjectId/coachId/maxCapacity/startDate/classType:Normal/totalSessions:12. Retry cùng requestId/body cùng Class; conflict không để nửa lịch.
 
 Tách bước: POST `/api/classes` tạo Normal Closed →POST `/api/sessions/preview-recurring` →POST `/api/sessions/generate` đủ12 →PUT Class Open. Không publish/enroll chỉ dựa ngày client; generate lại có SCHEDULE_ALREADY_EXISTS.
@@ -180,6 +211,8 @@ GET `/api/sessions/catalog/{classId}` là lịch Normal trước mua cho ngườ
 | POST `/api/attendances/correct` — Manager/Admin+MANAGE_CLASSES | attendanceId,newState,reason; sau end, audit/sync result, không đổi credit |
 
 Alias `/api/attendance` và `/checkin-code`/`/api/members/me/checkin-code` còn để tương thích; chọn1canonical trên FE. QR phải refresh khi hết hạn/foreground, không log payload/secret. Code trong bằng chứng đã redact, không dùng scan. Check-in/out cửa có code nhưng toggle mặc định tắt, không thay attendance ca. Giữ lịch sử Late/Excused; finalizer sau end không tính buổi invalidated và không trừ credit lần hai.
+
+Ngoại lệ ghi trước buổi duy nhất ở đây là Absent do Member báo vắng hợp lệ theo D05; manual/QR vẫn tuân thủ cửa sổ trong buổi. Attendance response thêm `absenceNoticeId` nullable để truy về notice/reason, kể cả sau khi Coach xác nhận kết quả thực tế.
 
 <a id="resolutions"></a>
 ## 13. Refund/CashCorrection — D10/D16
@@ -208,10 +241,13 @@ GET `/api/reports/dashboard`, `/members`, `/revenue?startDate=YYYY-MM-DD&endDate
 | cashCorrectionsRecorded | Điều chỉnh Cash trong completedAt, không phải tiền hoàn |
 | totalRevenue và breakdown cũ | Gross Paid tương thích, không thay các chỉ số thực thu/hoàn/ròng |
 | activeMembers | Người còn quyền;0 credit còn ca hợp lệ vẫn có thể active |
+| activeSubscriptions | Tổng lượt Advanced còn quyền + ghi danh Normal còn quyền; không phải số người. Advanced phải Paid hợp lệ, Active, đủ metadata, chưa hết hạn và còn credit hoặc ca hợp lệ; Normal Registered/Paid còn ca hợp lệ hoặc đang chờ bù TT |
 | expiredMembers | Alias previouslyEntitledMembersWithoutRights; không gom neverEntitledMembers |
 | expired/completed/reconciliationRegistrations | Từng lượt đăng ký, không cộng vào số người |
 
 FE tự quyết layout/chỉ số chính. Dữ liệu legacy thiếu provenance tách reconciliation; người có nhiều đăng ký chỉ đếm1ở chỉ số người.
+
+Dashboard không nhận khoảng ngày và lấy toàn kỳ; revenue áp dụng khoảng ngày đã gửi. Query hiện lọc theo center của actor, kể cả Admin: Admin center NULL trả dữ liệu rỗng, không tự tổng hợp toàn hệ thống. Chức năng chọn center/tổng hợp cho Admin chưa thuộc contract này; không gán Admin center1 để chữa số liệu0.
 
 ## 15. Notification, chat và nhóm bổ trợ
 
@@ -301,6 +337,6 @@ FE cần xác nhận phiên, lookup ID/role theo môi trường, state/field nul
 
 Nghiệm thu theo từng điều kiện Dxx: actor+fixture →request →response+state →môi trường/SHA →PASS/FAIL/BLOCKED/NOT_RUN. Ví dụ D05 đúng12h phải hoàn đúng1 và gọi lặp không tăng; D18 dùng phiên Coach hợp lệ để chứng minh403. GET anonymous401 chỉ là security smoke.
 
-Đối chiếu máy đọc nằm trong `authenticatedAcceptance.cases` của [QA duy nhất](../artifacts/qa/latest.json): Dxx/API/actor/fixture/expected, response tham chiếu `local.exchanges` và SQL state đọc sau commit. `authenticatedAcceptance.remaining` giữ phần BLOCKED/NOT_RUN; không suy PASS cho nhánh chưa chạy từ nhánh cùng Dxx đã đạt.
+Đối chiếu lịch sử nằm trong `authenticatedAcceptance.cases` của [QA duy nhất](../artifacts/qa/latest.json), response tham chiếu `local.exchanges`. Room/báo vắng02/11 dùng `roomAbsenceReview.postgresHttp.cases` và `exchanges` cùng section; không dùng matrix lịch sử để đóng yêu cầu mới. `authenticatedAcceptance.remaining` và Active giữ phần chưa nghiệm thu. [Bảng đối chiếu1:1](00-MASTER-CHECKLIST.md#report-trace) ghi rõ kết luận từng phát hiện gốc và phần capture SQL còn thiếu; test có assertion PASS không đồng nghĩa mọi giá trị đã được trích đầy đủ vào QA.
 
 Bộ contract/schema có thể còn thiếu hoặc sai ở phần chưa chạy. [docs00](00-MASTER-CHECKLIST.md#active) giữ các cổng chưa nghiệm thu; không dùng số route/assertion hoặc bản ghi local để ký full production/FE acceptance.
