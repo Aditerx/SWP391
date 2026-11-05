@@ -20392,5 +20392,667 @@
     },
     "currentPaymentConfigurationMatchesSnapshot": true,
     "contractIdentityLimit": "Concurrent email source/config edits and DB README differ from tested snapshot; current QueryDR feature sources and payment configuration match"
+  },
+  "vnpayRolloutFollowup": {
+    "checkedAtUtc": "2026-11-04T08:58:53.606234+00:00",
+    "localCommit": "1edb26dc877c25b46351ce8d95e0bae8d37a2562",
+    "runtimeReportedCommit": "a03cc608c6a5ec3769a981da31b5ecc2fd5e4054",
+    "runtimeCommitFetchedFromOrigin": true,
+    "invoiceSourcesAndApplicationPropertiesMatch": true,
+    "publicChecks": {
+      "health": {
+        "httpStatus": 200,
+        "status": "UP"
+      },
+      "openApi": {
+        "httpStatus": 200,
+        "verifyVnpayPublished": true
+      },
+      "preflight": {
+        "httpStatus": 200,
+        "origin": "https://scms-demo-04nov.pages.dev",
+        "allowCredentials": "true",
+        "method": "POST"
+      }
+    },
+    "ownerReportedMigration15": "Completed successfully; not independently queried on Supabase",
+    "configurationScreenshot": {
+      "VNPAY_QUERY_ENABLED": "true",
+      "VNPAY_QUERY_SETTLEMENT_ENABLED": "true",
+      "VNPAY_QUERY_URL": "https://sandbox.vnpayment.vn/merchant_webapi/api/transaction",
+      "VNPAY_QUERY_IP_ADDR": "blank"
+    },
+    "configurationEffectiveValues": "Not verified with authenticated endpoint yet; screenshot alone does not prove env was saved/redeployed",
+    "guidance": "Keeping both flags true is acceptable for the authorized sandbox demo; read-only staging is optional; all signature/identity/amount/state checks remain",
+    "ownerProvidedInvoice": {
+      "invoiceId": 37,
+      "invoiceCode": "INV-2026-000024",
+      "paymentMethod": "VNPay",
+      "amount": 900000,
+      "paymentStatus": "Pending",
+      "paymentDate": null,
+      "gatewayTransactionRef": null,
+      "reconciliationRequired": false,
+      "createdAt": "2026-11-04T15:54:42.969529",
+      "expiresAt": "2026-11-04T15:59:42.969529"
+    },
+    "authenticatedQueryDrResult": "Owner POST37 returned HTTP200 QUERY_UNAVAILABLE / invoice Expired; not a confirmed gateway result",
+    "gatewayCallsByAgent": 0,
+    "ipnCallsByAgent": 0,
+    "cloudWritesByAgent": 0,
+    "browserInventory": {
+      "apps": 0,
+      "browsers": 0
+    },
+    "frontendSourceProbe": "Public Pages request returned403; automatic POST integration not determined",
+    "documentation": {
+      "handoff": "SCMS-BAN-GIAO-FE-VNPAY-2026-11-04.md",
+      "misplacedQueryDrSectionRemovedFrom": "SCMS-BAN-GIAO-FE-2026-11-02.md",
+      "otpAddedToNewHandoff": false
+    },
+    "backendChanged": false,
+    "newBackendTestsRun": false,
+    "ownerReadOnlyFollowup": {
+      "requests": [
+        {
+          "method": "GET",
+          "path": "/api/invoices/37/receipt",
+          "httpStatus": 409,
+          "message": "A receipt is available after payment is recorded",
+          "serverTimestampUtc": "2026-11-04T08:58:26.920798666Z"
+        },
+        {
+          "method": "GET",
+          "path": "/api/members/me/invoices/37",
+          "httpStatus": 200,
+          "paymentStatus": "Pending",
+          "paymentDate": null,
+          "gatewayTransactionRef": null
+        }
+      ],
+      "queryDrPostResponseProvided": false,
+      "nextAction": "Reuse invoice37; run authenticated POST verify-vnpay from browser Console; no new payment needed"
+    }
+  },
+  "vnpayTransportFollowup": {
+    "checkedAtUtc": "2026-11-04T09:49:16.012434+00:00",
+    "ownerPostResult": {
+      "invoiceId": 37,
+      "httpStatus": 200,
+      "verificationStatus": "QUERY_UNAVAILABLE",
+      "retryAfterSeconds": 30,
+      "paymentStatus": "Expired",
+      "paymentDate": null,
+      "gatewayTransactionRef": null,
+      "reconciliationRequired": false
+    },
+    "ownerRenderLogs": [
+      {
+        "timeUtc": "2026-11-04T09:09:12.571965293Z",
+        "attemptId": 2,
+        "reason": "QUERY_UNAVAILABLE"
+      },
+      {
+        "timeUtc": "2026-11-04T09:09:15.576989154Z",
+        "attemptId": 1,
+        "reason": "QUERY_UNAVAILABLE"
+      }
+    ],
+    "rootCauseOnRender": "UNCONFIRMED: old catch-all does not expose the transport cause",
+    "localReachability": {
+      "host": "sandbox.vnpayment.vn",
+      "ipv4": [
+        "103.220.84.173"
+      ],
+      "pythonVerifiedTlsIssuer": "ZeroSSL RSA DV SSL CA 2",
+      "certificateValidFromUtc": "2026-10-01T00:00:00Z",
+      "certificateValidToUtc": "2026-12-30T23:59:59Z",
+      "javaVersion": "Oracle Java17.0.12 Windows; not the Render runtime",
+      "javaDefaultHttp2": "SSLHandshakeException / ValidatorException / SunCertPathBuilderException",
+      "javaDefaultHttp11": "SSLHandshakeException / ValidatorException / SunCertPathBuilderException",
+      "javaWithAiaHttp2": {
+        "headStatus": 405,
+        "negotiated": "HTTP_1_1",
+        "elapsedMs": 1084
+      },
+      "javaWithAiaHttp11": {
+        "headStatus": 405,
+        "negotiated": "HTTP_1_1",
+        "elapsedMs": 125
+      },
+      "purpose": "HEAD and verified TLS certificate observations only; no merchant data, payment or QueryDR payload",
+      "limits": "Local Java behavior does not establish the same root cause on Render; successful HEAD is not successful QueryDR"
+    },
+    "ownerNextStep": "Try JAVA_TOOL_OPTIONS=-Dcom.sun.security.enableAIAcaIssuers=true, preserving existing options; redeploy and verify same invoice37",
+    "tlsValidationDisabled": false,
+    "liveQueryDrAfterAia": {
+      "evidence": "Owner console response after suggested JVM-option step; effective JVM value not independently inspected",
+      "httpStatus": 200,
+      "verificationStatus": "QUERY_UNAVAILABLE",
+      "invoiceId": 37,
+      "paymentStatus": "Expired",
+      "paymentDate": null,
+      "gatewayTransactionRef": null,
+      "reconciliationRequired": false
+    },
+    "backendDiagnosticChange": "Specific fixed transport/provider status codes; raw exception messages/bodies/URLs never logged; no signing or settlement changes",
+    "diagnosticPatchDeployed": true,
+    "cloudWritesByAgent": 0,
+    "paymentOrQueryPayloadsSentByAgent": 0,
+    "documentationScope": "VNPay only; OTP section not added",
+    "officialReferences": [
+      "https://docs.oracle.com/en/java/javase/17/security/java-pki-programmers-guide.html",
+      "https://docs.oracle.com/en/java/javase/17/docs/api/java.net.http/HttpClient.html"
+    ],
+    "diagnosticValidation": {
+      "result": "PASS_LOCAL",
+      "checkedAtUtc": "2026-11-04T09:25:18.312274+00:00",
+      "baseCommit": "1edb26dc877c25b46351ce8d95e0bae8d37a2562",
+      "workingTree": true,
+      "sourceFingerprints": {
+        "src/main": "0f1eb4481ff71fb0514488eddc76fbe978216d4cac116819b60f2185591847c0",
+        "src/test": "d002cd6a7879d57c827b028f3f45320e226b4f0f4b03e80cfb1f28ccec5399f1",
+        "database": "fcb87aca26143a4b49d19670fef1c86515fa57e856d5ad8ebbbd95d1463d3291",
+        "pom.xml": "aa5c4d1a1bb3e23860225b7aacd7341fe278430cd6148a8a9d66c9ebabc1864b",
+        "schema_postgres.sql": "7b3a0b5878335ddbeade70b9a4060aba6a097ace8ea561ad3f30baccfa824a0e",
+        "scripts/test-room-absence-postgres.py": "7144adb3689349a949c9ee702958f765fb5743433d8a285dcfc264af2a77c82c",
+        "scripts/test-phases-postgres.py": "365df6003bd90f65afe0593f195a733c25ae8c9abdca6848119555657be54eaa",
+        "scripts/prepare-phases-release.py": "e6c525b8a70562527d606b0017d72199865c838df31b6bbc995acb1405deb5a5"
+      },
+      "currentWorkspaceFingerprints": {
+        "src/main": "0f1eb4481ff71fb0514488eddc76fbe978216d4cac116819b60f2185591847c0",
+        "src/test": "d002cd6a7879d57c827b028f3f45320e226b4f0f4b03e80cfb1f28ccec5399f1",
+        "database": "fcb87aca26143a4b49d19670fef1c86515fa57e856d5ad8ebbbd95d1463d3291",
+        "pom.xml": "aa5c4d1a1bb3e23860225b7aacd7341fe278430cd6148a8a9d66c9ebabc1864b",
+        "schema_postgres.sql": "7b3a0b5878335ddbeade70b9a4060aba6a097ace8ea561ad3f30baccfa824a0e",
+        "scripts/test-room-absence-postgres.py": "7144adb3689349a949c9ee702958f765fb5743433d8a285dcfc264af2a77c82c",
+        "scripts/test-phases-postgres.py": "365df6003bd90f65afe0593f195a733c25ae8c9abdca6848119555657be54eaa",
+        "scripts/prepare-phases-release.py": "e6c525b8a70562527d606b0017d72199865c838df31b6bbc995acb1405deb5a5"
+      },
+      "scope": "Transport diagnostics only; no signing, settlement, timeout, schema or API response contract change",
+      "command": "mvnw.cmd clean test",
+      "environment": "Java17/H2/local HTTP protocol simulator, private source copy without .env",
+      "totals": {
+        "tests": 360,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 28,
+        "passed": 332
+      },
+      "queryClientCases": [
+        "validSignatureDoesNotAuthorizeWrongMerchantReferenceAmountOrRefund",
+        "rejectsTamperingMissingSignatureAndDuplicateJson",
+        "malformedEndpointDoesNotLeakConfigurationOrSendRequest",
+        "providerStatusAndResponseLimitHaveSafeDistinctCodes",
+        "querySuccessDoesNotMeanPaymentSuccessAndOptionalPromotionValuesAreSigned",
+        "sendsExactOriginalPayDateAndProtocolSpecificRequestHmacOverHttp",
+        "acceptsIndependentGoldenHmacIncludingEmptyPromotionSlots",
+        "transportFailuresHaveSpecificCodesWithoutLeakingExceptionDetails"
+      ],
+      "testSandbox": "C:\\Users\\Admin\\AppData\\Local\\Temp\\scms_querydr_transport_polkg3aw",
+      "envFilePresent": false,
+      "liveAuthenticatedQueryDrAfterFix": "PENDING_OWNER_RESPONSE",
+      "cloudWritesByAgent": 0,
+      "gatewayPaymentOrQueryRequestsByAgent": 0
+    },
+    "sourcePatchSha256": {
+      "src/main/java/com/sportscenter/invoice/VnPayQueryClient.java": "6348b63fdf84a8b800c9072adfd86feb6746586fd89b135581b076238249944e",
+      "src/test/java/com/sportscenter/invoice/VnPayQueryClientTest.java": "3d46da32862457c324f5edf6ab21f2ab667cabbb1e515f7d423c03317dc7586c"
+    },
+    "diagnosticPatchCommit": "28406296638b23aa5a72cca186340c33f60481f8",
+    "runtimeRecheck": {
+      "httpStatus": 200,
+      "buildCommit": "4e6a88ee536a064d3ba3d8929b2f0684e8ce9fea",
+      "specificTransportCodesPresent": true,
+      "clientSourceMatchesLocalCommit": "954211b7eb519958680ba25a8d94ca6814ad34ba"
+    },
+    "nextStep": "Get the latest Render log invoice37 reason from the deployed diagnostic patch; do not create another payment",
+    "ownerPostAfterDiagnosticDeployment": {
+      "httpStatus": 200,
+      "verificationStatus": "QUERY_UNAVAILABLE",
+      "invoiceId": 37,
+      "paymentStatus": "Expired",
+      "paymentDate": null,
+      "gatewayTransactionRef": null,
+      "reconciliationRequired": false
+    },
+    "latestReason": "CONNECT_TIMEOUT (owner logs16:45); network phase not yet determined"
+  },
+  "vnpayConnectTimeoutFollowup": {
+    "checkedAtUtc": "2026-11-04T13:01:11.099329+00:00",
+    "ownerLogs": [
+      {
+        "timestamp": "2026-11-04T16:45:17.936+07:00",
+        "invoiceId": 37,
+        "attemptId": 2,
+        "reason": "CONNECT_TIMEOUT"
+      },
+      {
+        "timestamp": "2026-11-04T16:45:20.942+07:00",
+        "invoiceId": 37,
+        "attemptId": 1,
+        "reason": "CONNECT_TIMEOUT"
+      }
+    ],
+    "confirmed": "HTTPS connection establishment exceeded the configured3second limit; no verified gateway payment result",
+    "notEstablished": [
+      "TCP versus TLS phase",
+      "IP blocking or routing failure",
+      "whether15seconds succeeds on Render"
+    ],
+    "networkDiagnosticCommit": "ea15e9712d3ea07e2134888e427a321b12ce9c0f",
+    "validation": {
+      "result": "PASS_LOCAL",
+      "checkedAtUtc": "2026-11-04T12:54:04.313027+00:00",
+      "baseCommit": "954211b7eb519958680ba25a8d94ca6814ad34ba",
+      "workingTree": true,
+      "sourceFingerprints": {
+        "src/main": "904ba8c2d6bdab84a8c7e3c4974600bcd998bf57302684ff2cbb1241bb8902b1",
+        "src/test": "5e231daa32765428bfa40c857cc1b5ef95a73ec93b00fb311f6659764f596747",
+        "database": "fcb87aca26143a4b49d19670fef1c86515fa57e856d5ad8ebbbd95d1463d3291",
+        "pom.xml": "aa5c4d1a1bb3e23860225b7aacd7341fe278430cd6148a8a9d66c9ebabc1864b",
+        "schema_postgres.sql": "7b3a0b5878335ddbeade70b9a4060aba6a097ace8ea561ad3f30baccfa824a0e",
+        "scripts/test-room-absence-postgres.py": "7144adb3689349a949c9ee702958f765fb5743433d8a285dcfc264af2a77c82c",
+        "scripts/test-phases-postgres.py": "365df6003bd90f65afe0593f195a733c25ae8c9abdca6848119555657be54eaa",
+        "scripts/prepare-phases-release.py": "e6c525b8a70562527d606b0017d72199865c838df31b6bbc995acb1405deb5a5"
+      },
+      "scope": "Opt-in one-shot network probe + bounded configurable timeouts; signing/settlement/default timeouts unchanged",
+      "command": "mvnw.cmd -Dvnpay.network-probe-enabled=false clean test",
+      "environment": "Java17, H2/local HTTP simulator, private source copy without .env; no live provider probes during suite",
+      "totals": {
+        "tests": 368,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 28,
+        "passed": 340
+      },
+      "cases": {
+        "com.sportscenter.invoice.VnPayNetworkProbeTest": [
+          "probeBeanIsDisabledByDefaultAndCanBeExplicitlyEnabled",
+          "exceptionMessagesNeverAppearInDiagnosticLog",
+          "failedTcpSkipsTlsForThatTargetAndStillChecksControl",
+          "shortHttpsTimeoutStillTestsLongerHandshakeAndControl",
+          "failedDnsSkipsTargetAndStillChecksControl",
+          "startupEventRunsOnceWithoutBlockingCaller"
+        ],
+        "com.sportscenter.invoice.VnPayQueryClientTest": [
+          "validSignatureDoesNotAuthorizeWrongMerchantReferenceAmountOrRefund",
+          "configuredTimeoutsReachClientAndRequestWithoutChangingSignedProtocol",
+          "rejectsTamperingMissingSignatureAndDuplicateJson",
+          "malformedEndpointDoesNotLeakConfigurationOrSendRequest",
+          "providerStatusAndResponseLimitHaveSafeDistinctCodes",
+          "querySuccessDoesNotMeanPaymentSuccessAndOptionalPromotionValuesAreSigned",
+          "sendsExactOriginalPayDateAndProtocolSpecificRequestHmacOverHttp",
+          "acceptsIndependentGoldenHmacIncludingEmptyPromotionSlots",
+          "transportFailuresHaveSpecificCodesWithoutLeakingExceptionDetails",
+          "timeoutConfigurationIsBoundedAndInvalidValuesNeverReachTransport"
+        ]
+      },
+      "testSandbox": "C:\\Users\\Admin\\AppData\\Local\\Temp\\scms_querydr_network_ixoz_orb",
+      "envFilePresent": false,
+      "runtimeProbeOutcome": "NOT_RUN; requires publishing new code and explicit env opt-in on Render",
+      "cloudWritesByAgent": 0,
+      "livePaymentOrQueryRequestsByAgent": 0
+    },
+    "probeSafety": {
+      "defaultEnabled": false,
+      "oncePerStartup": true,
+      "backgroundDaemon": true,
+      "fixedHosts": [
+        "sandbox.vnpayment.vn",
+        "example.com"
+      ],
+      "phases": [
+        "DNS",
+        "TCP443 max15s",
+        "HTTPS HEAD connect3s",
+        "HTTPS HEAD connect15s"
+      ],
+      "merchantOrKeyOrInvoiceDataUsed": false,
+      "queryPaymentOrRefundPayloadSent": false,
+      "tlsAndHostnameValidationDisabled": false
+    },
+    "timeouts": {
+      "defaultConnectSeconds": 3,
+      "defaultRequestSeconds": 5,
+      "maximumSeconds": 15,
+      "requestAtLeastConnect": true,
+      "connectEnv": "VNPAY_QUERY_CONNECT_TIMEOUT_SECONDS",
+      "requestEnv": "VNPAY_QUERY_REQUEST_TIMEOUT_SECONDS"
+    },
+    "clientGuidance": "60second timeout for verify POST only; single in-flight UI request",
+    "nextOwnerStep": "Publish code, enable VNPAY_NETWORK_PROBE_ENABLED=true, wait Live and VNPAY_NET finished=true; send probe logs; no new payment needed",
+    "runtimeProbe": "OWNER_LOG_RECEIVED: VNPay TCP timeout15s; control TCP/HTTPS successful",
+    "agentPushOrDeploy": false,
+    "agentCloudWrites": 0,
+    "paymentSigningOrSettlementOrSchemaChanged": false,
+    "officialReferences": [
+      "https://docs.oracle.com/en/java/javase/17/docs/api/java.net.http/java/net/http/HttpClient.Builder.html",
+      "https://render.com/docs/outbound-ip-addresses"
+    ]
+  },
+  "vnpayProbePublicationFollowup": {
+    "checkedAtUtc": "2026-11-04T13:24:06.433160+00:00",
+    "ownerScreenshot": "Render Logs no matches for VNPAY_NET or finished=true; owner reports env added",
+    "health": {
+      "httpStatus": 200,
+      "buildCommit": "4e6a88ee536a064d3ba3d8929b2f0684e8ce9fea"
+    },
+    "runtimeCommitContainsProbe": false,
+    "remoteBeforePush": {
+      "main": "4e6a88ee536a064d3ba3d8929b2f0684e8ce9fea",
+      "tai": "954211b7eb519958680ba25a8d94ca6814ad34ba"
+    },
+    "causeOfMissingProbeLog": "Probe commits existed only locally; setting env could not add the absent class to the deployed application",
+    "agentAction": "Pushed tai normally, without force; no main merge or Render deploy performed",
+    "remoteAfterPush": {
+      "main": "4e6a88ee536a064d3ba3d8929b2f0684e8ce9fea",
+      "tai": "cea7fbe856e9aed139cffbacd3d7da714ab0c1aa"
+    },
+    "openTaiToMainPullRequests": [],
+    "nextAction": "Owner creates and merges tai-to-main PR; verify runtime commit before asking for network probe logs",
+    "compareUrl": "https://github.com/Aditerx/SWP391/compare/main...tai?expand=1",
+    "newEnvRequired": false,
+    "newPaymentRequired": false,
+    "businessTestsRerun": false,
+    "databaseWritesByAgent": 0
+  },
+  "vnpayRuntimeNetworkEvidence": {
+    "checkedAtUtc": "2026-11-04T13:44:04.978828+00:00",
+    "source": "Owner attached runtime log; selected VNPAY_NET lines only, full attachment not copied into repository",
+    "attachmentSha256": "5bd870cd35fe226a8750f1b6ee482471eb770fbe81596e765e782a72688e4bcd",
+    "runtimeReportedCommit": "076f04084e4865f5a7fb7a9f7f78fa79335c0500",
+    "healthHttpStatus": 200,
+    "observations": [
+      {
+        "time": "2026-11-04T20:32:56.638+07:00",
+        "host": "sandbox.vnpayment.vn",
+        "phase": "DNS",
+        "result": "OK",
+        "ips": [
+          "103.220.84.173"
+        ],
+        "elapsedMs": 153
+      },
+      {
+        "time": "2026-11-04T20:33:11.700+07:00",
+        "host": "sandbox.vnpayment.vn",
+        "phase": "TCP_15S",
+        "result": "SocketTimeoutException",
+        "elapsedMs": 15016
+      },
+      {
+        "host": "example.com",
+        "phase": "DNS",
+        "result": "OK",
+        "ips": [
+          "172.66.147.243",
+          "104.20.23.154"
+        ],
+        "elapsedMs": 5
+      },
+      {
+        "host": "example.com",
+        "phase": "TCP_15S",
+        "result": "OK",
+        "elapsedMs": 2
+      },
+      {
+        "host": "example.com",
+        "phase": "HTTPS_3S",
+        "result": "HttpConnectTimeoutException",
+        "elapsedMs": 3675
+      },
+      {
+        "host": "example.com",
+        "phase": "HTTPS_15S",
+        "result": "HTTP_200",
+        "elapsedMs": 1000
+      },
+      {
+        "time": "2026-11-04T20:33:16.385+07:00",
+        "finished": true
+      }
+    ],
+    "confirmed": "DNS resolves VNPay; Render cannot establish a raw TCP connection to its resolved IPv4 port443 within15seconds, while control TCP and verified HTTPS succeed",
+    "notEstablished": "Which network/provider causes the failed path; firewall/IP blocking is not proven",
+    "notApplicableFixes": [
+      "Changing payment signature",
+      "Changing HashSecret",
+      "Changing vnp_IpAddr",
+      "Repeating payment",
+      "Treating a longer overall HTTP response timeout as proof of a fix"
+    ],
+    "freshLocalComparison": {
+      "method": "verified HTTPS HEAD with no merchant or payment payload",
+      "status": 405,
+      "elapsedSeconds": 0.39,
+      "meaning": "Local network reaches same VNPay endpoint now; HEAD405 is not a successful QueryDR result"
+    },
+    "paidAcceptance": "NOT_CONFIRMED; this probe does not inspect or mutate invoices",
+    "nextDecision": "After sandbox payment recording succeeded following IPN setup, no relay selected; QueryDR network path remains a separate unresolved fallback",
+    "relayImplemented": false,
+    "relayDeployed": false,
+    "cloudWritesByAgent": 0,
+    "paymentOrQueryDrPayloadsSentByAgent": 0
+  },
+  "vnpayAlternativesResearch": {
+    "checkedAtUtc": "2026-11-04T13:58:58.326948+00:00",
+    "scope": "Primary provider/network documentation and actual open-source code review; no payment, cloud configuration or BE mutation",
+    "sources": [
+      {
+        "url": "https://sandbox.vnpayment.vn/apis/docs/thanh-toan-pay/pay.html",
+        "finding": "IPN updates merchant payment result; Return is browser redirect"
+      },
+      {
+        "url": "https://sandbox.vnpayment.vn/apis/docs/truy-van-hoan-tien/querydr%26refund.html",
+        "finding": "QueryDR2.1 POST application/json to merchant_webapi/api/transaction"
+      },
+      {
+        "url": "https://vnpay.js.org/ipn/config-ipn",
+        "authority": "Community SDK author documentation, not VNPay account permission evidence",
+        "finding": "Sandbox self-service through account info and Terminal edit; production contact support"
+      },
+      {
+        "url": "https://sandbox.vnpayment.vn/merchantv2/Account/TerminalEdit.htm",
+        "observed": "Public unauthenticated GET200 redirects to Users/Login.htm with TerminalEdit ReturnUrl",
+        "limitation": "Actual account fields, selected Terminal and permission not inspected"
+      },
+      {
+        "url": "https://github.com/lehuygiang28/vnpay/blob/43627794aa4735e82d539831b81d53c8891cce19/src/services/query.service.ts",
+        "finding": "QueryDR still uses fetch POST with signed JSON; SDK swap cannot fix raw TCP route failure"
+      },
+      {
+        "url": "https://github.com/phpviet/omnipay-vnpay/blob/91e2059838d44afa42f0173122fc499a709f7e7b/src/Message/QueryTransactionRequest.php",
+        "finding": "Legacy GET merchant.html differs from current official2.1 POST JSON; not a protocol replacement"
+      },
+      {
+        "url": "https://developers.cloudflare.com/tunnel/get-started/quick-tunnels/",
+        "finding": "Temporary hostname, process dependency, no uptime guarantee; requires separate noninteractive relay auth"
+      },
+      {
+        "url": "https://developers.cloudflare.com/workers/runtime-apis/fetch/",
+        "finding": "Hosted outbound fetch is possible; Worker to VNPay reachability has NOT_RUN status"
+      },
+      {
+        "url": "https://render.com/docs/dedicated-ips",
+        "finding": "Dedicated egress requires Pro or higher plus extra fee; not proven necessary or sufficient here"
+      }
+    ],
+    "recommendation": "Inspect self-service sandbox IPN configuration first; preserve QueryDR implementation as active verification, separately resolve or probe alternate outbound route",
+    "businessRulesUnchanged": [
+      "Return never records Paid",
+      "Verified signed IPN or QueryDR only",
+      "Frozen amount, merchant/reference/status and idempotency checks remain in BE",
+      "Late processing or unavailable entitlement leads to Paid plus reconciliation, no restored rights"
+    ],
+    "implementationSelected": false,
+    "relayImplemented": false,
+    "providerDeliveryAcceptance": "NOT_RUN",
+    "newBackendTests": "NOT_RUN; docs/research only",
+    "cloudWritesByAgent": 0
+  },
+  "vnpaySandboxIpnConfigurationFollowup": {
+    "checkedAtUtc": "2026-11-04T14:36:12.471014+00:00",
+    "environment": "Owner sandbox merchant UI; public Render health read only",
+    "ownerReported": "Opened Terminal configuration and clicked Complete",
+    "screenshotObserved": {
+      "ipnUrl": "https://scms-app-p1gy.onrender.com/api/payments/vnpay/ipn",
+      "method": "GET",
+      "hashType": "HMACSHA512"
+    },
+    "persistenceReopen": "NOT_CONFIRMED",
+    "providerDelivery": "No delivery trace captured; successful Paid result observed by Owner",
+    "invoicePaidAfterConfiguration": "Owner provided invoice40 Paid with gateway reference; see vnpaySandboxPaymentAcceptance",
+    "publicHealth": {
+      "httpStatus": 200,
+      "status": "UP",
+      "buildCommit": "076f04084e4865f5a7fb7a9f7f78fa79335c0500"
+    },
+    "nextStep": "Payment recording case succeeded per Owner API evidence; preserve separate scope for entitlement and QueryDR acceptance",
+    "expected": "Paid with paymentDate and gatewayTransactionRef; reconciliationRequired true if late or entitlement unavailable; check entitlement independently before claiming activation",
+    "unchanged": "QueryDR outbound connection timeout remains unresolved; no relay, source BE or SQL changes",
+    "agentCloudWrites": 0,
+    "agentPaymentOrIpnCalls": 0,
+    "newBackendTests": "NOT_RUN; documentation and public health only"
+  },
+  "vnpaySandboxPaymentAcceptance": {
+    "recordedAtUtc": "2026-11-04T14:57:35.162876+00:00",
+    "scope": "Single Owner-executed VNPay sandbox payment after merchant Terminal IPN configuration, persisted invoice fields exposed in Owner-provided API response and immediate FE display",
+    "environment": {
+      "frontend": "https://scms-demo-04nov.pages.dev",
+      "backend": "https://scms-app-p1gy.onrender.com",
+      "provider": "VNPay sandbox",
+      "healthObservedHttpStatus": 200,
+      "healthObservedStatus": "UP",
+      "healthReportedBuildCommit": "076f04084e4865f5a7fb7a9f7f78fa79335c0500"
+    },
+    "evidenceSource": "Owner pasted invoice response and stated success visible immediately on return without reload; Member name/email/phone omitted",
+    "invoice": {
+      "invoiceId": 40,
+      "invoiceCode": "INV-2026-000027",
+      "amount": "900000.00",
+      "paymentMethod": "VNPay",
+      "paymentStatus": "Paid",
+      "paymentDate": "2026-11-04T21:53:33.079965",
+      "gatewayTransactionRef": "15725858",
+      "createdAt": "2026-11-04T21:52:33.401005",
+      "expiresAt": "2026-11-04T21:57:33.401005",
+      "classId": 21,
+      "reconciliationRequired": false
+    },
+    "processingSecondsAfterCreation": 59.67896,
+    "paymentDateBeforeExpiry": true,
+    "result": "PASS_OWNER_REPORTED_API_STATE; bounded to this sandbox payment recorded Paid with gateway reference and reconciliation false",
+    "uiObservation": "Owner reports success immediately after Return, no manual reload",
+    "channelAssessment": "Consistent with configured IPN; Return source remains non-writing, outbound QueryDR previously failed. No per-transaction writer or provider delivery trace captured, so IPN attribution is an inference",
+    "notEstablished": [
+      "Successful QueryDR live request/response",
+      "Provider IPN delivery HTTP/RspCode trace",
+      "Direct independent DB read",
+      "Entitlement/enrollment/schedule state after payment",
+      "Authenticated retry/race/security matrix on Render",
+      "Recovery or reconciliation of earlier unpaid-recorded invoices",
+      "Current FE integration of verify-vnpay POST"
+    ],
+    "changesThisTurn": "Docs/evidence only; no BE, FE source, SQL, env or cloud mutation",
+    "agentPaymentOrIpnRequests": 0,
+    "agentCloudWrites": 0,
+    "newBackendTests": "NOT_RUN; docs-only change",
+    "nextStep": "Keep current successful payment evidence; no additional payment required to reproduce this case. Independently read entitlement if full workflow acceptance is requested; old invoice reconciliation and QueryDR connectivity remain separate"
+  },
+  "vnpayQueryRetentionDecision": {
+    "recordedAtUtc": "2026-11-04T15:11:35.272175+00:00",
+    "authority": "Owner explicitly instructed keeping the entire implementation and recording the process and reasons; prior suggestion to disable was not accepted",
+    "retain": [
+      "QueryDR source and tests",
+      "POST /api/members/me/invoices/{id}/verify-vnpay",
+      "vnpay_payment_attempts and existing rows",
+      "database/migrations/15_QueryDR.sql",
+      "Existing QueryDR and diagnostic environment variables and values"
+    ],
+    "reasons": [
+      "QueryDR provides active verification fallback when IPN delivery is missing, once outbound connectivity is restored",
+      "Original pay metadata is still written by current payment link code; removing its table alone breaks payment link creation"
+    ],
+    "liveQueryDrAcceptance": "Still not established; previous Render outbound TCP timeout is not resolved by successful IPN payment recording",
+    "handoff": "SCMS-BAN-GIAO-FE-VNPAY-2026-11-04.md",
+    "otpRegistrationHandoff": {
+      "path": "SCMS-BAN-GIAO-FE-OTP-2026-11-04.md",
+      "existingContentInRenamedHandoff": false,
+      "fileCreated": true,
+      "ruleLocation": "SCMS-BAN-GIAO-FE-OTP-2026-11-04.md for this task; AGENTS.md contains general handoff rules",
+      "temporaryInstructionsOnly": true,
+      "replacementInstruction": "Next OTP agent replaces temporary instructions with actual handoff and removes instruction section, retaining the file",
+      "ownerClarificationRecordedAtUtc": "2026-11-04T15:18:00.116173+00:00"
+    },
+    "documentationUpdates": [
+      "Rename and reorganize VNPay handoff",
+      "Update current links",
+      "Record Owner decision in D10 and Active/HISTORY",
+      "Add separate registration OTP handoff writing rules",
+      "Owner clarification: create OTP file now with temporary guidance, remove OTP-specific case from general AGENTS rules"
+    ],
+    "runtimeOrEnvironmentChanges": false,
+    "databaseChanges": false,
+    "backendSourceChanges": false,
+    "newBackendTests": "NOT_RUN; documentation only"
+  },
+  "otpSmtpDiagnostics": {
+    "recordedAt": "2026-11-04T22:39:09+07:00",
+    "scope": "Safe SMTP diagnostics for OTP; transport, API behavior and database unchanged",
+    "baseCommit": "cea7fbe856e9aed139cffbacd3d7da714ab0c1aa",
+    "workingTree": true,
+    "sourceSha256": {
+      "src/main/java/com/sportscenter/auth/EmailService.java": "f840414bf242c6dfd472fa1966d6a42280c12adc362aa876714aafc3146fb92e",
+      "src/test/java/com/sportscenter/auth/EmailServiceConfigurationTest.java": "80d4e3dfec8409dbd1d30944b6de2fe17206f0e92704fdb398632522db864e64",
+      "src/main/resources/application.properties": "cb2aea919ea77727d7db1f9766c1eb034cd0f9195aad4dc7ae8b901a925f130e"
+    },
+    "ownerReportedRenderEvidence": {
+      "observedAt": "2026-11-04T22:27:00.973+07:00",
+      "request": "POST /api/auth/resend-otp",
+      "postStatus": 200,
+      "optionsStatus": 200,
+      "warning": "OTP email delivery failed for purpose REGISTER",
+      "brevoTransactionalLogs": 0,
+      "buildCommitForOwnerLog": "NOT_CONFIRMED",
+      "delivery": "FAIL_OWNER_REPORTED",
+      "rootCause": "NOT_DETERMINED"
+    },
+    "localVerification": {
+      "environment": "Java17; isolated working-tree copy without .env; H2/local HTTP; no cloud SMTP/email/DB mutation",
+      "timezone": "Asia/Ho_Chi_Minh",
+      "targetedCommand": ".\\mvnw.cmd -Dtest=EmailServiceConfigurationTest,RegistrationOtpServiceTest -DargLine=-Duser.timezone=Asia/Ho_Chi_Minh test",
+      "targeted": {
+        "tests": 14,
+        "passed": 14,
+        "skipped": 0,
+        "failures": 0,
+        "errors": 0
+      },
+      "cleanCommand": ".\\mvnw.cmd -DargLine=-Duser.timezone=Asia/Ho_Chi_Minh clean test",
+      "clean": {
+        "tests": 377,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 28,
+        "passed": 349
+      },
+      "categoriesInjected": [
+        "AUTHENTICATION",
+        "DNS",
+        "TIMEOUT",
+        "CONNECTION",
+        "TLS",
+        "SMTP_REJECTED_550",
+        "SMTP_REJECTED_553",
+        "SMTP_REJECTED_451",
+        "UNKNOWN"
+      ],
+      "privacyAssertions": "PASS: no recipient/sender/login/key/OTP/server-reply/body leakage, including per-message failures and JavaMail nextException",
+      "rawRun": "artifacts/runs/mail-diagnostics/20261104-223909"
+    },
+    "deployment": "NOT_RUN_BY_AGENT",
+    "nextStep": "Owner deploys and retries once; inspect SMTP_SEND_ lines with matching attemptId before changing provider/config"
   }
 }

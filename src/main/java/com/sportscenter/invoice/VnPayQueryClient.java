@@ -6,11 +6,18 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Component;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
+import javax.net.ssl.SSLException;
+import java.io.IOException;
+import java.net.ConnectException;
 import java.net.InetAddress;
 import java.net.URI;
+import java.net.UnknownHostException;
 import java.net.http.HttpClient;
+import java.net.http.HttpConnectTimeoutException;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.net.http.HttpTimeoutException;
+import java.nio.channels.UnresolvedAddressException;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.Clock;
@@ -34,13 +41,22 @@ public class VnPayQueryClient {
     private final PaymentProperties properties;
     private final Clock clock;
     private final ObjectMapper mapper = new ObjectMapper().enable(JsonParser.Feature.STRICT_DUPLICATE_DETECTION);
-    private final HttpClient http = HttpClient.newBuilder().connectTimeout(java.time.Duration.ofSeconds(3))
-            .followRedirects(HttpClient.Redirect.NEVER).build();
+    private final HttpClient http;
 
-    public VnPayQueryClient(PaymentProperties properties, Clock clock) { this.properties = properties; this.clock = clock; }
+    public VnPayQueryClient(PaymentProperties properties, Clock clock) {
+        this.properties = properties; this.clock = clock;
+        // Build safely even if a disabled feature has bad configuration; query() rejects it before I/O.
+        int connect = Math.max(1, Math.min(15, properties.getVnpayQueryConnectTimeoutSeconds()));
+        this.http = HttpClient.newBuilder().connectTimeout(java.time.Duration.ofSeconds(connect))
+                .followRedirects(HttpClient.Redirect.NEVER).build();
+    }
 
     public VerifiedVnPayQuery query(VnPayPaymentAttempt.Snapshot attempt) {
         try {
+            int connect = properties.getVnpayQueryConnectTimeoutSeconds();
+            int requestTimeout = properties.getVnpayQueryRequestTimeoutSeconds();
+            if (connect < 1 || connect > 15 || requestTimeout < connect || requestTimeout > 15)
+                throw new VnPayQueryException("INVALID_QUERY_TIMEOUT");
             if (properties.getVnpayHashSecret().isBlank() || !attempt.tmnCode().equals(properties.getVnpayTmnCode()))
                 throw new VnPayQueryException("MERCHANT_NOT_CONFIGURED");
             URI endpoint = URI.create(properties.getVnpayQueryUrl());
@@ -57,21 +73,44 @@ public class VnPayQueryClient {
             request.put("vnp_CreateDate", DateTimeFormatter.ofPattern("yyyyMMddHHmmss")
                     .format(ZonedDateTime.now(clock).withZoneSameInstant(ZoneId.of("Asia/Ho_Chi_Minh"))));
             String ip = properties.getVnpayQueryIpAddress();
-            if (ip == null || ip.isBlank()) ip = InetAddress.getLocalHost().getHostAddress();
+            if (ip == null || ip.isBlank()) {
+                try { ip = InetAddress.getLocalHost().getHostAddress(); }
+                catch (UnknownHostException ex) { throw new VnPayQueryException("SERVER_IP_LOOKUP_FAILED"); }
+            }
             if (ip.length() > 45 || !ip.matches("[0-9a-fA-F:.]+")) throw new VnPayQueryException("INVALID_SERVER_IP");
             request.put("vnp_IpAddr", ip);
             request.put("vnp_OrderInfo", "Query " + attempt.txnRef());
             request.put("vnp_SecureHash", sign(request, REQUEST_FIELDS));
-            HttpRequest httpRequest = HttpRequest.newBuilder(endpoint).timeout(java.time.Duration.ofSeconds(5))
+            HttpRequest httpRequest = HttpRequest.newBuilder(endpoint).timeout(java.time.Duration.ofSeconds(requestTimeout))
                     .header("Content-Type", "application/json").header("Accept", "application/json")
                     .POST(HttpRequest.BodyPublishers.ofString(mapper.writeValueAsString(request))).build();
             HttpResponse<String> response = http.send(httpRequest, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
-            if (response.statusCode() != 200 || response.body().length() > 65536)
-                throw new VnPayQueryException("PROVIDER_HTTP_ERROR");
+            if (response.statusCode() != 200)
+                throw new VnPayQueryException("PROVIDER_HTTP_" + response.statusCode());
+            if (response.body().length() > 65536) throw new VnPayQueryException("RESPONSE_TOO_LARGE");
             return verify(response.body(), attempt);
         } catch (VnPayQueryException ex) { throw ex;
         } catch (InterruptedException ex) { Thread.currentThread().interrupt(); throw new VnPayQueryException("QUERY_INTERRUPTED");
-        } catch (Exception ex) { throw new VnPayQueryException("QUERY_UNAVAILABLE"); }
+        } catch (Exception ex) { throw new VnPayQueryException(failureReason(ex)); }
+    }
+
+    /** Fixed diagnostic codes only: exception messages can contain URLs or credentials. */
+    private static String failureReason(Exception error) {
+        boolean connectionFailure = false;
+        Throwable cause = error;
+        for (int depth = 0; cause != null && depth < 10; depth++, cause = cause.getCause()) {
+            if (cause instanceof HttpConnectTimeoutException) return "CONNECT_TIMEOUT";
+            if (cause instanceof HttpTimeoutException) return "REQUEST_TIMEOUT";
+            if (cause instanceof SSLException || cause instanceof java.security.cert.CertificateException
+                    || cause instanceof java.security.cert.CertPathValidatorException) return "TLS_FAILURE";
+            if (cause instanceof UnknownHostException || cause instanceof UnresolvedAddressException) return "DNS_FAILURE";
+            connectionFailure |= cause instanceof ConnectException;
+        }
+        if (connectionFailure) return "CONNECTION_FAILED";
+        if (error instanceof IOException) return "IO_FAILURE";
+        if (error instanceof IllegalArgumentException) return "INVALID_QUERY_CONFIGURATION";
+        if (error instanceof java.security.GeneralSecurityException) return "SIGNING_FAILURE";
+        return "QUERY_UNAVAILABLE";
     }
 
     VerifiedVnPayQuery verify(String body, VnPayPaymentAttempt.Snapshot attempt) {

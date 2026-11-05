@@ -60,7 +60,7 @@ Base Render: `https://scms-app-p1gy.onrender.com`; local thông thường `http:
   * Body: `{ "email": "a@example.com", "otp": "123456", "newPassword": "NewPassword123" }`
 * **Đăng xuất:** `POST /api/auth/logout`
 
-OTP đăng ký10phút, tối đa5lần sai, dùng một lần. REGISTRATION_PENDING/EMAIL_ALREADY_REGISTERED/OTP_INVALID/OTP_EXPIRED/OTP_ATTEMPTS_EXCEEDED/OTP_RESEND_TOO_SOON/OTP_RESEND_LIMIT cần UI riêng. OTP cloud đang bị mail/Render Free chặn theo ghi nhận; không coi thông báo gửi là delivery đã nghiệm thu. Tài khoản demo lịch sử không phải credential production.
+OTP đăng ký10phút, tối đa5lần sai, dùng một lần. REGISTRATION_PENDING/EMAIL_ALREADY_REGISTERED/OTP_INVALID/OTP_EXPIRED/OTP_ATTEMPTS_EXCEEDED/OTP_RESEND_TOO_SOON/OTP_RESEND_LIMIT cần UI riêng. `OtpMessageResponse.code` là mã trạng thái tùy chọn, có thể null; không chứa mã OTP. HTTP200/thông báo gửi chung không chứng minh thư đã được nhận vì mail gửi bất đồng bộ sau commit. Trạng thái email cloud xem [docs00](00-MASTER-CHECKLIST.md#active). Tài khoản demo lịch sử không phải credential production.
 
 `auth/me` hiện không có `centerId`; thiết kế center1 giữ nguyên. Actor/center dùng để phân quyền được BE đọc từ phiên, không nhận mã C01 hoặc center do FE gửi làm căn cứ cấp quyền.
 
@@ -159,7 +159,7 @@ Manager chỉ có MANAGE_INVOICES chưa đủ ROLE_RECEPTIONIST để confirm Ca
 
 Khi quay lại trang hóa đơn, lấy `invoiceId` từ URL, đọc ownInvoice để kiểm đúng hóa đơn VNPay rồi tự POST xác minh một lần và GET lại danh sách. Có thể tái sử dụng nút **Tải lại** cho POST của hóa đơn đang theo dõi rồi GET; không cần nút “xác nhận đã trả”. Không tự POST tất cả hóa đơn, không poll vô hạn, không dùng `status=00` trên URL để tô Paid. GET `/me/invoices` vẫn chỉ đọc. Nếu IPN đã ghi Paid thì POST trả `ALREADY_PAID` và không query/cấp quyền lại. Xác minh tới/quá hạn vẫn có thể ghi Paid+đối soát nhưng không cấp lại suất/quyền.
 
-Client nên dành ít nhất20giây cho POST: một lượt có thể thử3attempt với timeout5giây/attempt. Nếu client timeout/mất kết nối, đọc lại hóa đơn và chờ cooldown trước kiểm tra tiếp; không suy là thanh toán thất bại.
+Client nên dành60giây riêng cho POST này và chỉ giữ một lời gọi đang chạy trên UI. BE mặc định5giây/attempt, có thể cấu hình tối đa15giây/attempt; mỗi lượt thử tối đa3attempt. Nếu client timeout/mất kết nối, đọc lại hóa đơn và chờ cooldown trước kiểm tra tiếp; không suy là thanh toán thất bại.
 
 Lỗi:401 chưa đăng nhập;403 sai role/không Active/thiếu hồ sơ Member;404 không có hoặc không sở hữu/khác center;400 hóa đơn không phải VNPay hoặc body có field;415 sai Content-Type;409 một mã giao dịch đã gắn hóa đơn khác. Schema mới phải migration trước khi deploy. Contract này là BE local; trạng thái deploy/kiểm live theo docs00.
 

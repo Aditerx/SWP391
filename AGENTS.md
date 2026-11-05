@@ -57,3 +57,11 @@ Mỗi nguồn có vai trò riêng: quyết định Owner mô tả điều phải
 - Tìm bằng rg, đọc heading/đoạn/symbol cần thiết. Log dài chỉ trích lỗi liên quan; không in toàn JSON/stack dump/bundle vào context.
 - Báo cáo theo điều kiện nghiệm thu, không lấy số request/assertion làm thước đo chính. Một kết quả chuẩn, nơi khác liên kết tới nó.
 - Hoàn thành nhóm việc: cập nhật Active, đưa tóm tắt vào HISTORY và ghi bước kế tiếp. Lịch sử đầy đủ truy qua Git khi cần, không tạo nhiều bản before/after trong gói FE.
+
+### Quy tắc ghi chú bàn giao
+
+- Mỗi bản chỉ bàn giao một luồng, ghi rõ đối tượng và ngày; bản FE dùng tên `SCMS-BAN-GIAO-FE-<LUONG>-YYYY-MM-DD.md`. Không gộp luồng không liên quan hoặc ghi thay đổi mới vào bản của ngày cũ.
+- Mỗi bản dùng 5 mục: **Kết quả hiện tại → Quá trình và quyết định giữ/bỏ → API và DB liên quan → FE cần làm → Việc còn lại**. Quá trình chỉ 3–5 mốc, mỗi mốc một câu; quyết định phải ghi rõ giữ/bỏ phần nào và lý do.
+- Viết hành động cụ thể: endpoint/method, input, state/error, bước FE xử lý. Tách rõ đã quan sát thành công với chưa kiểm; không chép log dài, secret, lịch sử thử sai hoặc toàn bộ contract. Cấu hình/deploy dẫn docs02; bằng chứng dẫn docs00/QA.
+- Khi cần chuẩn bị chỗ cho lượt bàn giao sau, đặt hướng dẫn tạm ngay trong file đích và đánh dấu rõ. Agent viết nội dung thực tế phải xóa phần hướng dẫn tạm, giữ lại file bàn giao; không đưa chỉ dẫn riêng của từng lượt vào AGENTS.md.
+- Khi tách/đổi tên, chuyển nội dung đúng luồng và cập nhật mọi liên kết đang dùng; không tạo hai bản cùng nội dung. Chỉ ghi kết quả đã kiểm của luồng đang làm, không suy nghiệm thu từ luồng khác.
