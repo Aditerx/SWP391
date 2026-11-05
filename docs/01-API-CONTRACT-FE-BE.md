@@ -26,6 +26,39 @@ Base Render: `https://scms-app-p1gy.onrender.com`; local thông thường `http:
 | POST `/api/auth/resend-otp` | email; giới hạn60giây/lần và3OTP/giờ |
 | POST `/api/auth/forgot-password` | email; phản hồi chung không tiết lộ account tồn tại |
 | POST `/api/auth/reset-password` | email,otp,newPassword →204 |
+### 1.1. Cấu Hình Môi Trường & Kết Nối
+* **Base URL:**
+  * Local Development: `http://localhost:8080`
+  * Production (Render): `https://<ten-app>.onrender.com`
+* **Múi giờ nghiệp vụ:** `Asia/Ho_Chi_Minh` (UTC+7) qua Spring bean `Clock`. Mọi định dạng ngày giờ gửi lên / nhận về đều theo chuẩn ISO 8601:
+  * Ngày: `YYYY-MM-DD` (VD: `2026-10-20`)
+  * Giờ: `HH:mm:ss` hoặc `HH:mm` (VD: `06:00:00` hoặc `07:30`)
+* **Headers bắt buộc:**
+  * `Content-Type: application/json`
+  * `Cookie: JSESSIONID=...` (Hệ thống dùng Session Cookie bảo mật; Axios/Fetch trên Frontend bắt buộc bật `withCredentials: true`).
+  * FE và BE khác domain trên Render cần cookie `SameSite=None; Secure`; bật credentials cho cả login Google và các request tiếp theo.
+
+### 1.2. Nhóm API Xác Thực (Authentication Flow)
+* **Đăng nhập:** `POST /api/auth/login`
+  * Body: `{ "email": "member@example.com", "password": "password123" }`
+  * Response (200 OK): Trả về thông tin User, Role và gán Cookie `JSESSIONID`.
+* **Đăng nhập Google GIS:** `POST /api/auth/google`
+  * Body: `{ "credential": "<Google ID token>" }`. Backend xác minh chữ ký, hạn dùng và audience theo `GOOGLE_CLIENT_ID`; không gửi access token.
+  * Response `200`: cùng schema `LoginResponse` của đăng nhập thường (`userId`, `email`, `fullName`, `role`, `authorities`, `isFirstLogin`, `memberId`, `avatarUrl`) và session cookie `JSESSIONID`.
+  * Token sai, email chưa xác minh, tài khoản không Active hoặc Google `sub` không khớp trả `401` với thông báo chung. Khi `GOOGLE_AUTO_REGISTER=false`, email chưa có tài khoản trả `400` (`Tài khoản chưa đăng ký`). Mặc định tự tạo Member Active.
+  * Avatar trả về được tối ưu động: URL Cloudinary thêm `f_auto,q_auto`; URL Google giữ nguyên. Giá trị trong DB không bị thay đổi bởi tối ưu URL.
+* **Đăng ký hội viên:** `POST /api/auth/register`
+  * Body: `{ "fullName": "Nguyễn Văn A", "email": "a@example.com", "password": "password123", "phone": "0912345678", "gender": "Male", "dateOfBirth": "2000-01-01" }`
+  * Response (200 OK): Gửi mã OTP xác thực qua email.
+* **Xác thực OTP đăng ký:** `POST /api/auth/verify-registration`
+  * Body: `{ "email": "a@example.com", "otp": "123456" }`
+* **Gửi lại mã OTP:** `POST /api/auth/resend-otp`
+  * Body: `{ "email": "a@example.com" }`
+* **Quên mật khẩu:** `POST /api/auth/forgot-password`
+  * Body: `{ "email": "a@example.com" }`
+* **Đặt lại mật khẩu:** `POST /api/auth/reset-password`
+  * Body: `{ "email": "a@example.com", "otp": "123456", "newPassword": "NewPassword123" }`
+* **Đăng xuất:** `POST /api/auth/logout`
 
 OTP đăng ký10phút, tối đa5lần sai, dùng một lần. REGISTRATION_PENDING/EMAIL_ALREADY_REGISTERED/OTP_INVALID/OTP_EXPIRED/OTP_ATTEMPTS_EXCEEDED/OTP_RESEND_TOO_SOON/OTP_RESEND_LIMIT cần UI riêng. OTP cloud đang bị mail/Render Free chặn theo ghi nhận; không coi thông báo gửi là delivery đã nghiệm thu. Tài khoản demo lịch sử không phải credential production.
 
@@ -340,3 +373,40 @@ Nghiệm thu theo từng điều kiện Dxx: actor+fixture →request →respons
 Đối chiếu lịch sử nằm trong `authenticatedAcceptance.cases` của [QA duy nhất](../artifacts/qa/latest.json), response tham chiếu `local.exchanges`. Room/báo vắng02/11 dùng `roomAbsenceReview.postgresHttp.cases` và `exchanges` cùng section; không dùng matrix lịch sử để đóng yêu cầu mới. `authenticatedAcceptance.remaining` và Active giữ phần chưa nghiệm thu. [Bảng đối chiếu1:1](00-MASTER-CHECKLIST.md#report-trace) ghi rõ kết luận từng phát hiện gốc và phần capture SQL còn thiếu; test có assertion PASS không đồng nghĩa mọi giá trị đã được trích đầy đủ vào QA.
 
 Bộ contract/schema có thể còn thiếu hoặc sai ở phần chưa chạy. [docs00](00-MASTER-CHECKLIST.md#active) giữ các cổng chưa nghiệm thu; không dùng số route/assertion hoặc bản ghi local để ký full production/FE acceptance.
+FE có thể poll `GET /api/notifications/me/unread-count` mỗi 30–60 giây để cập nhật badge. Module không dùng WebSocket. Các bản ghi legacy giữ nguyên nội dung và cột `type`; các loại nghiệp vụ mới lưu trong `notification_type` và được API trả dưới tên trường `type`.
+
+## 16. Chat hỗ trợ Member – Receptionist
+
+Toàn bộ API dùng session đăng nhập hiện tại. Member chỉ đọc/ghi conversation của chính mình; truy cập conversation khác trả `404 CHAT_CONVERSATION_NOT_FOUND`. Receptionist và CenterManager cần quyền `HANDLE_CHAT`; Coach bị từ chối. Tin nhắn là text thuần, tối đa 2000 ký tự sau trim; FE phải render bằng text để tránh XSS.
+
+| Method | Endpoint | Mô tả |
+|---|---|---|
+| `POST` | `/api/chat/conversations` | Member lấy conversation `OPEN` hoặc tạo mới; body tùy chọn `{"subject":"Payment question"}`. |
+| `GET` | `/api/chat/conversations/me/active` | Conversation đang mở của member; 404 `CHAT_ACTIVE_CONVERSATION_NOT_FOUND` nếu chưa có. |
+| `GET` | `/api/chat/me/unread-count` | Tổng số tin chưa đọc trong các conversation của member: `{"unreadCount":2}`. |
+| `GET` | `/api/chat/conversations/{id}/messages?afterId=0&limit=30` | Poll theo ID tăng dần; mặc định 30, giới hạn tối đa 50. |
+| `POST` | `/api/chat/conversations/{id}/messages` | Gửi `{ "content":"Hello", "clientMessageId":"uuid" }`; ID client tùy chọn để retry an toàn. |
+| `POST` | `/api/chat/conversations/{id}/read` | Đánh dấu đã đọc tới message mới nhất cho user hiện tại. |
+| `GET` | `/api/chat/conversations?status=OPEN&assigned=true&unreadOnly=false&page=0&size=30` | Hộp thư staff, mới hoạt động gần nhất trước; `assigned=true` lọc hội thoại của người đang xem, `false` lọc hội thoại chưa được nhận; mỗi hàng kèm last message và unread của staff đang xem. |
+| `POST` | `/api/chat/conversations/{id}/claim` / `/release` | Nhận hội thoại hoặc tự nhả hội thoại đã nhận. |
+| `PATCH` | `/api/chat/conversations/{id}/close` / `/reopen` | Đóng/mở lại hội thoại. Reopen trả 409 nếu member đã có hội thoại khác đang mở. |
+
+Message response gồm `id`, `conversationId`, `senderType`, `senderName`, `isMine`, `content`, `contentType`, `metadata`, `clientMessageId`, `createdAt`. Thời gian trả ISO-8601 cùng offset `+07:00`. Ví dụ: `{ "id":4021,"conversationId":88,"senderType":"STAFF","senderName":"Tran Thi Huong","isMine":false,"content":"Hello","createdAt":"2026-10-24T09:15:00+07:00" }`.
+
+Các mã lỗi chính: `CHAT_CONVERSATION_NOT_FOUND` (404), `CHAT_ACTIVE_CONVERSATION_NOT_FOUND` (404), `CHAT_CONVERSATION_CLOSED` (409), `CHAT_RATE_LIMITED` (429, tối đa 20 tin/phút/người; response có `retryAfterSeconds` và header `Retry-After`), `CHAT_MESSAGE_EMPTY`, `CHAT_MESSAGE_TOO_LONG`, `CHAT_ALREADY_CLAIMED`, `CHAT_NOT_ASSIGNED_TO_ACTOR`, `CHAT_OPEN_CONVERSATION_EXISTS`. FE nên poll message mỗi 3–5 giây khi cửa sổ chat mở, unread count mỗi 30–60 giây, và gửi `clientMessageId` cho mỗi tin.
+
+### Mở rộng chat AI
+
+`ChatService` chỉ xử lý nghiệp vụ; thêm bean `ChatResponder` với `supports(ChatConversation)` và `respond(conversation, N tin gần nhất, memberUserId)`. `ChatResponderDispatcher` chạy nền và gọi responder đầu tiên hỗ trợ conversation khi `handler_type=AI`; lỗi hoặc timeout không rollback hay chặn response của tin member. Reply được lưu `sender_type=AI`, `sender_user_id=NULL`, cùng metadata tùy chọn (quy ước đề nghị: `model`, `latencyMs`, `sources`). Không có responder AI hoặc lời gọi dịch vụ ngoài được bật mặc định. `escalateToStaff(conversationId, reason)` chuyển handler về `STAFF`, lưu SYSTEM message và phát notification tới assigned staff hoặc các receptionist Active trong cùng center.
+
+Chat notification types persisted in `notification_type`: `CHAT_MEMBER_MESSAGE` (member message or escalation to staff) and `CHAT_STAFF_REPLY` (staff/AI reply to member). Notifications are emitted only on that viewer's unread transition from zero to one; storage failures do not roll back the chat message.
+
+## 17. Kết quả và đánh giá quá trình tập luyện
+
+| Method | Endpoint | Quyền và phạm vi |
+|---|---|---|
+| `GET` | `/api/training-results?sessionId={id}&memberId={id}&coachId={id}` | MANAGE_CLASSES, MANAGE_USERS, COACH hoặc MEMBER. Member chỉ đọc kết quả của chính mình; BE lấy User từ session Authentication, tự áp `memberId` hiện tại nếu bỏ trống và trả 403 nếu `memberId` khác. Coach giữ scope hiện có; quyền quản lý giữ hành vi hiện có. |
+| `GET` | `/api/training-plans?coachId={id}&classId={id}&memberId={id}` và `/api/training-plans/{id}` | Member được đọc kế hoạch của chính mình; service kiểm tra ownership. |
+| `GET` | `/api/evaluations?memberId={id}&coachId={id}` và `/api/evaluations/{id}` | Member được đọc đánh giá của chính mình; service kiểm tra ownership. |
+
+Member được xem toàn bộ `content` của training result và `comment` cùng `progressScore` của evaluation do Coach ghi nhận. Không dùng memberId, role hoặc actor từ client để xác định danh tính. Các GET danh sách trả `200` với danh sách rỗng khi không có kết quả phù hợp; truy cập dữ liệu của Member khác trả `403`.

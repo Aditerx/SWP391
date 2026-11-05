@@ -5,6 +5,7 @@ import com.sportscenter.user.User;
 import com.sportscenter.user.UserRepository;
 import com.sportscenter.user.MemberRepository;
 import com.sportscenter.user.UserService;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -12,9 +13,11 @@ import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.core.session.SessionRegistry;
 import org.springframework.security.web.context.SecurityContextRepository;
+import org.springframework.security.test.context.TestSecurityContextHolder;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 
@@ -25,6 +28,12 @@ import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class PendingLoginTest {
+    @AfterEach
+    void clearSecurityContexts() {
+        SecurityContextHolder.clearContext();
+        TestSecurityContextHolder.clearContext();
+    }
+
     @Test
     void pendingAccountWithCorrectPasswordGetsRegistrationCode() {
         var auth = mock(AuthenticationManager.class);
@@ -66,6 +75,6 @@ class PendingLoginTest {
     private AuthController controller(AuthenticationManager auth, UserRepository users, PasswordEncoder encoder, LoginAttemptService attempts) {
         return new AuthController(auth, mock(SecurityContextRepository.class), users, mock(MemberRepository.class), attempts,
                 mock(UserService.class), mock(UserDetailsService.class), mock(SessionRegistry.class), mock(PasswordResetService.class),
-                mock(RegistrationService.class), encoder);
+                mock(RegistrationService.class), encoder, mock(GoogleAuthService.class));
     }
 }

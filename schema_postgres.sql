@@ -1425,6 +1425,7 @@ BEGIN
  IF (current_setting('scms.rebuild',true)='true' OR NOT EXISTS(SELECT 1 FROM scms_data_migration_audit WHERE migration_key='20261029_catalog_accounts_v1')) AND EXISTS(SELECT 1 FROM _scms_accounts a LEFT JOIN users u ON lower(u.email)=a.email LEFT JOIN roles role_row ON role_row.role_id=u.role_id WHERE u.user_id IS NULL OR u.status<>'Active' OR role_row.role_name<>a.role_name OR (a.role_name='Admin' AND u.center_id IS NOT NULL) OR (a.role_name<>'Admin' AND u.center_id IS DISTINCT FROM 1)) THEN RAISE EXCEPTION 'PDF account/role/center postflight failed'; END IF;
 END $foreign_keys$;
 
+
 INSERT INTO scms_data_migration_audit(migration_key,captured_at,before_data,after_data)
 SELECT '20261029_catalog_accounts_v1',CURRENT_TIMESTAMP::timestamp,'Preserved existing identity keys and all protected transaction columns',
  json_build_object('subjects',(SELECT json_agg(subject_id ORDER BY subject_id) FROM subjects),'accounts',33,'variant','ROOT')::text
@@ -1577,6 +1578,30 @@ BEGIN
   'sessions',(SELECT jsonb_agg(to_jsonb(s) ORDER BY s.session_id) FROM sessions s JOIN _room_moves m USING(session_id)))::text);
 END $catalog$;
 
+INSERT INTO classes (class_name, subject_id, coach_id, max_capacity, tuition_fee, status, center_id, class_type, total_sessions)
+SELECT 
+    s.subject_name || ' (1:1 Nâng Cao)',
+    s.subject_id,
+    NULL,
+    1,
+    s.advanced_price,
+    'Open',
+    1,
+    'Advanced',
+    12
+FROM subjects s
+WHERE s.slug IN (
+    'quan-vot-tennis', 'boi-loi', 'pickleball', 'ban-cung', 
+    'bong-ro', 'bong-da', 'bong-chuyen', 'cau-long', 'bong-ban'
+)
+AND NOT EXISTS (
+    SELECT 1 FROM classes c 
+    WHERE c.subject_id = s.subject_id AND c.class_type = 'Advanced'
+);
+
+ALTER TABLE users ADD COLUMN IF NOT EXISTS google_sub VARCHAR(255) NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_users_google_sub ON users (google_sub) WHERE google_sub IS NOT NULL;
+
 COMMIT;
 -- Last statement deliberately returns the review result AFTER a successful commit.
 -- Demo seed password is SWP391; no passwords/hashes are returned by this review query.
@@ -1587,3 +1612,4 @@ SELECT 'COMMITTED' AS result,u.user_id,r.role_name,u.full_name,u.email,u.status,
 FROM users u JOIN roles r ON r.role_id=u.role_id
 WHERE lower(u.email) IN('admin@gmail.com','an@gmail.com','linh@gmail.com','huy@gmail.com','mai@gmail.com','khang@gmail.com','vy@gmail.com','bao@gmail.com','nhi@gmail.com','kiet@gmail.com','ha@gmail.com','coach.tennis1@gmail.com','coach.tennis2@gmail.com','coach.swimming1@gmail.com','coach.swimming2@gmail.com','coach.pickleball1@gmail.com','coach.pickleball2@gmail.com','coach.archery1@gmail.com','coach.archery2@gmail.com','coach.basketball1@gmail.com','coach.basketball2@gmail.com','coach.football1@gmail.com','coach.football2@gmail.com','coach.volleyball1@gmail.com','coach.volleyball2@gmail.com','coach.badminton1@gmail.com','coach.badminton2@gmail.com','coach.tabletennis1@gmail.com','coach.tabletennis2@gmail.com','receptionist1@gmail.com','receptionist2@gmail.com','manager1@gmail.com','manager2@gmail.com')
 ORDER BY u.user_id;
+

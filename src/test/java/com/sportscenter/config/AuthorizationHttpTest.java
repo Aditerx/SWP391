@@ -2,6 +2,8 @@ package com.sportscenter.config;
 
 import com.sportscenter.session.*;
 import com.sportscenter.training.AttendanceService;
+import com.sportscenter.training.TrainingResultController;
+import com.sportscenter.training.TrainingResultService;
 import com.sportscenter.user.UserRepository;
 import com.sportscenter.invoice.*;
 import org.junit.jupiter.api.Test;
@@ -15,7 +17,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@WebMvcTest(value={SessionController.class, InvoiceController.class}, properties={"scms.frontend-origins=https://frontend.test", "debug=false", "logging.level.org.springframework=WARN"}) @Import(SecurityConfig.class)
+@WebMvcTest(value={SessionController.class, InvoiceController.class, TrainingResultController.class}, properties={"scms.frontend-origins=https://frontend.test", "debug=false", "logging.level.org.springframework=WARN"}) @Import(SecurityConfig.class)
 class AuthorizationHttpTest {
     @org.springframework.boot.test.mock.mockito.MockBean com.sportscenter.session.SessionAbsenceService phaseAbsence;
     @Autowired MockMvc mvc;
@@ -25,10 +27,18 @@ class AuthorizationHttpTest {
     @MockBean InvoiceService invoices;
     @MockBean VnPayVerificationService verification;
     @MockBean PaymentProperties properties;
+    @MockBean TrainingResultService trainingResults;
     static final String BOOK = "{\"subscriptionId\":1,\"coachId\":2,\"roomId\":1,\"sessionDate\":\"2026-12-01\",\"startTime\":\"06:00\",\"endTime\":\"07:30\",\"classId\":1}";
     @Test void anonymousScheduleRequestIs401() throws Exception { mvc.perform(get("/api/sessions")).andExpect(status().isUnauthorized()); }
+
     @Test void coachCanCreateForAssignedMember() throws Exception { mvc.perform(post("/api/sessions/book-private").with(user("coach").roles("COACH")).contentType("application/json").content(BOOK)).andExpect(status().isCreated()); }
     @Test void receptionistCannotCreateAdvancedSchedule() throws Exception { mvc.perform(post("/api/sessions/book-private").with(user("staff").authorities(new SimpleGrantedAuthority("REGISTER_MEMBER"))).contentType("application/json").content(BOOK)).andExpect(status().isForbidden()); }
+
+    @Test void memberCanReadTrainingResults() throws Exception { mvc.perform(get("/api/training-results").with(user("member").roles("MEMBER"))).andExpect(status().isOk()); }
+    @Test void anonymousTrainingResultRequestIs401() throws Exception { mvc.perform(get("/api/training-results")).andExpect(status().isUnauthorized()); }
+    @Test void coachCanStillReadTrainingResults() throws Exception { mvc.perform(get("/api/training-results").with(user("coach").roles("COACH"))).andExpect(status().isOk()); }
+    @Test void managerPermissionCanStillReadTrainingResults() throws Exception { mvc.perform(get("/api/training-results").with(user("manager").authorities(new SimpleGrantedAuthority("MANAGE_CLASSES")))).andExpect(status().isOk()); }
+    
     @Test void centerManagerWithPermissionCanBook() throws Exception { mvc.perform(post("/api/sessions/book-private").with(user("manager").authorities(new SimpleGrantedAuthority("ROLE_CENTERMANAGER"),new SimpleGrantedAuthority("MANAGE_CLASSES"))).contentType("application/json").content(BOOK)).andExpect(status().isCreated()); }
     @Test void managerCannotConfirmCashWithoutReceptionistRole() throws Exception { mvc.perform(post("/api/invoices/1/confirm-cash").with(user("manager").authorities(new SimpleGrantedAuthority("ROLE_CENTERMANAGER"),new SimpleGrantedAuthority("MANAGE_INVOICES")))).andExpect(status().isForbidden()); }
     @Test void receptionistWithInvoicePermissionCanConfirmCash() throws Exception { mvc.perform(post("/api/invoices/1/confirm-cash").with(user("staff").authorities(new SimpleGrantedAuthority("ROLE_RECEPTIONIST"),new SimpleGrantedAuthority("MANAGE_INVOICES")))).andExpect(status().isOk()); }

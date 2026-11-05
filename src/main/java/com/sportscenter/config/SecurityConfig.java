@@ -120,7 +120,7 @@ public class SecurityConfig {
                         .requestMatchers("/actuator/health", "/actuator/info").permitAll()
                         .requestMatchers("/api/health").permitAll()
                         .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/payments/vnpay/ipn", "/api/payments/vnpay/return").permitAll()
-                        .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/auth/login", "/api/auth/logout",
+                        .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/auth/login", "/api/auth/google", "/api/auth/logout",
                                 "/api/auth/forgot-password", "/api/auth/reset-password", "/api/auth/register",
                                 "/api/auth/verify-registration", "/api/auth/resend-otp").permitAll()
                         .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/public/**").permitAll()

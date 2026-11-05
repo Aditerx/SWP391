@@ -23,6 +23,8 @@ public interface UserRepository extends JpaRepository<User, Integer> {
 
     Optional<User> findByEmailIgnoreCase(String email);
 
+    Optional<User> findByGoogleSub(String googleSub);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select u from User u where lower(u.email) = lower(:email)")
     Optional<User> findByEmailIgnoreCaseForUpdate(@Param("email") String email);

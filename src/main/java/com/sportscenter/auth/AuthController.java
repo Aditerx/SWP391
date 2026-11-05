@@ -46,6 +46,7 @@ public class AuthController {
     private final PasswordResetService passwordResetService;
     private final RegistrationService registrationService;
     private final PasswordEncoder passwordEncoder;
+    private final GoogleAuthService googleAuthService;
 
     @PostMapping("/login")
     public ResponseEntity<LoginResponse> login(@Valid @RequestBody LoginRequest request,
@@ -83,6 +84,24 @@ public class AuthController {
         User user = userRepository.findForAuthentication(email)
                 .orElseThrow();
         return ResponseEntity.ok(toResponse(user, authentication));
+    }
+
+    @PostMapping("/google")
+    public ResponseEntity<LoginResponse> google(@Valid @RequestBody GoogleLoginRequest request,
+                                                HttpServletRequest httpRequest,
+                                                HttpServletResponse httpResponse) {
+        User user = googleAuthService.authenticate(request.credential());
+        UserDetails principal = userDetailsService.loadUserByUsername(user.getEmail());
+        Authentication authentication = new UsernamePasswordAuthenticationToken(
+                principal, null, principal.getAuthorities());
+        SecurityContext context = SecurityContextHolder.createEmptyContext();
+        context.setAuthentication(authentication);
+        SecurityContextHolder.setContext(context);
+        securityContextRepository.saveContext(context, httpRequest, httpResponse);
+        HttpSession session = httpRequest.getSession(false);
+        if (session != null) sessionRegistry.registerNewSession(session.getId(), authentication.getPrincipal());
+        User responseUser = userRepository.findForAuthentication(user.getEmail()).orElseThrow();
+        return ResponseEntity.ok(toResponse(responseUser, authentication));
     }
 
     @GetMapping("/me")
@@ -169,6 +188,7 @@ public class AuthController {
                         .map(authority -> authority.getAuthority())
                         .toList()),
                 user.isFirstLogin(),
-                memberRepository.existsById(user.getId()) ? user.getId() : null);
+                memberRepository.existsById(user.getId()) ? user.getId() : null,
+                com.sportscenter.media.AvatarUrlOptimizer.optimize(user.getAvatarUrl()));
     }
 }
