@@ -39,6 +39,12 @@ class ChatControllerTest {
         mvc.perform(post("/api/chat/conversations").session(session("m@example.com","MEMBER","CHAT_AS_MEMBER")))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.id").value(1));
     }
+    @Test void memberCanRequestStaffHandoffForTheirConversation() throws Exception {
+        when(service.requestStaff(eq(1),any())).thenReturn(new ChatConversationResponse(1,4,"Member",ChatConversationStatus.OPEN,null,null,ChatHandlerType.STAFF,"Help",null,null,null,null,null,0));
+        mvc.perform(post("/api/chat/conversations/1/escalate").session(session("m@example.com","MEMBER","CHAT_AS_MEMBER")))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.handlerType").value("STAFF"));
+        verify(service).requestStaff(eq(1),any());
+    }
     @Test void receptionistAndManagerCanAccessInbox() throws Exception {
         when(service.inbox(any(),any(),anyBoolean(),any(),any())).thenReturn(org.springframework.data.domain.Page.empty());
         for(String role:List.of("RECEPTIONIST","CENTERMANAGER"))

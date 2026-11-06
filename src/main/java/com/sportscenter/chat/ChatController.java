@@ -20,6 +20,11 @@ public class ChatController {
     public ResponseEntity<ChatConversationResponse> getOrCreate(@RequestBody(required=false) ChatConversationRequest request, Authentication auth) {
         return ResponseEntity.status(HttpStatus.OK).body(service.getOrCreate(auth,request));
     }
+    @PostMapping("/conversations/{id}/escalate")
+    @PreAuthorize("hasRole('MEMBER') and hasAuthority('CHAT_AS_MEMBER')")
+    public ChatConversationResponse requestStaff(@PathVariable Integer id, Authentication auth) {
+        return service.requestStaff(id, auth);
+    }
     @GetMapping("/conversations/me/active") @PreAuthorize("hasRole('MEMBER') and hasAuthority('CHAT_AS_MEMBER')")
     public ChatConversationResponse active(Authentication auth) { return service.active(auth); }
     @GetMapping("/me/unread-count") @PreAuthorize("hasRole('MEMBER') and hasAuthority('CHAT_AS_MEMBER')")

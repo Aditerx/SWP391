@@ -14,10 +14,19 @@
 
 **QueryDR còn mở, quyết định đã chốt:** Probe trên cùng build, log Owner20:33 xác nhận DNS VNPay→103.220.84.173 nhưng TCP443 timeout15giây; đối chứng example.com TCP/HTTPS thành công. Chưa chứng minh bên nào chặn. Owner chốt giữ nguyên code/endpoint, bảng pay attempt, migration15 và các env đã thêm để bảo toàn metadata và kênh xác minh dự phòng; không áp dụng đề xuất tắt/gỡ. Chưa có lượt QueryDR live thành công mới, chưa thêm relay hoặc đổi env. Bàn giao riêng tại [VNPay04/11](../SCMS-BAN-GIAO-FE-VNPAY-2026-11-04.md). Bản [OTP04/11](../SCMS-BAN-GIAO-FE-OTP-2026-11-04.md) ghi kết quả gửi thất bại theo Owner và bước lấy log mới, chưa nghiệm thu delivery; AGENTS chỉ giữ quy tắc bàn giao chung.
 
+**Chuẩn bị Chat AI local07/11:** Trên nhánh `feature/ai-chatbot-env`, baseline trước sửa397 tests/369 pass/28 skip/0 lỗi; sau sửa402 tests/374 pass/28 skip/0 lỗi, `clean test` BUILD SUCCESS. Source tree chưa commit, dựa trên HEAD `b033ab7719bb124ac4fce9c1e0f6712e05c4e5c9`. PostgreSQL17.11 local service đang chạy nhưng chưa tạo DB; local connection yêu cầu mật khẩu chưa được cung cấp. FE hiện hành chưa xác định; không lấy `FE_Project-main` làm nguồn. Chưa chạy backend/FE local hoặc Anthropic thật. Bàn giao một luồng tại [AI Chat07/11](../SCMS-BAN-GIAO-FE-AI-CHAT-2026-11-07.md).
+
 | Việc còn mở | Trạng thái | Điều kiện tiếp tục |
 ---
 
 ## 📜 PHẦN II: LỊCH SỬ HOÀN THÀNH (HISTORY)
+
+### [07/11/2026] Chuẩn bị khung môi trường Chat AI local
+
+- Tạo nhánh `feature/ai-chatbot-env` từ HEAD `b033ab7719bb124ac4fce9c1e0f6712e05c4e5c9`. Thêm `AiCompletionClient`, fixed mock, Anthropic Messages adapter dùng Spring `RestClient`, config timeout/model/token/system prompt, giới hạn và bỏ tin có dấu hiệu nhạy cảm; lỗi/không có responder chuyển STAFF. Không gọi provider thật.
+- Giữ feature flag mặc định false và handler mới STAFF cho tới khi Owner chốt; thêm Member handoff `POST /api/chat/conversations/{id}/escalate`. Tái dùng metadata/chat schema, không migration/không dùng `ai_consultations`; cập nhật API/config/handoff ngày07/11.
+- Baseline `clean test`: 397 tests,369 pass,28 skip,0 fail/error. Sau thay đổi `clean test`: 402 tests,374 pass,28 skip,0 fail/error; BUILD SUCCESS. Test unit/API không là nghiệm thu PostgreSQL, browser hoặc provider.
+- Theo D11/D19: PostgreSQL17.11 local service và port5432 hoạt động, nhưng local role cần password; không kết nối DB, không đọc `.env`, không tạo DB/schema. Chưa xác định source FE hiện hành; backend health, auth `/api/auth/me`, polling, FE browser và Anthropic đều NOT_RUN. Chi tiết/việc tiếp tục tại [handoff AI Chat](../SCMS-BAN-GIAO-FE-AI-CHAT-2026-11-07.md).
 
 ### [04/11/2026] Sửa quyền Member đọc kết quả và đánh giá tập luyện
 

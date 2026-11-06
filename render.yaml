@@ -34,6 +34,16 @@ services:
         sync: false
       - key: FRONTEND_URL
         sync: false
+      - key: SCMS_AI_CHAT_ENABLED
+        value: "false"
+      - key: SCMS_AI_CHAT_PROVIDER
+        value: mock
+      - key: SCMS_AI_CHAT_NEW_CONVERSATION_HANDLER
+        value: STAFF
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: SCMS_AI_CHAT_MODEL
+        sync: false
       - key: SESSION_COOKIE_SAME_SITE
         value: none
       - key: SESSION_COOKIE_SECURE

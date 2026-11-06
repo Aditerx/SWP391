@@ -19,6 +19,7 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
+import org.springframework.test.util.ReflectionTestUtils;
 
 class ChatServiceTest {
     ChatConversationRepository conversations=mock(ChatConversationRepository.class);
@@ -55,6 +56,24 @@ class ChatServiceTest {
         ChatConversationResponse result=service.getOrCreate(auth,new ChatConversationRequest("  Billing  "));
         assertEquals("Billing",result.subject()); assertEquals("STAFF",result.handlerType().name());
         assertEquals("2026-10-24T12:00+07:00",result.createdAt().toString());
+    }
+
+    @Test void enabledAiHandlerIsUsedOnlyWhenExplicitlyConfigured() {
+        ReflectionTestUtils.setField(service, "aiChatEnabled", true);
+        ReflectionTestUtils.setField(service, "newConversationHandler", ChatHandlerType.AI);
+        when(conversations.findFirstByMember_IdAndStatusOrderByIdDesc(7,ChatConversationStatus.OPEN)).thenReturn(Optional.empty());
+        when(conversations.saveAndFlush(any())).thenAnswer(inv->{ChatConversation c=inv.getArgument(0); c.setId(16); return c;});
+        when(messages.findByConversation_IdOrderByIdDesc(eq(16),any())).thenReturn(List.of());
+        ChatConversationResponse result=service.getOrCreate(auth,new ChatConversationRequest(null));
+        assertEquals("AI",result.handlerType().name());
+    }
+
+    @Test void memberCannotEscalateAnotherMembersConversation() {
+        User other=new User(); other.setId(8);
+        ChatConversation c=conversation(17,other);
+        when(conversations.findByIdForUpdate(17)).thenReturn(Optional.of(c));
+        assertEquals("CHAT_CONVERSATION_NOT_FOUND",assertThrows(ChatException.class,()->service.requestStaff(17,auth)).getCode());
+        verify(messages,never()).saveAndFlush(any());
     }
 
     @Test void memberCannotReadAnotherMembersConversation() {

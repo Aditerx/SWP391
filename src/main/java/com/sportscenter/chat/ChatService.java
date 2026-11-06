@@ -14,6 +14,7 @@ import org.springframework.data.domain.*;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.transaction.annotation.Transactional;
 import java.time.Clock;
 import java.time.LocalDateTime;
@@ -29,6 +30,10 @@ public class ChatService {
     private final AuditService audit;
     private final ApplicationEventPublisher events;
     private final Clock clock;
+    @Value("${scms.ai.chat.new-conversation-handler:STAFF}")
+    private ChatHandlerType newConversationHandler = ChatHandlerType.STAFF;
+    @Value("${scms.ai.chat.enabled:false}")
+    private boolean aiChatEnabled;
 
     @Transactional
     public ChatConversationResponse getOrCreate(Authentication auth, ChatConversationRequest request) {
@@ -37,7 +42,8 @@ public class ChatService {
         ChatConversation conversation = conversations.findFirstByMember_IdAndStatusOrderByIdDesc(member.getId(), ChatConversationStatus.OPEN)
                 .orElseGet(() -> {
                     LocalDateTime now = now(); ChatConversation c = new ChatConversation(); c.setMember(member);
-                    c.setStatus(ChatConversationStatus.OPEN); c.setHandlerType(ChatHandlerType.STAFF);
+                    c.setStatus(ChatConversationStatus.OPEN);
+                    c.setHandlerType(aiChatEnabled ? newConversationHandler : ChatHandlerType.STAFF);
                     c.setSubject(cleanSubject(request == null ? null : request.subject())); c.setCreatedAt(now); c.setUpdatedAt(now);
                     return conversations.saveAndFlush(c);
                 });
@@ -158,12 +164,25 @@ public class ChatService {
     @Transactional
     public void escalateToStaff(Integer id, String reason) {
         ChatConversation c=conversations.findByIdForUpdate(id).orElseThrow(ChatService::notFound);
+         if (c.getHandlerType() == ChatHandlerType.STAFF) return;
         List<Integer> targets=staffRecipients(c).stream().filter(target->unread(c,target,true)==0).toList();
         audit.log(null,"CHAT_ESCALATE","CHAT_CONVERSATION",id,"conversationId="+id,now());
         c.setHandlerType(ChatHandlerType.STAFF); String safeReason=reason==null?"":reason.trim();
         ChatMessage m=new ChatMessage(); m.setConversation(c); m.setSenderType(ChatSenderType.SYSTEM); m.setContent(safeReason.isEmpty()?"This conversation has been transferred to our staff.":"Transferred to staff: "+safeReason);
         m.setContentType("TEXT"); m.setCreatedAt(now()); messages.saveAndFlush(m); c.setLastMessageAt(m.getCreatedAt()); c.setUpdatedAt(m.getCreatedAt());
         events.publishEvent(new ChatMessageCreatedEvent(c.getId(),m.getId(),ChatSenderType.SYSTEM,!targets.isEmpty(),c.getMember().getId(),targets));
+    }
+
+    @Transactional
+    public ChatConversationResponse requestStaff(Integer id, Authentication auth) {
+        User member = requireMember(auth);
+        ChatConversation conversation = conversations.findByIdForUpdate(id).orElseThrow(ChatService::notFound);
+        if (!Objects.equals(conversation.getMember().getId(), member.getId())) throw notFound();
+        if (conversation.getStatus() == ChatConversationStatus.CLOSED) {
+            throw new ChatException(409, "CHAT_CONVERSATION_CLOSED", "Conversation is closed");
+        }
+        escalateToStaff(id, "The member requested help from a staff member.");
+        return response(conversation, member.getId());
     }
 
     @Transactional

@@ -386,6 +386,7 @@ Toàn bộ API dùng session đăng nhập hiện tại. Member chỉ đọc/ghi
 | `GET` | `/api/chat/me/unread-count` | Tổng số tin chưa đọc trong các conversation của member: `{"unreadCount":2}`. |
 | `GET` | `/api/chat/conversations/{id}/messages?afterId=0&limit=30` | Poll theo ID tăng dần; mặc định 30, giới hạn tối đa 50. |
 | `POST` | `/api/chat/conversations/{id}/messages` | Gửi `{ "content":"Hello", "clientMessageId":"uuid" }`; ID client tùy chọn để retry an toàn. |
+| `POST` | `/api/chat/conversations/{id}/escalate` | Member có `CHAT_AS_MEMBER` chuyển cuộc hội thoại của chính mình sang STAFF; không nhận memberId từ body, trả conversation hiện tại. Retry không tạo thêm SYSTEM message nếu đã chuyển. |
 | `POST` | `/api/chat/conversations/{id}/read` | Đánh dấu đã đọc tới message mới nhất cho user hiện tại. |
 | `GET` | `/api/chat/conversations?status=OPEN&assigned=true&unreadOnly=false&page=0&size=30` | Hộp thư staff, mới hoạt động gần nhất trước; `assigned=true` lọc hội thoại của người đang xem, `false` lọc hội thoại chưa được nhận; mỗi hàng kèm last message và unread của staff đang xem. |
 | `POST` | `/api/chat/conversations/{id}/claim` / `/release` | Nhận hội thoại hoặc tự nhả hội thoại đã nhận. |
@@ -397,7 +398,7 @@ Các mã lỗi chính: `CHAT_CONVERSATION_NOT_FOUND` (404), `CHAT_ACTIVE_CONVERS
 
 ### Mở rộng chat AI
 
-`ChatService` chỉ xử lý nghiệp vụ; thêm bean `ChatResponder` với `supports(ChatConversation)` và `respond(conversation, N tin gần nhất, memberUserId)`. `ChatResponderDispatcher` chạy nền và gọi responder đầu tiên hỗ trợ conversation khi `handler_type=AI`; lỗi hoặc timeout không rollback hay chặn response của tin member. Reply được lưu `sender_type=AI`, `sender_user_id=NULL`, cùng metadata tùy chọn (quy ước đề nghị: `model`, `latencyMs`, `sources`). Không có responder AI hoặc lời gọi dịch vụ ngoài được bật mặc định. `escalateToStaff(conversationId, reason)` chuyển handler về `STAFF`, lưu SYSTEM message và phát notification tới assigned staff hoặc các receptionist Active trong cùng center.
+`ChatService` chỉ xử lý nghiệp vụ; `ChatResponder` dùng một interface `AiCompletionClient` và implementation mock hoặc Anthropic. `ChatResponderDispatcher` chạy nền và gọi responder đầu tiên hỗ trợ conversation khi `handler_type=AI`; lỗi hoặc timeout không rollback hay chặn response của tin member và tự chuyển STAFF bằng SYSTEM message. Reply được lưu `sender_type=AI`, `sender_user_id=NULL`, metadata `model`, `latencyMs` và token counts nếu provider trả về. Không có responder AI hoặc lời gọi dịch vụ ngoài được bật mặc định; config `SCMS_AI_CHAT_ENABLED` mặc định false và hội thoại mới mặc định STAFF. `POST /conversations/{id}/escalate` cho Member chuyển hội thoại của mình sang STAFF; BE suy ra Member từ Authentication, không dùng danh tính từ body. Nhân viên nhận thông báo theo quy tắc unread hiện hành.
 
 Chat notification types persisted in `notification_type`: `CHAT_MEMBER_MESSAGE` (member message or escalation to staff) and `CHAT_STAFF_REPLY` (staff/AI reply to member). Notifications are emitted only on that viewer's unread transition from zero to one; storage failures do not roll back the chat message.
 

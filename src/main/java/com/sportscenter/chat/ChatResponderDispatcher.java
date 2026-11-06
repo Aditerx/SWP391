@@ -19,18 +19,28 @@ public class ChatResponderDispatcher {
     @Async("chatExecutor")
     public void onMemberMessage(ChatMessageCreatedEvent event) {
         if(event.senderType()!=ChatSenderType.MEMBER) return;
+        ChatConversation conversation = null;
         try {
-            ChatConversation conversation=chatService.loadForResponder(event.conversationId());
+            conversation=chatService.loadForResponder(event.conversationId());
             if(conversation.getHandlerType()!=ChatHandlerType.AI) return;
             List<ChatMessage> recent=chatService.recentForResponder(event.conversationId(),20);
             for(ChatResponder responder:responders) {
                 if(!responder.supports(conversation)) continue;
                 Optional<ChatResponderReply> reply=responder.respond(conversation,recent,event.memberUserId());
-                reply.ifPresent(value->chatService.saveResponderReply(event.conversationId(),value));
+                if (reply.isPresent()) chatService.saveResponderReply(event.conversationId(),reply.get());
+                else chatService.escalateToStaff(event.conversationId(), "The AI assistant could not prepare a reply. A staff member will help you.");
                 return;
             }
+            chatService.escalateToStaff(event.conversationId(), "The AI assistant is unavailable. A staff member will help you.");
         } catch(RuntimeException ex) {
-            log.warn("Chat responder failed conversationId={}: {}",event.conversationId(),ex.getMessage());
+            log.warn("Chat responder failed conversationId={} errorType={}",event.conversationId(),ex.getClass().getSimpleName());
+            if (conversation != null && conversation.getHandlerType() == ChatHandlerType.AI) {
+                try {
+                    chatService.escalateToStaff(event.conversationId(), "The AI assistant is temporarily unavailable. A staff member will help you.");
+                } catch (RuntimeException escalationFailure) {
+                    log.warn("Chat escalation failed conversationId={} errorType={}",event.conversationId(),escalationFailure.getClass().getSimpleName());
+                }
+            }
         }
     }
 }

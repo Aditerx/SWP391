@@ -33,6 +33,7 @@ class ChatResponderDispatcherTest {
         dispatcher=new ChatResponderDispatcher(List.of(responder),service);
         dispatcher.onMemberMessage(new ChatMessageCreatedEvent(4,5,ChatSenderType.MEMBER,false,7,List.of()));
         verify(service,never()).saveResponderReply(anyInt(),any());
+        verify(service).escalateToStaff(4, "The AI assistant is temporarily unavailable. A staff member will help you.");
     }
 
     @Test void staffHandledConversationDoesNotInvokeResponder() {
