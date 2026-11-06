@@ -16,7 +16,7 @@ public class TrainingResultController {
     private final TrainingResultService trainingResultService;
 
     @GetMapping
-    @PreAuthorize("hasAnyAuthority('MANAGE_CLASSES', 'MANAGE_USERS') or hasRole('COACH')")
+    @PreAuthorize("hasAnyAuthority('MANAGE_CLASSES', 'MANAGE_USERS') or hasAnyRole('COACH', 'MEMBER')")
     public ResponseEntity<List<TrainingResultResponse>> searchResults(
             @RequestParam(required = false) Integer sessionId,
             @RequestParam(required = false) Integer memberId,

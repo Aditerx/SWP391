@@ -62,7 +62,10 @@ Chỉ9môn, giá VND cho trọn12buổi Normal hoặc12credit Advanced:
 <a id="d03"></a>
 ## D03 — Mua Advanced
 
+- **Thuật ngữ/phạm vi06/11:** hệ thống hiện tại bán khóa Normal và quyền học Advanced theo môn/Primary Coach, không dùng gói hội viên chung tháng/VIP làm sản phẩm hoặc điều kiện đăng ký. `member_packages` hiện lưu đăng ký/quyền học Advanced, không phải lý do giữ mô hình hội viên chung. Owner yêu cầu loại bỏ dữ liệu thực sự thuộc mô hình cũ sau kiểm kê/phân loại, không giữ để tương thích dự phòng. Phạm vi bản ghi/DB và phụ thuộc cần xác định trước migration; không suy tên bảng hoặc package_id khác NULL là dữ liệu bỏ được. Không tự xóa quyền học/chứng từ của mô hình hiện tại.
 - Chọn môn và Primary Coach trước thu tiền; từng đăng ký có môn/Coach/credit/hạn riêng.12 credit chỉ đúng môn và Coach chính/Coach thay hợp lệ.
+- Owner06/11 duyệt B: tuyến enroll lớp/enrollments chỉ nhận Normal; Advanced bị USE_ADVANCED_REGISTRATION và phải dùng flow chọn môn/Coach nhận. Không tự cấp ghi danh từ waitlist Advanced legacy.
+- Owner06/11 duyệt bỏ mô hình chung: đóng bán/gia hạn/đổi trạng thái gói chung và tạo danh mục mới; tạo Member không mua kèm gói bằng packageId. Migration16 chỉ xóa subgraph gói chung cũ xác định chắc chắn; bảo toàn quyền/chứng từ Normal/Advanced hiện hành, gặp liên kết hoặc hình dạng chưa rõ thì rollback. A đã duyệt nhưng phải chờ Owner chạy migration Supabase thành công mới triển khai.
 - Kiểm lịch làm việc, tải cam kết đa môn, phòng và năng lực dự kiến; Coach nhận trước Invoice. Kiểm lại dưới transaction/lock khi order.
 - Không yêu cầu Member khai lịch rảnh trong MVP, kể cả optional. Không có bộ ghép lịch Member–Coach; năng lực dự kiến không bảo đảm Member rảnh mọi ca hoặc giữ sẵn12ca.
 - Chờ duyệt chưa chạy5phút/45 ngày. Chọn Coach không giữ tài nguyên. Invoice lấy Subject.advancedPrice và đóng băng; Paid hợp lệ mới Active/12 credit.
@@ -154,6 +157,9 @@ Manager xem preview ảnh hưởng, xử lý từng lịch riêng qua workflow p
 <a id="d15"></a>
 ## D15 — Attendance và bù Normal
 
+- Owner06/11 chốt đăng ký và xét danh sách chờ Normal không yêu cầu có gói hội viên chung/Advanced Active trước đó. Quyền học theo hóa đơn của chính lớp; giữ kiểm tài khoản/owner/center/lịch/sĩ số và Paid mới Registered. Không cấp gói giả hoặc dùng credit Advanced làm điều kiện Normal; không xóa liên kết/lịch sử eligibility cũ.
+- Owner06/11 duyệt0.1-C: học phí Normal phải dương; thiếu/≤0 thì chặn đăng ký và không thăng Waitlisted thành Registered. Học phí hợp lệ vẫn tạo Pending trước Paid. Không tự sửa giá/chứng từ/ghi danh lịch sử để hợp thức hóa dữ liệu legacy.
+- Owner05/11 chốt Member Active được đọc lịch sử kết quả tập của chính mình qua GET `/api/training-results`. BE xác định Member từ phiên, ép phạm vi kể cả khi bỏ filter hoặc có thêm authority quản trị; truyền Member khác bị403. Quyền đọc này không cấp quyền ghi/sửa kết quả của Coach.
 - Record mới chỉ Present/Absent, ghi **[start,end)**, không Late/scan sớm; ngoại lệ Member báo vắng tự ghi Absent trước buổi theo D05. Giữ lịch sử Late/Excused và attendance superseded; superseded không tính là kết quả hiện hành. Điểm danh không trừ lần hai credit đã book.
 - Coach được giao ghi trong buổi; CenterManager sửa sau buổi có reason/audit, đồng bộ result và giữ credit. Finalizer sau end chốt thiếu theo policy, bỏ buổi centerInvalidated.
 - Normal gồm12buổi hợp lệ, tối đa15Member, Paid mới Registered. Member nghỉ cá nhân mất buổi, không bù.
@@ -164,6 +170,8 @@ Manager xem preview ảnh hưởng, xử lý từng lịch riêng qua workflow p
 ## D16 — CashCorrection hẹp
 
 CenterManager được đảo xác nhận Cash nhầm **chưa nhận tiền thực** cho Advanced chưa dùng, đủ12credit, không có booking kể cả đã hủy hoặc phụ thuộc/gia hạn/expiry/sự cố/hóa đơn khác. Không áp dụng Normal. Kiểm lại điều kiện khi Complete dưới lock; giữ chứng từ Paid/amount gốc, điều chỉnh riêng, không xóa hoặc tạo refund giả. Có reason/evidence/audit, chống lặp; không coi Approve là Complete.
+
+Owner06/11 duyệt A: một đăng ký Normal có hóa đơn riêng, không liên kết quyền Advanced đang sửa, không phải phụ thuộc chỉ vì được tạo sau ngày kích hoạt Advanced. Bỏ suy luận legacy theo thời gian sau bước loại mô hình cũ; vẫn chặn liên kết eligibility thật và hóa đơn khác thuộc cùng quyền, giữ các guard D16 trên.
 
 <a id="d17"></a>
 ## D17 — QR

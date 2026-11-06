@@ -79,7 +79,6 @@ class EnrollmentServiceTest {
     private User sampleMember;
     private User sampleAdmin;
     private SportsClass sampleClass;
-    private MemberPackage sampleActivePackage;
 
     @BeforeEach
     void setUp() {
@@ -106,23 +105,29 @@ class EnrollmentServiceTest {
         sampleClass = new SportsClass();
         sampleClass.setId(1);
         sampleClass.setName("Cầu lông Buổi Sáng");
-        sampleClass.setMaxCapacity(20);
+        sampleClass.setMaxCapacity(15);
         sampleClass.setStatus("Open");
-        sampleClass.setClassType("Advanced");
+        sampleClass.setClassType("Normal");
+        sampleClass.setTuitionFee(new BigDecimal("900000"));
 
-        sampleActivePackage = new MemberPackage();
-        sampleActivePackage.setSubscriptionId(1);
-        sampleActivePackage.setMember(sampleMember);
-        sampleActivePackage.setStatus("Active");
-        sampleActivePackage.setStartDate(LocalDate.now(clock).minusDays(10));
-        sampleActivePackage.setEndDate(LocalDate.now(clock).plusDays(20));
+        var room = new com.sportscenter.room.Room(); room.setStatus("Available");
+        var readySessions = new java.util.ArrayList<Session>();
+        for (int i = 1; i <= 12; i++) {
+            Session session = new Session(); session.setSessionDate(LocalDate.now(clock).plusDays(i));
+            session.setStartTime(java.time.LocalTime.of(7,45)); session.setEndTime(java.time.LocalTime.of(9,15));
+            session.setRoom(room); session.setStatus("Scheduled"); readySessions.add(session);
+        }
+        lenient().when(sessionRepository.findFiltered(eq(1), isNull(), isNull(), isNull(), isNull(), isNull())).thenReturn(readySessions);
+        var order = new com.sportscenter.invoice.InvoiceOrderResponse(99,"LOCAL-NORMAL",new BigDecimal("900000"),"Cash","Pending",LocalDateTime.now(clock).plusMinutes(5),null);
+        lenient().when(invoiceService.createClassOrder(any(), any(), anyString(), anyString())).thenReturn(order);
+
     }
 
     @Test
-    @DisplayName("Enroll member successfully when active package and capacity available")
+    @DisplayName("Normal enrollment creates a Pending tuition order without a membership requirement")
     void enroll_Success() {
         when(userRepository.findById(8)).thenReturn(Optional.of(sampleMember));
-        when(memberPackageRepository.findByMemberId(8)).thenReturn(List.of(sampleActivePackage));
+
         when(classRepository.findByIdForUpdate(1)).thenReturn(Optional.of(sampleClass));
         when(enrollmentRepository.countBySportsClassIdAndStatusIn(1, List.of("Registered", "Pending"))).thenReturn(10L);
         when(enrollmentRepository.findByMemberIdAndSportsClassId(8, 1)).thenReturn(Optional.empty());
@@ -131,7 +136,7 @@ class EnrollmentServiceTest {
         saved.setId(50);
         saved.setMember(sampleMember);
         saved.setSportsClass(sampleClass);
-        saved.setStatus("Registered");
+        saved.setStatus("Pending");
         saved.setEnrolledAt(LocalDateTime.now(clock));
 
         when(enrollmentRepository.save(any(ClassEnrollment.class))).thenReturn(saved);
@@ -142,21 +147,22 @@ class EnrollmentServiceTest {
         assertEquals(50, response.id());
         assertEquals("Hoàng Thị Oanh", response.memberName());
         assertEquals("Cầu lông Buổi Sáng", response.className());
-        assertEquals("Registered", response.status());
+        assertEquals("Pending", response.status());
         verify(enrollmentRepository).save(any(ClassEnrollment.class));
         verify(classRepository).findByIdForUpdate(1);
     }
 
     @Test
-    @DisplayName("Enroll throws exception when Member has no active membership package")
-    void enroll_NoActivePackage_ThrowsException() {
+    @DisplayName("Advanced enrollment must use the approved subject and Coach workflow")
+    void enroll_Advanced_RequiresAdvancedRegistration() {
+        sampleClass.setClassType("Advanced");
         when(userRepository.findById(8)).thenReturn(Optional.of(sampleMember));
         when(classRepository.findByIdForUpdate(1)).thenReturn(Optional.of(sampleClass));
-        when(memberPackageRepository.findByMemberId(8)).thenReturn(Collections.emptyList());
+
 
         BusinessException ex = assertThrows(BusinessException.class, () ->
                 enrollmentService.enroll(1, 8, "admin@scms.com"));
-        assertTrue(ex.getMessage().startsWith("PACKAGE_EXPIRED"));
+        assertTrue(ex.getMessage().startsWith("USE_ADVANCED_REGISTRATION"));
         verify(enrollmentRepository, never()).save(any(ClassEnrollment.class));
     }
 
@@ -164,7 +170,7 @@ class EnrollmentServiceTest {
     @DisplayName("Re-enrolling after cancellation resets cancellation data and enrollment time")
     void enroll_ReactivatesCancelledRecordAndResetsCancellationFields() {
         when(userRepository.findById(8)).thenReturn(Optional.of(sampleMember));
-        when(memberPackageRepository.findByMemberId(8)).thenReturn(List.of(sampleActivePackage));
+
         when(classRepository.findByIdForUpdate(1)).thenReturn(Optional.of(sampleClass));
         when(enrollmentRepository.countBySportsClassIdAndStatus(1, "Waitlisted")).thenReturn(0L);
         when(enrollmentRepository.countBySportsClassIdAndStatusIn(1, List.of("Registered", "Pending"))).thenReturn(0L);
@@ -179,7 +185,7 @@ class EnrollmentServiceTest {
 
         enrollmentService.enroll(1, 8, "admin@scms.com");
 
-        assertEquals("Registered", existing.getStatus());
+        assertEquals("Pending", existing.getStatus());
         assertNull(existing.getCancelledAt());
         assertNull(existing.getCancelledBy());
         assertNull(existing.getCancelReason());
@@ -191,7 +197,7 @@ class EnrollmentServiceTest {
     void enroll_ClassFull_AddsToWaitlist() {
         sampleClass.setMaxCapacity(15);
         when(userRepository.findById(8)).thenReturn(Optional.of(sampleMember));
-        when(memberPackageRepository.findByMemberId(8)).thenReturn(List.of(sampleActivePackage));
+
         when(classRepository.findByIdForUpdate(1)).thenReturn(Optional.of(sampleClass));
         when(enrollmentRepository.countBySportsClassIdAndStatusIn(1, List.of("Registered", "Pending"))).thenReturn(15L);
         when(enrollmentRepository.countBySportsClassIdAndStatus(1, "Waitlisted")).thenReturn(0L);
@@ -212,7 +218,7 @@ class EnrollmentServiceTest {
     @DisplayName("Enroll throws exception when Member is already registered")
     void enroll_AlreadyRegistered_ThrowsException() {
         when(userRepository.findById(8)).thenReturn(Optional.of(sampleMember));
-        when(memberPackageRepository.findByMemberId(8)).thenReturn(List.of(sampleActivePackage));
+
         when(classRepository.findByIdForUpdate(1)).thenReturn(Optional.of(sampleClass));
         ClassEnrollment existing = new ClassEnrollment();
         existing.setId(50);
@@ -248,7 +254,7 @@ class EnrollmentServiceTest {
     @DisplayName("Enrollment rejects overlapping future sessions in another registered class")
     void enroll_ScheduleConflict_ThrowsException() {
         when(userRepository.findById(8)).thenReturn(Optional.of(sampleMember));
-        when(memberPackageRepository.findByMemberId(8)).thenReturn(List.of(sampleActivePackage));
+
         when(classRepository.findByIdForUpdate(1)).thenReturn(Optional.of(sampleClass));
         when(enrollmentRepository.findByMemberIdAndSportsClassId(8, 1)).thenReturn(Optional.empty());
         Session clash = new Session();
@@ -272,7 +278,7 @@ class EnrollmentServiceTest {
     void enroll_FullClass_WaitlistsMember() {
         sampleClass.setMaxCapacity(1);
         when(userRepository.findById(8)).thenReturn(Optional.of(sampleMember));
-        when(memberPackageRepository.findByMemberId(8)).thenReturn(List.of(sampleActivePackage));
+
         when(classRepository.findByIdForUpdate(1)).thenReturn(Optional.of(sampleClass));
         when(enrollmentRepository.findByMemberIdAndSportsClassId(8, 1)).thenReturn(Optional.empty());
         when(enrollmentRepository.countBySportsClassIdAndStatus(1, "Waitlisted")).thenReturn(0L);
@@ -297,8 +303,8 @@ class EnrollmentServiceTest {
         User secondMember = activeMember(9); secondMember.setCenterId(1);
         when(userRepository.findById(8)).thenReturn(Optional.of(sampleMember));
         when(userRepository.findById(9)).thenReturn(Optional.of(secondMember));
-        when(memberPackageRepository.findByMemberId(8)).thenReturn(List.of(sampleActivePackage));
-        when(memberPackageRepository.findByMemberId(9)).thenReturn(List.of(sampleActivePackage));
+
+
         when(classRepository.findByIdForUpdate(1)).thenReturn(Optional.of(sampleClass));
         when(enrollmentRepository.countBySportsClassIdAndStatusIn(1, List.of("Registered", "Pending")))
                 .thenReturn(0L, 1L);
@@ -314,7 +320,7 @@ class EnrollmentServiceTest {
         EnrollmentResponse first = enrollmentService.enroll(1, 8, "admin@scms.com");
         EnrollmentResponse second = enrollmentService.enroll(1, 9, "admin@scms.com");
 
-        assertEquals("Registered", first.status());
+        assertEquals("Pending", first.status());
         assertEquals("Waitlisted", second.status());
         verify(classRepository, times(2)).findByIdForUpdate(1);
         // Mockito serializes the calls; this verifies the lock path, not a real database race.
@@ -325,7 +331,7 @@ class EnrollmentServiceTest {
     void enroll_WaitlistFull_ThrowsException() {
         sampleClass.setMaxCapacity(1);
         when(userRepository.findById(8)).thenReturn(Optional.of(sampleMember));
-        when(memberPackageRepository.findByMemberId(8)).thenReturn(List.of(sampleActivePackage));
+
         when(classRepository.findByIdForUpdate(1)).thenReturn(Optional.of(sampleClass));
         when(enrollmentRepository.findByMemberIdAndSportsClassId(8, 1)).thenReturn(Optional.empty());
         when(enrollmentRepository.countBySportsClassIdAndStatus(1, "Waitlisted")).thenReturn(10L);
@@ -340,6 +346,7 @@ class EnrollmentServiceTest {
     @Test
     @DisplayName("Staff cancellation with a reason succeeds and skips the two hour rule")
     void cancelEnrollment_Success() {
+        sampleClass.setClassType("Advanced"); // Existing historical enrollment, not a new Advanced purchase.
         ClassEnrollment existing = new ClassEnrollment();
         existing.setId(50);
         existing.setMember(sampleMember);
@@ -387,7 +394,7 @@ class EnrollmentServiceTest {
         when(enrollmentRepository.countBySportsClassIdAndStatusIn(1, List.of("Registered", "Pending"))).thenReturn(0L);
         when(enrollmentRepository.findBySportsClassIdAndStatusOrderByEnrolledAtAscIdAsc(1, "Waitlisted"))
                 .thenReturn(List.of(waiting));
-        when(memberPackageRepository.findByMemberId(8)).thenReturn(List.of(sampleActivePackage));
+
         when(sessionRepository.findFutureEnrollmentScheduleConflicts(eq(8), eq(1), any(), any())).thenReturn(List.of());
         when(enrollmentRepository.save(waiting)).thenReturn(waiting);
         doThrow(new IllegalStateException("notification storage unavailable"))
@@ -395,43 +402,37 @@ class EnrollmentServiceTest {
 
         assertDoesNotThrow(() -> enrollmentService.promoteWaitlist(1, sampleAdmin.getId()));
 
-        assertEquals("Registered", waiting.getStatus());
+        assertEquals("Pending", waiting.getStatus());
         assertEquals(LocalDateTime.now(clock), waiting.getPromotedAt());
         verify(notificationService).send(8, "Waitlist update",
-                "A place opened in " + sampleClass.getName() + ". Your status is Registered.", "Schedule");
+                "A place opened in " + sampleClass.getName() + ". Your status is Pending.", "Schedule");
         verify(auditService).log(sampleAdmin.getId(), "PROMOTE_WAITLIST", "CLASS_ENROLLMENT", 70,
                 "Promoted member 8 from waitlist for class 1");
     }
 
     @Test
-    @DisplayName("Promotion skips an expired package without removing the member from the waitlist")
-    void promoteWaitlist_SkipsExpiredPackageAndPromotesNextEligibleMember() {
+    @DisplayName("Promotion skips an Inactive member and promotes the next Active member without a membership gate")
+    void promoteWaitlist_SkipsInactiveMemberAndPromotesNextEligibleMember() {
         sampleClass.setMaxCapacity(2);
-        User expiredUser = activeMember(18);
+        User expiredUser = activeMember(18); expiredUser.setStatus("Inactive");
         User firstEligibleUser = activeMember(19);
         User beyondCapacityUser = activeMember(20);
         ClassEnrollment expired = waiting(81, expiredUser);
         ClassEnrollment firstEligible = waiting(82, firstEligibleUser);
         ClassEnrollment beyondCapacity = waiting(83, beyondCapacityUser);
-        MemberPackage expiredPackage = new MemberPackage();
-        expiredPackage.setStatus("Active");
-        expiredPackage.setEndDate(LocalDate.of(2026, 10, 15));
-        MemberPackage validPackage = new MemberPackage();
-        validPackage.setStatus("Active");
-        validPackage.setEndDate(LocalDate.of(2026, 11, 30));
         when(classRepository.findByIdForUpdate(1)).thenReturn(Optional.of(sampleClass));
         when(enrollmentRepository.countBySportsClassIdAndStatusIn(1, List.of("Registered", "Pending"))).thenReturn(1L);
         when(enrollmentRepository.findBySportsClassIdAndStatusOrderByEnrolledAtAscIdAsc(1, "Waitlisted"))
                 .thenReturn(List.of(expired, firstEligible, beyondCapacity));
-        when(memberPackageRepository.findByMemberId(18)).thenReturn(List.of(expiredPackage));
-        when(memberPackageRepository.findByMemberId(19)).thenReturn(List.of(validPackage));
+
+
         when(sessionRepository.findFutureEnrollmentScheduleConflicts(eq(19), eq(1), any(), any())).thenReturn(List.of());
         when(enrollmentRepository.save(any(ClassEnrollment.class))).thenAnswer(call -> call.getArgument(0));
 
         enrollmentService.promoteWaitlist(1, sampleAdmin.getId());
 
         assertEquals("Waitlisted", expired.getStatus());
-        assertEquals("Registered", firstEligible.getStatus());
+        assertEquals("Pending", firstEligible.getStatus());
         assertEquals("Waitlisted", beyondCapacity.getStatus());
         verify(enrollmentRepository, times(1)).save(any(ClassEnrollment.class));
         verify(notificationService, times(1)).send(eq(19), anyString(), anyString(), eq("Schedule"));
@@ -446,7 +447,7 @@ class EnrollmentServiceTest {
         when(enrollmentRepository.countBySportsClassIdAndStatusIn(1, List.of("Registered", "Pending"))).thenReturn(0L);
         when(enrollmentRepository.findBySportsClassIdAndStatusOrderByEnrolledAtAscIdAsc(1, "Waitlisted"))
                 .thenReturn(List.of(waiting));
-        when(memberPackageRepository.findByMemberId(8)).thenReturn(List.of(sampleActivePackage));
+
         when(sessionRepository.findFutureEnrollmentScheduleConflicts(eq(8), eq(1), any(), any())).thenReturn(List.of());
         when(enrollmentRepository.save(waiting)).thenReturn(waiting);
 
@@ -465,7 +466,7 @@ class EnrollmentServiceTest {
         when(enrollmentRepository.countBySportsClassIdAndStatusIn(1, List.of("Registered", "Pending"))).thenReturn(0L);
         when(enrollmentRepository.findBySportsClassIdAndStatusOrderByEnrolledAtAscIdAsc(1, "Waitlisted"))
                 .thenReturn(List.of(waiting));
-        when(memberPackageRepository.findByMemberId(8)).thenReturn(List.of(sampleActivePackage));
+
         when(memberRepository.findById(8)).thenReturn(Optional.of(profile));
 
         enrollmentService.promoteWaitlist(1, sampleAdmin.getId());
@@ -558,6 +559,7 @@ class EnrollmentServiceTest {
     }
 
     private ClassEnrollment registeredEnrollment() {
+        sampleClass.setClassType("Advanced"); // Retain historical cancellation coverage until legacy cleanup.
         ClassEnrollment existing = new ClassEnrollment();
         existing.setId(52);
         existing.setMember(sampleMember);
@@ -596,7 +598,7 @@ class EnrollmentServiceTest {
     void enroll_PaidClassCreatesPendingInvoiceAndReservation() {
         sampleClass.setTuitionFee(new BigDecimal("125.00"));
         when(userRepository.findById(8)).thenReturn(Optional.of(sampleMember));
-        when(memberPackageRepository.findByMemberId(8)).thenReturn(List.of(sampleActivePackage));
+
         when(classRepository.findByIdForUpdate(1)).thenReturn(Optional.of(sampleClass));
         when(enrollmentRepository.countBySportsClassIdAndStatusIn(1, List.of("Registered", "Pending"))).thenReturn(2L);
         when(enrollmentRepository.findByMemberIdAndSportsClassId(8, 1)).thenReturn(Optional.empty());

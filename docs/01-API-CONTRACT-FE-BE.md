@@ -23,7 +23,7 @@ Base Render: `https://scms-app-p1gy.onrender.com`; local thông thường `http:
 | POST `/api/auth/change-password` | oldPassword/newPassword theo schema;204; xử lý isFirstLogin theo luồng |
 | POST `/api/auth/register` | fullName/email/password bắt buộc; phone/dateOfBirth/gender tùy schema; Pending+OTP |
 | POST `/api/auth/verify-registration` | email,otp →204 |
-| POST `/api/auth/resend-otp` | email; giới hạn60giây/lần và3OTP/giờ |
+| POST `/api/auth/resend-otp` | email,purpose bắt buộc; purpose=REGISTER cho đăng ký; giới hạn60giây/lần và3OTP/giờ |
 | POST `/api/auth/forgot-password` | email; phản hồi chung không tiết lộ account tồn tại |
 | POST `/api/auth/reset-password` | email,otp,newPassword →204 |
 
@@ -42,8 +42,8 @@ FE xử lý **200/201/204** theo route;204 không có body. Lỗi có thể `{co
 |---|---|
 | GET `/api/public/subjects` | Public; **chỉ** id/slug/name/description, không có giá/outdoor |
 | GET `/api/subjects`, `/{id}` | Có phiên; normalPrice/advancedPrice/outdoor/status và metadata. [Bảng giá chuẩn](04-DEBUG-NOTE.md#d02) |
-| GET `/api/public/membership-packages?centerId=1` | Public Active trong center; id/name/price/durationDays/benefits |
-| GET `/api/packages` | Có phiên; gói chung/legacy, không thay giá Advanced theo Subject |
+| GET `/api/public/membership-packages?centerId=1` | Tuyến đọc danh mục legacy; sau migration16 danh mục trống, không phải sản phẩm đang bán |
+| GET `/api/packages` | Có phiên; danh mục legacy trống sau migration16; giá khóa hiện hành nằm ở Subject/Class |
 | GET `/api/coaches?specializationId=...&keyword=...` | Actor Active; specializationId khác subjectId; filter/center/contact theo D09 dưới đây |
 | GET `/api/rooms`, `/api/classes` | Có phiên; tra schema/filter; ID từ môi trường đang kết nối |
 | GET/PATCH `/api/members/me` | Member Active;200; danh tính từ phiên, chỉ7field hồ sơ theo D01 dưới đây |
@@ -81,6 +81,8 @@ Ngày `YYYY-MM-DD`, giờ **string** `HH:mm` hoặc `HH:mm:ss[.fraction]`. Busin
 <a id="advanced"></a>
 ## 4. Đăng ký và mua Advanced — D03
 
+**Phân biệt sản phẩm:** Normal là khóa học nhóm mua theo lớp; Advanced là quyền học1:1 theo môn/Primary Coach. Không có sản phẩm gói hội viên chung trước khi mua khóa. `MemberPackageResponse`/subscriptions vẫn là tên kỹ thuật cho quyền Advanced. Các API mua/gia hạn gói chung đã bị đóng tại BE bằng400 LEGACY_MEMBERSHIP_RETIRED; giữ tuyến GET quyền Advanced, không suy danh từ “package” là một sản phẩm hội viên khác.
+
 | Bước / actor | API | Payload và kết quả |
 |---|---|---|
 | Manager/Admin+MANAGE_CLASSES | PUT `/api/coaches/{id}/work-schedule` | weeklySlots như MONDAY:1,daysOff,acceptingNew; khai lịch làm thực |
@@ -91,11 +93,17 @@ Ngày `YYYY-MM-DD`, giờ **string** `HH:mm` hoặc `HH:mm:ss[.fraction]`. Busin
 | Có phiên đúng phạm vi | GET `/api/advanced-registrations` | Registration+subscription state cho Member chủ/Primary Coach/Manager |
 | Member chủ hoặc staff có quyền | GET `/api/members/{memberId}/subscriptions` | MemberPackageResponse; Member không được chọn người khác |
 
-GET `/api/members/me/subscriptions` không được định nghĩa; lỗi400 khi dùng `me` thay ID số không phải lỗi đọc quyền. Tuyến `/members/me/subscriptions` chỉ có POST mua gói tương thích, không thay GET ở bảng trên.
+GET `/api/members/me/subscriptions` không được định nghĩa; lỗi400 khi dùng `me` thay ID số không phải lỗi đọc quyền. POST `/members/me/subscriptions` và `/member-packages/subscribe-me` là tuyến mua gói cũ đã đóng: request hợp lệ/đúng quyền trả400 LEGACY_MEMBERSHIP_RETIRED, không tạo đơn hoặc quyền học.
 
 Chưa accepted thì COACH_ACCEPTANCE_REQUIRED. Order kiểm lại năng lực/center lock và snapshot Subject price. requestKey1–80ký tự `[A-Za-z0-9_.:-]`: retry cùng nội dung trả kết quả cũ; khác nội dung409 IDEMPOTENCY_CONFLICT. Không gửi amount/actor/time để thay dữ kiện BE.
 
-Advanced mua qua subscribe gói chung bị USE_ADVANCED_REGISTRATION. Sau Paid tải ownInvoice và subscriptions; generic status/extend không được cấp lại quyền hoặc thay incident recovery. Các lỗi cần xử lý: COACH_NOT_ACCEPTING/COACH_SCHEDULE_REQUIRED/COACH_CAPACITY_INSUFFICIENT/COACH_SUBJECT_MISMATCH/MEMBER_NOT_ACTIVE/BOOKING_BLOCKED/INVALID_PRICE; tra response thực để lấy message.
+Subscribe gói chung bị LEGACY_MEMBERSHIP_RETIRED; mua Advanced dùng advanced-registrations. Sau Paid tải ownInvoice và subscriptions; generic status/extend không được cấp lại quyền hoặc thay incident recovery. Các lỗi cần xử lý: COACH_NOT_ACCEPTING/COACH_SCHEDULE_REQUIRED/COACH_CAPACITY_INSUFFICIENT/COACH_SUBJECT_MISMATCH/MEMBER_NOT_ACTIVE/BOOKING_BLOCKED/INVALID_PRICE; tra response thực để lấy message.
+
+POST `/api/classes/{classId}/enroll` và POST `/api/enrollments` chỉ nhận Normal. Truyền lớp Advanced trả400 USE_ADVANCED_REGISTRATION, không tạo enrollment/hóa đơn; danh sách chờ Advanced cũ không tự được thăng qua cơ chế Normal. Registration Advanced đi Requested→Accepted→Invoiced; Paid là trạng thái hóa đơn, sau xác minh hợp lệ quyền Advanced mới Active.
+
+**Đóng thao tác gói chung:** các POST mua hộ `/api/members/{id}/packages` hoặc `/subscriptions`, POST `/api/packages`, PUT `/api/packages/{id}`, PATCH `/api/packages/{id}/status` trả400 LEGACY_MEMBERSHIP_RETIRED khi request hợp lệ/đủ quyền. Với subscription gói chung cũ, POST `/api/member-packages/{id}/extend` hoặc `/api/subscriptions/{id}/extend` và PATCH các alias `/{id}/status` cũng bị từ chối; subscription Advanced vẫn phải theo workflow thanh toán/sự cố, không được mở quyền qua generic extend/status. Tạo Member tại quầy với packageId khác null bị400 LEGACY_MEMBERSHIP_RETIRED trước khi tạo tài khoản; tạo tài khoản không kèm gói vẫn dùng luồng bình thường. Các guard401/403/validation vẫn áp dụng trước nghiệp vụ.
+
+Sau purge, ID subscription cũ không còn tồn tại có thể trả404 khi extend/status phải tra cứu đối tượng; không tự tạo lại record để vượt lỗi. GET subscriptions hiện hành phục vụ quyền Advanced, không phải lịch sử gói chung đã xóa.
 
 <a id="payments"></a>
 ## 5. Thanh toán, biên nhận — D10
@@ -198,6 +206,10 @@ Tách bước: POST `/api/classes` tạo Normal Closed →POST `/api/sessions/pr
 
 POST `/api/classes/{classId}/enroll` body paymentMethod, staff thêm memberId đúng quyền →201 EnrollmentResponse. Pending có invoiceId/invoiceCode/paymentStatus/amount/paymentUrl/expiresAt; Paid mới Registered. Lớp đầy có thể Waitlisted; maxCapacity≤15, Registered+Pending giữ chỗ. CLASS_CAPACITY_EXCEEDED dùng khi giảm capacity dưới chỗ đang giữ, không mặc định lỗi mọi enrollment đầy.
 
+**Normal độc lập với gói hội viên:** Member Active có thể đăng ký Normal dù subscriptions trả `[]`; không yêu cầu gói chung hoặc Advanced. Khi có chỗ tạo Pending và hóa đơn học phí của lớp; khi đầy vào Waitlisted, xét lên chỗ trống không kiểm gói chung và vẫn chờ Paid trước Registered. Các điều kiện tài khoản, owner/center, lớp/lịch, sĩ số và trùng lịch vẫn áp dụng.
+
+**Giá Normal:** POST `/api/classes/{classId}/enroll` và POST `/api/enrollments` trả400 `INVALID_PRICE` khi học phí lớp thiếu hoặc≤0; không tạo enrollment/hóa đơn, kể cả nhánh Waitlisted. Xét thăng danh sách chờ cũng kiểm học phí trước khi đổi trạng thái/tạo đơn: giá không hợp lệ thì giữ Waitlisted, không cấp Registered. Giá hợp lệ →Pending; Paid hợp lệ mới Registered. Chứng từ Paid/amount và ghi danh lịch sử không bị tự sửa theo giá hiện tại.
+
 GET `/api/sessions/catalog/{classId}` là lịch Normal trước mua cho người có phiên, không lộ private Member/subscription. Lịch cá nhân qua `/api/sessions` bị ép owner/Coach/center theo phiên. Normal chỉ bù do TT theo mục9; không hủy/notice cá nhân.
 
 <a id="attendance"></a>
@@ -206,6 +218,7 @@ GET `/api/sessions/catalog/{classId}` là lịch Normal trước mua cho ngườ
 | API / actor | Contract |
 |---|---|
 | GET `/api/attendances/me/checkin-code` — Member | Chỉ payload/expiresInSeconds; TTL còn lại1–30 giây |
+| GET `/api/training-results` — Member Active; Coach hoặc MANAGE_CLASSES/MANAGE_USERS theo quyền hiện có | Filter tùy chọn `sessionId`, `memberId`, `coachId`. Member luôn chỉ đọc mình từ phiên; `memberId` khác →403; không có kết quả →200 `[]`. Coach bị ép `coachId` theo phiên |
 | POST `/api/attendances/scan` — staff/Coach có quyền | memberId,code,sessionId; Coach được giao, Paid, trong[start,end), bước hiện tại/chống replay |
 | POST `/api/training-results`, `/bulk` — Coach được giao | Manual result/attendance chỉ trong buổi, Present/Absent mới; schema có các field kết quả khác |
 | POST `/api/attendances/correct` — Manager/Admin+MANAGE_CLASSES | attendanceId,newState,reason; sau end, audit/sync result, không đổi credit |
@@ -214,10 +227,27 @@ Alias `/api/attendance` và `/checkin-code`/`/api/members/me/checkin-code` còn 
 
 Ngoại lệ ghi trước buổi duy nhất ở đây là Absent do Member báo vắng hợp lệ theo D05; manual/QR vẫn tuân thủ cửa sổ trong buổi. Attendance response thêm `absenceNoticeId` nullable để truy về notice/reason, kể cả sau khi Coach xác nhận kết quả thực tế.
 
+GET training-results trả danh sách `TrainingResultResponse`: resultId,sessionId,sessionDate,classId,className,memberId,memberName,coachId,coachName,content,attendanceStatus,recordedAt. FE Member có thể bỏ `memberId`; mọi filter còn lại chỉ thu hẹp dữ liệu cá nhân. Thiếu phiên →401; tài khoản Member không còn Active/đúng role hoặc cố đọc Member khác →403. Member mặc định không được POST/bulk; không cấp thêm quyền quản trị để xử lý lỗi đọc. Kết quả kiểm và giới hạn môi trường ở docs00; GET không thay dữ liệu.
+
 <a id="resolutions"></a>
 ## 13. Refund/CashCorrection — D10/D16
 
+CashCorrection chỉ xử lý hóa đơn Cash đã bị xác nhận Paid khi **chưa nhận tiền thực cho hóa đơn đó**, trong phạm vi Advanced chưa dùng của D16. Xác nhận Cash dùng invoiceId cụ thể, không dò loại khóa theo giá. Nếu có tiền đã nhận nhưng phân bổ sai hóa đơn, cần xác minh hóa đơn nào thực sự được thu; không tự chuyển tiền hoặc khai moneyNotReceived khi đã thu cho chính hóa đơn đang sửa. Refund áp dụng khoản đã nhận và đủ điều kiện hoàn theo D10.
+
+Đăng ký Normal có hóa đơn riêng không phụ thuộc quyền Advanced chỉ vì tạo sau thời điểm kích hoạt Advanced; Pending hay Paid đều không tự chặn CashCorrection. BE vẫn chặn khi có liên kết `eligibility_subscription_id` tới đúng quyền đang sửa, booking history, hóa đơn khác cùng quyền hoặc lịch sử gia hạn/expiry/sự cố. Kiểm lại khi Complete dưới lock; không đổi hóa đơn/ghi danh Normal độc lập.
+
 Group `/api/payment-resolutions`: GET/POST cho Receptionist/Manager/Admin+MANAGE_INVOICES theo phạm vi; approve/complete chỉ Manager/Admin.
+
+| Role | GET danh sách / POST tạo | POST approve / complete |
+|---|---|---|
+| Member, Coach | Không, kể cả có MANAGE_INVOICES | Không |
+| Receptionist + MANAGE_INVOICES | Có, trong center của actor Active | Không |
+| CenterManager + MANAGE_INVOICES | Có, trong center của actor Active | Có, cùng center và đủ điều kiện nghiệp vụ |
+| Admin + MANAGE_INVOICES | Controller cho phép; service vẫn giới hạn center, không có ngoại lệ toàn hệ thống | Controller cho phép; service vẫn kiểm center và điều kiện nghiệp vụ |
+
+**Admin mặc định:** schema hiện hành không gán MANAGE_INVOICES và có center NULL, nên mặc định403 ở controller. Nếu được cấp thêm authority nhưng center vẫn NULL: GET chỉ truy vấn center NULL, không phải toàn hệ thống; ghi dừng400 `CENTER_REQUIRED` trước xử lý hồ sơ. Không suy tên role Admin là được vận hành tài chính. Đây là mô tả implementation hiện hành, chưa là quyết định mở quyền mới; không tự gán quyền hoặc center trên DB thật.
+
+Member/Coach bị403 khi gọi nhóm payment-resolutions; không có API đọc hồ sơ resolution cá nhân dành Member trong contract hiện hành. Quyền được xác định bằng role AND MANAGE_INVOICES, cùng kiểm Active/center và điều kiện nghiệp vụ tại BE.
 
 | API | Body / state |
 |---|---|

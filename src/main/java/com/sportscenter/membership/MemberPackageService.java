@@ -65,36 +65,7 @@ public class MemberPackageService {
 
     @Transactional
     public SubscriptionOrderResponse subscribe(Integer memberId, MemberPackageRequest request, String clientIp) {
-        User memberUser = userRepository.findById(memberId)
-                .orElseThrow(() -> new ResourceNotFoundException("Member user not found: " + memberId));
-        scheduleWriteLock.acquire(memberUser.getCenterId());
-
-        MembershipPackage pkg = membershipPackageRepository.findById(request.packageId())
-                .orElseThrow(() -> new ResourceNotFoundException("Membership package not found: " + request.packageId()));
-
-        if (!"Active".equalsIgnoreCase(pkg.getStatus())) throw new BusinessException("Cannot subscribe to an Inactive membership package");
-        if (pkg.isAdvanced()) throw new BusinessException("USE_ADVANCED_REGISTRATION: Choose a subject and Primary Coach and obtain acceptance before payment");
-        String method = request.paymentMethod() == null || request.paymentMethod().isBlank() ? "Cash" : request.paymentMethod();
-        LocalDate startDate = LocalDate.now(clock);
-        int days = pkg.isAdvanced()
-                ? (pkg.getDurationDays() != null ? pkg.getDurationDays() : 45)
-                : (pkg.getDurationDays() != null ? pkg.getDurationDays() : 30);
-
-        MemberPackage mp = new MemberPackage();
-        mp.setMember(memberUser);
-        mp.setMembershipPackage(pkg);
-        mp.setPurchaseAmount(pkg.getPrice());
-        mp.setStartDate(startDate);
-        mp.setEndDate(startDate.plusDays(days));
-        mp.setStatus("Pending");
-        mp.setRemainingCredit(0);
-        mp.setValidityDays(days);
-        MemberPackage saved = memberPackageRepository.save(mp);
-        InvoiceOrderResponse order = invoiceService.createPackageOrder(memberUser, pkg, method, saved, clientIp);
-        auditService.log(null, "SUBSCRIBE_PACKAGE", "MEMBER_PACKAGE", saved.getSubscriptionId(),
-                "Created pending subscription and invoice " + order.invoiceCode());
-        return new SubscriptionOrderResponse(saved.getSubscriptionId(), order.invoiceId(), order.invoiceCode(),
-                order.amount(), order.paymentMethod(), order.status(), order.expiresAt(), order.paymentUrl());
+        throw new BusinessException("LEGACY_MEMBERSHIP_RETIRED: Buy a Normal class or use Advanced registration instead of a shared membership");
     }
 
     @Transactional
@@ -115,6 +86,7 @@ public class MemberPackageService {
         MemberPackage mp = memberPackageRepository.findByIdForUpdate(subscriptionId)
                 .orElseThrow(() -> new ResourceNotFoundException("Member package subscription not found: " + subscriptionId));
 
+        if (!mp.isAdvanced()) throw new BusinessException("LEGACY_MEMBERSHIP_RETIRED: Shared membership state changes are retired");
         String normalizedStatus = normalizeStatus(status);
         String previousStatus = mp.getStatus();
         if(mp.isAdvanced()&&!"Active".equalsIgnoreCase(previousStatus)&&"Active".equals(normalizedStatus))
@@ -140,44 +112,11 @@ public class MemberPackageService {
 
     @Transactional
     public MemberPackageResponse extendValidity(Integer subscriptionId, PackageExtensionRequest request, Authentication authentication) {
-        if (request.extendDays() == null || request.extendDays() <= 0) {
-            throw new BusinessException("Số ngày gia hạn phải lớn hơn 0");
-        }
         scheduleWriteLock.acquire(memberPackageRepository.findCenterIdById(subscriptionId).orElseThrow(() -> new ResourceNotFoundException("Subscription center not found")));
-
         MemberPackage mp = memberPackageRepository.findByIdForUpdate(subscriptionId)
                 .orElseThrow(() -> new ResourceNotFoundException("Member package subscription not found: " + subscriptionId));
-        if(mp.isAdvanced())throw new BusinessException("USE_INCIDENT_RECOVERY: Advanced extensions require verified incident evidence and an agreed makeup session");
-
-        LocalDate today = LocalDate.now(clock);
-        LocalDate currentEnd = mp.getEndDate() != null ? mp.getEndDate() : today;
-        LocalDate newEnd = currentEnd.plusDays(request.extendDays());
-        int oldValidity = mp.getValidityDays() != null ? mp.getValidityDays() : 45;
-
-        mp.setEndDate(newEnd);
-        mp.setValidityDays(oldValidity + request.extendDays());
-
-        if ("Expired".equalsIgnoreCase(mp.getStatus()) && newEnd.isAfter(today)) {
-            mp.setStatus("Active");
-        }
-
-        MemberPackage saved = memberPackageRepository.save(mp);
-        Integer actorId = null;
-        if (authentication != null && authentication.getName() != null) {
-            actorId = userRepository.findByEmailIgnoreCase(authentication.getName()).map(User::getId).orElse(null);
-        }
-        auditService.log(actorId, "EXTEND_PACKAGE_VALIDITY", "MEMBER_PACKAGE", saved.getSubscriptionId(),
-                String.format("Gia hạn gói %d ngày (hạn mới: %s). Lý do: %s",
-                        request.extendDays(), newEnd, request.reason() != null ? request.reason() : "N/A"));
-        if (saved.getMembershipPackage() != null && saved.getMembershipPackage().isAdvanced()) {
-            eventPublisher.publishEvent(NotificationTemplates.event(NotificationType.PACKAGE_EXTENDED,
-                    List.of(saved.getMember().getId()),
-                    NotificationTemplates.packageExtended(packageName(saved), request.extendDays(), newEnd),
-                    "MEMBER_PACKAGE", saved.getSubscriptionId(),
-                    "PACKAGE_EXTENDED:" + saved.getSubscriptionId() + ":" + newEnd));
-        }
-
-        return MemberPackageResponse.from(saved);
+        if (mp.isAdvanced()) throw new BusinessException("USE_INCIDENT_RECOVERY: Advanced extensions require verified incident evidence and an agreed makeup session");
+        throw new BusinessException("LEGACY_MEMBERSHIP_RETIRED: Shared memberships cannot be extended");
     }
 
     @Transactional

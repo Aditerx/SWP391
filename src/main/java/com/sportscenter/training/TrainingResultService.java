@@ -36,6 +36,19 @@ public class TrainingResultService {
     public List<TrainingResultResponse> searchResults(Integer sessionId, Integer memberId, Integer coachId,
                                                       Authentication authentication) {
         if (authentication != null && authentication.getAuthorities().stream()
+                .anyMatch(authority -> "ROLE_MEMBER".equals(authority.getAuthority()))) {
+            User member = userRepository.findByEmailIgnoreCase(authentication.getName())
+                    .orElseThrow(() -> new AccessDeniedException("Authenticated member account was not found"));
+            if (!"Active".equalsIgnoreCase(member.getStatus()) || member.getRole() == null
+                    || !"Member".equalsIgnoreCase(member.getRole().getName())) {
+                throw new AccessDeniedException("Active Member account required");
+            }
+            if (memberId != null && !memberId.equals(member.getId())) {
+                throw new AccessDeniedException("Members may only view their own training results");
+            }
+            memberId = member.getId();
+        }
+        if (authentication != null && authentication.getAuthorities().stream()
                 .anyMatch(authority -> "ROLE_COACH".equals(authority.getAuthority()))) {
             User coach = userRepository.findByEmailIgnoreCase(authentication.getName())
                     .orElseThrow(() -> new AccessDeniedException("Authenticated coach account was not found"));
