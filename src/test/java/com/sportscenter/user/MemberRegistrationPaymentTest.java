@@ -30,23 +30,12 @@ class MemberRegistrationPaymentTest {
     @Spy Clock clock = Clock.fixed(Instant.parse("2026-10-23T01:00:00Z"),ZoneId.of("Asia/Ho_Chi_Minh"));
     @InjectMocks MemberService service;
 
-    @Test void registeringAtCounterWithPackageCreatesPendingPaymentInsteadOfGrantingAccess() {
-        var role = new Role(); role.setName("Member"); when(roles.findAll()).thenReturn(List.of(role));
-        when(centers.centerForNewAccount(1,false)).thenReturn(1);
-        when(passwords.generate()).thenReturn("test-temporary-password"); when(passwords.hash(anyString())).thenReturn("unused-test-hash");
-        when(users.save(any())).thenAnswer(c -> { User u = c.getArgument(0); u.setId(7); return u; });
-        when(members.save(any())).thenAnswer(c -> c.getArgument(0));
-        var pkg = new MembershipPackage(); pkg.setId(2); pkg.setPrice(BigDecimal.TEN);
-        var sub = new MemberPackage(); sub.setSubscriptionId(9); sub.setMembershipPackage(pkg); sub.setStatus("Pending"); sub.setRemainingCredit(0);
-        when(subscriptions.findById(9)).thenReturn(Optional.of(sub));
-        when(subscriptionService.subscribe(eq(7),any(MemberPackageRequest.class))).thenAnswer(call -> new SubscriptionOrderResponse(9,5,"TEST-INVOICE",BigDecimal.TEN,"Cash","Pending",LocalDateTime.now(clock).plusMinutes(5),null));
-        var response = service.createMember(new MemberRequest("Test member","new@test.invalid",null,null,2,null,null,null,null,null,"Active",1));
-        assertEquals("pending",response.membershipStatus()); assertEquals(BigDecimal.ZERO,response.totalSpent());
-        verify(subscriptionService).subscribe(eq(7),argThat(r -> r.packageId().equals(2) && "Cash".equals(r.paymentMethod())));
-        verify(subscriptions,never()).save(any());
-        assertEquals(0,sub.getRemainingCredit());
+    @Test void registeringAtCounterWithRetiredPackageIsRejectedBeforeCreatingAccount() {
+        var request = new MemberRequest("Test member","new@test.invalid",null,null,2,null,null,null,null,null,"Active",1);
+        var error = assertThrows(com.sportscenter.common.exception.BusinessException.class, () -> service.createMember(request));
+        assertTrue(error.getMessage().startsWith("LEGACY_MEMBERSHIP_RETIRED:"));
+        verifyNoInteractions(users,members,subscriptionService,email,passwords);
     }
-
     @Test void totalSpentUsesPaidInvoiceSnapshotAndIgnoresPendingOrders() {
         var member = new User(); member.setId(7); member.setFullName("Test member");
         when(users.findById(7)).thenReturn(Optional.of(member));

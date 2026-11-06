@@ -98,7 +98,7 @@ public class PaymentResolutionService {
         if(!"Active".equals(sub.getStatus())||sub.getSubject()==null||sub.getPrimaryCoach()==null||sub.getActivatedAt()==null||!Integer.valueOf(12).equals(sub.getRemainingCredit()))return "Original Advanced entitlement is missing, inactive, or not wholly unused";
         if(sessions.existsByMemberPackageSubscriptionId(sub.getSubscriptionId()))return "Booking history exists, including cancelled/refunded sessions";
         if(enrollments.existsByEligibilitySubscriptionSubscriptionId(sub.getSubscriptionId()))return "Another class registration depends on this subscription";
-        if(enrollments.findByMemberIdWithDetails(sub.getMember().getId()).stream().anyMatch(e->e.getEligibilitySubscription()==null&&(e.getEnrolledAt()==null||!e.getEnrolledAt().isBefore(sub.getActivatedAt()))))return "Legacy class-registration dependency requires reconciliation";
+        // A later Normal purchase is independent; only a recorded entitlement link is a dependency.
         if(invoices.findBySubscriptionSubscriptionId(sub.getSubscriptionId()).size()!=1)return "Another invoice depends on this entitlement";
         if(!pauses.findBySubscriptionSubscriptionId(sub.getSubscriptionId()).isEmpty()||sub.getApprovedExtraSeconds()!=0||sub.getApprovedExtraNanos()!=0||sub.getExpiryProcessedAt()!=null||sub.getDeferredCreditReturn()!=0)return "Extension, expiry, incident, or recovery history exists";
         return null;

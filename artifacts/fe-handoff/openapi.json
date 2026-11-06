@@ -6382,6 +6382,36 @@
           }
         }
       }
+    },
+    "/api/auth/google": {
+      "post": {
+        "tags": [
+          "auth-controller"
+        ],
+        "operationId": "google",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GoogleLoginRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginResponse"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -6493,6 +6523,9 @@
             "type": "boolean"
           },
           "warning": {
+            "type": "string"
+          },
+          "avatarUrl": {
             "type": "string"
           }
         }
@@ -8969,6 +9002,9 @@
           "memberId": {
             "type": "integer",
             "format": "int32"
+          },
+          "avatarUrl": {
+            "type": "string"
           }
         }
       },
@@ -10969,6 +11005,17 @@
           "createdAt": {
             "type": "string",
             "format": "date-time"
+          }
+        }
+      },
+      "GoogleLoginRequest": {
+        "required": [
+          "credential"
+        ],
+        "type": "object",
+        "properties": {
+          "credential": {
+            "type": "string"
           }
         }
       }

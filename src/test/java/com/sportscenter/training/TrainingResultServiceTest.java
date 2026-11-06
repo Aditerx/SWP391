@@ -70,6 +70,10 @@ class TrainingResultServiceTest {
         sampleMember = new User();
         sampleMember.setId(7); sampleMember.setCenterId(1);
         sampleMember.setFullName("Hoàng Thị Oanh");
+        sampleMember.setStatus("Active");
+        var memberRole = new com.sportscenter.user.Role();
+        memberRole.setName("Member");
+        sampleMember.setRole(memberRole);
 
         sampleSession = new Session();
         sampleSession.setId(1);sampleSession.setSessionDate(java.time.LocalDate.of(2026,10,16));sampleSession.setStartTime(java.time.LocalTime.of(9,30));sampleSession.setEndTime(java.time.LocalTime.of(11,0));
