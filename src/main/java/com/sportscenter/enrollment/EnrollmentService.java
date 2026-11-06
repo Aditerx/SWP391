@@ -3,8 +3,6 @@ package com.sportscenter.enrollment;
 import com.sportscenter.audit.AuditService;
 import com.sportscenter.common.exception.BusinessException;
 import com.sportscenter.common.exception.ResourceNotFoundException;
-import com.sportscenter.membership.MemberPackage;
-import com.sportscenter.membership.MemberPackageRepository;
 import com.sportscenter.notification.NotificationService;
 import com.sportscenter.user.Member;
 import com.sportscenter.user.MemberRepository;
@@ -38,7 +36,6 @@ public class EnrollmentService {
     private final ClassEnrollmentRepository enrollmentRepository;
     private final SportsClassRepository classRepository;
     private final UserRepository userRepository;
-    private final MemberPackageRepository memberPackageRepository;
     private final AuditService auditService;
     private final InvoiceService invoiceService;
     private final Clock clock;
@@ -95,6 +92,9 @@ public class EnrollmentService {
         SportsClass sportsClass = classRepository.findByIdForUpdate(classId)
                 .orElseThrow(() -> new ResourceNotFoundException("Class not found: " + classId));
         if (!java.util.Objects.equals(member.getCenterId(), sportsClass.getCenterId())) throw new AccessDeniedException("Class belongs to another center");
+        if (!sportsClass.isNormal()) {
+            throw new BusinessException("USE_ADVANCED_REGISTRATION: Advanced requires subject selection and Coach acceptance before payment");
+        }
         if (sportsClass.getSubject() != null && !"Active".equalsIgnoreCase(sportsClass.getSubject().getStatus())) {
             throw new BusinessException("SUBJECT_INACTIVE: New registrations are closed for this subject");
         }
@@ -106,18 +106,12 @@ public class EnrollmentService {
         if (profile != null && profile.getBookingBlockedUntil() != null && profile.getBookingBlockedUntil().isAfter(LocalDateTime.now(clock))) {
             throw new BusinessException("BOOKING_BLOCKED: booking is blocked until " + profile.getBookingBlockedUntil());
         }
-        List<MemberPackage> activePackages = memberPackageRepository.findByMemberId(memberId).stream()
-                .filter(p -> "Active".equalsIgnoreCase(p.getStatus())
-                        && (p.isAdvanced() ? p.getActivatedAt()!=null&&p.getExpiresAt()!=null&&!p.getActivatedAt().isAfter(LocalDateTime.now(clock))&&p.getExpiresAt().isAfter(LocalDateTime.now(clock))
-                        : p.getStartDate()!=null&&p.getEndDate()!=null&&!p.getStartDate().isAfter(LocalDate.now(clock))&&!p.getEndDate().isBefore(LocalDate.now(clock))))
-                .toList();
-        if (activePackages.isEmpty()) throw new BusinessException("PACKAGE_EXPIRED: member package is expired or inactive");
-
         if (!"Open".equalsIgnoreCase(sportsClass.getStatus()) && !"Ongoing".equalsIgnoreCase(sportsClass.getStatus())) {
             throw new BusinessException("CLASS_NOT_OPEN: class status is '" + sportsClass.getStatus() + "'");
         }
         if (sportsClass.isNormal()) {
             if (!"Open".equalsIgnoreCase(sportsClass.getStatus())) throw new BusinessException("CLASS_NOT_READY: Normal registration is closed");
+            requirePositiveNormalPrice(sportsClass);
             com.sportscenter.session.NormalSchedulePolicy.requireReady(sportsClass, sessionRepository, clock);
         }
 
@@ -152,7 +146,6 @@ public class EnrollmentService {
             enrollment.setCancelReason(null);
         }
         enrollment.setEnrolledAt(LocalDateTime.now(clock));
-        enrollment.setEligibilitySubscription(activePackages.stream().max(java.util.Comparator.comparing(p->p.getExpiresAt()!=null?p.getExpiresAt():p.getEndDate().plusDays(1).atStartOfDay())).orElseThrow());
         if (shouldWaitlist) {
             enrollment.setStatus("Waitlisted");
             ClassEnrollment saved = enrollmentRepository.save(enrollment);
@@ -289,18 +282,13 @@ public class EnrollmentService {
 
     private void promote(Integer classId, Integer actorId) {
         SportsClass sportsClass = classRepository.findByIdForUpdate(classId).orElse(null);
-        if (sportsClass == null || sportsClass.getMaxCapacity() == null) return;
+        if (sportsClass == null || !sportsClass.isNormal() || sportsClass.getMaxCapacity() == null) return;
         long occupied = enrollmentRepository.countBySportsClassIdAndStatusIn(classId, List.of("Registered", "Pending"));
         int free = Math.max(0, sportsClass.getMaxCapacity() - (int) occupied);
         for (ClassEnrollment waiting : enrollmentRepository.findBySportsClassIdAndStatusOrderByEnrolledAtAscIdAsc(classId, "Waitlisted")) {
             if (free <= 0) break;
             User member = waiting.getMember();
             if (member == null || !"Active".equalsIgnoreCase(member.getStatus())) continue;
-            boolean packageActive = memberPackageRepository.findByMemberId(member.getId()).stream()
-                    .anyMatch(p -> "Active".equalsIgnoreCase(p.getStatus())
-                            && (p.getStartDate() == null || !p.getStartDate().isAfter(LocalDate.now(clock)))
-                            && (p.getEndDate() == null || !p.getEndDate().isBefore(LocalDate.now(clock))));
-            if (!packageActive) continue;
             Member profile = memberRepository.findById(member.getId()).orElse(null);
             if (profile != null && profile.getBookingBlockedUntil() != null && profile.getBookingBlockedUntil().isAfter(LocalDateTime.now(clock))) continue;
             if (!sessionRepository.findFutureEnrollmentScheduleConflicts(member.getId(), classId,
@@ -327,8 +315,14 @@ public class EnrollmentService {
     }
 
     private String statusForNewEnrollment(SportsClass sportsClass) {
-        return sportsClass.getTuitionFee() != null && sportsClass.getTuitionFee().signum() > 0
-                ? "Pending" : "Registered";
+        requirePositiveNormalPrice(sportsClass);
+        return "Pending";
+    }
+
+    private void requirePositiveNormalPrice(SportsClass sportsClass) {
+        if (sportsClass.getTuitionFee() == null || sportsClass.getTuitionFee().signum() <= 0) {
+            throw new BusinessException("INVALID_PRICE: Normal class tuition must be positive");
+        }
     }
 
     private User requireActor(String actorEmail) {

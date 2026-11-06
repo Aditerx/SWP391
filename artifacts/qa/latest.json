@@ -21054,5 +21054,847 @@
     },
     "deployment": "NOT_RUN_BY_AGENT",
     "nextStep": "Owner deploys and retries once; inspect SMTP_SEND_ lines with matching attemptId before changing provider/config"
+  },
+  "otpRegistrationOwnerAcceptance": {
+    "recordedDate": "2026-11-04",
+    "scope": "Owner-performed real-email OTP registration through FE Pages, Render backend, Brevo SMTP and Gmail",
+    "sourceReviewCommit": "3a2adaf1b6ac11bbe55cdc7e41931a4a5e31530a",
+    "runtimeBuildCommit": "NOT_CAPTURED_FOR_SUCCESSFUL_CASE",
+    "evidenceSource": "Owner statement and screenshots supplied in conversation; no screenshots containing PII or OTP copied to repository",
+    "environment": {
+      "frontend": "https://scms-demo-04nov.pages.dev",
+      "backend": "https://scms-app-p1gy.onrender.com",
+      "transport": "Brevo SMTP port 2525, STARTTLS configured",
+      "recipientProvider": "Gmail"
+    },
+    "diagnosticSequence": {
+      "priorFailureCategory": "AUTHENTICATION",
+      "priorFailureTime": "2026-11-04T22:54:20.620+07:00",
+      "brevoBlockingBefore": {
+        "smtpKeys": "Activated",
+        "authorizedCount": 0,
+        "unauthorizedCount": 1
+      },
+      "blockedIp": "74.220.52.132",
+      "renderOutboundRangesShown": [
+        "74.220.52.0/24",
+        "74.220.60.0/24"
+      ],
+      "blockedIpMatchesRenderRange": true,
+      "resolutionContext": "Owner reported success after guidance to authorize the matching Render outbound IP in Brevo",
+      "effectiveAllowlistAfter": "NOT_INDEPENDENTLY_QUERIED"
+    },
+    "observations": {
+      "displayedTimeOnBrevoAndGmail": "2026-11-04 23:08; screenshots do not display a timezone",
+      "emailMessageCount": 1,
+      "brevoEventCount": 3,
+      "brevoEvents": [
+        "Sent",
+        "Delivered",
+        "First opening"
+      ],
+      "gmailInboxShowsRegistrationOtpMail": true,
+      "senderAddressRewrittenToBrevoDomainObserved": true,
+      "ownerReportsOtpEnteredAndAccountCreated": true,
+      "frontendShowsRegistrationSuccessAndVerifiedBadge": true
+    },
+    "acceptance": {
+      "realEmailDelivery": "PASS_OWNER_EVIDENCE",
+      "registrationCompletionInFrontend": "PASS_OWNER_EVIDENCE",
+      "verifyRegistrationHttpResponse": "PASS_OWNER_HTTP_DETAILS_POST_204",
+      "databaseStateAfterCommit": "PASS_OWNER_DB_SCREENSHOT_USERS_ACTIVE_ONLY",
+      "expiredWrongReusedOtpAndResendBoundaryCasesOnRender": "NOT_RUN_IN_THIS_ACCEPTANCE",
+      "otpUsedStateAfterCommit": "NOT_PROVIDED",
+      "memberDatabaseLinkage": "NOT_PROVIDED",
+      "loginAndMemberPortal": "PASS_OWNER_LOGIN_RESPONSE_AND_MEMBER_PORTAL"
+    },
+    "agentActions": "Documentation and QA update only; owner HTTP details and screenshots inspected, no direct DB query, email sending, cloud mutation, deployment, backend change or new backend test run",
+    "nextStep": "Use the OTP handoff with login response identity/authorities; do not repeat the successful registration/login case. Only extend OTP error/boundary acceptance when scoped.",
+    "historicalDiagnosticsReference": "otpSmtpDiagnostics",
+    "handoff": "SCMS-BAN-GIAO-FE-OTP-2026-11-04.md",
+    "ownerFollowupEvidence": {
+      "recordedDate": "2026-11-04",
+      "source": "Owner-provided HTTP details, Supabase users screenshot and Member dashboard/Network screenshot",
+      "verifyRegistration": {
+        "url": "https://scms-app-p1gy.onrender.com/api/auth/verify-registration",
+        "postStatus": 204,
+        "postStatusText": "No Content",
+        "optionsStatus": 200,
+        "preflightIsNotBusinessVerification": true
+      },
+      "databaseScreenshot": {
+        "provider": "Supabase",
+        "table": "users",
+        "userId": 42,
+        "status": "Active",
+        "observedBy": "Owner screenshot inspected by agent; no direct database query by agent"
+      },
+      "loginEvidence": {
+        "ownerReportsLoginSucceeded": true,
+        "memberDashboardVisible": true,
+        "memberIdShown": 42,
+        "selectedNetworkRequest": {
+          "method": "GET",
+          "path": "/api/notifications/me",
+          "status": 200
+        },
+        "rawLoginHttpResponseCaptured": true,
+        "loginResponseEvidence": {
+          "path": "/api/auth/login",
+          "context": "Browser Network response view on FE Pages Member dashboard",
+          "httpStatus": "NOT_VISIBLE_IN_PROVIDED_RESPONSE_VIEW",
+          "userId": 42,
+          "memberId": 42,
+          "role": "Member",
+          "isFirstLogin": false,
+          "authorities": [
+            "CHAT_AS_MEMBER",
+            "ROLE_MEMBER"
+          ]
+        }
+      },
+      "notCaptured": [
+        "email_otps.used row",
+        "members table direct query"
+      ],
+      "privacy": "Only fixture ID and non-sensitive statuses retained; no screenshot files, names, email, phone, OTP, password hash or cookie copied"
+    },
+    "handoffIdentitySource": "POST /api/auth/login response, as selected by Owner for the OTP handoff"
+  },
+  "rbacIssue0": {
+    "recordedAt": "2026-11-05T00:30:45.656865+07:00",
+    "scope": "Issue 0 only: Member training-result self-read and existing payment-resolution role/authority/center boundaries",
+    "decision": "Owner 2026-11-05 approved Member self-read; Backend/code/docs only, no Frontend edits",
+    "baseCommit": "3a2adaf1b6ac11bbe55cdc7e41931a4a5e31530a",
+    "sourceState": "uncommitted working-tree snapshot; base SHA is not a deployment SHA",
+    "sourceFingerprints": {
+      "src/main": "198cd5a15fb5301f5958c532c573222520124ccf5a69bbef32f9e62bea38b9bd",
+      "src/test": "736e9fac74b8e2d8647f9f53f83e4e01c1520955152d90352fd6746a19583a94",
+      "database": "fcb87aca26143a4b49d19670fef1c86515fa57e856d5ad8ebbbd95d1463d3291",
+      "pom.xml": "aa5c4d1a1bb3e23860225b7aacd7341fe278430cd6148a8a9d66c9ebabc1864b",
+      "schema_postgres.sql": "7b3a0b5878335ddbeade70b9a4060aba6a097ace8ea561ad3f30baccfa824a0e",
+      "scripts/test-room-absence-postgres.py": "7144adb3689349a949c9ee702958f765fb5743433d8a285dcfc264af2a77c82c",
+      "scripts/test-phases-postgres.py": "365df6003bd90f65afe0593f195a733c25ae8c9abdca6848119555657be54eaa",
+      "scripts/prepare-phases-release.py": "e6c525b8a70562527d606b0017d72199865c838df31b6bbc995acb1405deb5a5"
+    },
+    "sourceSha256": {
+      "src/main/java/com/sportscenter/training/TrainingResultController.java": "88b4ecd0c5fcc296744c1d4669fc9fcc249af1ed3e5ceeba19f1d8605d8fdd1c",
+      "src/main/java/com/sportscenter/training/TrainingResultService.java": "d232306a8af3485d106d3ced3d5d8274b894c8df640eacd17ea4bf97e58cd239",
+      "src/test/java/com/sportscenter/training/TrainingResultAccessIntegrationTest.java": "8ad48687b8d98c10bdd3673a27479f54c40577ed006aeff9aa1a740095d1e03d",
+      "src/test/java/com/sportscenter/invoice/PaymentResolutionAuthorizationHttpTest.java": "87e295502a43d5fb6459eab7c1ad82b469493323bbe4a612ac4e72a2144ef6da"
+    },
+    "environment": {
+      "java": "17.0.12",
+      "database": "H2 PostgreSQL mode, isolated local in-memory fixtures",
+      "http": "Spring MockMvc with real login/auth-me and JPA service/repository for integration; mocked service only for controller authorization matrix",
+      "testedCheckout": "C:\\Users\\Admin\\AppData\\Local\\Temp\\scms_rbac0_lstkfg21",
+      "dotenvCopied": false,
+      "cloudMutation": false
+    },
+    "localVerification": {
+      "result": "PASS",
+      "targeted": {
+        "tests": 21,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "passed": 21
+      },
+      "clean": {
+        "tests": 395,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 28,
+        "passed": 367
+      },
+      "commands": [
+        "mvnw.cmd -Dspring.config.import= -Dtest=TrainingResultAccessIntegrationTest,PaymentResolutionAuthorizationHttpTest,TrainingResultServiceTest test",
+        "mvnw.cmd -Dspring.config.import= clean test"
+      ],
+      "rawRun": "artifacts/runs/rbac0/2026-11-05",
+      "xmlManifest": "artifacts/runs/rbac0/2026-11-05/verification.json"
+    },
+    "acceptance": {
+      "D15MemberSelfRead": {
+        "result": "PASS",
+        "integrationCases": [
+          {
+            "test": "memberReadsOnlyOwnCommittedResultsWithOrWithoutMemberFilter",
+            "result": "PASS"
+          },
+          {
+            "test": "adminWithExplicitInvoiceAuthorityStillHasNoGlobalCenterBypass",
+            "result": "PASS"
+          },
+          {
+            "test": "memberCannotSelectAnotherMemberOrExpandScopeViaSessionAndCoach",
+            "result": "PASS"
+          },
+          {
+            "test": "extraManagementAuthorityDoesNotBypassMemberOwnership",
+            "result": "PASS"
+          },
+          {
+            "test": "paymentResolutionReadsRequireRoleAndAuthorityAndStayInActorsCenter",
+            "result": "PASS"
+          },
+          {
+            "test": "coachAndAuthorizedStaffKeepExistingReadAccess",
+            "result": "PASS"
+          },
+          {
+            "test": "staleSessionCannotReadAfterMemberBecomesInactiveOrChangesRole",
+            "result": "PASS"
+          },
+          {
+            "test": "anonymousAndMemberWritesAreRejectedWithoutChangingResults",
+            "result": "PASS"
+          }
+        ],
+        "fixture": "Committed Member accounts, two Coaches, shared/other sessions, three persisted results; payment-resolution reads use Paid invoice fixtures in two centers",
+        "checks": "Owner IDs and optional filters, other-ID rejection, empty own subset, no default Member writes, unchanged committed result values/counts, inactive/stale-role session denial, extra authority cannot bypass ownership"
+      },
+      "paymentResolutionControllerGates": {
+        "result": "PASS",
+        "suite": "PaymentResolutionAuthorizationHttpTest",
+        "checks": "Five roles with/without MANAGE_INVOICES, GET/open/approve/complete; service mock proves authorization only, not money workflow"
+      },
+      "paymentResolutionReadScope": {
+        "result": "PASS",
+        "checks": "Real login/auth-me: default Member/Coach/Admin denied, Receptionist/Manager correct center, Inactive denied; explicitly granted Admin with null center GET empty and write 400 code CENTER_REQUIRED, scoped Admin GET own center; invoice/resolution counts and Paid state unchanged"
+      }
+    },
+    "initialFailure": {
+      "cause": "New test incorrectly searched CENTER_REQUIRED in message instead of code",
+      "observed": "HTTP 400 with code=CENTER_REQUIRED and message=Schedule writes require a valid center",
+      "fix": "Assertion changed to $.code; expected status and Backend behavior unchanged",
+      "evidence": "artifacts/runs/rbac0/2026-11-05/initial-clean-xml/TEST-com.sportscenter.training.TrainingResultAccessIntegrationTest.xml",
+      "supersededBy": "Final targeted and clean results above"
+    },
+    "frontendRequirement": "Do not request payment-resolutions on Member login/background/pages or show internal resolution controls. Remove the resulting spurious Access Denied notification by removing the out-of-role request; do not globally suppress 403 or legitimate Member business notifications.",
+    "limits": {
+      "renderAcceptance": "NOT_RUN; no new deployment or same-session live request proof",
+      "frontendAcceptance": "NOT_RUN; no Frontend source edited per Owner",
+      "postgresSpecificAcceptance": "NOT_RUN in this change; H2 does not certify PostgreSQL-specific behavior",
+      "paymentMutationBusinessAcceptance": "NOT_RUN newly; controller mock success is not approval/completion acceptance",
+      "remainingAuditItems": "BE-01 through BE-07 not reviewed individually"
+    }
+  },
+  "normalMembershipIndependence": {
+    "recordedAt": "2026-11-06T13:13:30.936888+07:00",
+    "decision": "Owner 2026-11-06 approved removing shared-membership eligibility from Normal enrollment and waitlist promotion; preserve history and report further legacy issues for separate approval",
+    "baseCommit": "3a2adaf1b6ac11bbe55cdc7e41931a4a5e31530a",
+    "sourceState": "uncommitted working-tree snapshot; base SHA is not deployed runtime SHA",
+    "sourceFingerprints": {
+      "src/main": "a85dd102b3449daba0d7eb8aaa2a45a392f18cc9328eb710c3a85554fb72e0cb",
+      "src/test": "f6a5c33ed67bd9eb97d2f76077244446312a18609281427078e05d97578b8d9d",
+      "database": "fcb87aca26143a4b49d19670fef1c86515fa57e856d5ad8ebbbd95d1463d3291",
+      "pom.xml": "aa5c4d1a1bb3e23860225b7aacd7341fe278430cd6148a8a9d66c9ebabc1864b",
+      "schema_postgres.sql": "7b3a0b5878335ddbeade70b9a4060aba6a097ace8ea561ad3f30baccfa824a0e",
+      "scripts/test-room-absence-postgres.py": "7144adb3689349a949c9ee702958f765fb5743433d8a285dcfc264af2a77c82c",
+      "scripts/test-phases-postgres.py": "365df6003bd90f65afe0593f195a733c25ae8c9abdca6848119555657be54eaa",
+      "scripts/prepare-phases-release.py": "e6c525b8a70562527d606b0017d72199865c838df31b6bbc995acb1405deb5a5"
+    },
+    "sourceSha256": {
+      "src/main/java/com/sportscenter/enrollment/EnrollmentService.java": "cd408200810a1c675bf6cd79c64c3407d456e9200ae18d51838963cb8cb7d49a",
+      "src/test/java/com/sportscenter/enrollment/EnrollmentServiceTest.java": "d84bb02de41353be6fe2e4c4164cc4ab78b80ec5b8e514f84f2d82d7473c359b",
+      "src/test/java/com/sportscenter/enrollment/NormalEnrollmentMembershipIntegrationTest.java": "cca618b9426a02008c29952bb07fda01c8ac56897798d5beafa6cf2122bc830d"
+    },
+    "ownerEvidence": {
+      "environment": "Owner browser FE Pages / BE Render",
+      "runtimeSha": "NOT_CAPTURED",
+      "result": "FAIL original Normal enrollment rule",
+      "request": {
+        "method": "POST",
+        "path": "/api/classes/19/enroll",
+        "status": 400,
+        "body": {
+          "code": "PACKAGE_EXPIRED",
+          "message": "member package is expired or inactive"
+        }
+      },
+      "precondition": "Newly registered/OTP-verified account; Normal badminton modal, 900000 VND, VNPay selected",
+      "agentAuthenticatedReproduction": false,
+      "separate404": {
+        "method": "GET",
+        "path": "/api/sessions/catalog/17",
+        "status": 404,
+        "body": "NOT_PROVIDED",
+        "assessment": "Different class ID from enrollment; no shared root cause established"
+      },
+      "piiStored": false
+    },
+    "implementation": {
+      "scope": "Normal only: skip membership lookup/gate in enroll and promotion; do not assign new eligibility dependency; retain existing historical link; legacy non-Normal and money-resolution behavior unchanged",
+      "databaseMigration": "NONE",
+      "frontendSourceEdited": false
+    },
+    "environment": {
+      "java": "17.0.12",
+      "database": "H2 PostgreSQL mode, isolated local fixtures",
+      "transport": "MockMvc with real login/auth-me, JPA and committed SQL state; full clean suite includes existing local workflow tests",
+      "testedCheckout": "C:\\Users\\Admin\\AppData\\Local\\Temp\\scms_normal_no_membership_l6txg7qo",
+      "dotenvCopied": false,
+      "cloudMutation": false,
+      "postgresCheck": "NOT_RUN; Docker Linux engine unavailable"
+    },
+    "verification": {
+      "result": "PASS",
+      "targeted": {
+        "tests": 32,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "passed": 32
+      },
+      "clean": {
+        "tests": 402,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 28,
+        "passed": 374
+      },
+      "integrationCases": [
+        {
+          "test": "concurrentLastSeatRequestsWithoutMembershipProduceOnePendingAndOneWaitlist",
+          "result": "PASS"
+        },
+        {
+          "test": "newMemberCashOrderBecomesRegisteredOnlyAfterPaidAndPriceStaysFrozen",
+          "result": "PASS"
+        },
+        {
+          "test": "scheduleReadinessAndConflictsStillApplyWithoutMembership",
+          "result": "PASS"
+        },
+        {
+          "test": "normalReenrollmentDoesNotRequireExpiredLegacyPackageOrEraseItsHistoricalLink",
+          "result": "PASS"
+        },
+        {
+          "test": "waitlistMemberWithoutMembershipIsPromotedToPendingAndDoesNotGetFreeRights",
+          "result": "PASS"
+        },
+        {
+          "test": "ownerCenterInactiveAndBlockedGuardsStillRejectWithoutCreatingOrders",
+          "result": "PASS"
+        },
+        {
+          "test": "vnpayOrderWithoutMembershipStaysPendingAndRetryDoesNotCreateAnotherInvoice",
+          "result": "PASS"
+        }
+      ],
+      "commands": [
+        "mvnw.cmd -Dspring.config.import= -Dtest=EnrollmentServiceTest,NormalEnrollmentMembershipIntegrationTest test",
+        "mvnw.cmd -Dspring.config.import= clean test"
+      ],
+      "rawRun": "artifacts/runs/normal-no-membership/2026-11-06",
+      "xmlManifest": "artifacts/runs/normal-no-membership/2026-11-06/verification.json"
+    },
+    "acceptance": {
+      "normalCash": "No package: Pending enrollment/invoice, no new eligibility link; real receptionist Cash confirmation -> Paid/Registered; duplicate confirmation 409; original 900000 amount frozen after class price changes",
+      "normalVnpay": "No package: Pending with locally signed payment URL only; repeated enroll rejected without duplicate invoice, no gateway request",
+      "waitlist": "No package: full class Waitlisted without new invoice; local fixture releases a slot, promotion -> Pending plus one invoice; retry no duplicate, no free entitlement. Fixture release is not cancellation acceptance",
+      "authorizationAndReadiness": "Other owner/center, Inactive, booking block, incomplete schedule and conflicting schedule rejected; no target-class invoice on rejected requests",
+      "concurrency": "Two committed-fixture actors, independent authenticated requests synchronized at a latch; one Pending and one Waitlisted, one invoice. H2 locks only, not PostgreSQL certification",
+      "history": "Expired legacy package remains Expired with credit unchanged; existing eligibility link retained on reenrollment"
+    },
+    "testExpectedExplanation": "Existing no-package unit test fixture was Advanced; renamed to explicitly legacy non-Normal and kept expected rejection. New Normal cases use independent fixtures under approved rule; old expected not weakened to green.",
+    "setupFailures": {
+      "compilation": "Initial test wildcard import made Role ambiguous; explicit imports fixed",
+      "fixture": "Initial integration setup lacked invoice_code_seq; added sequence in isolated H2 fixture. No Backend business-rule change for setup errors. Evidence retained in targeted.log, targeted-2.log and initial-targeted-xml",
+      "supersededBy": "Final targeted and clean results above"
+    },
+    "frontendNote": "Empty membership text after Backend records it can imply staff approval is required after OTP. FE decides wording; distinguish no purchase from actual pending payment/Coach acceptance; subscriptions empty must not block Normal.",
+    "additionalFindingsPendingApproval": [
+      {
+        "id": "0.1-A",
+        "scope": "CashCorrection conservative null-eligibility heuristic may block independent Normal purchases",
+        "proposal": "Distinguish proven independent Normal purchase from explicit or ambiguous legacy dependency; preserve history",
+        "status": "STATIC_REVIEW_ONLY_NOT_CHANGED"
+      },
+      {
+        "id": "0.1-B",
+        "scope": "Generic enrollment still accepts Advanced classes under legacy rules",
+        "proposal": "Reject Advanced on generic enrollment route and direct to approved Advanced registration workflow",
+        "status": "STATIC_REVIEW_ONLY_NOT_CHANGED"
+      },
+      {
+        "id": "0.1-C",
+        "scope": "Zero/nonpositive tuition branch can select Registered without invoice",
+        "proposal": "Validate positive Normal price and keep Pending until Paid; decide handling of legacy data",
+        "status": "STATIC_REVIEW_ONLY_NOT_CHANGED"
+      },
+      {
+        "id": "0.1-D",
+        "scope": "Legacy membership buy/status/extend endpoints remain",
+        "proposal": "Review callers before deciding to disable new legacy sales/extensions or retain compatibility",
+        "status": "STATIC_REVIEW_ONLY_NOT_CHANGED"
+      }
+    ],
+    "limits": {
+      "renderAcceptance": "NOT_RUN for fixed source; not deployed",
+      "frontendAcceptance": "NOT_RUN; no Frontend source edits",
+      "vnpayGatewayLive": "NOT_RUN; payment URL generation and local tests do not prove gateway settlement",
+      "postgresSpecific": "NOT_RUN in this change; H2 does not prove PostgreSQL locks",
+      "catalog17": "UNRESOLVED; need response body and class type/status",
+      "remainingAuditItems": "BE-01 through BE-07 not handled here"
+    }
+  },
+  "normalPositivePriceGuard": {
+    "recordedAt": "2026-11-06T13:56:22.996995+07:00",
+    "scope": "Approved issue 0.1-C only: positive Normal tuition and Pending until Paid; no changes to A/B/D legacy business branches",
+    "decision": "Owner 2026-11-06 approved C first; move UI empty-state wording and Frontend integration guidance to SCMS-BAN-GIAO-FE-RBAC-LAN-1-2026-11-06.md; docs01 contains official contract",
+    "baseCommit": "3a2adaf1b6ac11bbe55cdc7e41931a4a5e31530a",
+    "sourceState": "uncommitted working-tree snapshot; base SHA is not deployed runtime SHA",
+    "sourceFingerprints": {
+      "src/main": "dfdb159724ab10f12bb516729487235e9c071c7df5ed1b3046c183bbac758463",
+      "src/test": "abcef46745cb79052bc8903286e2d5f3710b01ef01c1c17411157809a9946ceb",
+      "database": "fcb87aca26143a4b49d19670fef1c86515fa57e856d5ad8ebbbd95d1463d3291",
+      "pom.xml": "aa5c4d1a1bb3e23860225b7aacd7341fe278430cd6148a8a9d66c9ebabc1864b",
+      "schema_postgres.sql": "7b3a0b5878335ddbeade70b9a4060aba6a097ace8ea561ad3f30baccfa824a0e",
+      "scripts/test-room-absence-postgres.py": "7144adb3689349a949c9ee702958f765fb5743433d8a285dcfc264af2a77c82c",
+      "scripts/test-phases-postgres.py": "365df6003bd90f65afe0593f195a733c25ae8c9abdca6848119555657be54eaa",
+      "scripts/prepare-phases-release.py": "e6c525b8a70562527d606b0017d72199865c838df31b6bbc995acb1405deb5a5"
+    },
+    "sourceSha256": {
+      "src/main/java/com/sportscenter/enrollment/EnrollmentService.java": "9e0be5b5c111117eb6552b25d9a7e8259d291d7f03160c2c55fe7969009fe570",
+      "src/test/java/com/sportscenter/enrollment/NormalEnrollmentMembershipIntegrationTest.java": "c524366c007076ab8cca5e5ded7020ff88c45e9d45a27d283a76e9d4be48386b"
+    },
+    "environment": {
+      "java": "17.0.12",
+      "database": "Isolated local H2 PostgreSQL mode",
+      "transport": "MockMvc, real login/auth-me, application service/JPA with committed fixture and post-request SQL reads",
+      "testedCheckout": "C:\\Users\\Admin\\AppData\\Local\\Temp\\scms_normal_positive_price_0tsw21_t",
+      "dotenvCopied": false,
+      "cloudMutation": false
+    },
+    "verification": {
+      "result": "PASS",
+      "targeted": {
+        "tests": 34,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "passed": 34
+      },
+      "clean": {
+        "tests": 404,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 28,
+        "passed": 376
+      },
+      "normalIntegrationCases": [
+        {
+          "test": "concurrentLastSeatRequestsWithoutMembershipProduceOnePendingAndOneWaitlist",
+          "result": "PASS"
+        },
+        {
+          "test": "newMemberCashOrderBecomesRegisteredOnlyAfterPaidAndPriceStaysFrozen",
+          "result": "PASS"
+        },
+        {
+          "test": "invalidPriceDuringPromotionKeepsWaitlistAndExistingPaidReceiptUnchanged",
+          "result": "PASS"
+        },
+        {
+          "test": "scheduleReadinessAndConflictsStillApplyWithoutMembership",
+          "result": "PASS"
+        },
+        {
+          "test": "normalReenrollmentDoesNotRequireExpiredLegacyPackageOrEraseItsHistoricalLink",
+          "result": "PASS"
+        },
+        {
+          "test": "waitlistMemberWithoutMembershipIsPromotedToPendingAndDoesNotGetFreeRights",
+          "result": "PASS"
+        },
+        {
+          "test": "ownerCenterInactiveAndBlockedGuardsStillRejectWithoutCreatingOrders",
+          "result": "PASS"
+        },
+        {
+          "test": "vnpayOrderWithoutMembershipStaysPendingAndRetryDoesNotCreateAnotherInvoice",
+          "result": "PASS"
+        },
+        {
+          "test": "normalInvalidPricesRejectBothEnrollmentRoutesAndWaitlistingWithoutWrites",
+          "result": "PASS"
+        }
+      ],
+      "commands": [
+        "mvnw.cmd -Dspring.config.import= -Dtest=EnrollmentServiceTest,NormalEnrollmentMembershipIntegrationTest test",
+        "mvnw.cmd -Dspring.config.import= clean test"
+      ],
+      "rawRun": "artifacts/runs/normal-positive-price/2026-11-06",
+      "xmlManifest": "artifacts/runs/normal-positive-price/2026-11-06/verification.json"
+    },
+    "acceptance": {
+      "invalidEnrollmentPrice": {
+        "result": "PASS",
+        "scope": "Cash and VNPay, both POST /api/classes/{classId}/enroll and POST /api/enrollments, space available and full capacity; zero/negative/null price returns 400 code INVALID_PRICE; no enrollment or invoice inserted"
+      },
+      "invalidPromotionPrice": {
+        "result": "PASS",
+        "scope": "Already Paid/Registered first Member and Waitlisted second Member; zero/negative current price causes promotion transaction to reject INVALID_PRICE with waiting status/promoted_at unchanged and no additional invoice; Paid receipt amount/status unchanged; valid price then produces Pending once, retry no duplicate"
+      },
+      "positivePriceRegression": {
+        "result": "PASS",
+        "scope": "Prior Normal no-membership/Cash/VNPay local-link/owner-center/schedule/race/history tests remain passing"
+      }
+    },
+    "fixtureLimits": {
+      "nullPrice": "NULL only admitted by temporarily dropping classes.tuition_fee NOT NULL in isolated H2 fixture, then restoring it. PostgreSQL schema currently rejects NULL; no production schema change or NULL acceptance claimed.",
+      "waitlist": "Invocation is real transaction service; no public standalone promotion endpoint is claimed.",
+      "paidData": "No update/backfill of real historical prices, receipts or enrollment states; pre-existing Paid invoice fixture remains unchanged."
+    },
+    "designReview": "SportsClassService already enforces positive subject prices on new class creation; this adds defense at enrollment/promotion for legacy or invalid persisted data.",
+    "handoff": {
+      "path": "SCMS-BAN-GIAO-FE-RBAC-LAN-1-2026-11-06.md",
+      "layout": "Five required sections; UI wording is FE decision, not official API design",
+      "frontendSourceEdited": false
+    },
+    "pendingApprovals": [
+      "0.1-A: distinguish independent Normal invoice from Advanced dependency in CashCorrection",
+      "0.1-B: reject Advanced on generic enrollment routes, retain historical data",
+      "0.1-D: stop new legacy shared-membership purchases/extensions while retaining history/Advanced reads"
+    ],
+    "limits": {
+      "postgresSpecific": "NOT_RUN in this change; H2 is not PostgreSQL verification",
+      "render": "NOT_RUN for fixed source; not deployed",
+      "frontend": "NOT_RUN; no Frontend source changes",
+      "gatewayLive": "NOT_RUN; VNPay local payment URL creation does not prove settlement",
+      "catalog17": "UNRESOLVED, separate from class19 enrollment"
+    }
+  },
+  "legacyMembershipRetirement": {
+    "recordedAt": "2026-11-06T16:35:54.345049+07:00",
+    "ownerApproval": "2026-11-06 A/B/C approved; execute B, then prepare/test one Supabase SQL file; STOP until Owner migration succeeds, before A",
+    "baseCommit": "3a2adaf1b6ac11bbe55cdc7e41931a4a5e31530a",
+    "sourceState": "Uncommitted working-tree snapshot; not a deployment SHA",
+    "testedSourceFingerprints": {
+      "src/main": "d695dac6f34e62dcd96be055b74c5ec18af590901e13fd1f1fef4eb4e1463819",
+      "src/test": "da6cef562d785ba2f4e8e33b4f6f9654671e0c2f2e8b21ae9f722c110e65a7f8",
+      "database": "88f47f4c788e1de6525a29bd6a45fc6dccd22cee2495004226fef266ac4fe6df",
+      "pom.xml": "aa5c4d1a1bb3e23860225b7aacd7341fe278430cd6148a8a9d66c9ebabc1864b",
+      "schema_postgres.sql": "7b3a0b5878335ddbeade70b9a4060aba6a097ace8ea561ad3f30baccfa824a0e",
+      "scripts/test-room-absence-postgres.py": "7144adb3689349a949c9ee702958f765fb5743433d8a285dcfc264af2a77c82c",
+      "scripts/test-phases-postgres.py": "365df6003bd90f65afe0593f195a733c25ae8c9abdca6848119555657be54eaa",
+      "scripts/prepare-phases-release.py": "e6c525b8a70562527d606b0017d72199865c838df31b6bbc995acb1405deb5a5"
+    },
+    "sourceSha256": {
+      "src/main/java/com/sportscenter/enrollment/EnrollmentService.java": "631a7684abb14f275fdb9d8a843bc92690d744ab280b2ce7963b58d322172f44",
+      "src/main/java/com/sportscenter/membership/MemberPackageService.java": "d8758b1ca82901e5bf2aec2d5010add014bded99f4ad45265b3c5dced1d46efd",
+      "src/main/java/com/sportscenter/membership/MembershipPackageService.java": "8539ea2601382ab4b77bc1e572d2cfc401225d8ce1ec8ac98bc726d7ec6981ee",
+      "src/main/java/com/sportscenter/user/MemberService.java": "dab7da9b6df1fb77deea083b0840af981aae03607bea78e8987e01f202baa8f0",
+      "src/test/java/com/sportscenter/enrollment/NormalEnrollmentMembershipIntegrationTest.java": "252819f7a16bb22ddf041f229516553e9f176dfe0e0f314d25bb19706891f043",
+      "scripts/test-retire-legacy-memberships.py": "6ee9e7e5b864bbde6732a4fdaf659de1be0f06474a23df269a140dff88fb9f3d",
+      "database/migrations/16_retire_legacy_memberships_postgres.sql": "b63c43328b1900aac8dba86f63dbbd90e4c5ff38bbb2eb7eca44b804564aaa69"
+    },
+    "documentationOnlyDeltaAfterSnapshot": {
+      "database/README.md": {
+        "testedSha256": "fff930f1a1872587f83e7f49feae44390fa341b0e9c06211a47ca5aa3cb77b24",
+        "currentSha256": "0d705a9bdccf5a8268d157d2cdf4e9ba3a915db47371076f6c215f072f2edd5c"
+      }
+    },
+    "bStage": {
+      "result": "PASS_LOCAL",
+      "targeted": {
+        "tests": 38,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "clean": {
+        "tests": 405,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 28
+      },
+      "rawRun": "artifacts/runs/normal-only/2026-11-06",
+      "scope": "Normal-only generic enrollment routes; Advanced rejected USE_ADVANCED_REGISTRATION before new order; legacy Advanced waitlist not promoted"
+    },
+    "finalBackend": {
+      "result": "PASS_LOCAL",
+      "environment": "Java17.0.12 / isolated H2 fixtures and local PostgreSQL17",
+      "testedCheckout": "C:\\Users\\Admin\\AppData\\Local\\Temp\\scms_retire_memberships_wuiv0468",
+      "dotenvCopied": false,
+      "targeted": {
+        "tests": 49,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "passed": 49
+      },
+      "clean": {
+        "tests": 406,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 28,
+        "passed": 378
+      },
+      "postgresHttp": {
+        "tests": 22,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "passed": 22
+      },
+      "postgresDatabase": "scms_phases_retire_http_20261106090841",
+      "postgresMigratedBeforeWorkflow": true,
+      "postgresTestShaPropertyVerified": true,
+      "postgresReplayAfterWorkflow": "PASS",
+      "rawRun": "artifacts/runs/retire-legacy-memberships/2026-11-06",
+      "xmlManifest": "artifacts/runs/retire-legacy-memberships/2026-11-06/verification.json"
+    },
+    "migration": {
+      "path": "database/migrations/16_retire_legacy_memberships_postgres.sql",
+      "sha256": "b63c43328b1900aac8dba86f63dbbd90e4c5ff38bbb2eb7eca44b804564aaa69",
+      "testRunnerSha256": "6ee9e7e5b864bbde6732a4fdaf659de1be0f06474a23df269a140dff88fb9f3d",
+      "result": "PASS_LOCAL_POSTGRESQL",
+      "checks": {
+        "modernOnlyBaselineUnchanged": "PASS",
+        "obsoleteSubgraphDeletedAndCurrentAdvancedPreserved": "PASS",
+        "replayDoesNotDeleteOrModifyAnythingElse": "PASS",
+        "retiredCatalogSubscriptionAndInvoiceWritesBlocked": "PASS",
+        "currentAdvancedWritesRemainCompatible": "PASS",
+        "currentEnrollmentLinkStopsEntirePurge": "PASS",
+        "partialAdvancedCannotBeMisclassifiedAsObsolete": "PASS",
+        "unknownCascadingForeignKeyStopsBeforeMutation": "PASS",
+        "postflightDetectsUnexpectedMoneyChangeAndRollsBackAllDeletes": "PASS",
+        "replayWithUnexpectedReintroducedLegacyRowsStops": "PASS"
+      },
+      "rawReport": "artifacts/runs/retire-legacy-memberships/2026-11-06/migration.json",
+      "fixtureDeletionCounts": {
+        "model_retired": true,
+        "deleted_catalog": 2,
+        "deleted_legacy_invoices": 1,
+        "detached_current_invoices": 1,
+        "deleted_legacy_resolutions": 1,
+        "deleted_legacy_subscriptions": 1,
+        "detached_current_subscriptions": 1,
+        "deleted_legacy_payment_attempts": 1
+      },
+      "guardPolicy": "Unambiguous obsolete shared-membership subgraph only. Partial/current links and unknown/cascading FKs stop the full transaction. Current Advanced catalog FK may be detached only with complete subject/Coach/owner shape; remaining money/credit/status/Normal/session/attendance data protected by witnesses. No DROP TABLE/TRUNCATE/CASCADE or business-row archive. Retired-write triggers installed; replay is guarded and idempotent.",
+      "cloudExecuted": true,
+      "ownerSupabaseRun": "PASS_OWNER_REPORTED",
+      "expectedOwnerResult": {
+        "result": "PASS",
+        "migration_key": "20261106_retire_legacy_memberships_v1",
+        "summary.model_retired": true
+      },
+      "cloudExecutionByAgent": false,
+      "ownerResult": {
+        "result": "PASS",
+        "migration_key": "20261106_retire_legacy_memberships_v1",
+        "summary": {
+          "model_retired": true,
+          "deleted_catalog": 0,
+          "deleted_legacy_invoices": 0,
+          "detached_current_invoices": 0,
+          "deleted_legacy_resolutions": 0,
+          "deleted_legacy_subscriptions": 0,
+          "detached_current_subscriptions": 0,
+          "deleted_legacy_payment_attempts": 0
+        },
+        "reportedOn": "2026-11-06",
+        "source": "Owner pasted SQL Editor result in conversation",
+        "independentlyQueriedByAgent": false,
+        "backendDeployed": false
+      }
+    },
+    "retiredWrites": {
+      "result": "PASS_LOCAL",
+      "scope": "Legacy self/staff purchase aliases, catalog create/update/status, shared subscription extend/status; counter Member create with packageId rejects before creating account. Role/validation gates remain. Advanced incident-recovery and GET rights preserved."
+    },
+    "expectedChanges": "Old generic enrollment fixtures changed from Advanced/free Registered to proper paid Normal Pending. Shared-membership extension/reactivation/purchase success expected replaced by approved retirement rejection. Historical cancellation tests retained separately; no test expected changed to hide a business failure.",
+    "setupFailures": {
+      "b": "Constructor dependency removal required updating explicit test construction; mock Clock was evaluated inside unfinished Mockito stubbing and moved outside. Final targeted/clean passed.",
+      "postgres": "First HTTP run failed before fixtures: JDBC Asia/Saigon rejected by PostgreSQL. Same code/DB rerun with -DargLine=-Duser.timezone=Asia/Ho_Chi_Minh passed; not a business FAIL or cloud result."
+    },
+    "handoff": "SCMS-BAN-GIAO-FE-RBAC-LAN-1-2026-11-06.md",
+    "cashCorrectionA": {
+      "approved": true,
+      "implemented": true,
+      "migrationGate": "SATISFIED_BY_OWNER_REPORTED_PASS",
+      "sourceUnchangedUntilSupabaseSuccess": true,
+      "verification": "cashCorrectionIndependence"
+    },
+    "limits": {
+      "render": "NOT_RUN for current fixes; not deployed",
+      "supabase": "PASS_OWNER_REPORTED; result+marker+model_retired true; all purge/detach counters zero; no independent agent cloud query",
+      "frontend": "NOT_RUN; source not edited",
+      "gateway": "NOT_RUN live; local payment proof does not certify VNPay merchant",
+      "remaining": "A completed locally in cashCorrectionIndependence; catalog17, deployment/FE and full BE-01..BE-07 remain open"
+    }
+  },
+  "cashCorrectionIndependence": {
+    "recordedAt": "2026-11-06T10:19:37.996394+00:00",
+    "result": "PASS_LOCAL",
+    "baseCommit": "3a2adaf1b6ac11bbe55cdc7e41931a4a5e31530a",
+    "sourceState": "uncommitted working tree; no commit/push/deploy",
+    "environment": "Java 17.0.12; isolated checkouts without .env; H2 + Docker PostgreSQL17 at 127.0.0.1:55440; no cloud mutation by agent",
+    "sourceFingerprints": {
+      "main": "83c1217f9af6df8f249f5cf7abe0f1dafb47087ae4b4c0d835d9fe76a7ab7b38",
+      "test": "57b742119989ab57e01381d85f019b5865ed24d5cea520c263d61d5bf6855ffa"
+    },
+    "sourceSha256": {
+      "src/main/java/com/sportscenter/invoice/PaymentResolutionService.java": "2c092934158a281d8695888b22294027054e124688de086abb373a00f245f59e",
+      "src/test/java/com/sportscenter/invoice/PaymentResolutionCashCorrectionHttpTest.java": "2a6b02eb9528984b5c2856c0d924e1b480caa7368ab75f633725677fc471747b",
+      "src/test/java/com/sportscenter/workflow/PhaseWorkflowHttpTest.java": "91ca782c2aab1d253d93cd4c3fe81e3b37f4cbeb8737c6681341f654aa2d5faf"
+    },
+    "manifest": "artifacts/runs/cash-correction/2026-11-06/manifest.json",
+    "targeted": {
+      "tests": 35,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "passed": 35
+    },
+    "clean": {
+      "tests": 412,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 28,
+      "passed": 384
+    },
+    "postgresCorrection": {
+      "tests": 6,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "passed": 6
+    },
+    "postgresWorkflow": {
+      "tests": 22,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "passed": 22
+    },
+    "rawDirectory": "artifacts/runs/cash-correction/2026-11-06",
+    "cleanFixtureOnlyDifference": {
+      "file": "src/test/java/com/sportscenter/invoice/PaymentResolutionCashCorrectionHttpTest.java",
+      "cleanSha256": "d6c7fdd993e35d184187e463ade7da93faed46505419595a1ebf522c0344cbc4",
+      "finalSha256": "2a6b02eb9528984b5c2856c0d924e1b480caa7368ab75f633725677fc471747b",
+      "change": "Fixture now uses approved cau-long catalog entry instead of arbitrary test slug; backend source is identical. Final targeted H2 and PG revalidated this fixture. No expected business result or DB constraint changed."
+    },
+    "verifiedScenarios": [
+      "Later independent Normal Pending and Paid do not block Advanced CashCorrection",
+      "Normal invoice and enrollment row snapshots unchanged after complete/retry",
+      "Original Advanced invoice remains Paid with frozen amount; reversed flag and Cancelled/zero credit entitlement",
+      "Real eligibility link blocks approval; dependency added after approval blocks completion",
+      "Credit changed after approval blocks completion; approval alone does not reverse",
+      "moneyNotReceived=false rejected before completion; role/center violations cannot mutate",
+      "Open/complete retry creates one resolution, completion audit and notification",
+      "Existing full workflow checks unused/history guards, money reports, receipts, role/owner/center and resource/payment races after SQL16"
+    ],
+    "fixtureSetupFailures": {
+      "initialCompile": "Explicit Spring annotation imports resolved Role type ambiguity before successful runs",
+      "postgresBeforeCanonicalFixture": "6 setup errors from ck_approved_subject_slug rejecting arbitrary test slugs; fixed fixture to approved subject. No service logic/expected/DB guard relaxed."
+    },
+    "limits": {
+      "render": "NOT_RUN; current BE not deployed",
+      "supabase": "Owner-reported SQL16 PASS only; not independently queried by agent",
+      "frontend": "NOT_RUN; source untouched",
+      "gateway": "NOT_RUN live",
+      "audit": "BE01/04/05 partial handoff; full seven-item audit remains open",
+      "catalog17": "Pending response body and class17 type/status"
+    }
+  },
+  "rbacMainMergeIntegration": {
+    "recordedAt": "2026-11-06T15:33:25.816254+00:00",
+    "result": "PASS_LOCAL",
+    "parents": [
+      "9a4ffb70e2425c5c91fb1efa4383a9320cb599ee",
+      "b033ab7719bb124ac4fce9c1e0f6712e05c4e5c9"
+    ],
+    "sourceState": "merged source with recorded resolutions before merge commit; publication status is recorded by Git and PR18",
+    "sourceFingerprintsLfNormalized": {
+      "src/main": "8882337e2ee5c18bba080f9e090e92f63304d81883d54c789161ca5287840fe4",
+      "src/test": "fa00608472ce4193828c348fbc63e00a4ab3aead33c4f390928ba274b0dbe1f9"
+    },
+    "files": {
+      "src/main/java/com/sportscenter/training/TrainingResultController.java": {
+        "sha256Raw": "88b4ecd0c5fcc296744c1d4669fc9fcc249af1ed3e5ceeba19f1d8605d8fdd1c",
+        "sha256LfNormalized": "63e5be3fae0f53b83cb98ea9c2cdee9d9b6ad07dddbb6c8531852d0dc7c2a6f8"
+      },
+      "src/main/java/com/sportscenter/training/TrainingResultService.java": {
+        "sha256Raw": "d232306a8af3485d106d3ced3d5d8274b894c8df640eacd17ea4bf97e58cd239",
+        "sha256LfNormalized": "f9f85ab4a84447388d8a423bb3bba2d078b9d819339fa0b48e85351420f405a1"
+      },
+      "src/test/java/com/sportscenter/training/TrainingResultServiceTest.java": {
+        "sha256Raw": "24e9692a89aa4454776d72be7016bf28031d97d723a61bc99a6c38abad40675b",
+        "sha256LfNormalized": "487133fee0140edd61ea6e37a45ba8a8bb040a554c9e38a58383f06165711cba"
+      },
+      "src/test/java/com/sportscenter/training/TrainingResultAccessIntegrationTest.java": {
+        "sha256Raw": "f2e837645601733f02bd0232171efe0626e7ad4bb281083b63df48f30be96fef",
+        "sha256LfNormalized": "8ad48687b8d98c10bdd3673a27479f54c40577ed006aeff9aa1a740095d1e03d"
+      },
+      "src/test/java/com/sportscenter/workflow/PhaseWorkflowHttpTest.java": {
+        "sha256Raw": "91ca782c2aab1d253d93cd4c3fe81e3b37f4cbeb8737c6681341f654aa2d5faf",
+        "sha256LfNormalized": "10a416a14cb7cf4e11e59b9c78e7c3ef9c84ef70926b28176ce43bdbc3af7ae5"
+      },
+      "scripts/test-phases-postgres.py": {
+        "sha256Raw": "13a3dbf3e3081eae0693834f010deefadbc278dd47b666b05cd2ae37fd3993e7",
+        "sha256LfNormalized": "6bac7df74637329f19fa3737cb6d2c297e70531fe3a0cf8ebc6d25f2cc3cc57c"
+      },
+      "database/migrations/13_google_login_postgres.sql": {
+        "sha256Raw": "984566d55a76ceb13a136792ef898c4a187ea03594a4b69144fb8143ac5e39a7",
+        "sha256LfNormalized": "e9856dacb21df954d48f2fda2c904e77ee7684a7159eaa1822a28ca1d971544f"
+      },
+      "artifacts/fe-handoff/openapi.json": {
+        "sha256Raw": "53b5466b0cdaac1a187c432da862f98d518e5289de3d14894bd7d0f31a594948",
+        "sha256LfNormalized": "2829c85cc45721364d07dcd0d99f58b1e24c479457ec12db3c84f2030be18acb"
+      }
+    },
+    "rawDirectory": "artifacts/runs/merge-main-rbac/2026-11-06",
+    "environment": "Java17.0.12, H2, PostgreSQL17 Docker 127.0.0.1:55440; isolated checkout without .env",
+    "counts": {
+      "targeted": {
+        "tests": 54,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "passed": 54
+      },
+      "clean": {
+        "tests": 432,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 28,
+        "passed": 404
+      },
+      "postgres": {
+        "tests": 22,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "passed": 22
+      }
+    },
+    "decisions": [
+      "Both training-results conflict resolutions retain tai content including Active/current-role guard",
+      "Main Member fixture now explicitly Active with Member role; no expected/policy changed",
+      "Main Google login/avatar and other nonconflicting code preserved",
+      "Removed reintroduced historical block from docs00 and duplicate contract sections; historical content remains in Git",
+      "Canonical OpenAPI regenerated from actual merged application; added Google route and avatar DTO fields; no prior path removed"
+    ],
+    "postgresSetup": {
+      "database": "scms_phases_merge_rbac_20261106",
+      "googleMigrationReplayed": true,
+      "queryDr15AndRetire16Applied": true,
+      "invoiceEnrollmentReplaySnapshotsPreserved": true,
+      "initialSetup": "First attempt met database system is starting up; retried after pg_isready; no business case ran in failed setup"
+    },
+    "limits": {
+      "supabase": "No cloud write; Google migration not confirmed on current DB; previous Owner SQL16 PASS retained separately",
+      "render": "NOT_RUN deployment/acceptance for merge",
+      "frontend": "NOT_RUN; source not modified",
+      "googleLive": "NOT_RUN; token verification service tested with local mocks",
+      "rbacAudit": "BE-01..BE-07 still open as full items; no broad audit acceptance from this merge"
+    },
+    "pullRequest": "https://github.com/Aditerx/SWP391/pull/18"
   }
 }

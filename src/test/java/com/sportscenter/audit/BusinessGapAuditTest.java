@@ -40,11 +40,11 @@ class BusinessGapAuditTest {
         service.findAll(7,null,null,"Pending","Cash","INV-",null,null,auth);
         verify(repo).searchInvoices(7,null,null,"Pending","Cash","INV-",null,null);
     }
-    @Test void futureActivePackageCannotEnrollToday() {
+    @Test void normalWithoutValidPriceCannotEnrollRegardlessOfOldMembership() {
         var er=mock(ClassEnrollmentRepository.class); var cr=mock(SportsClassRepository.class);
-        var ur=mock(UserRepository.class); var mr=mock(MemberPackageRepository.class);
-        var service=new EnrollmentService(er,cr,ur,mr,mock(AuditService.class),mock(InvoiceService.class),
-            Clock.systemDefaultZone(),mock(SessionRepository.class),mock(NotificationService.class),mock(MemberRepository.class),mock(com.sportscenter.session.ScheduleWriteLock.class));
+        var ur=mock(UserRepository.class);
+        var service=new EnrollmentService(er,cr,ur,mock(AuditService.class),mock(InvoiceService.class),
+            Clock.fixed(java.time.Instant.parse("2026-11-06T01:00:00Z"),java.time.ZoneId.of("Asia/Ho_Chi_Minh")),mock(SessionRepository.class),mock(NotificationService.class),mock(MemberRepository.class),mock(com.sportscenter.session.ScheduleWriteLock.class));
         var role=new Role(); role.setName("Member");
         var member=new User(); member.setId(7); member.setStatus("Active"); member.setRole(role); member.setCenterId(1);
         when(ur.findByEmailIgnoreCase("audit@example.com")).thenReturn(Optional.of(member));
@@ -53,8 +53,7 @@ class BusinessGapAuditTest {
         sampleClass.setId(1);
         sampleClass.setStatus("Open");
         when(cr.findByIdForUpdate(1)).thenReturn(Optional.of(sampleClass));
-        var pkg=new MemberPackage(); pkg.setStatus("Active"); pkg.setStartDate(LocalDate.now().plusDays(30)); pkg.setEndDate(LocalDate.now().plusDays(60));
-        when(mr.findByMemberId(7)).thenReturn(List.of(pkg));
-        assertThrows(com.sportscenter.common.exception.BusinessException.class, () -> service.enroll(1,null,"audit@example.com"));
+        var error=assertThrows(com.sportscenter.common.exception.BusinessException.class, () -> service.enroll(1,null,"audit@example.com"));
+        assertTrue(error.getMessage().startsWith("INVALID_PRICE:"));
     }
 }

@@ -37,7 +37,6 @@ public class MemberService {
     private final CenterContext centerContext;
     private final EmailService emailService;
     private final TemporaryPasswordGenerator temporaryPasswordGenerator;
-    private final com.sportscenter.membership.MemberPackageService subscriptionService;
 
     @Transactional(readOnly = true)
     public List<MemberResponse> findAllMembers() {
@@ -83,6 +82,9 @@ public class MemberService {
 
     @Transactional
     public MemberResponse createMember(MemberRequest request) {
+        if (request.packageId() != null) {
+            throw new BusinessException("LEGACY_MEMBERSHIP_RETIRED: Create the member without a shared package; register a Normal or Advanced course separately");
+        }
         if (userRepository.findForAuthentication(request.email()).isPresent()) {
             throw new BusinessException("Email already exists: " + request.email());
         }
@@ -123,17 +125,10 @@ public class MemberService {
         Member savedMember = memberRepository.save(member);
 
 
-        MemberPackage createdPackage = null;
-        if (request.packageId() != null) {
-            var order = subscriptionService.subscribe(savedUser.getId(),
-                    new com.sportscenter.membership.MemberPackageRequest(request.packageId(), null, null, false, "Cash", null));
-            createdPackage = memberPackageRepository.findById(order.subscriptionId()).orElseThrow();
-        }
-
         auditService.log(null, "CREATE_MEMBER", "USER", savedUser.getId(), savedUser.getFullName());
         BigDecimal totalSpent = BigDecimal.ZERO; // Pending orders are not money received.
         boolean emailSent = emailService.sendWelcomeEmail(savedUser.getEmail(), savedUser.getFullName(), temporaryPassword);
-        return MemberResponse.from(savedUser, savedMember, createdPackage, totalSpent).withEmailDelivery(emailSent,
+        return MemberResponse.from(savedUser, savedMember, null, totalSpent).withEmailDelivery(emailSent,
                 emailSent ? null : "Tạo tài khoản thành công nhưng gửi email thất bại. Dùng chức năng cấp lại mật khẩu để gửi lại.");
     }
 

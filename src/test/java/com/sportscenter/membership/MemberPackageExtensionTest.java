@@ -78,58 +78,39 @@ class MemberPackageExtensionTest {
         subscription.setStatus("Active");
     }
 
-    @Test
-    @DisplayName("Manager gia hạn gói thành công thêm 15 ngày")
-    void extendValidity_Success() {
-        when(userRepository.findByEmailIgnoreCase(managerUser.getEmail())).thenReturn(Optional.of(managerUser));
+    @Test void legacyActiveMembershipCannotBeExtended() {
         when(memberPackageRepository.findByIdForUpdate(101)).thenReturn(Optional.of(subscription));
-        when(memberPackageRepository.save(any(MemberPackage.class))).thenAnswer(i -> i.getArgument(0));
-
-        PackageExtensionRequest request = new PackageExtensionRequest(15, "Bù thời gian do trung tâm sửa chữa sân");
-
-        MemberPackageResponse response = memberPackageService.extendValidity(101, request, managerAuth);
-
-        assertNotNull(response);
-        assertEquals(LocalDate.of(2026, 11, 30), response.endDate());
-        assertEquals(60, response.validityDays());
-        assertEquals("Active", response.status());
-
-        verify(auditService).log(eq(managerUser.getId()), eq("EXTEND_PACKAGE_VALIDITY"), eq("MEMBER_PACKAGE"), eq(101),
-                contains("Bù thời gian do trung tâm sửa chữa sân"));
+        var originalEnd = subscription.getEndDate();
+        var error = assertThrows(BusinessException.class, () -> memberPackageService.extendValidity(101,
+                new PackageExtensionRequest(15,"Retired shared-membership extension"),managerAuth));
+        assertTrue(error.getMessage().startsWith("LEGACY_MEMBERSHIP_RETIRED:"));
+        assertEquals(originalEnd,subscription.getEndDate());
+        assertEquals("Active",subscription.getStatus());
+        verify(memberPackageRepository,never()).save(any());
+        verifyNoInteractions(auditService);
     }
-
-    @Test
-    @DisplayName("Gia hạn gói đã Expired thành công và tự động phục hồi Active")
-    void extendValidity_ExpiredPackage_ReinstatesActive() {
+    @Test void legacyExpiredMembershipCannotBeReactivatedByExtension() {
         subscription.setStatus("Expired");
-        subscription.setEndDate(LocalDate.of(2026, 10, 10)); // Đã hết hạn trước hôm nay
-
-        when(userRepository.findByEmailIgnoreCase(managerUser.getEmail())).thenReturn(Optional.of(managerUser));
         when(memberPackageRepository.findByIdForUpdate(101)).thenReturn(Optional.of(subscription));
-        when(memberPackageRepository.save(any(MemberPackage.class))).thenAnswer(i -> i.getArgument(0));
-
-        PackageExtensionRequest request = new PackageExtensionRequest(30, "Trung tâm bù ngày cho học viên sau khi mở cửa lại");
-
-        MemberPackageResponse response = memberPackageService.extendValidity(101, request, managerAuth);
-
-        assertNotNull(response);
-        assertEquals("Active", response.status());
-        assertTrue(response.endDate().isAfter(LocalDate.now(clock)));
+        var originalEnd = subscription.getEndDate();
+        var error = assertThrows(BusinessException.class, () -> memberPackageService.extendValidity(101,
+                new PackageExtensionRequest(30,"No revival"),managerAuth));
+        assertTrue(error.getMessage().startsWith("LEGACY_MEMBERSHIP_RETIRED:"));
+        assertEquals("Expired",subscription.getStatus());assertEquals(originalEnd,subscription.getEndDate());
+        verify(memberPackageRepository,never()).save(any());
     }
-
-    @Test
-    @DisplayName("Gia hạn với số ngày <= 0 -> Ném BusinessException")
-    void extendValidity_InvalidDays_ThrowsException() {
-        PackageExtensionRequest request = new PackageExtensionRequest(0, "Lỗi");
-
-        assertThrows(BusinessException.class, () ->
-                memberPackageService.extendValidity(101, request, managerAuth));
+    @Test void invalidDaysCannotReopenLegacyMembership() {
+        when(memberPackageRepository.findByIdForUpdate(101)).thenReturn(Optional.of(subscription));
+        var error = assertThrows(BusinessException.class, () -> memberPackageService.extendValidity(101,
+                new PackageExtensionRequest(0,"No extension"),managerAuth));
+        assertTrue(error.getMessage().startsWith("LEGACY_MEMBERSHIP_RETIRED:"));
+        verify(memberPackageRepository,never()).save(any());
     }
-    @Test void advancedExtensionCannotBypassIncidentRecovery() {
+    @Test void advancedExtensionStillRequiresIncidentRecovery() {
         subscription.getMembershipPackage().setPackageType("Advanced");
         when(memberPackageRepository.findByIdForUpdate(101)).thenReturn(Optional.of(subscription));
-        assertTrue(assertThrows(BusinessException.class,()->memberPackageService.extendValidity(101,new PackageExtensionRequest(15,"Unproven extension"),managerAuth)).getMessage().startsWith("USE_INCIDENT_RECOVERY:"));
-        assertEquals(6,subscription.getRemainingCredit());verify(memberPackageRepository,never()).save(any());
+        assertTrue(assertThrows(BusinessException.class, () -> memberPackageService.extendValidity(101,
+                new PackageExtensionRequest(15,"Unproven extension"),managerAuth)).getMessage().startsWith("USE_INCIDENT_RECOVERY:"));
+        verify(memberPackageRepository,never()).save(any());
     }
 }
-

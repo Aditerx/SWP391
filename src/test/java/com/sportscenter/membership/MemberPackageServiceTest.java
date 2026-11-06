@@ -75,14 +75,12 @@ class MemberPackageServiceTest {
     }
 
     @Test
-    @DisplayName("D03: legacy Advanced purchase is blocked until subject/Coach acceptance")
+    @DisplayName("Legacy shared-membership purchase is retired before lookup or invoice creation")
     void subscribeAdvancedRequiresApprovedRegistration() {
         var request = new MemberPackageRequest(10, null, null, false, "VNPay", null);
-        when(userRepository.findById(15)).thenReturn(Optional.of(sampleMember));
-        when(membershipPackageRepository.findById(10)).thenReturn(Optional.of(advancedPackage));
         var ex = assertThrows(com.sportscenter.common.exception.BusinessException.class,
                 () -> memberPackageService.subscribe(15, request, "127.0.0.1"));
-        assertTrue(ex.getMessage().startsWith("USE_ADVANCED_REGISTRATION:"));
+        assertTrue(ex.getMessage().startsWith("LEGACY_MEMBERSHIP_RETIRED:"));
         verifyNoInteractions(invoiceService);
         verify(memberPackageRepository,never()).save(any());
     }

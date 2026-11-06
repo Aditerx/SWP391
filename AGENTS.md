@@ -65,3 +65,12 @@ Mỗi nguồn có vai trò riêng: quyết định Owner mô tả điều phải
 - Viết hành động cụ thể: endpoint/method, input, state/error, bước FE xử lý. Tách rõ đã quan sát thành công với chưa kiểm; không chép log dài, secret, lịch sử thử sai hoặc toàn bộ contract. Cấu hình/deploy dẫn docs02; bằng chứng dẫn docs00/QA.
 - Khi cần chuẩn bị chỗ cho lượt bàn giao sau, đặt hướng dẫn tạm ngay trong file đích và đánh dấu rõ. Agent viết nội dung thực tế phải xóa phần hướng dẫn tạm, giữ lại file bàn giao; không đưa chỉ dẫn riêng của từng lượt vào AGENTS.md.
 - Khi tách/đổi tên, chuyển nội dung đúng luồng và cập nhật mọi liên kết đang dùng; không tạo hai bản cùng nội dung. Chỉ ghi kết quả đã kiểm của luồng đang làm, không suy nghiệm thu từ luồng khác.
+
+## 6. Hướng dẫn thao tác thủ công
+
+- Tự thực hiện phần có công cụ và quyền truy cập phù hợp; phần người dùng phải làm cần hướng dẫn cụ thể, dựa trên bước họ đã hoàn thành và giao diện hiện tại.
+- Trước khi hướng dẫn, kiểm tra tài liệu chính thức hoặc ảnh/giao diện tham khảo phù hợp. Không đoán tên menu, vị trí nút hoặc tính năng chưa xác minh.
+- Nếu không tìm được tài liệu phù hợp hoặc giao diện khác tài liệu, yêu cầu ảnh màn hình đúng bước đang vướng; chỉ cần vùng liên quan, che thông tin bí mật. Chỉ yêu cầu ảnh khi thiếu thông tin để hướng dẫn chính xác; chưa hướng dẫn tiếp các bước phụ thuộc vào giao diện chưa rõ.
+- Chia thao tác dài thành các nhóm ngắn, đánh số theo thứ tự; ghi đúng tên menu/nút và giá trị cần nhập. Không bắt làm lại bước đã thành công nếu chưa có căn cứ cần kiểm lại.
+- Sau mỗi nhóm thao tác, nêu kết quả cụ thể để người dùng đối chiếu: màn hình, thông báo, mã HTTP hoặc field/giá trị trả về. Diễn đạt rõ “Kết quả trả về … là đúng” và ý nghĩa trong phạm vi đó; nếu khác, chỉ ra bước hoặc dữ liệu cần kiểm tra tiếp.
+- Phân biệt kết quả mong đợi với kết quả đã quan sát; chỉ xác nhận thành công khi có bằng chứng. Không coi lưu cấu hình, kết nối được hoặc HTTP200 là đã hoàn tất nghiệp vụ nếu chưa kiểm kết quả tương ứng.
