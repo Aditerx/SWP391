@@ -9,5 +9,6 @@ public record LoginResponse(
         String role,
         Set<String> authorities,
         boolean isFirstLogin,
-        Integer memberId) {
+        Integer memberId,
+        String avatarUrl) {
 }

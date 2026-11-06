@@ -70,6 +70,10 @@ class TrainingResultServiceTest {
         sampleMember = new User();
         sampleMember.setId(7); sampleMember.setCenterId(1);
         sampleMember.setFullName("Hoàng Thị Oanh");
+        sampleMember.setStatus("Active");
+        var memberRole = new com.sportscenter.user.Role();
+        memberRole.setName("Member");
+        sampleMember.setRole(memberRole);
 
         sampleSession = new Session();
         sampleSession.setId(1);sampleSession.setSessionDate(java.time.LocalDate.of(2026,10,16));sampleSession.setStartTime(java.time.LocalTime.of(9,30));sampleSession.setEndTime(java.time.LocalTime.of(11,0));
@@ -111,6 +115,48 @@ class TrainingResultServiceTest {
         assertEquals("Hoàng Thị Oanh", response.memberName());
         verify(trainingResultRepository).save(any(TrainingResult.class));
         verify(attendanceRepository).save(any(Attendance.class));
+    }
+
+    @Test
+    @DisplayName("Member can only search own training results")
+    void searchResults_MemberIsScopedToSelf() {
+        sampleMember.setEmail("member@example.test");
+        Authentication authentication = org.mockito.Mockito.mock(Authentication.class);
+        when(authentication.getName()).thenReturn("member@example.test");
+        when(authentication.getAuthorities()).thenAnswer(invocation -> List.of(new SimpleGrantedAuthority("ROLE_MEMBER")));
+        when(userRepository.findByEmailIgnoreCase("member@example.test")).thenReturn(Optional.of(sampleMember));
+        when(trainingResultRepository.searchResults(null, 7, null)).thenReturn(List.of());
+
+        assertTrue(trainingResultService.searchResults(null, null, null, authentication).isEmpty());
+        verify(trainingResultRepository).searchResults(null, 7, null);
+    }
+
+    @Test
+    @DisplayName("Member cannot search another member's training results")
+    void searchResults_MemberCannotSpoofMemberId() {
+        sampleMember.setEmail("member@example.test");
+        Authentication authentication = org.mockito.Mockito.mock(Authentication.class);
+        when(authentication.getName()).thenReturn("member@example.test");
+        when(authentication.getAuthorities()).thenAnswer(invocation -> List.of(new SimpleGrantedAuthority("ROLE_MEMBER")));
+        when(userRepository.findByEmailIgnoreCase("member@example.test")).thenReturn(Optional.of(sampleMember));
+
+        assertThrows(org.springframework.security.access.AccessDeniedException.class,
+                () -> trainingResultService.searchResults(null, 999, null, authentication));
+        verifyNoInteractions(trainingResultRepository);
+    }
+
+    @Test
+    @DisplayName("Member can search own training results with matching memberId")
+    void searchResults_MemberMayPassOwnMemberId() {
+        sampleMember.setEmail("member@example.test");
+        Authentication authentication = org.mockito.Mockito.mock(Authentication.class);
+        when(authentication.getName()).thenReturn("member@example.test");
+        when(authentication.getAuthorities()).thenAnswer(invocation -> List.of(new SimpleGrantedAuthority("ROLE_MEMBER")));
+        when(userRepository.findByEmailIgnoreCase("member@example.test")).thenReturn(Optional.of(sampleMember));
+        when(trainingResultRepository.searchResults(1, 7, null)).thenReturn(List.of());
+
+        assertTrue(trainingResultService.searchResults(1, 7, null, authentication).isEmpty());
+        verify(trainingResultRepository).searchResults(1, 7, null);
     }
 
     @Test

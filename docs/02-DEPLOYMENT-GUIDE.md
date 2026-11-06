@@ -67,6 +67,13 @@ Báo cáo đủ: `Dxx/case →actor/fixture →expected →response+state →PAS
 
 ## 3. Deploy
 
+<a id="google-login"></a>
+### Google login/avatar nhập từ main
+
+Entity User có google_sub; DB ứng dụng đã tồn tại cần [13_google_login_postgres.sql](../database/migrations/13_google_login_postgres.sql) trước deploy bản BE này, kể cả khi chưa bật Google login vì truy vấn User đã đọc cột đó. File chỉ thêm cột/index nếu chưa có, không reset/seed; đây là migration Google riêng, khác các file13 về room. Hai schema gộp đã chứa Google; bootstrap local dùng migration riêng khi chạy runner. Kết quả SQL16 trước đó không chứng minh migration Google đã chạy trên Supabase.
+
+GOOGLE_CLIENT_ID là audience của GIS ID token; GOOGLE_AUTO_REGISTER mặc định true theo source, false thì email chưa đăng ký bị từ chối. Login thường/Google cùng session JSESSIONID; cấu hình CORS/cookie theo mục1. Bản ghép giữ tính năng hiện có từ main; kiểm token giả lập local không thay nghiệm thu Google thật hoặc Render. Trạng thái thực thi DB/deploy xem docs00/QA; agent không tự chạy migration cloud.
+
 <a id="retire-legacy-memberships"></a>
 ### Bỏ dữ liệu gói hội viên chung — migration16
 

@@ -26,6 +26,11 @@ Base Render: `https://scms-app-p1gy.onrender.com`; local thông thường `http:
 | POST `/api/auth/resend-otp` | email,purpose bắt buộc; purpose=REGISTER cho đăng ký; giới hạn60giây/lần và3OTP/giờ |
 | POST `/api/auth/forgot-password` | email; phản hồi chung không tiết lộ account tồn tại |
 | POST `/api/auth/reset-password` | email,otp,newPassword →204 |
+| POST `/api/auth/google` | credential là Google ID token →200 LoginResponse và cookie JSESSIONID; không gửi access token |
+
+Đăng nhập Google GIS xác minh chữ ký, hạn và audience theo GOOGLE_CLIENT_ID. Token sai, email chưa xác minh, tài khoản không Active hoặc Google sub không khớp →401 chung. GOOGLE_AUTO_REGISTER=false: email chưa đăng ký →400; mặc định tự tạo Member Active theo implementation Google đã nhập từ main. Luồng Google tạo phiên giống login thường; các request tiếp theo vẫn gửi credentials/cookie.
+
+LoginResponse của login thường/Google và auth/me có userId,email,fullName,role,authorities,isFirstLogin,memberId,avatarUrl. Avatar Cloudinary được tối ưu động bằng f_auto,q_auto; URL Google giữ nguyên, không ghi đè URL trong DB chỉ để tối ưu. Cấu hình/migration trước triển khai theo [docs02](02-DEPLOYMENT-GUIDE.md#google-login).
 
 OTP đăng ký10phút, tối đa5lần sai, dùng một lần. REGISTRATION_PENDING/EMAIL_ALREADY_REGISTERED/OTP_INVALID/OTP_EXPIRED/OTP_ATTEMPTS_EXCEEDED/OTP_RESEND_TOO_SOON/OTP_RESEND_LIMIT cần UI riêng. `OtpMessageResponse.code` là mã trạng thái tùy chọn, có thể null; không chứa mã OTP. HTTP200/thông báo gửi chung không chứng minh thư đã được nhận vì mail gửi bất đồng bộ sau commit. Trạng thái email cloud xem [docs00](00-MASTER-CHECKLIST.md#active). Tài khoản demo lịch sử không phải credential production.
 
@@ -229,6 +234,8 @@ Ngoại lệ ghi trước buổi duy nhất ở đây là Absent do Member báo 
 
 GET training-results trả danh sách `TrainingResultResponse`: resultId,sessionId,sessionDate,classId,className,memberId,memberName,coachId,coachName,content,attendanceStatus,recordedAt. FE Member có thể bỏ `memberId`; mọi filter còn lại chỉ thu hẹp dữ liệu cá nhân. Thiếu phiên →401; tài khoản Member không còn Active/đúng role hoặc cố đọc Member khác →403. Member mặc định không được POST/bulk; không cấp thêm quyền quản trị để xử lý lỗi đọc. Kết quả kiểm và giới hạn môi trường ở docs00; GET không thay dữ liệu.
 
+Member đọc toàn bộ content của kết quả thuộc mình. GET `/api/training-plans` (coachId,classId,memberId tùy chọn) và `/api/training-plans/{id}` đọc kế hoạch; GET `/api/evaluations` (memberId,coachId tùy chọn) và `/api/evaluations/{id}` đọc đánh giá/comment/progressScore. Service kiểm ownership của Member; danh sách không có dữ liệu →200 `[]`, yêu cầu dữ liệu Member khác →403. Không suy các mô tả này là nghiệm thu toàn bộ Coach/role/owner của BE-03/BE-04.
+
 <a id="resolutions"></a>
 ## 13. Refund/CashCorrection — D10/D16
 
@@ -296,6 +303,10 @@ Chat dùng HTTP, FE có thể polling; chọn chu kỳ theo nhu cầu UI. Member
 | POST `/{id}/claim`, `/{id}/release`; PATCH `/{id}/close`, `/{id}/reopen` trong group conversations | Staff; kiểm trạng thái/assignment. Reopen 409 nếu Member đã có OPEN khác |
 
 Owner/staff scope được kiểm lại ở service cho message/read.429 có Retry-After/retryAfterSeconds;400/404/409 có CHAT_*code theo điều kiện, không retry vô hạn. Message gồm id/conversationId/senderType/senderName/isMine/content/contentType/metadata/clientMessageId/createdAt; senderType có MEMBER/STAFF/AI/SYSTEM, không có cam kết AI provider đã bật. Notification/chat datetime có thể offset+07:00.
+
+FE render chat bằng text, không HTML. Có thể poll messages mỗi3–5giây khi mở chat, unread count mỗi30–60giây; không dùng WebSocket. Notification legacy giữ type cũ, loại mới lưu notification_type và trả qua field type. CHAT_MEMBER_MESSAGE/CHAT_STAFF_REPLY chỉ thông báo khi người nhận chuyển từ không có tin chưa đọc sang có tin chưa đọc; lỗi lưu notification không rollback message.
+
+Điểm mở rộng AI giữ ChatResponder/ChatResponderDispatcher: xử lý nền khi handler_type=AI, lỗi/timeout không rollback tin Member; reply senderType=AI, không có sender_user_id. escalateToStaff chuyển STAFF, ghi SYSTEM message và thông báo staff Active đúng center. Không có AI provider/lời gọi ngoài bật mặc định.
 
 Các API CRUD/training/evaluation/feedback/audit còn lại tra OpenAPI. Đây không đồng nghĩa mọi role/owner/center/error đã nghiệm thu. Chi tiết thiết kế cũ của OTP/chat/notification truy qua Git tại a4f3cd0 nếu cần, không phải một tài liệu bàn giao độc lập nữa.
 

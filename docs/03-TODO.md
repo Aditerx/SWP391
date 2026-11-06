@@ -4,6 +4,8 @@ Mở04/11/2026; cập nhật06/11/2026. Nguồn: [bản audit](../SCMS_ACCESS_DE
 
 ## Checklist
 
+**Cập nhật sau xử lý conflict06/11:** bản ghép main/tai và kiểm hồi quy mới xem [Active](00-MASTER-CHECKLIST.md#active)/PR18; giữ các quyết định0/0.1, không coi merge là nghiệm thu FE/Render hoặc hoàn tất cả mục audit. Mốc Git/source của bàn giao trước chỉ mô tả lúc ghi; khi mở session mới phải kiểm git status/diff hiện tại.
+
 - [x] **0 — Hai403 của Member, phần BE local và tài liệu:** đã sửa training-results, rà năm role payment-resolutions và ghi yêu cầu FE. Chưa deploy/nghiệm thu Render/FE.
 - [x] **0.1 — Bỏ điều kiện gói chung cho Normal, phần BE local/tài liệu:** đã sửa và kiểm đăng ký/waitlist, thanh toán, owner/center/lịch, retry/race và giữ liên kết cũ. 0.1-B/C đã kiểm local, SQL16 đã được Owner xác nhận PASS; chưa deploy/kiểm Render/FE. Catalog/17 còn mở.
 - [x] **0.1-B — Đóng tuyến ghi danh Advanced cũ:** hai tuyến enroll chỉ nhận Normal; không tự thăng waitlist Advanced. Test đích/clean đã đạt; final PG workflow sau migration cũng đạt. Chưa deploy Render.
@@ -43,7 +45,7 @@ Mở04/11/2026; cập nhật06/11/2026. Nguồn: [bản audit](../SCMS_ACCESS_DE
 
 ### Vì sao hiện tại có thể bị chặn?
 
-- **Rule cũ:** [TECHNICAL_ANALYSIS §4.2](../old-docs/TECHNICAL_ANALYSIS.md) từng yêu cầu có gói Active còn hạn trước khi đăng ký lớp.
+- **Rule cũ:** [TECHNICAL_ANALYSIS §4.2 tại mốc trước merge](https://github.com/Aditerx/SWP391/blob/3a2adaf1b6ac11bbe55cdc7e41931a4a5e31530a/old-docs/TECHNICAL_ANALYSIS.md) từng yêu cầu có gói Active còn hạn trước khi đăng ký lớp. Main đã bỏ file lịch sử này; không khôi phục nó thành yêu cầu hiện hành.
 - **Yêu cầu đã thay:** [MVP Role Permissions](../old-docs/SCMS-Requirements-MVP-Role-Permissions-20261018.pdf), trang14/19/52: hoãn gói thành viên vì chưa có quyền lợi riêng; đăng ký khóa không bắt buộc có gói và không dùng gói chung làm lõi đăng ký. D02/D03/D15 trong [docs04](04-DEBUG-NOTE.md) và [contract Normal](01-API-CONTRACT-FE-BE.md#normal) mô tả giá/quyền theo khóa.
 - **Nguyên nhân trước sửa:** [EnrollmentService.enroll](../src/main/java/com/sportscenter/enrollment/EnrollmentService.java) đòi member_package Active còn hạn; thiếu thì400 `PACKAGE_EXPIRED`, kể cả người chưa từng mua gói. Guard chạy trước khi tạo hóa đơn Normal và có cả trong `promote`. Bản sửa bỏ điều kiện cho Normal; B đã chặn Advanced đi qua tuyến enroll chung.
 - **Phụ thuộc khi sửa:** enroll còn gán `eligibilitySubscription`; [CashCorrection](../src/main/java/com/sportscenter/invoice/PaymentResolutionService.java) kiểm liên kết này và dependency legacy. Không chỉ xóa một dòng guard hoặc xóa dữ liệu để vượt điều kiện.

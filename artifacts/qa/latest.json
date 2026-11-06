@@ -21802,5 +21802,99 @@
       "audit": "BE01/04/05 partial handoff; full seven-item audit remains open",
       "catalog17": "Pending response body and class17 type/status"
     }
+  },
+  "rbacMainMergeIntegration": {
+    "recordedAt": "2026-11-06T15:33:25.816254+00:00",
+    "result": "PASS_LOCAL",
+    "parents": [
+      "9a4ffb70e2425c5c91fb1efa4383a9320cb599ee",
+      "b033ab7719bb124ac4fce9c1e0f6712e05c4e5c9"
+    ],
+    "sourceState": "merged source with recorded resolutions before merge commit; publication status is recorded by Git and PR18",
+    "sourceFingerprintsLfNormalized": {
+      "src/main": "8882337e2ee5c18bba080f9e090e92f63304d81883d54c789161ca5287840fe4",
+      "src/test": "fa00608472ce4193828c348fbc63e00a4ab3aead33c4f390928ba274b0dbe1f9"
+    },
+    "files": {
+      "src/main/java/com/sportscenter/training/TrainingResultController.java": {
+        "sha256Raw": "88b4ecd0c5fcc296744c1d4669fc9fcc249af1ed3e5ceeba19f1d8605d8fdd1c",
+        "sha256LfNormalized": "63e5be3fae0f53b83cb98ea9c2cdee9d9b6ad07dddbb6c8531852d0dc7c2a6f8"
+      },
+      "src/main/java/com/sportscenter/training/TrainingResultService.java": {
+        "sha256Raw": "d232306a8af3485d106d3ced3d5d8274b894c8df640eacd17ea4bf97e58cd239",
+        "sha256LfNormalized": "f9f85ab4a84447388d8a423bb3bba2d078b9d819339fa0b48e85351420f405a1"
+      },
+      "src/test/java/com/sportscenter/training/TrainingResultServiceTest.java": {
+        "sha256Raw": "24e9692a89aa4454776d72be7016bf28031d97d723a61bc99a6c38abad40675b",
+        "sha256LfNormalized": "487133fee0140edd61ea6e37a45ba8a8bb040a554c9e38a58383f06165711cba"
+      },
+      "src/test/java/com/sportscenter/training/TrainingResultAccessIntegrationTest.java": {
+        "sha256Raw": "f2e837645601733f02bd0232171efe0626e7ad4bb281083b63df48f30be96fef",
+        "sha256LfNormalized": "8ad48687b8d98c10bdd3673a27479f54c40577ed006aeff9aa1a740095d1e03d"
+      },
+      "src/test/java/com/sportscenter/workflow/PhaseWorkflowHttpTest.java": {
+        "sha256Raw": "91ca782c2aab1d253d93cd4c3fe81e3b37f4cbeb8737c6681341f654aa2d5faf",
+        "sha256LfNormalized": "10a416a14cb7cf4e11e59b9c78e7c3ef9c84ef70926b28176ce43bdbc3af7ae5"
+      },
+      "scripts/test-phases-postgres.py": {
+        "sha256Raw": "13a3dbf3e3081eae0693834f010deefadbc278dd47b666b05cd2ae37fd3993e7",
+        "sha256LfNormalized": "6bac7df74637329f19fa3737cb6d2c297e70531fe3a0cf8ebc6d25f2cc3cc57c"
+      },
+      "database/migrations/13_google_login_postgres.sql": {
+        "sha256Raw": "984566d55a76ceb13a136792ef898c4a187ea03594a4b69144fb8143ac5e39a7",
+        "sha256LfNormalized": "e9856dacb21df954d48f2fda2c904e77ee7684a7159eaa1822a28ca1d971544f"
+      },
+      "artifacts/fe-handoff/openapi.json": {
+        "sha256Raw": "53b5466b0cdaac1a187c432da862f98d518e5289de3d14894bd7d0f31a594948",
+        "sha256LfNormalized": "2829c85cc45721364d07dcd0d99f58b1e24c479457ec12db3c84f2030be18acb"
+      }
+    },
+    "rawDirectory": "artifacts/runs/merge-main-rbac/2026-11-06",
+    "environment": "Java17.0.12, H2, PostgreSQL17 Docker 127.0.0.1:55440; isolated checkout without .env",
+    "counts": {
+      "targeted": {
+        "tests": 54,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "passed": 54
+      },
+      "clean": {
+        "tests": 432,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 28,
+        "passed": 404
+      },
+      "postgres": {
+        "tests": 22,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "passed": 22
+      }
+    },
+    "decisions": [
+      "Both training-results conflict resolutions retain tai content including Active/current-role guard",
+      "Main Member fixture now explicitly Active with Member role; no expected/policy changed",
+      "Main Google login/avatar and other nonconflicting code preserved",
+      "Removed reintroduced historical block from docs00 and duplicate contract sections; historical content remains in Git",
+      "Canonical OpenAPI regenerated from actual merged application; added Google route and avatar DTO fields; no prior path removed"
+    ],
+    "postgresSetup": {
+      "database": "scms_phases_merge_rbac_20261106",
+      "googleMigrationReplayed": true,
+      "queryDr15AndRetire16Applied": true,
+      "invoiceEnrollmentReplaySnapshotsPreserved": true,
+      "initialSetup": "First attempt met database system is starting up; retried after pg_isready; no business case ran in failed setup"
+    },
+    "limits": {
+      "supabase": "No cloud write; Google migration not confirmed on current DB; previous Owner SQL16 PASS retained separately",
+      "render": "NOT_RUN deployment/acceptance for merge",
+      "frontend": "NOT_RUN; source not modified",
+      "googleLive": "NOT_RUN; token verification service tested with local mocks",
+      "rbacAudit": "BE-01..BE-07 still open as full items; no broad audit acceptance from this merge"
+    },
+    "pullRequest": "https://github.com/Aditerx/SWP391/pull/18"
   }
 }
