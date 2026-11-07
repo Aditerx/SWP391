@@ -1,6 +1,8 @@
 package com.sportscenter.enrollment;
 
 import com.sportscenter.audit.AuditService;
+import com.sportscenter.common.AccountScope;
+import com.sportscenter.common.ActorPolicy;
 import com.sportscenter.common.exception.BusinessException;
 import com.sportscenter.common.exception.ResourceNotFoundException;
 import com.sportscenter.notification.NotificationService;
@@ -46,28 +48,55 @@ public class EnrollmentService {
 
     @Transactional(readOnly = true)
     public List<EnrollmentResponse> findAll(Integer classId, Integer memberId, String status, String actorEmail) {
-        User actor = requireActor(actorEmail);
+        User actor = requireReadActor(actorEmail);
+        if (classId != null) requireClassRead(actor, classId);
         if (isMemberActor(actor)) {
             memberId = resolveMemberScope(actor, memberId);
         }
         return enrollmentRepository.findFiltered(classId, memberId, status)
-                .stream().map(EnrollmentResponse::from).toList();
+                .stream().filter(e -> readable(actor, e)).map(EnrollmentResponse::from).toList();
     }
 
     @Transactional(readOnly = true)
-    public List<EnrollmentResponse> findByClassId(Integer classId) {
+    public List<EnrollmentResponse> findByClassId(Integer classId, String actorEmail) {
+        User actor = requireReadActor(actorEmail);
+        requireClassRead(actor, classId);
         return enrollmentRepository.findByClassIdWithDetails(classId)
-                .stream().map(EnrollmentResponse::from).toList();
+                .stream().filter(e -> readable(actor, e)).map(EnrollmentResponse::from).toList();
     }
 
     @Transactional(readOnly = true)
     public List<EnrollmentResponse> findByMemberId(Integer memberId, String actorEmail) {
-        memberId = resolveMemberScope(requireActor(actorEmail), memberId);
-        return enrollmentRepository.findByMemberIdWithDetails(memberId).stream().map(enrollment -> {
+        User actor = requireReadActor(actorEmail);
+        memberId = resolveMemberScope(actor, memberId);
+        User member = userRepository.findById(memberId).orElseThrow(() -> new ResourceNotFoundException("Member not found"));
+        AccountScope.require(actor, member.getCenterId());
+        return enrollmentRepository.findByMemberIdWithDetails(memberId).stream().filter(e -> readable(actor, e)).map(enrollment -> {
             Integer position = "Waitlisted".equalsIgnoreCase(enrollment.getStatus())
                     ? waitlistPosition(enrollment) : null;
             return EnrollmentResponse.from(enrollment, position);
         }).toList();
+    }
+
+    private User requireReadActor(String email) {
+        User actor = requireActor(email);
+        if (!"Active".equalsIgnoreCase(actor.getStatus()) || actor.getRole() == null)
+            throw new AccessDeniedException("Active account required");
+        return actor;
+    }
+
+    private void requireClassRead(User actor, Integer classId) {
+        SportsClass c = classRepository.findById(classId).orElseThrow(() -> new ResourceNotFoundException("Class not found"));
+        AccountScope.require(actor, c.getCenterId());
+        if (ActorPolicy.role(actor, "Coach") && (c.getCoach() == null || !actor.getId().equals(c.getCoach().getId())))
+            throw new AccessDeniedException("Coach is not assigned to this class");
+    }
+
+    private boolean readable(User actor, ClassEnrollment e) {
+        SportsClass c = e.getSportsClass();
+        return c != null && e.getMember() != null && AccountScope.visible(actor, c.getCenterId())
+                && AccountScope.visible(actor, e.getMember().getCenterId())
+                && (!ActorPolicy.role(actor, "Coach") || c.getCoach() != null && actor.getId().equals(c.getCoach().getId()));
     }
 
     @Transactional

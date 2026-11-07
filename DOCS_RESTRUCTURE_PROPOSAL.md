@@ -1,3 +1,5 @@
+> **ĐỀ XUẤT LỊCH SỬ — KHÔNG CÒN LÀ KẾ HOẠCH/QUYẾT ĐỊNH CHỜ DUYỆT HIỆN TẠI.** Việc tổ chức tài liệu và các rule24h/credit/gói nêu dưới đây đã được thay thế hoặc chốt khác. Dùng [AGENTS](AGENTS.md), [D01–D19](docs/04-DEBUG-NOTE.md), [Active](docs/00-MASTER-CHECKLIST.md#active) và [checklist hiện hành](docs/03-TODO.md); không hỏi lại quyết định từ danh sách câu hỏi cũ này.
+
 # ĐỀ XUẤT TÁI CẤU TRÚC TÀI LIỆU, ĐỐI CHIẾU THIẾT KẾ & MASTER CHECKLIST (SCMS)
 
 > **Mục tiêu:** Tinh gọn hệ thống tài liệu, triệt tiêu tình trạng "nhiễm độc context" (context pollution) do các tài liệu cũ/mâu thuẫn, chuẩn hóa kiến trúc nghiệp vụ giữa `Member.pdf` và Codebase hiện tại, đồng thời thiết lập lộ trình rõ ràng cho các giai đoạn tiếp theo.

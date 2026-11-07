@@ -35,6 +35,8 @@ GET/PATCH `/api/members/me`, DTO tự phục vụ riêng; danh tính từ Auth. 
 
 Owner29/10 chốt riêng bộ33account demo theo `System Account.pdf`: mật khẩu demo đã duyệt, Active, `is_first_login=false`, không còn khóa đăng nhập cũ. Luồng tạo/cấp lại mật khẩu của BE vẫn giữ first-login hiện hành; không bỏ filter toàn hệ thống.
 
+Ranh giới quản trị theo RP-04/RP-05 của thiết kế gốc, đã đối chiếu lại07/11: chỉ Admin quản lý tài khoản Admin/CenterManager; CenterManager vận hành Coach/Receptionist/Member trong center. Áp dụng cho cả target hiện tại và role được gán, không lách qua alias users/staff, PUT, đổi trạng thái hoặc cấp lại mật khẩu. Quyền endpoint vẫn phải đạt; Admin không mặc nhiên có mọi authority. Đây không thay luồng tự đổi mật khẩu/avatar của chính tài khoản và không mở phạm vi tài chính/report cho Admin.
+
 <a id="d02"></a>
 ## D02 — Danh mục và giá
 
@@ -54,6 +56,7 @@ Chỉ9môn, giá VND cho trọn12buổi Normal hoặc12credit Advanced:
 
 - Quyết định cleanup27/10 trên fixture khi đó giữ canonical IDs19–27, bỏ8bản trùng và Bắn súng ngoài danh mục **khi không có tham chiếu**; gặp liên kết phải đối soát, không cascade/xóa lịch sử. Dải ID19–27 không là yêu cầu ID chung cho mọi DB hoặc bản dựng lại29/10.
 - Invoice.amount bất biến. Không suy môn từ amount/tên gói hoặc seed lại để ghi đè giá đã thay có chủ đích.
+- RP-13 cho người có quyền định giá Normal khi công bố lớp, với giá Subject là mặc định. Bất biến Invoice/purchaseAmount không có nghĩa khóa giá Class vĩnh viễn; giá Class đã công bố không tự đổi theo Subject. Advanced order theo D03. Không suy từ quyền định giá lúc công bố thành quyền định giá lại mọi lớp đã mở/có đơn; phần sau cần xét đúng tình huống và giữ chứng từ cũ.
 - ID là dữ liệu từng môi trường, không hardcode vào FE. Các quyền xử lý fixture cũ là phê duyệt lịch sử cụ thể, không mở quyền sửa mọi dữ liệu production.
 - Owner29/10 chốt hai biến thể SQL: schema root nâng cấp/bảo toàn ID và chứng từ; `database/schema_postgres.sql` được phép dựng lại dữ liệu SCMS tham chiếu cùng ID số độc lập từ1. PK subtype vẫn bằng `users.user_id`; không đổi UUID/khóa ghép sang số. Danh sách8phòng giữ Bóng rổ/Bóng chuyền chung một tài nguyên. Giữ `ai_consultations`/`support_requests` cho tương lai. Quyết định này không là quyền cho agent chạy reset Supabase.
 - Owner02/11 thay danh mục8phòng bằng20tài nguyên theo `room.jpg`: tách Bóng rổ/Bóng chuyền, giữ `room_id` số và thêm `room_code` C01; không thêm `subject_id`. Migration giữ phòng/lịch sử cũ, đối soát lịch và sức chứa trước chuyển; danh mục duy nhất xem database/README.
@@ -162,6 +165,7 @@ Manager xem preview ảnh hưởng, xử lý từng lịch riêng qua workflow p
 - Owner05/11 chốt Member Active được đọc lịch sử kết quả tập của chính mình qua GET `/api/training-results`. BE xác định Member từ phiên, ép phạm vi kể cả khi bỏ filter hoặc có thêm authority quản trị; truyền Member khác bị403. Quyền đọc này không cấp quyền ghi/sửa kết quả của Coach.
 - Record mới chỉ Present/Absent, ghi **[start,end)**, không Late/scan sớm; ngoại lệ Member báo vắng tự ghi Absent trước buổi theo D05. Giữ lịch sử Late/Excused và attendance superseded; superseded không tính là kết quả hiện hành. Điểm danh không trừ lần hai credit đã book.
 - Coach được giao ghi trong buổi; CenterManager sửa sau buổi có reason/audit, đồng bộ result và giữ credit. Finalizer sau end chốt thiếu theo policy, bỏ buổi centerInvalidated.
+- RP-36: tạo/sửa/xóa giáo án và đánh giá chuyên môn dành Coach theo phân công; role quản trị hoặc authority quản lý lớp không tự cấp quyền ghi chuyên môn. Không lấy quyền hỗ trợ đặt lịch D04 hoặc correction attendance ở trên để suy rộng. Giáo án Normal theo lớp có quan hệ với Member qua enrollment/quyền học, không bắt mỗi plan phải gắn memberId trực tiếp hoặc nhân bản cho từng người. Trường hợp Normal Registered/Paid đọc đúng plan lớp được tách khỏi các ca hủy/đảo quyền/lịch sử cần đối chiếu riêng.
 - Normal gồm12buổi hợp lệ, tối đa15Member, Paid mới Registered. Member nghỉ cá nhân mất buổi, không bù.
 - Sự cố TT thật có thể báo sau khi đã finalise nhưng phải xác minh buổi **thực sự không tổ chức**, có evidence, không dùng để sửa vắng cá nhân. Giữ buổi gốc không hợp lệ, liên kết đúng1makeup, chống bù lặp;13 record vật lý có thể chỉ12buổi hợp lệ.
 - Check-in cửa là nâng cấp sau, default toggle tắt; không dùng check-in/out thay attendance buổi. Giữ code chế tài booking-block nhưng default tắt.

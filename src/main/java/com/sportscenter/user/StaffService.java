@@ -1,6 +1,7 @@
 package com.sportscenter.user;
 
 import com.sportscenter.audit.AuditService;
+import com.sportscenter.common.AccountScope;
 import com.sportscenter.center.CenterContext;
 import com.sportscenter.auth.EmailService;
 import com.sportscenter.auth.TemporaryPasswordGenerator;
@@ -36,12 +37,14 @@ public class StaffService {
 
     @Transactional(readOnly = true)
     public List<StaffResponse> findAllStaff() {
+        User actor = AccountScope.actor(userRepository);
         List<User> users = userRepository.findAll();
         var allClasses = sportsClassRepository.findAll();
         Map<Integer, Coach> coachMap = coachRepository.findAllWithUser().stream()
                 .collect(Collectors.toMap(Coach::getUserId, c -> c));
 
         return users.stream()
+                .filter(u -> AccountScope.visible(actor, u.getCenterId()))
                 .filter(u -> u.getRole() != null &&
                         ("Coach".equalsIgnoreCase(u.getRole().getName()) ||
                          "Receptionist".equalsIgnoreCase(u.getRole().getName()) ||
@@ -60,11 +63,15 @@ public class StaffService {
 
     @Transactional
     public StaffResponse createStaff(StaffRequest request) {
+        User actor = AccountScope.actor(userRepository);
         if (userRepository.findForAuthentication(request.email()).isPresent()) {
             throw new BusinessException("Email already exists: " + request.email());
         }
 
         String roleName = normalizeRoleName(request.role());
+        if (!java.util.Set.of("Coach", "Receptionist", "CenterManager").contains(roleName))
+            throw new org.springframework.security.access.AccessDeniedException("Use the account administration endpoint for this role");
+        AccountScope.manageRole(actor, null, roleName);
         Role role = roleRepository.findAll().stream()
                 .filter(r -> roleName.equalsIgnoreCase(r.getName()))
                 .findFirst()
@@ -96,7 +103,7 @@ public class StaffService {
             receptionistRepository.save(receptionist);
         }
 
-        auditService.log(null, "CREATE_STAFF", "USER", savedUser.getId(), savedUser.getFullName() + " (" + roleName + ")");
+        auditService.log(actor.getId(), "CREATE_STAFF", "USER", savedUser.getId(), savedUser.getFullName() + " (" + roleName + ")");
         boolean emailSent = emailService.sendWelcomeEmail(savedUser.getEmail(), savedUser.getFullName(), temporaryPassword);
         return StaffResponse.fromUser(savedUser, savedCoach, 0).withEmailDelivery(emailSent,
                 emailSent ? null : "Tạo tài khoản thành công nhưng gửi email thất bại. Dùng chức năng cấp lại mật khẩu để gửi lại.");
@@ -104,8 +111,11 @@ public class StaffService {
 
     @Transactional
     public StaffResponse updateStaff(Integer id, StaffRequest request) {
-        User user = userRepository.findById(id)
+        User user = userRepository.findByIdForUpdate(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Staff user not found: " + id));
+        User actor = AccountScope.actor(userRepository);
+        AccountScope.target(actor, user, "Coach", "Receptionist", "CenterManager");
+        AccountScope.manageRole(actor, user, null);
 
         user.setFullName(request.name());
         if (request.phone() != null) user.setPhone(request.phone());
@@ -124,21 +134,24 @@ public class StaffService {
         }
 
         User savedUser = userRepository.save(user);
-        auditService.log(null, "UPDATE_STAFF", "USER", savedUser.getId(), savedUser.getFullName());
+        auditService.log(actor.getId(), "UPDATE_STAFF", "USER", savedUser.getId(), savedUser.getFullName());
         return StaffResponse.fromUser(savedUser, coach, 0);
     }
 
     @Transactional
     public StaffResponse updateStaffStatus(Integer id, String status) {
-        User user = userRepository.findById(id)
+        User user = userRepository.findByIdForUpdate(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Staff user not found: " + id));
+        User actor = AccountScope.actor(userRepository);
+        AccountScope.target(actor, user, "Coach", "Receptionist", "CenterManager");
+        AccountScope.manageRole(actor, user, null);
         String previousStatus = user.getStatus();
         String newStatus = normalizeUserStatus(status);
         user.setStatus(newStatus);
 
         User savedUser = userRepository.save(user);
         Coach coach = coachRepository.findById(id).orElse(null);
-        auditService.log(null, "CHANGE_STAFF_STATUS", "USER", savedUser.getId(), previousStatus + " -> " + newStatus);
+        auditService.log(actor.getId(), "CHANGE_STAFF_STATUS", "USER", savedUser.getId(), previousStatus + " -> " + newStatus);
         return StaffResponse.fromUser(savedUser, coach, 0);
     }
 

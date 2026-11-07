@@ -19,6 +19,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @WebMvcTest(value={SessionController.class, InvoiceController.class, TrainingResultController.class}, properties={"scms.frontend-origins=https://frontend.test", "debug=false", "logging.level.org.springframework=WARN"}) @Import(SecurityConfig.class)
 class AuthorizationHttpTest {
+    @org.junit.jupiter.api.BeforeEach void accountFixture() { ControllerSecurityFixture.currentAccount(users); }
     @org.springframework.boot.test.mock.mockito.MockBean com.sportscenter.session.SessionAbsenceService phaseAbsence;
     @Autowired MockMvc mvc;
     @MockBean SessionService sessions;

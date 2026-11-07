@@ -1,6 +1,7 @@
 package com.sportscenter.user;
 
 import com.sportscenter.audit.AuditService;
+import com.sportscenter.common.AccountScope;
 import com.sportscenter.center.CenterContext;
 import com.sportscenter.auth.EmailService;
 import com.sportscenter.auth.TemporaryPasswordGenerator;
@@ -40,7 +41,9 @@ public class MemberService {
 
     @Transactional(readOnly = true)
     public List<MemberResponse> findAllMembers() {
+        User actor = AccountScope.actor(userRepository);
         List<User> users = userRepository.findAll().stream()
+                .filter(u -> AccountScope.visible(actor, u.getCenterId()))
                 .filter(u -> u.getRole() != null && "Member".equalsIgnoreCase(u.getRole().getName()))
                 .toList();
 
@@ -68,6 +71,7 @@ public class MemberService {
     public MemberResponse findById(Integer id) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Member user not found: " + id));
+        AccountScope.target(AccountScope.actor(userRepository), user, "Member");
         Member member = memberRepository.findById(id).orElse(null);
         List<MemberPackage> packages = memberPackageRepository.findByMemberId(id);
         MemberPackage activePkg = packages.stream()
@@ -85,6 +89,7 @@ public class MemberService {
         if (request.packageId() != null) {
             throw new BusinessException("LEGACY_MEMBERSHIP_RETIRED: Create the member without a shared package; register a Normal or Advanced course separately");
         }
+        User actor = AccountScope.actor(userRepository);
         if (userRepository.findForAuthentication(request.email()).isPresent()) {
             throw new BusinessException("Email already exists: " + request.email());
         }
@@ -125,7 +130,7 @@ public class MemberService {
         Member savedMember = memberRepository.save(member);
 
 
-        auditService.log(null, "CREATE_MEMBER", "USER", savedUser.getId(), savedUser.getFullName());
+        auditService.log(actor.getId(), "CREATE_MEMBER", "USER", savedUser.getId(), savedUser.getFullName());
         BigDecimal totalSpent = BigDecimal.ZERO; // Pending orders are not money received.
         boolean emailSent = emailService.sendWelcomeEmail(savedUser.getEmail(), savedUser.getFullName(), temporaryPassword);
         return MemberResponse.from(savedUser, savedMember, null, totalSpent).withEmailDelivery(emailSent,
@@ -134,8 +139,10 @@ public class MemberService {
 
     @Transactional
     public MemberResponse updateMember(Integer id, MemberRequest request) {
-        User user = userRepository.findById(id)
+        User user = userRepository.findByIdForUpdate(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Member user not found: " + id));
+        User actor = AccountScope.actor(userRepository);
+        AccountScope.target(actor, user, "Member");
 
         user.setFullName(request.name());
         if (request.phone() != null) user.setPhone(request.phone());
@@ -152,20 +159,22 @@ public class MemberService {
             member = memberRepository.save(member);
         }
 
-        auditService.log(null, "UPDATE_MEMBER", "USER", savedUser.getId(), savedUser.getFullName());
+        auditService.log(actor.getId(), "UPDATE_MEMBER", "USER", savedUser.getId(), savedUser.getFullName());
         return findById(id);
     }
 
     @Transactional
     public MemberResponse updateMemberStatus(Integer id, String status) {
-        User user = userRepository.findById(id)
+        User user = userRepository.findByIdForUpdate(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Member user not found: " + id));
+        User actor = AccountScope.actor(userRepository);
+        AccountScope.target(actor, user, "Member");
         String previousStatus = user.getStatus();
         String newStatus = normalizeUserStatus(status);
         user.setStatus(newStatus);
         User savedUser = userRepository.save(user);
 
-        auditService.log(null, "CHANGE_MEMBER_STATUS", "USER", savedUser.getId(), previousStatus + " -> " + newStatus);
+        auditService.log(actor.getId(), "CHANGE_MEMBER_STATUS", "USER", savedUser.getId(), previousStatus + " -> " + newStatus);
         return findById(id);
     }
 

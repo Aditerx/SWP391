@@ -35,13 +35,13 @@ public class TrainingPlanController {
 
     @org.springframework.web.bind.annotation.ResponseStatus(org.springframework.http.HttpStatus.CREATED)
     @PostMapping
-    @PreAuthorize("hasAnyAuthority('MANAGE_TRAINING_PLAN', 'MANAGE_CLASSES')")
+    @PreAuthorize("hasRole('COACH') and hasAuthority('MANAGE_TRAINING_PLAN')")
     public ResponseEntity<TrainingPlanResponse> createPlan(@Valid @RequestBody TrainingPlanRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(trainingPlanService.createPlan(request));
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAnyAuthority('MANAGE_TRAINING_PLAN', 'MANAGE_CLASSES')")
+    @PreAuthorize("hasRole('COACH') and hasAuthority('MANAGE_TRAINING_PLAN')")
     public ResponseEntity<TrainingPlanResponse> updatePlan(
             @PathVariable Integer id,
             @Valid @RequestBody TrainingPlanRequest request
@@ -51,7 +51,7 @@ public class TrainingPlanController {
 
     @org.springframework.web.bind.annotation.ResponseStatus(org.springframework.http.HttpStatus.NO_CONTENT)
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasAnyAuthority('MANAGE_TRAINING_PLAN', 'MANAGE_CLASSES')")
+    @PreAuthorize("hasRole('COACH') and hasAuthority('MANAGE_TRAINING_PLAN')")
     public ResponseEntity<Void> deletePlan(@PathVariable Integer id) {
         trainingPlanService.deletePlan(id);
         return ResponseEntity.noContent().build();

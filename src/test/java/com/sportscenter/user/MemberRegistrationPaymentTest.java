@@ -38,6 +38,11 @@ class MemberRegistrationPaymentTest {
     }
     @Test void totalSpentUsesPaidInvoiceSnapshotAndIgnoresPendingOrders() {
         var member = new User(); member.setId(7); member.setFullName("Test member");
+        var role = new Role(); role.setName("Member"); member.setRole(role); member.setStatus("Active"); member.setCenterId(1);
+        var context = org.springframework.security.core.context.SecurityContextHolder.createEmptyContext();
+        context.setAuthentication(new org.springframework.security.authentication.UsernamePasswordAuthenticationToken("member@test.invalid", "n/a", List.of()));
+        org.springframework.security.core.context.SecurityContextHolder.setContext(context);
+        when(users.findByEmailIgnoreCase("member@test.invalid")).thenReturn(Optional.of(member));
         when(users.findById(7)).thenReturn(Optional.of(member));
         var pkg = new MembershipPackage(); pkg.setPrice(new BigDecimal("9999"));
         var sub = new MemberPackage(); sub.setMembershipPackage(pkg); sub.setMember(member); sub.setStatus("Active");
@@ -47,4 +52,5 @@ class MemberRegistrationPaymentTest {
         when(invoices.findByMemberId(7)).thenReturn(List.of(paid,pending));
         assertEquals(BigDecimal.TEN,service.findById(7).totalSpent());
     }
+    @org.junit.jupiter.api.AfterEach void clearIdentity() { org.springframework.security.core.context.SecurityContextHolder.clearContext(); }
 }

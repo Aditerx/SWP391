@@ -178,7 +178,23 @@ class CoachRoleSpecializationTest {
                 new SimpleGrantedAuthority("MANAGE_USERS"), new SimpleGrantedAuthority("MANAGE_CLASSES"));
     }
 
-    private Role role(String name) { Role role=new Role();role.setName(name);return roles.saveAndFlush(role); }
+    private Role role(String name) {
+        Role role=new Role();role.setName(name);
+        if ("CenterManager".equals(name)) {
+            // The real account must carry both permissions previously supplied only by manager().
+            for (String authority : List.of("MANAGE_USERS", "MANAGE_CLASSES")) {
+                Permission p = new Permission(); p.setName(authority);
+                emPersistPermission(p);
+                role.getPermissions().add(p);
+            }
+        }
+        return roles.saveAndFlush(role);
+    }
+
+    private void emPersistPermission(Permission permission) {
+        jdbc.update("INSERT INTO permissions(permission_name) VALUES(?)", permission.getName());
+        permission.setId(jdbc.queryForObject("SELECT permission_id FROM permissions WHERE permission_name=?", Integer.class, permission.getName()));
+    }
     private User account(String email, Role role) {
         User user=new User();user.setFullName("Role fixture");user.setEmail(email);user.setRole(role);
         user.setCenterId(1);user.setStatus("Active");user.setPasswordHash("unused-test-hash");return users.saveAndFlush(user);

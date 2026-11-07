@@ -466,7 +466,7 @@
     },
     "diagnosticFieldsDescribePreImplementation": true
   },
-  "recordedAt": "2026-11-02T06:53:31.963612+00:00",
+  "recordedAt": "2026-11-07T10:57:01+07:00",
   "purpose": "FE handoff readiness: fresh local authenticated HTTP and post-commit acceptance; retained cloud evidence is not rerun",
   "historyCommit": "a4f3cd0df946963ee905c1f6a3263f941f1b8fa2",
   "results": {
@@ -561,8 +561,8 @@
   },
   "openApi": {
     "path": "artifacts/fe-handoff/openapi.json",
-    "sha256": "1236137993e0a0d7833291e68ce0a00585eb4ab5cea7010f82ffdab15429b16f",
-    "evidence": "queryDrImplementation",
+    "sha256": "2829c85cc45721364d07dcd0d99f58b1e24c479457ec12db3c84f2030be18acb",
+    "evidence": "rbacDesignCorrections.openApi; same local PostgreSQL application; structural equality confirmed",
     "generatedLocally": true
   },
   "local": {
@@ -21896,5 +21896,308 @@
       "rbacAudit": "BE-01..BE-07 still open as full items; no broad audit acceptance from this merge"
     },
     "pullRequest": "https://github.com/Aditerx/SWP391/pull/18"
+  },
+  "rbacPriorityGuards": {
+    "recordedAt": "2026-11-07T00:20:28+07:00",
+    "status": "PASS_LOCAL_CHECKS_WITH_BUSINESS_RBAC_REVIEW_REQUIRED",
+    "scope": "TK01/TK02 guards, TK03, baseline part of TK04; BE03 enrollment read; historical docs TK06 and database documentation TK12",
+    "source": {
+      "commit": "91e49a198ca26badc5b994e73db3f2961a5cceab",
+      "workingTreeChanges": true,
+      "fingerprints": {
+        "src/main": "a3a9a1118e9c183b4031226afd369f5a97980b8c8f5f315f5a07a2dff86f75a3",
+        "src/test": "331a0c9b0eecf38b4baa4f1216846dc87399d413374b8ca27b167e04d583c532",
+        "database": "22da3b407291b73b646441b410df4cb8b431b641a264b278ba238296ced3d75b",
+        "pom.xml": "9c305e856ad15dd2723b756b4c659c2755ff7df7f18a475078bd690c7c2c3877",
+        "schema_postgres.sql": "b45ef0a351e2a36f9caba86a8bad52b3cc94049b5e151e54cbbdcc15b57e25c0",
+        "scripts/test-room-absence-postgres.py": "7144adb3689349a949c9ee702958f765fb5743433d8a285dcfc264af2a77c82c",
+        "scripts/test-phases-postgres.py": "13a3dbf3e3081eae0693834f010deefadbc278dd47b666b05cd2ae37fd3993e7",
+        "scripts/prepare-phases-release.py": "e6c525b8a70562527d606b0017d72199865c838df31b6bbc995acb1405deb5a5"
+      },
+      "mainAndTestsMatchCleanAndPostgresCopies": true
+    },
+    "environment": {
+      "java": "java version \"17.0.12\" 2024-07-16 LTS",
+      "springBoot": "3.3.5",
+      "clean": "isolated copy without .env, H2/MockMvc and local HTTP fixtures",
+      "postgres": "17.11 (Debian 17.11-1.pgdg13+2)",
+      "postgresTarget": "127.0.0.1:55440/scms_phases_rbac_guard_20261106_4093674",
+      "businessZone": "Asia/Ho_Chi_Minh",
+      "cloudAccess": false
+    },
+    "clean": {
+      "tests": 450,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 28,
+      "passed": 422,
+      "command": ".\\mvnw.cmd clean test",
+      "xmlDirectory": "artifacts/runs/rbac-guards/2026-11-06/clean-final-xml"
+    },
+    "targetedGuardIntegration": {
+      "tests": 18,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "passed": 18,
+      "source": "src/test/java/com/sportscenter/config/RbacGuardIntegrationTest.java",
+      "evidence": "final clean XML; real login/auth-me, committed state and controlled H2 row lock"
+    },
+    "postgresWorkflow": {
+      "tests": 22,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "passed": 22,
+      "evidence": "artifacts/runs/rbac-guards/2026-11-06/postgres-http",
+      "scope": "existing Dxx HTTP/commit/retry/race workflow regression after local Google13/QueryDR15/retire16; not the 18 new H2 guard cases on PostgreSQL"
+    },
+    "baselineReproduction": {
+      "result": "REPRODUCED_5_EXPECTED_SECURITY_FAILURES",
+      "commit": "91e49a198ca26badc5b994e73db3f2961a5cceab",
+      "tests": 5,
+      "failures": 5,
+      "errors": 0,
+      "selectedFixtureSha256": "8faa9e8bfd89555f6556ceccb92320ad010d864beab0690570cc212731c24828",
+      "expectedFailures": [
+        "Staff alias accepted Admin creation (201 vs expected403)",
+        "Baseline users list exposed other-center accounts",
+        "Coach spoof training write accepted (201 vs expected403)",
+        "Assigned Coach roster wrongly denied (403 vs expected200)",
+        "Expired registry session still read auth/me (200 vs expected401)"
+      ],
+      "evidence": "artifacts/runs/rbac-guards/2026-11-06/baseline-reproduction.xml",
+      "note": "Expected negative control on pre-fix source, not a pass of that source or additional acceptance quota",
+      "environment": "Local H2/MockMvc only; does not prove those pre-fix responses on PostgreSQL or Render"
+    },
+    "acceptance": {
+      "targetAccountGuards": "PASS wrong subtype/Admin alias and cross-center mutations denied before changes; target locked and current center rechecked after concurrent change; actual actor audit",
+      "trainingWrites": "Local identity/assignment/center/audit checks passed. The positive Manager-write case characterizes existing implementation only; it is not business acceptance under RP-36. The non-Coach role ceiling remains to be corrected/reviewed.",
+      "sessionPermissions": "PASS persisted permissions effective next request; inactive403; changed role403 plus session invalidation; expired registry/password reissue/admin password update401; public IPN remains independent",
+      "baselineScope": "PASS users/members/staff/rooms scoped; room creation uses actor center; existing Admin-null users/rooms read preserved; audit-log policy not implemented",
+      "coachEnrollment": "PASS both routes assigned completed class200, other/unassigned/other-center403; omitted/additional filters cannot widen data; extra management authority cannot bypass assignment; no new write permission or invoice changes",
+      "historicalDocs": "PASS UTF-8, current links and byte-content comparison after newline normalization: original bodies of five historical documents retained; README current; Google/16 dependency docs clarified"
+    },
+    "ownerScreenshotBE03": {
+      "observedDate": "2026-11-06",
+      "environment": "Owner FE localhost:5175 / Vite proxy to Render, screenshots only",
+      "displayedRole": "Coach",
+      "classId": 23,
+      "displayedSessionState": "Completed",
+      "requests": [
+        {
+          "method": "GET",
+          "path": "/api/classes/23/enrollments",
+          "status": 403
+        },
+        {
+          "method": "GET",
+          "path": "/api/enrollments?classId=23",
+          "status": 403
+        }
+      ],
+      "authMeVerified": false,
+      "assignmentVerified": false,
+      "runtimeSha": null,
+      "conclusion": "Evidence of the UI failure, not proof that class23 belongs to this actor or that deployed runtime has been fixed; 403 remains correct for an unassigned Coach",
+      "containsAccountIdentityOrCookie": false
+    },
+    "openApi": {
+      "path": "artifacts/fe-handoff/openapi.json",
+      "sha256": "2829c85cc45721364d07dcd0d99f58b1e24c479457ec12db3c84f2030be18acb",
+      "generatedFromSamePostgresApplication": true,
+      "structurallyEqualToExistingSnapshot": true,
+      "rewritten": false,
+      "roleMatrixComplete": false
+    },
+    "resolvedTestAdjustments": [
+      "Controller-only mocks and Coach directory/specialization fixtures now supply persisted permissions matching their synthetic request identities; expected scope unchanged",
+      "Inactive actor403 ACCOUNT_NOT_ACTIVE replaces former business400; separately verified Active eligible staff targeting Inactive Member still400 MEMBER_NOT_ACTIVE with no order",
+      "Filter403 preserves status/error fields required by existing profile contract"
+    ],
+    "notRun": [
+      "Render deployment or authenticated acceptance on new source",
+      "FE/browser acceptance or live retest of screenshot class23",
+      "New guard integration suite on PostgreSQL (H2 only); PostgreSQL evidence is the separate existing workflow suite",
+      "Google migration on Supabase",
+      "SQL16 or any cloud reset/seed/mutation in this session"
+    ],
+    "remaining": [
+      "Full BE01 matrix and BE02-BE07 acceptance remain open",
+      "TK04 audit-log/provenance and other CRUD beyond the documented baseline scope",
+      "Corrected P1-P7 assessment in docs03; the previous seven-choice approval table is withdrawn",
+      "TK08 status validation and TK11 deprecation/full error schema; permission-ID validation and final-admin safeguards require their separate work"
+    ],
+    "businessInterpretationReview": {
+      "date": "2026-11-07",
+      "trigger": "Owner questioned the seven policy proposals",
+      "references": [
+        "Member.pdf p6 RP-04/RP-13/RP-36/RP-43",
+        "Member.pdf p8 pricing flow",
+        "docs/04-DEBUG-NOTE.md D02/D03/D04/D15/D18"
+      ],
+      "result": "REVIEW_REQUIRED_FOR_ROLE_CEILINGS_AND_WITHDRAWN_POLICY_OPTIONS",
+      "corrections": [
+        "Withdraw the seven-way A/B approval table; do not reopen already defined design requirements",
+        "Manager management follows RP-04; current Manager-to-Manager account operations are an implementation gap, not automatically a missing Owner decision",
+        "RP-43 already grants Manager relevant scoped business logs; missing provenance is not authorization to remove that function",
+        "Invoice immutability does not imply permanently immutable Class price; RP-13 permits authorized pricing at publication",
+        "MANAGE_CLASSES and a positive Manager training-write test do not establish business permission under RP-36",
+        "Room capability table versus configuration is a technical choice, not a new business-policy vote",
+        "Class-plan ownership must account for enrollment; private-plan duplication is not an equivalent solution"
+      ],
+      "existingTestResultsUnchanged": true,
+      "newBackendRun": false,
+      "businessCodeChangedInThisReview": false,
+      "next": "Correct operations with established actor/scope requirements; ask only concrete uncovered cases, e.g. repricing after publication or historical access after entitlement reversal"
+    },
+    "followup": {
+      "evidence": "rbacDesignCorrections",
+      "scope": "Supersedes RP-04/RP-36/class-plan interpretation and supplies full expanded guard coverage on PostgreSQL. Historical run/source/fixture records below remain unchanged."
+    }
+  },
+  "rbacDesignCorrections": {
+    "recordedAt": "2026-11-07T10:57:01+07:00",
+    "status": "PASS_LOCAL_SCOPE",
+    "scope": "RP-04 privileged account administration, RP-36 assigned-Coach professional writes, Member shared Normal class-plan reads; continuation after withdrawing P1-P7 A/B proposals",
+    "expectedSources": {
+      "design": "Member.pdf p6 RP-04/RP-05/RP-36; original requirements cross-check recorded in docs03 pending-policy-20261107",
+      "currentDecisions": "docs04 D01/D15, Paid/owner/center constraints; no restoration of superseded 24h/15min rules",
+      "checkpoint": "docs/03-TODO.md#design-corrections-20261107"
+    },
+    "source": {
+      "head": "91e49a198ca26badc5b994e73db3f2961a5cceab",
+      "workingTree": "Uncommitted; pre-existing changes retained",
+      "fingerprints": {
+        "src/main": "f260ee91319c0431e358f68b60c0f94edd3137f49e29bf7fab11400d299c889a",
+        "src/test": "8c008a5bc25b23081b1b84a2d67d34a13cf6b084b812698c006dcccf0aba06dd",
+        "database": "22da3b407291b73b646441b410df4cb8b431b641a264b278ba238296ced3d75b",
+        "pom.xml": "9c305e856ad15dd2723b756b4c659c2755ff7df7f18a475078bd690c7c2c3877",
+        "schema_postgres.sql": "b45ef0a351e2a36f9caba86a8bad52b3cc94049b5e151e54cbbdcc15b57e25c0",
+        "scripts/test-room-absence-postgres.py": "7144adb3689349a949c9ee702958f765fb5743433d8a285dcfc264af2a77c82c",
+        "scripts/test-phases-postgres.py": "13a3dbf3e3081eae0693834f010deefadbc278dd47b666b05cd2ae37fd3993e7",
+        "scripts/prepare-phases-release.py": "e6c525b8a70562527d606b0017d72199865c838df31b6bbc995acb1405deb5a5"
+      },
+      "testedCopiesMatch": true,
+      "copiesExcludeEnv": true
+    },
+    "environment": {
+      "java": "17.0.12",
+      "springBoot": "3.3.5",
+      "h2": "MockMvc and local HTTP, committed fixtures",
+      "postgres": "17.11 disposable databases on 127.0.0.1:55440; no cloud",
+      "businessZone": "Asia/Ho_Chi_Minh"
+    },
+    "clean": {
+      "status": "PASS",
+      "result": {
+        "tests": 457,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 28,
+        "passed": 429,
+        "xmlFiles": 69
+      },
+      "path": "artifacts/runs/rbac-design-corrections/2026-11-07/clean-final-xml"
+    },
+    "h2Guard": {
+      "status": "PASS",
+      "result": {
+        "tests": 25,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "passed": 25,
+        "xmlFiles": 1
+      },
+      "path": "artifacts/runs/rbac-design-corrections/2026-11-07/clean-final-xml/TEST-com.sportscenter.config.RbacGuardIntegrationTest.xml",
+      "sha256": "ba1d3e4e55dfaa8eb3ccecf9b0747787db842be9dd8f75e239d774d944523783"
+    },
+    "postgresGuard": {
+      "status": "PASS",
+      "result": {
+        "tests": 25,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "passed": 25,
+        "xmlFiles": 1
+      },
+      "path": "artifacts/runs/rbac-design-corrections/2026-11-07/postgres-guards.xml",
+      "sha256": "d2b063d1bb6dda65a1d0b58bbab5909ebbd2221f334aa07003901d0557b0e953"
+    },
+    "postgresWorkflow": {
+      "status": "PASS",
+      "result": {
+        "tests": 22,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "passed": 22,
+        "xmlFiles": 1
+      },
+      "path": "artifacts/runs/rbac-design-corrections/2026-11-07/postgres-workflow.xml",
+      "sha256": "90545433d26c27f6fc5ebd6ad491105222beef0a2419c7e4478ef41c331a41d2",
+      "scope": "Existing PhaseWorkflowHttpTest on final main source and unchanged workflow test; ran before one unrelated RbacGuard fixture joinDate field was added. Final guard and clean were subsequently rerun with the exact final main/test tree."
+    },
+    "baselineReproduction": {
+      "status": "EXPECTED_FAILURES_REPRODUCED",
+      "result": {
+        "tests": 3,
+        "failures": 3,
+        "errors": 0,
+        "skipped": 0,
+        "passed": 0,
+        "xmlFiles": 1
+      },
+      "path": "artifacts/runs/rbac-design-corrections/2026-11-07/before-reproduction.xml",
+      "sha256": "db7cc45fac2c86e68aa68944bf233a5c5a44c9df88dacc04b29f87a332477a8b",
+      "sourceFingerprints": {
+        "src/main": "a3a9a1118e9c183b4031226afd369f5a97980b8c8f5f315f5a07a2dff86f75a3",
+        "src/test": "d940dc48d7eb304fc0251479566065564cce743d5f1ece56819b0c7b08a4899d"
+      },
+      "scope": "Working-tree snapshot immediately before these corrections, not clean HEAD: Manager creates Manager, Manager professional write, missing Member shared class plan; 3 assertion failures, no setup error"
+    },
+    "fixtureAdjustment": {
+      "initialPostgresStatus": "BLOCKED_SETUP",
+      "cause": "Member fixture omitted required members.join_date; failed before business assertions. Separate existing workflow tests succeeded.",
+      "fix": "Added valid joinDate; retained NOT NULL, subtype/FK/paid-source constraints; canonical subject, Coach qualification, Receptionist and Member subtype rows. Final guard rerun on separate fresh local fixture database.",
+      "schemaWeakened": false,
+      "expectedChangedToHideFailure": false
+    },
+    "acceptance": [
+      "RP-04 guards existing and requested privileged roles across users/staff create/update/status/role/reissue; actual Admin plus endpoint authorities required; denied requests preserve persisted state and audit",
+      "Admin positive management of Manager and actual-actor audit retained; target row-lock race rechecks scope after concurrent account change",
+      "RP-36 controller and service both require Coach plus MANAGE_TRAINING_PLAN or RECORD_RESULT and stored assignment; extra management/write authorities do not permit Admin/Manager/Receptionist/Member writes",
+      "Assigned Coach create/update/delete still succeeds; MANAGE_CLASSES alone is insufficient; attendance correction is a separate unchanged flow",
+      "Member query and direct-ID read include own private history or shared Normal plan through same-center Registered enrollment and valid Paid invoice; other Member/class and tampered memberId denied",
+      "Shared plan tests cover Pending, Waitlisted, Cancelled and reconciliation denial, with private-history access retained. Query/guard also exclude cashConfirmationReversed; a dedicated reversed-cash/history scenario is not accepted by this group.",
+      "Existing enrollment dual-route, session authority refresh/revocation, inactive actor, subtype/center and persisted audit checks remain covered on H2 and PostgreSQL"
+    ],
+    "expectedCorrection": "Prior positive Manager professional-write characterization was replaced by 403 expected from RP-36. It was not independent business acceptance. Assigned-Coach positive and non-Coach extra-authority tests protect the intended boundary.",
+    "openApi": {
+      "path": "artifacts/fe-handoff/openapi.json",
+      "sha256": "2829c85cc45721364d07dcd0d99f58b1e24c479457ec12db3c84f2030be18acb",
+      "structurallyEqual": true,
+      "paths": 152,
+      "generatedFrom": "Same local PostgreSQL workflow application",
+      "canonicalSnapshotRewritten": false
+    },
+    "notRun": [
+      "FE/browser integration",
+      "Render authenticated reproduction of class23 screenshots",
+      "deployment/push/merge",
+      "Supabase SQL16 rerun/reset or any cloud mutation",
+      "Google migration verification on Supabase"
+    ],
+    "remaining": [
+      "RP-13 authorized price on Normal publication; post-publication price changes need separate scenario analysis",
+      "RP-43 audit query/classification/center provenance including legacy unknown rows",
+      "Room-to-sport capability within approved room model",
+      "Role lookup versus full permission-matrix read/write scope",
+      "All historical/reversed-entitlement read cases",
+      "Complete API matrix and BE-01 through BE-07 acceptance"
+    ],
+    "rawEvidenceRoot": "artifacts/runs/rbac-design-corrections/2026-11-07"
   }
 }

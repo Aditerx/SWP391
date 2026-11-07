@@ -1,3 +1,5 @@
+> **GHI CHÚ LỊCH SỬ — ĐÃ CÓ QUYẾT ĐỊNH THAY THẾ.** Mốc24h, Member tự book, API bán/gia hạn gói chung và các alias được mô tả bên dưới không phải contract hiện hành. Áp dụng [D01–D19](docs/04-DEBUG-NOTE.md), [docs01](docs/01-API-CONTRACT-FE-BE.md); tiến độ/bằng chứng xem [Active](docs/00-MASTER-CHECKLIST.md#active). Không triển khai lại đề xuất cũ chỉ vì còn trong ghi chú này.
+
 
 ---
 
