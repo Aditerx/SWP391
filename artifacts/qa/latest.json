@@ -466,7 +466,7 @@
     },
     "diagnosticFieldsDescribePreImplementation": true
   },
-  "recordedAt": "2026-11-07T10:57:01+07:00",
+  "recordedAt": "2026-11-07T11:04:21+07:00",
   "purpose": "FE handoff readiness: fresh local authenticated HTTP and post-commit acceptance; retained cloud evidence is not rerun",
   "historyCommit": "a4f3cd0df946963ee905c1f6a3263f941f1b8fa2",
   "results": {
@@ -22198,6 +22198,22 @@
       "All historical/reversed-entitlement read cases",
       "Complete API matrix and BE-01 through BE-07 acceptance"
     ],
-    "rawEvidenceRoot": "artifacts/runs/rbac-design-corrections/2026-11-07"
+    "rawEvidenceRoot": "artifacts/runs/rbac-design-corrections/2026-11-07",
+    "publication": {
+      "requestedAt": "2026-11-07T11:04:21+07:00",
+      "ownerAuthorization": "Push and merge; guide FE acceptance; wait for Owner successful/error-free report before reorganizing next proposals.",
+      "codeCommit": "cbfa72cd313a5c9630eb1712f2477966b09bbe62",
+      "branch": "tai",
+      "pullRequest": "https://github.com/Aditerx/SWP391/pull/19",
+      "ciAndMergeSourceOfTruth": "https://github.com/Aditerx/SWP391/pull/19",
+      "prePublicationHealth": {
+        "status": 200,
+        "buildCommit": "cc5e18f153321e85ab8aa8802a7f283753a920e0",
+        "scope": "Anonymous health only; before merge. Does not verify DB migrations or authenticated business."
+      },
+      "runtimeAcceptance": "WAITING_OWNER_FE",
+      "guide": "docs/02-DEPLOYMENT-GUIDE.md#rbac-fe-verification",
+      "testResultsUnchanged": true
+    }
   }
 }
