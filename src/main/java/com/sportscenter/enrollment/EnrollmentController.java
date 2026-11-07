@@ -18,7 +18,7 @@ public class EnrollmentController {
     private final EnrollmentService enrollmentService;
 
     @GetMapping("/enrollments")
-    @PreAuthorize("hasAnyAuthority('MANAGE_USERS', 'MANAGE_CLASSES', 'REGISTER_MEMBER') or hasRole('MEMBER')")
+    @PreAuthorize("hasAnyAuthority('MANAGE_USERS', 'MANAGE_CLASSES', 'REGISTER_MEMBER') or hasAnyRole('MEMBER','COACH')")
     public ResponseEntity<List<EnrollmentResponse>> findAll(
             @RequestParam(required = false) Integer classId,
             @RequestParam(required = false) Integer memberId,
@@ -28,13 +28,13 @@ public class EnrollmentController {
     }
 
     @GetMapping("/classes/{classId}/enrollments")
-    @PreAuthorize("hasAnyAuthority('MANAGE_USERS', 'MANAGE_CLASSES', 'REGISTER_MEMBER')")
-    public ResponseEntity<List<EnrollmentResponse>> findByClassId(@PathVariable Integer classId) {
-        return ResponseEntity.ok(enrollmentService.findByClassId(classId));
+    @PreAuthorize("hasAnyAuthority('MANAGE_USERS', 'MANAGE_CLASSES', 'REGISTER_MEMBER') or hasRole('COACH')")
+    public ResponseEntity<List<EnrollmentResponse>> findByClassId(@PathVariable Integer classId, Authentication authentication) {
+        return ResponseEntity.ok(enrollmentService.findByClassId(classId, authentication.getName()));
     }
 
     @GetMapping({"/members/{memberId}/enrollments", "/members/{memberId}/classes"})
-    @PreAuthorize("hasAnyAuthority('MANAGE_USERS', 'MANAGE_CLASSES', 'REGISTER_MEMBER') or hasRole('MEMBER')")
+    @PreAuthorize("hasAnyAuthority('MANAGE_USERS', 'MANAGE_CLASSES', 'REGISTER_MEMBER') or hasAnyRole('MEMBER','COACH')")
     public ResponseEntity<List<EnrollmentResponse>> findByMemberId(@PathVariable Integer memberId,
                                                                    Authentication authentication) {
         return ResponseEntity.ok(enrollmentService.findByMemberId(memberId, authentication.getName()));

@@ -29,6 +29,8 @@ Copy **toàn bộ đúng một file schema gộp** vào SQL Editor trong một l
 
 **Bổ sung06/11 — bỏ gói chung:** schema gộp hiện gồm tới15, chưa nhúng bước retire16. Để loại dữ liệu gói chung và khóa ghi trở lại, chạy **toàn bộ một file** [16_retire_legacy_memberships_postgres.sql](migrations/16_retire_legacy_memberships_postgres.sql) trên DB đã có cấu trúc hiện hành, gồm QueryDR15. Không chạy schema dựng lại để thay migration16. Hướng dẫn và kết quả cần đối chiếu tại [docs02](../docs/02-DEPLOYMENT-GUIDE.md#retire-legacy-memberships).
 
+**Dependency Google trước deploy:** BE ghép Google cần cột `users.google_sub` kể cả khi chưa bật đăng nhập Google. Hai schema gộp đã chứa cấu trúc này; DB cũ cần xác minh riêng [13_google_login_postgres.sql](migrations/13_google_login_postgres.sql) theo [docs02](../docs/02-DEPLOYMENT-GUIDE.md#google-login). Prefix13 không chứng minh các migration room/capacity/Google thay thế nhau. SQL16 đã PASS trên Supabase không chứng minh Google đã chạy; không chạy lại SQL16 hoặc schema reset để bổ sung cột này.
+
 Ngoại lệ có phê duyệt riêng: `13_owner_class_capacity_20261102_postgres.sql` chỉ dành7lớp/ID center1 Owner vừa xác nhận, không nhúng vào schema gộp hoặc empty-schema release. Bản tạm `0211-1.sql` đã gộp bước này trước13_room_catalog, cùng transaction; `0212-2.sql` là14 và kiểm đủ marker. Không chạy thêm file nguồn khi dùng cặp root. Giữ nguồn Owner-specific này sau khi xóa bản tạm, không áp dụng nhầm cho DB khác chỉ vì trùng số ID.
 
 Mỗi file dùng transaction. Bản dựng lại chỉ drop danh sách bảng SCMS đã nêu, không drop bảng Supabase `auth`/`storage`/`realtime` hoặc bảng ứng dụng ngoài danh sách. Dependency FK/view từ ngoài phạm vi khiến thao tác dừng và rollback thay vì cascade. Sau lỗi, xử lý nguyên nhân trước khi chạy lại; không thêm `CASCADE` để vượt guard.
@@ -114,7 +116,9 @@ Migration13 giữ nguyên ID và dữ liệu phòng cũ bằng mã `C01-LEGACY-<
 | `12_payment_resolutions_postgres.sql` | Hồ sơ Refund/CashCorrection |
 | `13_room_catalog_postgres.sql` | room_code;20tài nguyên center1; chuyển lịch tương lai có guard, giữ phòng/lịch sử cũ và marker replay |
 | `13_owner_class_capacity_20261102_postgres.sql` | Phê duyệt riêng7lớp Normal; kiểm ID/môn/center/old→new/held seats, audit một lần; chạy trước13_room_catalog trong bundle Owner |
+| [13_google_login_postgres.sql](migrations/13_google_login_postgres.sql) | Thêm google_sub/index cho DB cũ trước BE ghép Google; độc lập với room/capacity cùng prefix13; không seed/reset |
 | `14_absence_attendance_postgres.sql` | Nguồn notice, attendance superseded và unique cho bản hiện hành; không backfill lịch sử |
+| [16_retire_legacy_memberships_postgres.sql](migrations/16_retire_legacy_memberships_postgres.sql) | Loại mô hình gói chung theo guard/phân loại; Owner đã xác nhận Supabase PASS, không yêu cầu chạy lại |
 
 `05_reseed_demo_users_and_coaches.sql` là script reset demo cũ, không thuộc chuỗi nâng cấp an toàn cho DB dùng chung/live. File `*_mssql.sql` dành cho SQL Server, không chạy trên PostgreSQL; runtime SQL Server chưa được nghiệm thu.
 

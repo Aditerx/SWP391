@@ -25,6 +25,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 })
 @Import(SecurityConfig.class)
 class PaymentResolutionAuthorizationHttpTest {
+    @org.junit.jupiter.api.BeforeEach void accountFixture() { com.sportscenter.config.ControllerSecurityFixture.currentAccount(users); }
     @Autowired MockMvc mvc;
     @MockBean UserRepository users;
     @MockBean PaymentResolutionService service;

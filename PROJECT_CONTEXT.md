@@ -1,3 +1,5 @@
+> **BỐI CẢNH LỊCH SỬ — KHÔNG PHẢI TRẠNG THÁI TRIỂN KHAI HIỆN TẠI.** Các mốc100%, số test, mô hình gói/gia hạn, check-in cửa và mô tả SQLServer bên dưới thuộc thời điểm cũ. Trạng thái duy nhất xem [Active](docs/00-MASTER-CHECKLIST.md#active); nghiệp vụ theo [D01–D19](docs/04-DEBUG-NOTE.md), giao tiếp theo [docs01](docs/01-API-CONTRACT-FE-BE.md), vận hành theo [docs02](docs/02-DEPLOYMENT-GUIDE.md). Không dùng bảng role cũ cấp quyền mới.
+
 # BỐI CẢNH DỰ ÁN & QUY HOẠCH HỆ THỐNG SCMS
 ## SPORTS CENTER MANAGEMENT SYSTEM (HỆ THỐNG QUẢN LÝ TRUNG TÂM THỂ THAO)
 

@@ -94,6 +94,7 @@ class CoachDirectoryIntegrationTest {
             manager = user("manager@directory.test", "Center Manager", managerRole, 1);
             member = user("member@directory.test", "Member", memberRole, 1);
             admin = user("admin@directory.test", "Admin", adminRole, null);
+            jdbc.update("INSERT INTO permissions(permission_name) VALUES('MANAGE_USERS')");
 
             Subject subject = new Subject();
             subject.setName("Test sport");
@@ -198,9 +199,14 @@ class CoachDirectoryIntegrationTest {
         assertEquals(2, request(member.getEmail(), null, null, "ROLE_MEMBER").size());
         CoachSummaryResponse hidden = request(manager.getEmail(), null, null, "ROLE_CENTERMANAGER").get(0);
         assertNull(hidden.email());
-        CoachSummaryResponse visible = request(manager.getEmail(), null, null,
-                "ROLE_CENTERMANAGER", "MANAGE_USERS").get(0);
-        assertNotNull(visible.email());
+        int permissionId = jdbc.queryForObject("SELECT permission_id FROM permissions WHERE permission_name='MANAGE_USERS'", Integer.class);
+        jdbc.update("INSERT INTO role_permissions(role_id,permission_id) VALUES (?,?)", manager.getRole().getId(), permissionId);
+        try {
+            // Match the synthetic request identity with the persisted permission checked on every API call.
+            CoachSummaryResponse visible = request(manager.getEmail(), null, null,
+                    "ROLE_CENTERMANAGER", "MANAGE_USERS").get(0);
+            assertNotNull(visible.email());
+        } finally { jdbc.update("DELETE FROM role_permissions WHERE role_id=? AND permission_id=?", manager.getRole().getId(), permissionId); }
         assertEquals(8, request(admin.getEmail(), null, null, "ROLE_ADMIN").size());
 
         new TransactionTemplate(transactionManager).executeWithoutResult(status -> {

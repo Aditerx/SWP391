@@ -27,6 +27,8 @@ Các nhóm endpoint cần có trong ma trận:
 
 Đây là khoảng trống tài liệu/chứng cứ hiện tại; chưa khẳng định policy trên server đang sai.
 
+**Tiến độ BE-01:** đã có [ma trận quan sát](docs/03-TODO.md#be01-review-20261106) và [sửa RP-04/RP-36/giáo án lớp](docs/03-TODO.md#design-corrections-20261107) được kiểm local. Chưa hoàn tất full matrix; phải tách lookup role khỏi đọc/sửa cấu hình quyền, không hỏi lại cả ba GET như cùng một quyết định. Bảng nhóm role của audit không tự trở thành policy; trạng thái/môi trường chuẩn xem Active/QA.
+
 ### BE-02 — Xác minh vòng đời phiên và phản hồi 401 — Ưu tiên P0
 
 Các lỗi lịch sử trên `/api/auth/me` cùng nhiều API nghiệp vụ có thể cùng phát sinh khi cookie phiên không được gửi, hết hạn, hoặc phiên bị server từ chối. BE cần xác nhận:
@@ -39,6 +41,8 @@ Các lỗi lịch sử trên `/api/auth/me` cùng nhiều API nghiệp vụ có 
 Log cũ không kèm request login, cookie request/response hoặc body nên chưa thể xác định lỗi thuộc cấu hình phiên Backend. Cần tái kiểm tra bằng log mới sau khi frontend hoàn tất điều chỉnh proxy cookie.
 
 ### BE-03 — Ràng buộc dữ liệu Coach theo lớp được giao — Ưu tiên P0, rủi ro cần xác minh
+
+**Bổ sung Owner/kiểm local07/11:** ảnh cho thấy hai GET enrollment lớp23 trả403 qua FE proxy tới Render, thiếu auth/me/assignment/runtime SHA. Local đã kiểm hai tuyến đọc theo phân công/center, kể cả lớp hoàn tất; không mở quyền ghi enrollment. Nhóm tiếp theo sửa RP-36: chỉ Coach đúng authority/phân công được ghi giáo án/đánh giá, các role khác dù thêm quyền vẫn403; Member đọc giáo án chung qua quan hệ Registered+Paid hợp lệ. [Checkpoint hiện hành](docs/03-TODO.md#design-corrections-20261107), kết quả chuẩn tại Active/QA; chưa đóng toàn BE-03 hoặc nghiệm thu lại lớp23 live.
 
 Frontend Coach gọi các danh sách attendance, enrollment, evaluation, training plan/result, session, feedback, học viên cần chú ý và đăng ký nâng cao. BE cần bảo đảm mỗi truy vấn chỉ trả dữ liệu thuộc lớp/học viên mà Coach hiện tại được phân công; không dựa vào việc frontend lọc kết quả.
 

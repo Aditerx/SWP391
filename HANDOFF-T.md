@@ -1,3 +1,5 @@
+> **BÀN GIAO LỊCH SỬ NGÀY27/10 — CHỈ THEO SNAPSHOT GHI BÊN DƯỚI.** Contract D01/D09 hiện hành ở [docs01](docs/01-API-CONTRACT-FE-BE.md#catalog), triển khai/nghiệm thu ở [Active](docs/00-MASTER-CHECKLIST.md#active). Không lấy SHA/count/giới hạn cũ làm trạng thái hoặc quyền runtime hiện tại.
+
 # Gói T — handoff D01/D09
 
 Ngày: 27/10/2026 13:37 ICT  
