@@ -317,7 +317,7 @@ Căn cứ trực tiếp: [Member.pdf](../Member.pdf) trang6 RP-04/RP-13/RP-36/RP
 
 **Đối chiếu hệ thống tương đương đã làm trước khi chốt:** [TeamUp scope instructor](https://support.goteamup.com/en/articles/9327607-how-to-create-instructors-add-them-to-classes-appointments-courses) và [nhắc kiểm attendance sau lớp](https://support.goteamup.com/en/articles/9333531-create-a-pre-post-class-notification-for-your-staff) cho thấy có workflow đối soát; không chứng minh hạn sửa chung. [Mindbody](https://support.mindbodyonline.com/s/article/203259423-Classes-Class-Sign-in-screen?language=en_US) có quyền Make Past Reservations (search chính thức có nội dung, mở trực tiếp CSS Error), không đồng nhất correction SCMS. [Momence](https://help.momence.com/en/articles/7869547-momence-term-glossary) mô tả thêm/check-in người ở lớp quá khứ, không nêu deadline từng role. Hạn cuối ngày là quyết định Owner sau giải thích, không suy thành chuẩn bắt buộc từ các hệ thống này.
 
-**Bước tiếp:** review/publish BE và migration17 theo phạm vi phát hành được duyệt; FE/Render/CRUD/live nghiệm thu đợt chung Owner đã hẹn. Chưa xác nhận deploy, migration cloud hoặc FE đã nhận/hiển thị note; không suy từ OpenAPI/local test thành live PASS.
+**Phát hành theo Owner:** đã push tai, mở [PR21](https://github.com/Aditerx/SWP391/pull/21), tích hợp main AI và kiểm lại bản phát hành theo Active/QA. Trạng thái merge/CI theo PR; trước kiểm FE cần migration17 và BE đúng build mới. Agent không chạy SQL cloud hoặc lại16. FE/Render/CRUD/live nghiệm thu đợt chung Owner đã hẹn; chưa xác nhận FE đã nhận/hiển thị note, không suy từ OpenAPI/local test thành live PASS.
 
 <a id="coach-open-items-20261107"></a>
 ### Coach — phần còn mở sau LAN-2 — 07/11/2026

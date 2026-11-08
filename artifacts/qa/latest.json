@@ -561,8 +561,8 @@
   },
   "openApi": {
     "path": "artifacts/fe-handoff/openapi.json",
-    "sha256": "ea994554a5b862c14698c1612b30e66a63e6954f6426fc23353f34625b31c667",
-    "evidence": "attendanceImplementation20261109.openApi; final isolated local H2 app, attendance schema covered by PostgreSQL tests",
+    "sha256": "99272f2c02cdb3b6a1005a19e6ccd8dc5ac20aa61907aab17e5c156b96e5e1e7",
+    "evidence": "attendanceRelease20261109.openApi; final local integrated application",
     "generatedLocally": true
   },
   "local": {
@@ -22825,6 +22825,95 @@
       "result": "PASS",
       "artifact": "artifacts/runs/attendance-20261109/offline-contract-check.json",
       "scope": "Static routes, schema hash and historical response structural compatibility only; no live probe or new business test."
+    }
+  },
+  "attendanceRelease20261109": {
+    "result": "PASS_LOCAL",
+    "recordedAt": "2026-11-09T03:56:28+07:00",
+    "sourceCommit": "a921bff6a920288f8657721b993383c25a78aa11",
+    "integratedMain": "0bac4ffe7d755471b98400933f6b2600de180926",
+    "attendanceCommit": "4bcded2",
+    "sourceFingerprints": {
+      "src/main": "97c21285b740b0c3bb46ff30cc66364e00c3ea49e78517ed1f60db02588aede0",
+      "src/test": "20a5a6c6303a4f5ce63f8bd9b854a8b777a1ecc75b88a62dab98daba2f4a5506",
+      "database": "31c6c6b85957d4e6e6be364cb8ec27c7c96cdedb4adb8867d9b869132a138128",
+      "pom.xml": "050f3393d2ecdc350e8ac52acab26c052ba35a1ea0e509fffe45db122e882bf7",
+      "schema_postgres.sql": "b45ef0a351e2a36f9caba86a8bad52b3cc94049b5e151e54cbbdcc15b57e25c0",
+      "scripts/test-room-absence-postgres.py": "7144adb3689349a949c9ee702958f765fb5743433d8a285dcfc264af2a77c82c",
+      "scripts/test-phases-postgres.py": "c2fde3c412c2d5f6043875adb46b380b6f959d9395a906aeb521510ec74c242c",
+      "scripts/prepare-phases-release.py": "e6c525b8a70562527d606b0017d72199865c838df31b6bbc995acb1405deb5a5"
+    },
+    "sourceAndTestsMatchIsolatedCopy": true,
+    "isolatedCopy": "C:\\Users\\Admin\\AppData\\Local\\Temp\\scms-attendance-release-20261109",
+    "envFileUsed": false,
+    "environment": "Windows Java17.0.12, isolated H2; PostgreSQL17.11 loopback55440, no cloud DB mutation",
+    "cleanVerify": {
+      "tests": 502,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 28,
+      "passed": 474,
+      "command": ".\\mvnw.cmd -Dscms.attendance.openapi=<raw artifact> clean verify",
+      "xmlDirectory": "artifacts/runs/attendance-release-20261109/clean-xml"
+    },
+    "jar": {
+      "sha256": "432a2156635907686dcdc74357e1cccf95e3b8efa7fb0683c53e0b5a66e1d68b",
+      "packaged": true
+    },
+    "postgresAttendance": {
+      "tests": 22,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "database": "scms_phases_attendance_release_20261109_a",
+      "xml": "artifacts/runs/attendance-release-20261109/postgres-attendance.xml",
+      "testSha256": "76d60175318e2bb9df28db25ea91df9511fbfa13d963f27108c5c31d0a3b2608"
+    },
+    "smtpFixtureCheck": {
+      "before": {
+        "tests": 1,
+        "failures": 1,
+        "errors": 0,
+        "skipped": 0
+      },
+      "after": {
+        "tests": 12,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "forcedRootLevel": "WARN",
+      "fix": "Set SMTP logger INFO for each test and restore its original level; preserve sender, content and privacy assertions.",
+      "runtimeEmailCodeChanged": false
+    },
+    "acceptanceScope": "attendanceImplementation20261109.coverage; repeated against the tree integrated with main AI chatbot",
+    "migrationFileSha256": "a6c903edab57f6ecb1d905baa753637b22d74071143058a7424e3289ae9b013b",
+    "openApi": {
+      "sha256": "99272f2c02cdb3b6a1005a19e6ccd8dc5ac20aa61907aab17e5c156b96e5e1e7",
+      "generatedFrom": "Final local integrated H2 app during clean verify",
+      "additionalPathFromMain": "/api/chat/conversations/{id}/escalate",
+      "existingOperationsUnchanged": true,
+      "canonicalLineEndings": "LF; same generated JSON content",
+      "rawArtifactSha256": "3a5c48486459d696ae58706ded1e13a1ea6f65591058040df641379556273725"
+    },
+    "ciForTestedCode": {
+      "headSha": "a921bff6a920288f8657721b993383c25a78aa11",
+      "push": "SUCCESS",
+      "pullRequest": "SUCCESS",
+      "pushRun": "https://github.com/Aditerx/SWP391/actions/runs/42522170118",
+      "prRun": "https://github.com/Aditerx/SWP391/actions/runs/42522173888"
+    },
+    "publication": {
+      "pullRequest": "https://github.com/Aditerx/SWP391/pull/21",
+      "statusSource": "GitHub PR/CI/branch state; metadata commit does not certify Render deployment"
+    },
+    "limits": {
+      "renderAuthenticatedBusiness": "NOT_RUN",
+      "frontend": "NOT_RUN",
+      "agentCloudSql": "NOT_RUN",
+      "ownerMigration17State": "UNVERIFIED",
+      "migration16Rerun": false,
+      "generalCrudLive": "Owner common acceptance"
     }
   }
 }

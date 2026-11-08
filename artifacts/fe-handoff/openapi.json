@@ -2940,6 +2940,33 @@
         }
       }
     },
+    "/api/chat/conversations/{id}/escalate" : {
+      "post" : {
+        "tags" : [ "chat-controller" ],
+        "operationId" : "requestStaff",
+        "parameters" : [ {
+          "name" : "id",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ChatConversationResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/chat/conversations/{id}/claim" : {
       "post" : {
         "tags" : [ "chat-controller" ],
@@ -8927,15 +8954,15 @@
           "displayName" : {
             "type" : "string"
           },
-          "autowireCapableBeanFactory" : {
-            "$ref" : "#/components/schemas/AutowireCapableBeanFactory"
+          "applicationName" : {
+            "type" : "string"
           },
           "startupDate" : {
             "type" : "integer",
             "format" : "int64"
           },
-          "applicationName" : {
-            "type" : "string"
+          "autowireCapableBeanFactory" : {
+            "$ref" : "#/components/schemas/AutowireCapableBeanFactory"
           },
           "environment" : {
             "$ref" : "#/components/schemas/Environment"
@@ -9340,13 +9367,13 @@
           "is2xxSuccessful" : {
             "type" : "boolean"
           },
-          "is1xxInformational" : {
-            "type" : "boolean"
-          },
           "is3xxRedirection" : {
             "type" : "boolean"
           },
           "is4xxClientError" : {
+            "type" : "boolean"
+          },
+          "is1xxInformational" : {
             "type" : "boolean"
           },
           "is5xxServerError" : {
@@ -9357,16 +9384,16 @@
       "JspConfigDescriptor" : {
         "type" : "object",
         "properties" : {
-          "taglibs" : {
-            "type" : "array",
-            "items" : {
-              "$ref" : "#/components/schemas/TaglibDescriptor"
-            }
-          },
           "jspPropertyGroups" : {
             "type" : "array",
             "items" : {
               "$ref" : "#/components/schemas/JspPropertyGroupDescriptor"
+            }
+          },
+          "taglibs" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/TaglibDescriptor"
             }
           }
         }
@@ -9377,13 +9404,10 @@
           "buffer" : {
             "type" : "string"
           },
-          "pageEncoding" : {
+          "defaultContentType" : {
             "type" : "string"
           },
-          "elIgnored" : {
-            "type" : "string"
-          },
-          "includePreludes" : {
+          "urlPatterns" : {
             "type" : "array",
             "items" : {
               "type" : "string"
@@ -9392,34 +9416,37 @@
           "isXml" : {
             "type" : "string"
           },
+          "elIgnored" : {
+            "type" : "string"
+          },
+          "pageEncoding" : {
+            "type" : "string"
+          },
+          "includePreludes" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          },
           "includeCodas" : {
             "type" : "array",
             "items" : {
               "type" : "string"
             }
           },
-          "urlPatterns" : {
-            "type" : "array",
-            "items" : {
-              "type" : "string"
-            }
-          },
-          "scriptingInvalid" : {
-            "type" : "string"
-          },
-          "errorOnELNotFound" : {
-            "type" : "string"
-          },
-          "deferredSyntaxAllowedAsLiteral" : {
+          "errorOnUndeclaredNamespace" : {
             "type" : "string"
           },
           "trimDirectiveWhitespaces" : {
             "type" : "string"
           },
-          "errorOnUndeclaredNamespace" : {
+          "errorOnELNotFound" : {
             "type" : "string"
           },
-          "defaultContentType" : {
+          "scriptingInvalid" : {
+            "type" : "string"
+          },
+          "deferredSyntaxAllowedAsLiteral" : {
             "type" : "string"
           }
         }
@@ -9511,15 +9538,15 @@
             },
             "writeOnly" : true
           },
-          "attributesCSV" : {
-            "type" : "string",
-            "writeOnly" : true
-          },
           "attributesMap" : {
             "type" : "object",
             "additionalProperties" : {
               "type" : "object"
             }
+          },
+          "attributesCSV" : {
+            "type" : "string",
+            "writeOnly" : true
           }
         }
       },
@@ -9593,29 +9620,21 @@
             "type" : "integer",
             "format" : "int32"
           },
-          "serverInfo" : {
-            "type" : "string"
-          },
-          "sessionTimeout" : {
-            "type" : "integer",
-            "format" : "int32"
-          },
           "attributeNames" : {
             "type" : "object"
           },
           "contextPath" : {
             "type" : "string"
           },
-          "defaultSessionTrackingModes" : {
-            "uniqueItems" : true,
-            "type" : "array",
-            "items" : {
-              "type" : "string",
-              "enum" : [ "COOKIE", "URL", "SSL" ]
-            }
+          "effectiveMinorVersion" : {
+            "type" : "integer",
+            "format" : "int32"
           },
-          "sessionCookieConfig" : {
-            "$ref" : "#/components/schemas/SessionCookieConfig"
+          "initParameterNames" : {
+            "type" : "object"
+          },
+          "servletContextName" : {
+            "type" : "string"
           },
           "effectiveMajorVersion" : {
             "type" : "integer",
@@ -9625,34 +9644,6 @@
             "type" : "object",
             "additionalProperties" : {
               "$ref" : "#/components/schemas/ServletRegistration"
-            }
-          },
-          "initParameterNames" : {
-            "type" : "object"
-          },
-          "jspConfigDescriptor" : {
-            "$ref" : "#/components/schemas/JspConfigDescriptor"
-          },
-          "effectiveMinorVersion" : {
-            "type" : "integer",
-            "format" : "int32"
-          },
-          "servletContextName" : {
-            "type" : "string"
-          },
-          "filterRegistrations" : {
-            "type" : "object",
-            "additionalProperties" : {
-              "$ref" : "#/components/schemas/FilterRegistration"
-            }
-          },
-          "sessionTrackingModes" : {
-            "uniqueItems" : true,
-            "type" : "array",
-            "writeOnly" : true,
-            "items" : {
-              "type" : "string",
-              "enum" : [ "COOKIE", "URL", "SSL" ]
             }
           },
           "effectiveSessionTrackingModes" : {
@@ -9666,25 +9657,61 @@
           "responseCharacterEncoding" : {
             "type" : "string"
           },
+          "virtualServerName" : {
+            "type" : "string"
+          },
+          "filterRegistrations" : {
+            "type" : "object",
+            "additionalProperties" : {
+              "$ref" : "#/components/schemas/FilterRegistration"
+            }
+          },
           "requestCharacterEncoding" : {
             "type" : "string"
           },
-          "virtualServerName" : {
+          "defaultSessionTrackingModes" : {
+            "uniqueItems" : true,
+            "type" : "array",
+            "items" : {
+              "type" : "string",
+              "enum" : [ "COOKIE", "URL", "SSL" ]
+            }
+          },
+          "sessionTrackingModes" : {
+            "uniqueItems" : true,
+            "type" : "array",
+            "writeOnly" : true,
+            "items" : {
+              "type" : "string",
+              "enum" : [ "COOKIE", "URL", "SSL" ]
+            }
+          },
+          "jspConfigDescriptor" : {
+            "$ref" : "#/components/schemas/JspConfigDescriptor"
+          },
+          "sessionCookieConfig" : {
+            "$ref" : "#/components/schemas/SessionCookieConfig"
+          },
+          "serverInfo" : {
             "type" : "string"
+          },
+          "sessionTimeout" : {
+            "type" : "integer",
+            "format" : "int32"
           }
         }
       },
       "ServletRegistration" : {
         "type" : "object",
         "properties" : {
-          "runAsRole" : {
-            "type" : "string"
-          },
           "mappings" : {
             "type" : "array",
             "items" : {
               "type" : "string"
             }
+          },
+          "runAsRole" : {
+            "type" : "string"
           },
           "name" : {
             "type" : "string"
@@ -9703,10 +9730,16 @@
       "SessionCookieConfig" : {
         "type" : "object",
         "properties" : {
-          "name" : {
+          "domain" : {
             "type" : "string"
           },
+          "httpOnly" : {
+            "type" : "boolean"
+          },
           "path" : {
+            "type" : "string"
+          },
+          "name" : {
             "type" : "string"
           },
           "attributes" : {
@@ -9718,12 +9751,6 @@
           "comment" : {
             "type" : "string",
             "deprecated" : true
-          },
-          "domain" : {
-            "type" : "string"
-          },
-          "httpOnly" : {
-            "type" : "boolean"
           },
           "secure" : {
             "type" : "boolean"
@@ -9832,10 +9859,10 @@
           "pageable" : {
             "$ref" : "#/components/schemas/PageableObject"
           },
-          "first" : {
+          "last" : {
             "type" : "boolean"
           },
-          "last" : {
+          "first" : {
             "type" : "boolean"
           },
           "numberOfElements" : {
@@ -9860,15 +9887,15 @@
               "$ref" : "#/components/schemas/SortObject"
             }
           },
-          "paged" : {
-            "type" : "boolean"
+          "pageSize" : {
+            "type" : "integer",
+            "format" : "int32"
           },
           "unpaged" : {
             "type" : "boolean"
           },
-          "pageSize" : {
-            "type" : "integer",
-            "format" : "int32"
+          "paged" : {
+            "type" : "boolean"
           },
           "pageNumber" : {
             "type" : "integer",
@@ -10152,10 +10179,10 @@
           "pageable" : {
             "$ref" : "#/components/schemas/PageableObject"
           },
-          "first" : {
+          "last" : {
             "type" : "boolean"
           },
-          "last" : {
+          "first" : {
             "type" : "boolean"
           },
           "numberOfElements" : {
