@@ -143,6 +143,16 @@ if attendance_review.get('result')=='PASS_LOCAL':
         backend_match=source_fingerprints(ROOT)==attendance_review.get('sourceFingerprints')
         source_verification='Attendance09/11 tested local tree; retained wire exchanges remain historical and are checked only for structural compatibility'
 hash_match=schema_hash==qa['openApi']['sha256']
+attendance_release=qa.get('attendanceRelease20261109',{})
+if attendance_release.get('result')=='PASS_LOCAL':
+    clean=attendance_release.get('cleanVerify',{})
+    pg=attendance_release.get('postgresAttendance',{})
+    if (clean.get('failures')==0 and clean.get('errors')==0
+            and pg.get('failures')==0 and pg.get('errors')==0 and pg.get('skipped')==0
+            and schema_hash==attendance_release.get('openApi',{}).get('sha256')
+            and attendance_release.get('migrationFileSha256')==attendance_review.get('migrationFile',{}).get('sha256')):
+        backend_match=source_fingerprints(ROOT)==attendance_release.get('sourceFingerprints')
+        source_verification='Attendance release integrated with main and tested locally; retained wire exchanges remain historical structural evidence'
 result={'result':'PASS' if not issues and not missing and not extra and hash_match and backend_match else 'REVIEW_REQUIRED',
         'mode':'OFFLINE_RETAINED_EVIDENCE_CHECK','checkedAtUtc':dt.datetime.now(dt.timezone.utc).isoformat(),
         'backendTestsExecuted':False,'liveProbePerformed':False,'evidenceSourceCommit':reference,
