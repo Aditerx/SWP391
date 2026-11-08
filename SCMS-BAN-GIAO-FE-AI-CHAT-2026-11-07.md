@@ -1,34 +1,34 @@
-# SCMS bàn giao FE — AI Chat — 2026-11-07
+﻿# SCMS ban giao FE - AI Chat - 2026-11-07
 
-## Kết quả hiện tại
+## Ket qua hien tai
 
-- Đã dựng khung backend provider-neutral, mock không cần key và Anthropic Messages API có thể cấu hình; feature flag mặc định tắt, hội thoại mới mặc định STAFF.
-- Đã thêm Member handoff `POST /api/chat/conversations/{id}/escalate`, polling/API chat hiện hữu giữ nguyên. Chưa có cơ sở dữ liệu local được dựng hoặc FE integration/browser smoke.
-- Kết quả test baseline và sau thay đổi được ghi tại [docs00 Active](docs/00-MASTER-CHECKLIST.md#active); đây là local test, không là nghiệm thu PostgreSQL, FE hay deploy.
+- Provider `deepseek` duoc bat bang `SCMS_AI_CHAT_ENABLED=true`, `SCMS_AI_CHAT_PROVIDER=deepseek` va key trong secret `DEEPSEEK_API_KEY`. Model mac dinh `deepseek-flash`, API Chat Completions qua Spring `RestClient`, thinking disabled bang `{"type":"disabled"}`.
+- System prompt tieng Viet co dau nam tai `src/main/resources/ai/system-prompt.txt`, doc bang UTF-8 tuong minh; yeu cau luon tra loi tieng Viet co dau. Knowledge base `src/main/resources/ai/knowledge-base.md` duoc doc UTF-8, khong sua noi dung; gioi han do dai mac dinh 12.000 ky tu, co log canh bao neu cat/thieu/rong. Transcript da loc du lieu nhay cam, toi da 20 tin/8.000 ky tu. Quota 30 cau tra loi AI/member/ngay theo `Asia/Ho_Chi_Minh`, rate limit chat 20 tin/phut giu nguyen.
+- Token `[HANDOFF]` duoc tach truoc khi hien thi. Backend luu phan tra loi AI, chuyen handler sang STAFF va them tin SYSTEM.
+- Knowledge base duoc giu nguyen theo yeu cau; bot khong suy doan va de nghi gap nhan vien neu thieu thong tin. Chua kiem provider that, FE/browser, PostgreSQL hoac Render.
 
-## Quá trình và quyết định giữ/bỏ
+## Qua trinh va quyet dinh giu/bo
 
-1. Đối chiếu contract chat mục 16, code và hai schema; `chat_messages` đã hỗ trợ `sender_type=AI` và `metadata`, nên không thêm migration.
-2. Giữ lựa chọn Anthropic Messages API sau interface mỏng; bỏ SDK nặng vì Spring `RestClient` đủ cho request/timeout.
-3. Giữ STAFF làm mặc định khi mở chat cho đến khi Owner chốt; config AI chỉ để bật mock cục bộ và handler AI tường minh.
-4. Thêm giới hạn transcript, che tin nghi chứa secret, metadata hiệu năng, không log nội dung; lỗi AI chuyển STAFF an toàn.
+1. Doi chieu docs DeepSeek chinh thuc: base URL `https://api.deepseek.com`, `POST /chat/completions`, header `Authorization: Bearer`, roles system/user/assistant, `max_tokens`, `temperature`, `thinking`, `stream`; doc `choices[0].message.content` va `usage.prompt_tokens/completion_tokens`.
+2. Giu RestClient khong SDK; thinking `disabled`; chi log model, latency, token counts va loai loi, khong log noi dung hay key.
+3. Giu provider mock/faq khong tao HTTP client. DeepSeek request factory/client chi co khi provider la deepseek va key khong rong.
+4. Loi 401/402/429, 5xx, timeout/IO va key thieu duoc xu ly khong mat tin member; chi retry toi da mot lan voi 5xx hoac timeout/IO. Sau do fallback tieng Viet va handoff STAFF.
+5. Tim thay nguyen nhan chu mock vo dau o gia tri mac dinh trong `application.properties` bi double-encode (`Xin chÃ o`); `.env` khong override. Da sua gia tri properties bang Unicode escapes va xac dinh compiler UTF-8; API JSON serialization giu nguyen dau trong MockMvc. `spring-boot:run` khoi dong va health 200; GET messages live tra 401 vi khong co phien dang nhap, nen khong co du lieu live de doc.
 
-## API và DB liên quan
+## API va DB lien quan
 
-- Luồng Member hiện hành: `POST /api/chat/conversations`, `POST /api/chat/conversations/{id}/messages` với `content`/`clientMessageId`, poll `GET /api/chat/conversations/{id}/messages?afterId=...`.
-- Nút gặp nhân viên gọi `POST /api/chat/conversations/{id}/escalate` không cần body; BE lấy Member từ phiên, chỉ cho chủ cuộc hội thoại, trả `CHAT_CONVERSATION_NOT_FOUND` (404) hoặc `CHAT_CONVERSATION_CLOSED` (409) khi phù hợp. Response trả `handlerType=STAFF`; tin SYSTEM/thông báo do BE ghi.
-- AI reply xuất hiện như `senderType=AI`, `metadata` có model/latency/token counts nếu có. Render text thuần; tiếp tục xử lý 429 `CHAT_RATE_LIMITED` và header `Retry-After` theo contract.
-- Không thay DB. Tái dùng chat tables/notification hiện hữu; không dùng `ai_consultations`.
+- FE giu `POST /api/chat/conversations/{id}/messages` voi `content`/`clientMessageId`; poll `GET /api/chat/conversations/{id}/messages?afterId=...`. Tin AI co metadata `model`, `latencyMs`, `inputTokens`, `outputTokens`.
+- Handoff backend dung workflow hien huu; FE render sender AI va SYSTEM, sau SYSTEM refresh conversation de doc `handlerType=STAFF`. Endpoint member tu yeu cau nhan vien van la `POST /api/chat/conversations/{id}/escalate`.
+- Khong them migration; dung lai `chat_messages.metadata` va conversation handler.
 
-## FE cần làm
+## FE can lam
 
-- Chưa xác định source FE hiện hành: `FE_Project-main` đã được đánh dấu out-of-date; không chọn `SCMS_demo_fe_v1.1` thay Owner. Xác nhận repo/thư mục đang deploy trước khi tích hợp.
-- Trong Member Support, mở/lấy active conversation, gửi `clientMessageId` duy nhất mỗi tin, poll theo `afterId`, hiển thị riêng MEMBER/AI/STAFF/SYSTEM, gắn nhãn “Trợ lý AI”, thêm nút gặp nhân viên và render text thuần.
-- Sau handoff refresh conversation/messages để đổi trạng thái xử lý; không gửi memberId/role/actor trong request.
+- Hien thi tin AI/SYSTEM dang text thuong; FE khong xu ly `[HANDOFF]` vi backend da tach token.
+- Khong gui key, role, actor hay memberId; tiep tuc xu ly `429 CHAT_RATE_LIMITED` va `Retry-After`.
 
-## Việc còn lại
+## Viec con lai
 
-- Owner/nhóm xác nhận FE source hiện hành, handler mặc định AI hay STAFF, nhà cung cấp/model dùng sau này, và nội dung trung tâm đã duyệt để làm knowledge base tĩnh. Chưa nhét docs nội bộ vào prompt.
-- Dựng/đăng nhập PostgreSQL local riêng bằng local credential, chạy `database/schema_postgres.sql` chỉ trên DB mới trống, tạo `.env` local với `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`; hiện local PostgreSQL yêu cầu mật khẩu chưa được cung cấp. Không dùng `.env` chưa xác minh hay Supabase.
-- Bật local mock bằng `SCMS_AI_CHAT_ENABLED=true`, `SCMS_AI_CHAT_PROVIDER=mock`, `SCMS_AI_CHAT_NEW_CONVERSATION_HANDLER=AI`; không cần key. Anthropic chỉ bật sau khi có `ANTHROPIC_API_KEY` trong local ignored environment và chọn `SCMS_AI_CHAT_MODEL` hợp lệ; không chạy provider test.
-- Sau khi có DB credential/source FE: khởi chạy BE, kiểm `/actuator/health`, Swagger, login demo rồi `/api/auth/me`, kiểm luồng polling/handoff thật, chạy lại full Maven suite và đánh giá setup FE local.
+- `mvnw clean test` PASS local working tree: 446 tests, 0 failure/error, 28 skipped. Tests kiem doc prompt/knowledge-base UTF-8 co dau, mock/faq greeting, va API JSON; skip khong tinh pass.
+- Bien moi truong: `DEEPSEEK_API_KEY` (secret); `SCMS_AI_CHAT_DEEPSEEK_BASE_URL` (`https://api.deepseek.com`); `SCMS_AI_CHAT_DEEPSEEK_MODEL` (`deepseek-flash`); `SCMS_AI_CHAT_DEEPSEEK_TIMEOUT_SECONDS` (12); `SCMS_AI_CHAT_DEEPSEEK_MAX_TOKENS` (400); `SCMS_AI_CHAT_TEMPERATURE` (0.2); `SCMS_AI_CHAT_MAX_KNOWLEDGE_BASE_CHARACTERS` (12000); `SCMS_AI_CHAT_MAX_INPUT_CHARACTERS` (8000); `SCMS_AI_CHAT_DAILY_LIMIT_PER_MEMBER` (30); cung `SCMS_AI_CHAT_ENABLED`, `SCMS_AI_CHAT_PROVIDER`, `SCMS_AI_CHAT_NEW_CONVERSATION_HANDLER`.
+- Gia tham khao DeepSeek ngay 08/11/2026: Flash peak $0.30/1M input token cache miss va $1.20/1M output token; off-peak $0.15/$0.60. Vi du 1.000 input + 400 output token, 30 luot/ngay x 30 ngay: khoang $0.70 peak hoac $0.35 off-peak/member/thang; token thuc va cache hit co the giam gia. Gia co the thay doi, can kiem tra [bang gia chinh thuc](https://api-docs.deepseek.com/quick_start/pricing/).
+- Chua xac nhan FE source hien hanh hoac deploy. Tham khao docs: [Your First API Call](https://api-docs.deepseek.com/); [Chat Completions](https://api-docs.deepseek.com/api/create-chat-completion/); [Error Codes](https://api-docs.deepseek.com/quick_start/error_codes/); [Rate Limit](https://api-docs.deepseek.com/quick_start/rate_limit/).

@@ -16,6 +16,9 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Optional;
+import java.nio.charset.StandardCharsets;
+import java.io.IOException;
+import org.springframework.core.io.ClassPathResource;
 
 @Component
 @ConditionalOnProperty(name = "scms.ai.chat.enabled", havingValue = "true")
@@ -53,7 +56,15 @@ public class ChatAiResponder implements ChatResponder {
         Collections.reverse(prompt);
         if (prompt.isEmpty()) return Optional.empty();
         long started = System.nanoTime();
-        AiCompletion result = client.complete(properties.getSystemPrompt(), List.copyOf(prompt), Math.max(1, properties.getMaxTokens()));
+        String systemPrompt = systemPrompt();
+        AiCompletion result;
+        try {
+            result = client.complete(systemPrompt, List.copyOf(prompt), Math.max(1, properties.getMaxTokens()));
+        } catch (AiProviderException ex) {
+            long latencyMs = (System.nanoTime() - started) / 1_000_000;
+            log.warn("AI_CHAT_FALLBACK model={} latencyMs={} errorType={}", properties.getDeepseekModel(), latencyMs, ex.getMessage().substring("AI provider unavailable: ".length()));
+            result = new AiCompletion("Tro ly AI dang gap su co. Toi se chuyen cau hoi den nhan vien de ho tro ban. [HANDOFF]", "faq-fallback", null, null);
+        }
         if (result == null || result.text() == null || result.text().isBlank()) return Optional.empty();
         long latencyMs = (System.nanoTime() - started) / 1_000_000;
         log.info("AI_CHAT_COMPLETION model={} latencyMs={} inputTokens={} outputTokens={}",
@@ -68,5 +79,31 @@ public class ChatAiResponder implements ChatResponder {
         } catch (JsonProcessingException ex) {
             return Optional.of(new ChatResponderReply(result.text().trim(), "{}"));
         }
+    }
+
+    private String systemPrompt() {
+        String knowledge;
+        try {
+            knowledge = new ClassPathResource("ai/knowledge-base.md").getContentAsString(StandardCharsets.UTF_8);
+        } catch (IOException ex) {
+            knowledge = "Chua co thong tin da duyet. Khong suy doan; de nghi thanh vien gap nhan vien.";
+            log.warn("AI_CHAT_KNOWLEDGE_BASE errorType={}", ex.getClass().getSimpleName());
+        }
+        if (knowledge.isBlank()) {
+            log.warn("AI_CHAT_KNOWLEDGE_BASE_EMPTY");
+        }
+        int limit = Math.max(0, properties.getMaxKnowledgeBaseCharacters());
+        if (knowledge.length() > limit) {
+            knowledge = knowledge.substring(0, limit);
+            log.warn("AI_CHAT_KNOWLEDGE_BASE_TRUNCATED limit={}", limit);
+        }
+        String prompt;
+        try {
+            prompt = new ClassPathResource("ai/system-prompt.txt").getContentAsString(StandardCharsets.UTF_8);
+        } catch (IOException ex) {
+            log.warn("AI_CHAT_SYSTEM_PROMPT errorType={}", ex.getClass().getSimpleName());
+            prompt = "Tra loi bang tieng Viet. Chi dung knowledge base; neu thieu thong tin, de nghi gap nhan vien. [HANDOFF]";
+        }
+        return prompt + "\n\nKNOWLEDGE BASE:\n" + knowledge;
     }
 }

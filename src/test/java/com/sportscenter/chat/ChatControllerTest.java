@@ -20,6 +20,8 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.test.web.servlet.MockMvc;
 import java.util.List;
+import java.time.OffsetDateTime;
+import java.nio.charset.StandardCharsets;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
@@ -38,6 +40,19 @@ class ChatControllerTest {
         when(service.getOrCreate(any(),any())).thenReturn(new ChatConversationResponse(1,4,"Member",ChatConversationStatus.OPEN,null,null,ChatHandlerType.STAFF,"Help",null,null,null,null,null,0));
         mvc.perform(post("/api/chat/conversations").session(session("m@example.com","MEMBER","CHAT_AS_MEMBER")))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.id").value(1));
+    }
+    @Test void messagesApiPreservesUtf8VietnameseAiReply() throws Exception {
+        String reply = "Xin ch" + (char) 0x00e0 + "o! Tr" + (char) 0x1ea3 + " l" + (char) 0x1edd + "i";
+        when(service.listMessages(eq(1), any(), any(), any())).thenReturn(List.of(
+                new ChatMessageResponse(7, 1, ChatSenderType.AI, null, false, reply, "TEXT", "{}", null, OffsetDateTime.now())));
+        var response = mvc.perform(get("/api/chat/conversations/1/messages")
+                        .session(session("m@example.com", "MEMBER", "CHAT_AS_MEMBER")))
+                .andExpect(status().isOk()).andExpect(content().contentTypeCompatibleWith("application/json"))
+                .andExpect(jsonPath("$[0].content").value(reply)).andReturn().getResponse();
+        String json = response.getContentAsString(StandardCharsets.UTF_8);
+        org.junit.jupiter.api.Assertions.assertTrue(json.contains(reply));
+        org.junit.jupiter.api.Assertions.assertFalse(json.indexOf((char) 0x00c3) >= 0
+                || json.contains(new String(new char[] {(char) 0x00e1, (char) 0x00bb})));
     }
     @Test void memberCanRequestStaffHandoffForTheirConversation() throws Exception {
         when(service.requestStaff(eq(1),any())).thenReturn(new ChatConversationResponse(1,4,"Member",ChatConversationStatus.OPEN,null,null,ChatHandlerType.STAFF,"Help",null,null,null,null,null,0));

@@ -34,6 +34,8 @@ public class ChatService {
     private ChatHandlerType newConversationHandler = ChatHandlerType.STAFF;
     @Value("${scms.ai.chat.enabled:false}")
     private boolean aiChatEnabled;
+    @Value("${scms.ai.chat.daily-limit-per-member:30}")
+    private int aiDailyLimitPerMember = 30;
 
     @Transactional
     public ChatConversationResponse getOrCreate(Authentication auth, ChatConversationRequest request) {
@@ -200,6 +202,13 @@ public class ChatService {
     public ChatConversation loadForResponder(Integer id) { return conversations.findById(id).orElseThrow(ChatService::notFound); }
     @Transactional(readOnly=true)
     public List<ChatMessage> recentForResponder(Integer id, int limit) { List<ChatMessage> rows=messages.latestMessages(id,PageRequest.of(0,Math.max(1,Math.min(50,limit)))); Collections.reverse(rows); return rows; }
+
+    @Transactional(readOnly = true)
+    public boolean aiDailyLimitReached(Integer memberUserId) {
+        java.time.LocalDate today = clock.instant().atZone(java.time.ZoneId.of("Asia/Ho_Chi_Minh")).toLocalDate();
+        LocalDateTime start = today.atStartOfDay();
+        return messages.countAiRepliesForMemberBetween(memberUserId, start, start.plusDays(1)) >= Math.max(0, aiDailyLimitPerMember);
+    }
 
     private ChatConversationResponse response(ChatConversation c,Integer viewerId) {
         List<ChatMessage> last=messages.findByConversation_IdOrderByIdDesc(c.getId(),PageRequest.of(0,1));

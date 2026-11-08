@@ -1,6 +1,7 @@
 # SCMS — Tiến độ và nghiệm thu
 
 ## Active
+**AI chat DeepSeek / 08-11-2026:** Them provider `deepseek`, client RestClient, system prompt + knowledge base UTF-8 co dau, fallback/handoff, metadata va quota AI 30/ngay theo Asia/Ho_Chi_Minh; khong migration. `mvnw clean test` PASS local working tree: 446 tests, 0 failure/error, 28 skip; skip khong tinh pass. Test provider dung RestClient mock, khong goi mang that. Chua kiem key/provider that, PostgreSQL, FE hoac Render; chi tiet cau hinh/chi phi, nguyen nhan loi encoding va gioi han live API tai [ban giao AI chat](../SCMS-BAN-GIAO-FE-AI-CHAT-2026-11-07.md).
 
 **Cách mở session:** đọc AGENTS → Active → đúng Dxx trong docs04; khi sửa DB đọc [database/README](../database/README.md) và source/trigger/test liên quan. Đọc docs01 theo API, docs02 theo nhu cầu test/migration. Kết quả bên dưới luôn theo đúng mốc/source/môi trường đã ghi.
 
@@ -824,6 +825,7 @@ Bằng chứng khi cần: [QA duy nhất](../artifacts/qa/latest.json). Bộ FE 
 27skip của lần clean gồm19baseline live/data/PG,6communication và2clone opt-in. Communication12case và clone2case đã chạy riêng ở source trước; xem QA theo SHA, không gọi đó là lần chạy mới của source hiện tại.
 
 ## HISTORY
+| 08/11/2026 | Bo sung DeepSeek provider va prompt tieng Viet co dau cho AI chat, quota member/day, knowledge base va an toan handoff | Clean test local 446 tests = 418 pass + 28 skip, 0 fail/error tren working tree branch feature/ai-chatbot-env; chi tiet trong ban giao AI chat. Chua live/provider/Render/FE. |
 
 | Ngày | Nhóm hoàn tất | Dấu vết |
 |---|---|---|
