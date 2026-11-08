@@ -131,6 +131,17 @@ if query_review and query_review.get('result')=='PASS_LOCAL':
         backend_match=source_fingerprints(ROOT)==query_review.get('sourceFingerprints')
         source_verification='QueryDR snapshot tested locally; concurrent workspace edits require separate verification; prior wire exchanges remain historical evidence'
 schema_hash=hashlib.sha256(openapi_path.read_bytes()).hexdigest()
+attendance_review=qa.get('attendanceImplementation20261109',{})
+if attendance_review.get('result')=='PASS_LOCAL':
+    clean=attendance_review.get('cleanTest',{})
+    pg=attendance_review.get('postgresAttendance',{})
+    if (clean.get('failures')==0 and clean.get('errors')==0
+            and pg.get('failures')==0 and pg.get('errors')==0
+            and pg.get('skipped')==0
+            and attendance_review.get('migration',{}).get('status')=='PASS'
+            and schema_hash==attendance_review.get('openApi',{}).get('sha256')):
+        backend_match=source_fingerprints(ROOT)==attendance_review.get('sourceFingerprints')
+        source_verification='Attendance09/11 tested local tree; retained wire exchanges remain historical and are checked only for structural compatibility'
 hash_match=schema_hash==qa['openApi']['sha256']
 result={'result':'PASS' if not issues and not missing and not extra and hash_match and backend_match else 'REVIEW_REQUIRED',
         'mode':'OFFLINE_RETAINED_EVIDENCE_CHECK','checkedAtUtc':dt.datetime.now(dt.timezone.utc).isoformat(),

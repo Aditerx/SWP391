@@ -466,7 +466,7 @@
     },
     "diagnosticFieldsDescribePreImplementation": true
   },
-  "recordedAt": "2026-11-07T11:04:21+07:00",
+  "recordedAt": "2026-11-07T15:50:21+07:00",
   "purpose": "FE handoff readiness: fresh local authenticated HTTP and post-commit acceptance; retained cloud evidence is not rerun",
   "historyCommit": "a4f3cd0df946963ee905c1f6a3263f941f1b8fa2",
   "results": {
@@ -561,8 +561,8 @@
   },
   "openApi": {
     "path": "artifacts/fe-handoff/openapi.json",
-    "sha256": "2829c85cc45721364d07dcd0d99f58b1e24c479457ec12db3c84f2030be18acb",
-    "evidence": "rbacDesignCorrections.openApi; same local PostgreSQL application; structural equality confirmed",
+    "sha256": "ea994554a5b862c14698c1612b30e66a63e6954f6426fc23353f34625b31c667",
+    "evidence": "attendanceImplementation20261109.openApi; final isolated local H2 app, attendance schema covered by PostgreSQL tests",
     "generatedLocally": true
   },
   "local": {
@@ -22184,10 +22184,11 @@
       "canonicalSnapshotRewritten": false
     },
     "notRun": [
-      "FE/browser integration",
-      "Render authenticated reproduction of class23 screenshots",
-      "deployment/push/merge",
-      "Supabase SQL16 rerun/reset or any cloud mutation",
+      "Complete authenticated FE/browser business acceptance; partial Coach read/error/UI observations are recorded separately",
+      "Original class23 authenticated Render reproduction",
+      "Initial attendance write/readback, QR UI and management correction live acceptance",
+      "Coach professional CRUD and all Coach workflow live/negative scope coverage",
+      "Supabase SQL16 rerun/reset or any cloud mutation (intentionally not performed)",
       "Google migration verification on Supabase"
     ],
     "remaining": [
@@ -22211,9 +22212,619 @@
         "buildCommit": "cc5e18f153321e85ab8aa8802a7f283753a920e0",
         "scope": "Anonymous health only; before merge. Does not verify DB migrations or authenticated business."
       },
-      "runtimeAcceptance": "WAITING_OWNER_FE",
+      "runtimeAcceptance": "PARTIAL_OWNER_FE_READ_REQUEST; ATTENDANCE_WRITES_UNRESOLVED",
       "guide": "docs/02-DEPLOYMENT-GUIDE.md#rbac-fe-verification",
-      "testResultsUnchanged": true
+      "testResultsUnchanged": true,
+      "merged": true,
+      "mergeCommit": "63fb46c1e150527abf577e2f2a0c520a563bad5c",
+      "ci": {
+        "pullRequest": "success",
+        "branch": "success",
+        "main": "success",
+        "mainRun": "https://github.com/Aditerx/SWP391/actions/runs/42337035284"
+      }
+    },
+    "ownerFeAttendanceFeedback": {
+      "recordedAt": "2026-11-07T13:51:26+07:00",
+      "frontend": "https://scms-demo-04nov.pages.dev/coach/attendance",
+      "backend": "https://scms-app-p1gy.onrender.com",
+      "scope": "Owner evidence confirms the session selector changes while attendance details/actions remain stale. Correction of previous interpretation: a bug in the submit-ID mapping itself is not proven. Manual first-write and correct write-route live acceptance remain open.",
+      "observedRequests": [
+        {
+          "method": "GET",
+          "path": "/api/classes/10/enrollments",
+          "status": 200
+        },
+        {
+          "method": "POST",
+          "path": "/api/attendances/correct",
+          "status": 403
+        },
+        {
+          "method": "POST",
+          "path": "/api/attendances/check-in",
+          "status": 400
+        },
+        {
+          "method": "POST",
+          "path": "/api/attendances",
+          "status": 405
+        }
+      ],
+      "separateAgentHealth": {
+        "status": 200,
+        "buildCommit": "63fb46c1e150527abf577e2f2a0c520a563bad5c",
+        "scope": "Anonymous health read at same backend; does not establish build/identity at the moment of every Owner request or verify migrations."
+      },
+      "interpretation": {
+        "correct403": "Expected: supplied auth/me has role Coach, which does not satisfy Manager/Admin correction gate; RECORD_RESULT does not grant correction rights.",
+        "checkIn400": "Confirmed LOBBY_CHECKIN_DISABLED by supplied error body: lobby check-in deliberately disabled, not session attendance. Do not enable lobby feature to make this Coach operation pass.",
+        "root405": "No POST mapping on AttendanceController root; incompatible with published manual attendance flow.",
+        "canonicalWrite": "POST /api/training-results or /bulk, assigned Coach, Present/Absent, in session window.",
+        "fallback": "Provided correction click has one failed POST followed by successful reads; no evidence of automatic fallback across write endpoints.",
+        "display": "CONFIRMED_UI_STATE_DESYNC: Owner says changing session dropdown does not update the attendance area below. New screenshot selects13/11 06:00 and retains old attendance UI; Network displays prior Payload85. Do not infer a newly submitted13/11 POST solely from the selected Network row."
+      },
+      "pending": [
+        "Inspect or hand off current FE session-change/state/render/action synchronization; no FE edits authorized in this review",
+        "Initial attendance flow on an eligible session and persisted readback; not yet attempted by Owner"
+      ],
+      "mutationsPerformed": false,
+      "backendTestsRunThisReview": false,
+      "checkpoint": "docs/03-TODO.md#rbac-fe-attendance-feedback-20261107",
+      "ownerAuthMe": {
+        "userId": 12,
+        "role": "Coach",
+        "authorities": [
+          "MANAGE_TRAINING_PLAN",
+          "RECORD_RESULT",
+          "ROLE_COACH"
+        ],
+        "isFirstLogin": false
+      },
+      "checkInResponse": {
+        "code": "LOBBY_CHECKIN_DISABLED",
+        "message": "Lobby check-in is reserved for a later release"
+      },
+      "originalDesignDoubleCheck": {
+        "recordedAt": "2026-11-07T12:31:26+07:00",
+        "sources": [
+          {
+            "path": "Member.pdf",
+            "pages": [
+              3,
+              4,
+              6
+            ],
+            "sha256": "a4a88013b02f77d8d9237121dd661a3f74f816ab70bcd64a8e616ed233fcb3db",
+            "scope": "Session attendance called Check-in, 30-minute legacy window; Coach/Receptionist scope and post-session progress recording."
+          },
+          {
+            "path": "analysis 2410.pdf",
+            "pages": [
+              2,
+              8
+            ],
+            "sha256": "2f592251f96517a60f1a01a8817263e07a09af90c52c7bbaa28341d14494351e",
+            "scope": "Separates lobby check-in from session attendance; proposes lobby after MVP."
+          },
+          {
+            "path": "old-docs/SCMS-Requirements-MVP-Role-Permissions-20261018.pdf",
+            "pages": [
+              13,
+              18,
+              43,
+              51,
+              61
+            ],
+            "sha256": "9b224c40daf2b36dfad79f8b0bf53ffbb354c18190acee88b6e452b3d5021bb8",
+            "scope": "Coach session attendance, no default Present, correction initially unassigned and 30-minute window unresolved."
+          }
+        ],
+        "visualPagesReviewed": {
+          "Member.pdf": [
+            4,
+            6
+          ],
+          "analysis 2410.pdf": [
+            8
+          ],
+          "old-docs/SCMS-Requirements-MVP-Role-Permissions-20261018.pdf": [
+            51,
+            61
+          ]
+        },
+        "laterOwnerDecision": {
+          "gitRef": "a4f3cd0",
+          "path": "docs/04-DEBUG-NOTE.md",
+          "sections": [
+            "33.3",
+            "33.5"
+          ],
+          "currentSummary": "docs/04-DEBUG-NOTE.md#d15",
+          "recordedChoice": "Owner chose option1: Session attendance during session, new Present/Absent only; CenterManager correction after end/finalized with reason/audit; lobby UI later."
+        },
+        "provenanceCorrection": "Prior two replies had checked D15/contract/source but had not reread the original attendance PDF pages in that turn. That check has now been performed.",
+        "conclusion": "Do not blame FE based only on the endpoint name Check-in: original design used it for session attendance. Supplied requests are incompatible with the current published write flow; their rejection is explained by code/contract and later D15. Correct-route live business acceptance remains open. This does not certify all BE behavior.",
+        "separateProgressFlow": "Original design allows recording progress/results after session; the D15 attendance window must not be generalized to all professional content.",
+        "backendOrFrontendChanges": false,
+        "newBusinessDecision": false,
+        "backendTestsRun": false
+      },
+      "ownerFollowup": {
+        "attendanceHistory": {
+          "getStatus": 200,
+          "scope": "Multiple assigned sessions/classes, not restricted by sessionId",
+          "representativeRecord": {
+            "attendanceId": 85,
+            "sessionId": 10,
+            "classId": 10,
+            "sessionDate": "2026-11-05",
+            "memberId": 2,
+            "state": "Absent",
+            "recordedBy": null
+          },
+          "session11PresentInSuppliedResponse": false,
+          "recordedByNullMeaning": "Compatible with system finalizer; not independently proven provenance for these rows. Null lobby check-in/out timestamps are not a session attendance defect by themselves."
+        },
+        "catalog": {
+          "path": "/api/sessions/catalog/10",
+          "status": 200,
+          "sessions": [
+            {
+              "id": 11,
+              "sessionDate": "2026-11-09",
+              "startTime": "06:00:00",
+              "endTime": "07:30:00"
+            },
+            {
+              "id": 12,
+              "sessionDate": "2026-11-12",
+              "startTime": "06:00:00",
+              "endTime": "07:30:00"
+            },
+            {
+              "id": 109,
+              "sessionDate": "2026-11-13",
+              "startTime": "06:00:00",
+              "endTime": "07:30:00"
+            }
+          ],
+          "sourceMeaning": "Normal Open/Ongoing class; only Scheduled sessions without bookedMember; no complete attendance history."
+        },
+        "correction": {
+          "payload": {
+            "attendanceId": 85,
+            "newState": "Absent",
+            "reasonProvided": true
+          },
+          "preflightStatus": 200,
+          "postStatus": 403,
+          "responseMessage": "Access Denied",
+          "responseTimestamp": "2026-11-07T06:30:13.996032898Z",
+          "targetResolvedToSessionId": 10,
+          "targetResolvedToDate": "2026-11-05",
+          "interpretation": "Previous CONFIRMED_WRONG_SESSION_TARGET diagnosis is withdrawn as too specific. Attendance85 belongs to05/11, but its payload may follow the old record still displayed. Selector/detail/action context is inconsistent; submit-function root cause is NOT_INSPECTED.",
+          "selectedSessionAtClick": {
+            "sessionId": 11,
+            "sessionDate": "2026-11-09",
+            "startTime": "06:00:00",
+            "evidence": "Explicit Owner answer confirms selection remained as screenshot at click."
+          }
+        },
+        "followingReads": "Owner reports GET enrollments/attendances/catalog200 after Sửa click; refresh success does not establish write success or a fallback chain across write routes.",
+        "manualFirstWrite": "NOT_RUN: Owner explicitly has not tried initial attendance button.",
+        "databasePlan": "Owner mentioned DB adjustment as worst-case fallback, not an instruction to mutate cloud/history now; prefer fixed Clock on disposable local PG if a time-bound fixture is needed.",
+        "agentMutations": "Documentation/evidence only; no cloud writes or BE/FE/test changes."
+      },
+      "confirmedFeDefect": {
+        "status": "CONFIRMED_UI_STATE_DESYNC_OWNER_EVIDENCE",
+        "behavior": "Session dropdown changes but attendance detail/action context remains on old data.",
+        "sourceRootCause": "NOT_INSPECTED; withdraw specific submit-ID/mapping root cause diagnosis",
+        "fixAcceptance": [
+          "Changing selected session refreshes or clears attendance state and edit context before actions are enabled",
+          "Responses for an older selection cannot overwrite details for the current selection",
+          "State/attendanceId and write action context belong to selected session/member; the roster may remain identical within a class",
+          "No existing record is shown as unrecorded instead of copying old Present/Absent or correction target",
+          "Role/time controls still follow D15; no BE permission expansion to mask UI state issue"
+        ],
+        "agentFeBeDbChanges": false
+      },
+      "ownerUiClarification": {
+        "recordedAt": "2026-11-07T13:51:26+07:00",
+        "ownerMeaning": "Request85 corresponds to the old displayed attendance; changing the dropdown does not refresh the section below. Owner describes UI as inconsistent, not a proven wrong-ID submit function.",
+        "newScreenshotSelection": {
+          "sessionDate": "2026-11-13",
+          "startTime": "06:00:00",
+          "catalogSessionId": 109
+        },
+        "observedBelow": "Same class/member attendance controls retain stale state; class summary still shows05/10 07:00. Whether that summary is class metadata versus selected-session metadata is not proven.",
+        "networkLimit": "Displayed Payload85 can be a previously selected Network entry; no new13/11 POST is inferred.",
+        "whatCanStayTheSame": "Roster membership for the same class",
+        "whatMustMatchSelection": "Attendance state, attendanceId, edit-form context and write target"
+      },
+      "handoff": {
+        "recordedAt": "2026-11-07T14:00:10+07:00",
+        "path": "SCMS-BAN-GIAO-FE-RBAC-LAN-2-2026-11-07.md",
+        "scope": "Attendance Coach only: selector/detail/form/action synchronization, contracts and acceptance criteria",
+        "status": "CREATED_NOT_IMPLEMENTED",
+        "frontendSource": "Current Pages repo/build not yet identified; local FE_Project-main remains historical reference",
+        "firstWriteAcceptance": "NOT_RUN",
+        "sourceRootCause": "NOT_INSPECTED",
+        "newBackendFrontendDatabaseChanges": false,
+        "sha256": "5a4133e08c17631dc62494a03dac5bfa2ee08984d0f691b4587683ec5b815551",
+        "ownerScheduling": "WAIT_FOR_FE_RESPONSE; manual/CRUD/live acceptance deferred to combined round"
+      }
+    },
+    "notRunScopeNote": "Current remaining/non-performed scope updated after publication and Owner follow-up; PR19 push/merge and main CI completed as recorded in publication. Historical local test source/counts unchanged.",
+    "coachOpenItemsReview": {
+      "recordedAt": "2026-11-07T14:00:10+07:00",
+      "status": "STATIC_PARTIAL_REVIEW",
+      "checkpoint": "docs/03-TODO.md#coach-open-items-20261107",
+      "handoff": "SCMS-BAN-GIAO-FE-RBAC-LAN-2-2026-11-07.md",
+      "groups": [
+        "C01 attendance UI and first-write",
+        "C02 professional plan/evaluation FE acceptance and separate handoff",
+        "C03 post-session professional content versus attendance window",
+        "C04 attendance date filters versus null checkInTime",
+        "C05 full owner/center matrix and historical assignment cases",
+        "C06 Advanced lifecycle/resource capability FE acceptance",
+        "C07 current-session FE handling and out-of-duty APIs",
+        "C08 feedback/at-risk proper Coach APIs and scope",
+        "C09 design/source/handoff provenance"
+      ],
+      "sourceObservations": [
+        {
+          "path": "src/main/java/com/sportscenter/training/TrainingResultService.java",
+          "symbols": [
+            "recordResult",
+            "recordBulkResults"
+          ],
+          "observation": "SessionAttendancePolicy.requireWindow runs before handling content; post-session progress update needs operation/design mapping before classifying as defect.",
+          "status": "NEEDS_SEPARATE_REVIEW"
+        },
+        {
+          "path": "src/main/java/com/sportscenter/training/AttendanceService.java",
+          "symbol": "searchAttendances",
+          "observation": "Date predicates use checkInTime and exclude null; supplied Absent attendance85 has sessionDate but null checkInTime. Filter contract meaning and appropriate expected need independent check before a BE fix.",
+          "status": "NEEDS_SEPARATE_REVIEW"
+        }
+      ],
+      "scopeLimits": "Not all Coach source, triggers, API combinations or tests have been audited; no new tests, no declared full RBAC/Coach acceptance. Source implementation causes for UI remain uninspected.",
+      "newBusinessDecisions": false,
+      "backendTestsRun": false,
+      "frontendOrBackendCodeChanged": false,
+      "cloudMutations": false,
+      "documentationValidation": {
+        "status": "PASS",
+        "checks": [
+          "Five required handoff sections and four decision milestones",
+          "Relative links and new explicit anchors resolve",
+          "UTF-8 and JSON syntax",
+          "No names/emails/phone, test-count or SHA duplication in LAN-2",
+          "Tested main/test/schema fingerprints unchanged"
+        ],
+        "backendTestsRun": false
+      },
+      "latestOwnerScope": "Superseded planning scope: current R1–R3 proposal uses same-center A/B only; FE/live acceptance deferred by Owner, see coachReviewProposal. Historical tests/observations remain unchanged."
+    },
+    "coachReviewProposal": {
+      "recordedAt": "2026-11-07T14:22:05+07:00",
+      "status": "PARTIALLY_APPROVED_R3_SOURCE_REVIEW_STARTED",
+      "checkpoint": "docs/03-TODO.md#coach-review-proposal-20261107",
+      "acceptedOwnerScope": {
+        "attendance": "WAIT_FOR_FE_RESPONSE",
+        "feRenderCrudAcceptance": "DEFER_TO_COMBINED_LATER_ROUND",
+        "newScopeFixtures": "Coach A/B in same center; no additional cross-center review",
+        "existingCenterGuardsAndTests": "Retained; no permission expansion"
+      },
+      "order": [
+        "R1 attendance date filter",
+        "R2 post-session content versus attendance",
+        "R3 protected Coach A/B matrix"
+      ],
+      "proposalExpectedNotYetApproved": {
+        "R1": "Session-linked attendance date filtering uses sessionDate, including Absent/null checkInTime; historical non-Session lobby rows use checkInTime. Full inclusive date boundaries.",
+        "R2": "Separate content-only mutation from attendance after session; keep locked attendance/credit/schedule. First specify route/DTO/errors; stop for unresolved no-result/non-held/reassignment business cases.",
+        "R3": "Protect owned data against another same-center Coach using direct IDs, filters, spoofed IDs or extra authority; distinguish shared published catalogs; reuse existing tests and add only missing cases."
+      },
+      "doubleCheck": {
+        "design": [
+          {
+            "path": "Member.pdf",
+            "pages": [
+              4,
+              6
+            ]
+          },
+          {
+            "path": "analysis 2410.pdf",
+            "pages": [
+              8
+            ]
+          },
+          {
+            "path": "old-docs/SCMS-Requirements-MVP-Role-Permissions-20261018.pdf",
+            "pages": [
+              18
+            ]
+          }
+        ],
+        "decisions": [
+          "D15",
+          "D17",
+          "D19"
+        ],
+        "source": [
+          "TrainingResultService.recordResult/recordBulkResults",
+          "TrainingResultRequest/BulkTrainingResultRequest",
+          "EvaluationRequest/EvaluationService",
+          "AttendanceController.searchAttendances/AttendanceService.searchAttendances",
+          "CurrentAccountFilter/FirstLoginPasswordFilter",
+          "Coach scope controllers/services reviewed in coachOpenItemsReview"
+        ],
+        "testsRead": [
+          "AttendanceServiceTest.searchAttendances_Success (no date-filter coverage in that test)",
+          "TrainingResultServiceTest (success/bulk/spoofed Coach cases)",
+          "SessionPrivacyTest",
+          "TrainingResultAccessIntegrationTest",
+          "RbacGuardIntegrationTest",
+          "PhaseWorkflowHttpTest",
+          "ClassFeedbackAuditTest"
+        ],
+        "openApiDateFilterDescriptions": "startDate/endDate have date schema but no description; schema/code are not independent business expected"
+      },
+      "sessionExplanation": {
+        "meaning": "Existing login lifetime and FE handling when server permissions/account/session changes; not a proven current login failure",
+        "feAcceptance": "Deferred combined round",
+        "generic403": "Do not treat every403 as expired login",
+        "existingBeEvidence": "RbacGuard/previous local tests retained; no new run"
+      },
+      "frontendSourceExplanation": {
+        "meaning": "Repository plus revision/build that generated the Pages deployment, distinct from login session",
+        "localReference": "Tracked FE_Project-main package scms-frontend1.0.0; last tracked folder change2026-10-23; not proof of active Pages source",
+        "publicPageMetadataProbe": "HTTP retrieval failed in this session; no deploy metadata verified",
+        "neededFromFrontend": "Repo/branch/commit or build-source provenance for direct upload; no secrets",
+        "blocksBeReview": false
+      },
+      "backendFrontendChanges": false,
+      "backendTestsRun": false,
+      "newCloudMutations": false,
+      "documentationValidation": {
+        "status": "PASS",
+        "checks": [
+          "Owner scope explicitly separated from unapproved fixes",
+          "LAN-2 retains five sections and reflects deferred FE acceptance",
+          "New proposal links/anchor, UTF-8 and QA JSON valid",
+          "Tested main/test/schema fingerprints unchanged; handoff digest refreshed"
+        ],
+        "backendTestsRun": false
+      },
+      "latestOwnerDirection": {
+        "recordedAt": "2026-11-07T15:47:55+07:00",
+        "attendance": "Owner reports latest UI state-change trial now only has known correct403; development ongoing, not persisted-write acceptance",
+        "R1": "Needs plain-language explanation; no filter change or DB setup approved",
+        "R2": "Reassess complexity/need; no new content API approved",
+        "R3": "APPROVED; same-center Coach A/B source review started, no new tests/production changes yet",
+        "lateQuestion": "Owner requests original-design lookup to recall prior decision; no rule change requested"
+      }
+    },
+    "lateDesignVerification": {
+      "recordedAt": "2026-11-07T15:47:55+07:00",
+      "status": "VERIFIED_FROM_DESIGN_DECISION_AND_SOURCE",
+      "designSearch": [
+        {
+          "path": "Member.pdf",
+          "matchedPagesForLateOrTre": [
+            6
+          ],
+          "meaning": "RP-21 cancellation/no-show, not an attendance Late definition; section6.1 page4 says present/absent."
+        },
+        {
+          "path": "analysis 2410.pdf",
+          "matchedPagesForLateOrTre": [],
+          "meaning": "No matching Late/Excused/late-arrival text found in targeted term scan."
+        },
+        {
+          "path": "old-docs/SCMS-Requirements-MVP-Role-Permissions-20261018.pdf",
+          "matchedPagesForLateOrTre": [
+            7,
+            13,
+            17,
+            30,
+            31,
+            32,
+            43,
+            58
+          ],
+          "meaning": "Occurrences include late absence/cancellation/credit or late payments; no10-minute Late attendance threshold found in matching contexts."
+        }
+      ],
+      "historicalDecision": {
+        "gitRef": "a4f3cd0",
+        "path": "docs/04-DEBUG-NOTE.md",
+        "oldSource": "Section33.1 records earlier scan30min early/Late after10min",
+        "unapprovedOptions": [
+          "33.2",
+          "33.4"
+        ],
+        "ownerChoice": "33.5 explicitly records option1: new Present/Absent only, within session; historical Late retained",
+        "recordedReason": "No distinct late-credit sanction need established; recording/scan timestamp is not automatically actual arrival time."
+      },
+      "currentSource": [
+        "SessionAttendancePolicy.state: Present/Absent only",
+        "AttendanceService.normalizeState delegates to same policy"
+      ],
+      "ownerLatestPayload": {
+        "attendanceId": 85,
+        "newState": "Late",
+        "reasonProvided": true
+      },
+      "observedResult": "correct403 for Coach; rejected at role gate before state validation, not evidence Late was stored/accepted",
+      "newBusinessDecision": false,
+      "newTestsOrDatabaseChanges": false
+    },
+    "attendanceStorageVerification": {
+      "recordedAt": "2026-11-07T15:50:21+07:00",
+      "status": "SOURCE_MAPPING_ONLY",
+      "manualWrite": "TrainingResultService saves training_results including content and attendance_status, then upserts attendances.state.",
+      "correctionWrite": "AttendanceService.correctAttendance updates attendances.state and existing training_results.attendance_status, then logs reason in system_logs.detail with ATTENDANCE_CORRECTION/attendances/attendanceId.",
+      "noteColumn": "Attendance.note exists; correct does not set it. SessionAbsenceService currently sets it from absence notice reason.",
+      "readDto": "AttendanceResponse does not include note or correction reason.",
+      "ownerFailedRequest": "Coach correct403 is denied before handler; no state/reason persisted by that request.",
+      "databaseLocation": "Effective runtime DB_URL controls database target. Source refers to environment variable, not a local DB file. Docs specify PostgreSQL/Supabase; no actual project/credential inspected here.",
+      "cloudDatabaseQueried": false,
+      "newMutations": false,
+      "newTestsRun": false
+    },
+    "attendanceCorrectionDesignApproval": {
+      "date": "2026-11-09",
+      "timezone": "Asia/Ho_Chi_Minh",
+      "status": "OWNER_APPROVED_DESIGN_NOT_IMPLEMENTED",
+      "scope": "Attendance correction through end of session calendar day, member-visible note, explicit denial messages, completion at end and no-show processing after cutoff",
+      "coachDeadline": "Exclusive start of next day of sessionDate, not rolling 24 hours; assigned Active Coach with RECORD_RESULT; wrong Coach denied clearly",
+      "note": "Member reads own note; separate internal correction reason; optional/null preserve, trimmed empty clears; max 1000 chars",
+      "finalizer": "Complete lifecycle at session end; defer NO_SHOW_RECORDED and disabled-by-default sanctions until cutoff; worker delay does not extend correction permission",
+      "frontend": "Flow/field/UI examples are suggestions; FE retains final layout and wording decisions; no FE source inspected or edited in this turn",
+      "decisions": "docs/04-DEBUG-NOTE.md#d15",
+      "targetContract": "docs/01-API-CONTRACT-FE-BE.md#attendance-correction-20261109",
+      "handoff": "SCMS-BAN-GIAO-FE-ATTENDANCE-2026-11-09.md",
+      "handoffSha256": "74fd4dd13d97ebb92adf96f362071ab0a93c6cd6a2b7fd781dec4519c111f4a3",
+      "sourceHead": "42c3ea7194891b69b272250309d0b8151ec07c14",
+      "documentationChecks": "PASS: UTF-8, URL-decoded local link targets, explicit anchors, five handoff sections, four milestones",
+      "backendSourceEdited": false,
+      "frontendSourceEdited": false,
+      "databaseMutation": false,
+      "newTestsRun": false,
+      "renderAcceptance": "NOT_RUN",
+      "cloudAcceptance": "NOT_RUN"
+    }
+  },
+  "attendanceImplementation20261109": {
+    "result": "PASS_LOCAL",
+    "recordedAt": "2026-11-09T03:31:14+07:00",
+    "decision": "D15 Owner09/11/2026",
+    "sourceCommit": "42c3ea7194891b69b272250309d0b8151ec07c14",
+    "uncommittedSource": true,
+    "sourceFingerprints": {
+      "src/main": "3bbd1e8068aada93e7f03dd88eebc2afdb4d78c3371e751f1d5891ee3372f1e3",
+      "src/test": "b423b0cdd190b169ccec20a3b3d48648f3e6b818ca903fce1a53d256e2b81692",
+      "database": "31c6c6b85957d4e6e6be364cb8ec27c7c96cdedb4adb8867d9b869132a138128",
+      "pom.xml": "9c305e856ad15dd2723b756b4c659c2755ff7df7f18a475078bd690c7c2c3877",
+      "schema_postgres.sql": "b45ef0a351e2a36f9caba86a8bad52b3cc94049b5e151e54cbbdcc15b57e25c0",
+      "scripts/test-room-absence-postgres.py": "7144adb3689349a949c9ee702958f765fb5743433d8a285dcfc264af2a77c82c",
+      "scripts/test-phases-postgres.py": "c2fde3c412c2d5f6043875adb46b380b6f959d9395a906aeb521510ec74c242c",
+      "scripts/prepare-phases-release.py": "e6c525b8a70562527d606b0017d72199865c838df31b6bbc995acb1405deb5a5"
+    },
+    "manifest": "artifacts/runs/attendance-20261109/source-manifest.json",
+    "manifestSha256": "f2bb1899cfaf8dfb07a980f7cf21c402c05620b7e36ecc3f6ec0f45dc5cd813c",
+    "sourceAndTestsMatchIsolatedCopy": true,
+    "isolatedCopy": "C:\\Users\\Admin\\AppData\\Local\\Temp\\scms-attendance-20261109",
+    "envFileUsed": false,
+    "cloudAccess": false,
+    "environment": "Windows/Java17.0.12; isolated H2 clean tests and disposable PostgreSQL17.11",
+    "cleanTest": {
+      "tests": 480,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 28,
+      "passed": 452,
+      "command": ".\\mvnw.cmd -Dscms.attendance.openapi=<raw artifact> clean test",
+      "xmlDirectory": "artifacts/runs/attendance-20261109/clean-xml"
+    },
+    "postgresAttendance": {
+      "tests": 22,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "environment": "PostgreSQL 17.11 loopback 127.0.0.1:55440, ddl-auto=none; MockMvc login/auth-me, JDBC post-commit assertions and races",
+      "database": "scms_phases_attendance_20261109_c",
+      "xml": "artifacts/runs/attendance-20261109/postgres-attendance.xml",
+      "xmlSha256": "149fc3d04bfcf046ed3ef9e45b1335c0a513ecd35dabc44da263885387b90243",
+      "testSha256AtRun": "c4d0dec19a6608b791304bdabdf14743810cede072506f1a36a561ac8c268626",
+      "finalTestChangeAfterPg": "Only OpenAPI response decoding changed to JSON bytes for UTF-8; final clean test executes final test source and exports schema.",
+      "cases": [
+        "manualClosesAtEndAndCorrectionDoesNotOpenBeforeEnd",
+        "inactiveMissingPermissionAndWrongRoleCannotCorrect",
+        "coachCreatesAtEndAndJustBeforeMidnight(String)[1]",
+        "coachCreatesAtEndAndJustBeforeMidnight(String)[2]",
+        "advancedHistoricalEligibilityPreservesCreditAndLifecycle(String)[1]",
+        "advancedHistoricalEligibilityPreservesCreditAndLifecycle(String)[2]",
+        "advancedHistoricalEligibilityPreservesCreditAndLifecycle(String)[3]",
+        "legacyFinalizedSessionIsNotQueuedForHistoricalNotifications",
+        "validationIsAtomicAndAcceptsTrimmedLimits",
+        "finalizerCompletesNormalAtEndAndCorrectionWorksAfterLifecycle",
+        "originalAbsenceReasonAndLinkSurviveCorrection",
+        "openApiMatchesImplementedAttendanceFields",
+        "noteOmitNullClearAndMemberReadbackWithInternalAudit",
+        "scopeCheckedBeforeTimeAndManagerHasNoCoachDeadline",
+        "cancelledInvalidatedAndSupersededRemainProtected",
+        "completedNormalCanCreateAndFinalizerCannotOverwriteCorrection",
+        "enabledSanctionCommitsSevenDaysOnlyAfterCutoffAndDoesNotExtendOnRetry",
+        "noShowWaitsForCutoffUsesCurrentAbsenceAndDoesNotRepeat",
+        "rejectsAmbiguousIncompleteAndIneligibleTargets",
+        "correctionAndFinalizerRaceKeepOneCurrentRecord",
+        "metadataUsesVietnamClockIndependentOfClockZone",
+        "bulkNoteReadbackAndInvalidItemRollback"
+      ]
+    },
+    "migration": {
+      "status": "PASS",
+      "database": "scms_phases_attendance_migration_20261109_a",
+      "localOnly": true,
+      "checks": [
+        "baseline guards",
+        "legacy not queued",
+        "replay preserves pending",
+        "attendance/session preserved",
+        "new default false",
+        "incompatible column rollback"
+      ]
+    },
+    "openApi": {
+      "path": "artifacts/fe-handoff/openapi.json",
+      "sha256": "ea994554a5b862c14698c1612b30e66a63e6954f6426fc23353f34625b31c667",
+      "generatedFrom": "Final isolated H2 application during clean test; response bytes decoded as UTF-8",
+      "changedSchemas": [
+        "AttendanceCorrectionRequest",
+        "AttendanceResponse",
+        "Item",
+        "SessionResponse",
+        "TrainingResultRequest",
+        "TrainingResultResponse"
+      ],
+      "pathsAndOperationsUnchanged": true
+    },
+    "coverage": [
+      "PASS: assigned Active Coach + RECORD_RESULT; end/23:59:59.999 allowed, exact midnight denied; Coach B same center denied before timing details; Manager after cutoff allowed.",
+      "PASS: exactly one target; create missing current attendance under center/session locks; Completed Normal/Advanced and historical valid-through Expired Advanced; Paid guard; race with finalizer preserves one current row.",
+      "PASS: manual/QR keep [start,end), Present/Absent only; note trim/limit/omit/null/clear, single/bulk response/readback, rollback and Member owner scope; internal reason/audit separate.",
+      "PASS: lifecycle at end; correction preserves check-in, absence reason/link, content and credit; no synthetic training result.",
+      "PASS: no-show after cutoff uses current state; corrected Present receives none; concurrent review/retry no duplicate notification; legacy finalized sessions not queued; booking-block default off, opt-in seven days commits without retry extension."
+    ],
+    "expectedChanges": [
+      "Coach403 immediately at end replaced by assigned Coach + permission until exclusive next midnight under D15.",
+      "No-show/sanction checks moved from lifecycle at end to post-cutoff review; seven-day/default-off guards retained."
+    ],
+    "initialFixtureIssues": [
+      "PG invoice FK required Receptionist subtype; fixture corrected, FK retained.",
+      "Advanced fixture required capacity 1; fixture corrected, constraint retained."
+    ],
+    "migrationFile": {
+      "path": "database/migrations/17_attendance_review_postgres.sql",
+      "sha256": "a6c903edab57f6ecb1d905baa753637b22d74071143058a7424e3289ae9b013b"
+    },
+    "limits": {
+      "frontend": "NOT_RUN; no FE changes",
+      "renderAuthenticatedBusiness": "NOT_RUN",
+      "cloudMigration17": "NOT_RUN",
+      "generalCrudLiveAcceptance": "Deferred to Owner common acceptance",
+      "r1r2r3OtherRbac": "Not implemented in this group",
+      "sanctionsDefaultEnabled": false
+    },
+    "offlineContractCheck": {
+      "result": "PASS",
+      "artifact": "artifacts/runs/attendance-20261109/offline-contract-check.json",
+      "scope": "Static routes, schema hash and historical response structural compatibility only; no live probe or new business test."
     }
   }
 }

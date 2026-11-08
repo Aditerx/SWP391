@@ -39,6 +39,7 @@ public class AttendanceService {
     private final MemberRepository memberRepository;
     private final MemberPackageRepository memberPackageRepository;
     private final com.sportscenter.session.ScheduleWriteLock scheduleWriteLock;
+    private final com.sportscenter.invoice.InvoiceRepository invoiceRepository;
     @org.springframework.beans.factory.annotation.Value("${scms.lobby-checkin.enabled:false}") private boolean lobbyCheckinEnabled;
 
     @Transactional(readOnly = true)
@@ -65,6 +66,7 @@ public class AttendanceService {
         }
         final Integer effectiveMemberId = resolvedMemberId;
         User actor = userRepository.findByEmailIgnoreCase(authentication.getName()).orElseThrow(() -> new AccessDeniedException("Account not found"));
+        if (!"Active".equalsIgnoreCase(actor.getStatus())) throw new AccessDeniedException("ACCOUNT_NOT_ACTIVE: Active account required");
         boolean coachRole = authentication.getAuthorities().stream().anyMatch(a -> "ROLE_COACH".equals(a.getAuthority()));
         List<Attendance> all = attendanceRepository.findAllWithDetails();
         return all.stream()
@@ -76,7 +78,7 @@ public class AttendanceService {
                 .filter(a -> state == null || state.isBlank() || (a.getState() != null && a.getState().equalsIgnoreCase(state)))
                 .filter(a -> startDate == null || (a.getCheckInTime() != null && !a.getCheckInTime().isBefore(startDate)))
                 .filter(a -> endDate == null || (a.getCheckInTime() != null && !a.getCheckInTime().isAfter(endDate)))
-                .map(AttendanceResponse::from)
+                .map(a -> AttendanceResponse.from(a, actor, clock))
                 .toList();
     }
 
@@ -129,31 +131,41 @@ public class AttendanceService {
     public AttendanceResponse correctAttendance(AttendanceCorrectionRequest request, String actorEmail) {
         User actor = userRepository.findByEmailIgnoreCase(actorEmail)
                 .orElseThrow(() -> new ResourceNotFoundException("Authenticated user not found"));
-        com.sportscenter.common.ActorPolicy.manager(actor);
-        if(!"Active".equals(actor.getStatus()))throw new AccessDeniedException("Active Manager required");
+        if (!SessionAttendancePolicy.correctionActor(actor)) throw SessionAttendancePolicy.forbidden();
+        boolean byId = request.attendanceId() != null;
+        if (byId ? request.sessionId() != null || request.memberId() != null : request.sessionId() == null || request.memberId() == null)
+            throw new BusinessException("INVALID_ATTENDANCE_TARGET: Supply attendanceId OR sessionId and memberId");
         scheduleWriteLock.acquire(actor.getCenterId());
-        Attendance att = attendanceRepository.findById(request.attendanceId())
-                .orElseThrow(() -> new ResourceNotFoundException("Attendance record not found: " + request.attendanceId()));
-        if (att.getMember() != null && !java.util.Objects.equals(actor.getCenterId(), att.getMember().getCenterId())) throw new AccessDeniedException("Attendance belongs to another center");
-        if(att.getSupersededAt()!=null)throw new BusinessException("ATTENDANCE_SUPERSEDED: Correct the current session attendance, not a superseded notice");
-        if(att.getSession()==null)throw new BusinessException("SESSION_REQUIRED: This correction flow applies to session attendance");
-        Session locked=sessionRepository.findByIdForUpdate(att.getSession().getId()).orElseThrow(()->new ResourceNotFoundException("Session not found"));
-        if(LocalDateTime.now(clock).isBefore(locked.getSessionDate().atTime(locked.getEndTime())))throw new BusinessException("USE_SESSION_ATTENDANCE: Record in-session attendance before session end");
-        if(locked.isCenterInvalidated())throw new BusinessException("SESSION_NOT_HELD: Preserve incident and attendance history");
-
-        if (request.reason() == null || request.reason().isBlank()) {
-            throw new BusinessException("A reason is required for attendance correction");
-        }
-        if (actor.getRole() != null && ("Coach".equalsIgnoreCase(actor.getRole().getName()) || "ROLE_COACH".equalsIgnoreCase(actor.getRole().getName()))) {
-            if (att.getSession() == null || !actor.getId().equals(assignedCoachId(att.getSession()))) {
-                throw new AccessDeniedException("Coaches may only correct attendance for their own classes");
-            }
-        }
-
-        String oldState = att.getState();
+        Attendance att = byId ? attendanceRepository.findById(request.attendanceId())
+                .orElseThrow(() -> new ResourceNotFoundException("Attendance record not found")) : null;
+        if (byId && att.getSession() == null) throw new BusinessException("SESSION_REQUIRED: This correction flow applies to session attendance");
+        Integer sessionId = byId ? att.getSession().getId() : request.sessionId();
+        Session locked = sessionRepository.findByIdForUpdate(sessionId).orElseThrow(() -> new ResourceNotFoundException("Session not found"));
+        // Center mutex -> Session -> current Attendance, shared with manual/QR/finalizer.
+        // In particular, never load an attendance before acquiring the center mutex.
+        if (!SessionAttendancePolicy.correctionScope(actor, locked)) throw SessionAttendancePolicy.forbidden();
+        if (!byId) att = attendanceRepository.findBySessionIdAndMemberId(sessionId, request.memberId()).orElse(null);
+        if (att != null && (att.getMember() == null || !java.util.Objects.equals(actor.getCenterId(), att.getMember().getCenterId())))
+            throw SessionAttendancePolicy.forbidden();
+        if (att != null && att.getSupersededAt() != null)
+            throw new BusinessException("ATTENDANCE_SUPERSEDED: Correct the current session attendance, not a superseded notice");
+        SessionAttendancePolicy.requireCorrection(actor, locked, SessionAttendancePolicy.now(clock));
         String newState = normalizeState(request.newState());
+        String reason = SessionAttendancePolicy.reason(request.reason());
+        String note = SessionAttendancePolicy.note(request.note());
+        if (att == null) {
+            User member = userRepository.findById(request.memberId()).orElseThrow(() -> new ResourceNotFoundException("Member not found"));
+            if (!java.util.Objects.equals(actor.getCenterId(), member.getCenterId())) throw SessionAttendancePolicy.forbidden();
+            requireCorrectionEligibility(locked, member);
+            att = new Attendance(); att.setState(null); att.setSession(locked); att.setMember(member); att.setRecordedBy(actor);
+        }
+        String oldState = att.getState();
+        String oldNote = att.getNote();
+        String newNote = request.note() == null ? oldNote : note;
+        if (att.getAttendanceId() != null && java.util.Objects.equals(oldState, newState) && java.util.Objects.equals(oldNote, newNote))
+            return AttendanceResponse.from(att, actor, clock);
         att.setState(newState);
-
+        att.setNote(newNote);
         Attendance saved = attendanceRepository.save(att);
 
         // Also sync training result if tied to a session
@@ -165,14 +177,28 @@ public class AttendanceService {
                     });
         }
 
-        String auditReason = request.reason() != null && !request.reason().isBlank()
-                ? request.reason()
-                : "Manual attendance correction";
-
         auditService.log(actor.getId(), "ATTENDANCE_CORRECTION", "attendances", saved.getAttendanceId(),
-                "Status: " + oldState + " -> " + newState + " | Reason: " + auditReason);
+                "Status: " + oldState + " -> " + newState + " | Reason: " + reason + SessionAttendancePolicy.noteAudit(oldNote, newNote));
 
-        return AttendanceResponse.from(saved);
+        return AttendanceResponse.from(saved, actor, clock);
+    }
+
+    private void requireCorrectionEligibility(Session session, User member) {
+        boolean eligible;
+        if (session.getBookedMember() != null) {
+            var entitlement = session.getMemberPackage();
+            eligible = member.getId().equals(session.getBookedMember().getId()) && entitlement != null
+                    && entitlement.getMember() != null && member.getId().equals(entitlement.getMember().getId())
+                    && java.util.Set.of("Active", "Completed", "Expired").contains(entitlement.getStatus())
+                    && com.sportscenter.membership.EntitlementTimePolicy.validThrough(entitlement, session.getSessionDate().atTime(session.getEndTime()))
+                    && invoiceRepository.existsBySubscriptionSubscriptionIdAndPaymentStatusAndReconciliationRequiredFalseAndCashConfirmationReversedFalse(entitlement.getSubscriptionId(), "Paid");
+        } else {
+            eligible = enrollmentRepository.findByMemberIdAndSportsClassId(member.getId(), session.getSportsClass().getId())
+                    .filter(e -> java.util.Set.of("Registered", "Completed").contains(e.getStatus())
+                            && e.getEnrolledAt() != null && !e.getEnrolledAt().isAfter(session.getSessionDate().atTime(session.getStartTime())))
+                    .isPresent() && invoiceRepository.existsByMemberIdAndSportsClassIdAndPaymentStatusAndReconciliationRequiredFalseAndCashConfirmationReversedFalse(member.getId(), session.getSportsClass().getId(), "Paid");
+        }
+        if (!eligible) throw new BusinessException("NOT_YOUR_CLASS: No paid eligibility for this session");
     }
 
     /** Compatibility entry point: use the transactional notice + Absent workflow. */
@@ -278,7 +304,7 @@ public class AttendanceService {
         Attendance saved = attendanceRepository.save(attendance);
         auditService.log(recorder.getId(), "SCAN_CHECKIN", "attendances", saved.getAttendanceId(),
                 "QR check-in recorded for member " + memberId + (sessionId == null ? " at lobby" : " for session " + sessionId));
-        return AttendanceResponse.from(saved);
+        return AttendanceResponse.from(saved, recorder, clock);
     }
 
     private String normalizeState(String state) {

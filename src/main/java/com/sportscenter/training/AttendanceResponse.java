@@ -17,10 +17,18 @@ public record AttendanceResponse(
         String state,
         LocalDateTime checkInTime,
         LocalDateTime checkOutTime,
-        Integer absenceNoticeId
+        Integer absenceNoticeId,
+        String note,
+        boolean correctionAllowed,
+        java.time.OffsetDateTime correctionDeadline,
+        java.time.OffsetDateTime serverTime
 ) {
     public static AttendanceResponse from(Attendance att) {
+        return from(att, null, null);
+    }
+    public static AttendanceResponse from(Attendance att, com.sportscenter.user.User actor, java.time.Clock clock) {
         if (att == null) return null;
+        var metadata = clock == null ? null : SessionAttendancePolicy.metadata(att.getSession(), actor, clock);
 
         Integer sessionId = att.getSession() != null ? att.getSession().getId() : null;
         LocalDate sessionDate = att.getSession() != null ? att.getSession().getSessionDate() : null;
@@ -50,7 +58,9 @@ public record AttendanceResponse(
                 att.getState(),
                 att.getCheckInTime(),
                 att.getCheckOutTime(),
-                att.getAbsenceNoticeId()
+                att.getAbsenceNoticeId(), att.getNote(),
+                att.getSupersededAt() == null && metadata != null && metadata.correctionAllowed(),
+                metadata == null ? null : metadata.correctionDeadline(), metadata == null ? null : metadata.serverTime()
         );
     }
 }

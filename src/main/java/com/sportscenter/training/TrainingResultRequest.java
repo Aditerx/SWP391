@@ -15,10 +15,14 @@ public record TrainingResultRequest(
         String content,
 
         String attendanceStatus,
-        String reason
+        String reason,
+        String note
 ) {
+    public TrainingResultRequest(Integer sessionId, Integer memberId, Integer coachId, String content, String attendanceStatus, String reason) {
+        this(sessionId, memberId, coachId, content, attendanceStatus, reason, null);
+    }
     public TrainingResultRequest(Integer sessionId, Integer memberId, Integer coachId,
                                  String content, String attendanceStatus) {
-        this(sessionId, memberId, coachId, content, attendanceStatus, null);
+        this(sessionId, memberId, coachId, content, attendanceStatus, null, null);
     }
 }

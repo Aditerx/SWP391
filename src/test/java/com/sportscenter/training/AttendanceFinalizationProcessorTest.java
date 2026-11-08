@@ -56,7 +56,7 @@ class AttendanceFinalizationProcessorTest {
     @BeforeEach
     void setUp() {
         when(clock.instant()).thenReturn(Instant.parse("2026-10-16T03:00:00Z"));
-        when(clock.getZone()).thenReturn(ZoneId.of("Asia/Ho_Chi_Minh"));
+        lenient().when(clock.getZone()).thenReturn(ZoneId.of("Asia/Ho_Chi_Minh"));
         session = new Session();
         session.setId(90);
         session.setStatus("Completed");
@@ -78,19 +78,14 @@ class AttendanceFinalizationProcessorTest {
         when(enrollmentRepository.findByClassIdWithDetails(12)).thenReturn(List.of(registered));
         when(attendanceRepository.findBySessionIdAndMemberId(90, 31)).thenReturn(Optional.empty());
         when(attendanceRepository.save(any(Attendance.class))).thenAnswer(call -> call.getArgument(0));
-        when(attendanceRepository.countAbsencesForMemberInRange(31, LocalDate.of(2026, 10, 1), LocalDate.of(2026, 11, 1))).thenReturn(1L);
-        when(memberRepository.findByIdForUpdate(31)).thenReturn(Optional.of(profile));
 
         processor.process(90);
         processor.process(90);
 
         verify(attendanceRepository, times(1)).save(argThat(a -> "Absent".equals(a.getState()) && a.getRecordedBy() == null));
         verify(sessionRepository, times(1)).save(session);
-        org.mockito.ArgumentCaptor<Object> eventCaptor = org.mockito.ArgumentCaptor.forClass(Object.class);
-        verify(eventPublisher).publishEvent(eventCaptor.capture());
-        NotificationEvent event = (NotificationEvent) eventCaptor.getValue();
-        assertEquals("NO_SHOW_RECORDED", event.type().name());
-        assertEquals(List.of(31), event.recipientIds());
+        org.junit.jupiter.api.Assertions.assertTrue(session.isAttendanceReviewPending());
+        verifyNoInteractions(eventPublisher);
         verifyNoInteractions(notificationService);
     }
 
@@ -131,12 +126,22 @@ class AttendanceFinalizationProcessorTest {
         when(enrollmentRepository.findByClassIdWithDetails(12)).thenReturn(List.of(registered));
         when(attendanceRepository.findBySessionIdAndMemberId(90, 31)).thenReturn(Optional.empty());
         when(attendanceRepository.save(any(Attendance.class))).thenAnswer(call -> call.getArgument(0));
-        when(attendanceRepository.countAbsencesForMemberInRange(31, LocalDate.of(2026, 10, 1), LocalDate.of(2026, 11, 1))).thenReturn(3L);
-        when(memberRepository.findByIdForUpdate(31)).thenReturn(Optional.of(profile));
 
         processor.process(90);
+        assertNullOrUnchangedBeforeCutoff(profile);
+        when(clock.instant()).thenReturn(Instant.parse("2026-10-16T17:00:00Z"));
+        Attendance absent = new Attendance(); absent.setMember(memberUser); absent.setState("Absent");
+        when(attendanceRepository.findCurrentAbsencesBySessionId(90)).thenReturn(List.of(absent));
+        when(attendanceRepository.countAbsencesForMemberInRange(31, LocalDate.of(2026,10,1), LocalDate.of(2026,10,17))).thenReturn(3L);
+        when(memberRepository.findByIdForUpdate(31)).thenReturn(Optional.of(profile));
+        org.springframework.transaction.support.TransactionSynchronizationManager.initSynchronization();
+        try {
+            processor.review(90);
+            for (var sync : org.springframework.transaction.support.TransactionSynchronizationManager.getSynchronizations()) sync.afterCommit();
+        } finally { org.springframework.transaction.support.TransactionSynchronizationManager.clearSynchronization(); }
+        processor.review(90);
 
-        LocalDateTime expectedUntil = LocalDateTime.of(2026, 10, 16, 10, 0).plusDays(7);
+        LocalDateTime expectedUntil = LocalDateTime.of(2026, 10, 17, 0, 0).plusDays(7);
         assertEquals(expectedUntil, profile.getBookingBlockedUntil());
         verify(auditService).log(isNull(), eq("BOOKING_BLOCK_APPLIED"), eq("members"), eq(31), contains("after 3 absences"));
         verify(notificationService).send(eq(31), eq("Class booking restricted"), anyString(), eq("System"));
@@ -144,24 +149,36 @@ class AttendanceFinalizationProcessorTest {
 
     @Test
     void process_TwoAbsencesAndOneExcusedDoNotTriggerBookingBlock() {
+        org.springframework.test.util.ReflectionTestUtils.setField(processor, "bookingBlockEnabled", true);
         ClassEnrollment registered = enrollment("Registered");
         Member profile = new Member(); profile.setUser(memberUser);
         when(sessionRepository.findByIdForUpdate(90)).thenReturn(Optional.of(session));
         when(enrollmentRepository.findByClassIdWithDetails(12)).thenReturn(List.of(registered));
         when(attendanceRepository.findBySessionIdAndMemberId(90, 31)).thenReturn(Optional.empty());
         when(attendanceRepository.save(any(Attendance.class))).thenAnswer(call -> call.getArgument(0));
-        when(attendanceRepository.countAbsencesForMemberInRange(31, LocalDate.of(2026, 10, 1), LocalDate.of(2026, 11, 1))).thenReturn(2L);
-        when(memberRepository.findByIdForUpdate(31)).thenReturn(Optional.of(profile));
 
         processor.process(90);
+        assertNullOrUnchangedBeforeCutoff(profile);
+        when(clock.instant()).thenReturn(Instant.parse("2026-10-16T17:00:00Z"));
+        Attendance absent = new Attendance(); absent.setMember(memberUser); absent.setState("Absent");
+        when(attendanceRepository.findCurrentAbsencesBySessionId(90)).thenReturn(List.of(absent));
+        when(attendanceRepository.countAbsencesForMemberInRange(31, LocalDate.of(2026,10,1), LocalDate.of(2026,10,17))).thenReturn(2L);
+        when(memberRepository.findByIdForUpdate(31)).thenReturn(Optional.of(profile));
+        org.springframework.transaction.support.TransactionSynchronizationManager.initSynchronization();
+        try {
+            processor.review(90);
+            for (var sync : org.springframework.transaction.support.TransactionSynchronizationManager.getSynchronizations()) sync.afterCommit();
+        } finally { org.springframework.transaction.support.TransactionSynchronizationManager.clearSynchronization(); }
+        processor.review(90);
 
         assertNull(profile.getBookingBlockedUntil());
         verify(auditService, never()).log(any(), eq("BOOKING_BLOCK_APPLIED"), anyString(), any(), anyString());
-        verify(attendanceRepository).countAbsencesForMemberInRange(31, LocalDate.of(2026, 10, 1), LocalDate.of(2026, 11, 1));
+        verify(attendanceRepository).countAbsencesForMemberInRange(31, LocalDate.of(2026, 10, 1), LocalDate.of(2026, 10, 17));
     }
 
     @Test
     void process_DoesNotExtendExistingBookingBlock() {
+        org.springframework.test.util.ReflectionTestUtils.setField(processor, "bookingBlockEnabled", true);
         ClassEnrollment registered = enrollment("Registered");
         Member profile = new Member(); profile.setUser(memberUser);
         LocalDateTime oldUntil = LocalDateTime.of(2026, 10, 18, 10, 0);
@@ -170,10 +187,20 @@ class AttendanceFinalizationProcessorTest {
         when(enrollmentRepository.findByClassIdWithDetails(12)).thenReturn(List.of(registered));
         when(attendanceRepository.findBySessionIdAndMemberId(90, 31)).thenReturn(Optional.empty());
         when(attendanceRepository.save(any(Attendance.class))).thenAnswer(call -> call.getArgument(0));
-        when(attendanceRepository.countAbsencesForMemberInRange(31, LocalDate.of(2026, 10, 1), LocalDate.of(2026, 11, 1))).thenReturn(4L);
-        when(memberRepository.findByIdForUpdate(31)).thenReturn(Optional.of(profile));
 
         processor.process(90);
+        assertNullOrUnchangedBeforeCutoff(profile);
+        when(clock.instant()).thenReturn(Instant.parse("2026-10-16T17:00:00Z"));
+        Attendance absent = new Attendance(); absent.setMember(memberUser); absent.setState("Absent");
+        when(attendanceRepository.findCurrentAbsencesBySessionId(90)).thenReturn(List.of(absent));
+        when(attendanceRepository.countAbsencesForMemberInRange(31, LocalDate.of(2026,10,1), LocalDate.of(2026,10,17))).thenReturn(4L);
+        when(memberRepository.findByIdForUpdate(31)).thenReturn(Optional.of(profile));
+        org.springframework.transaction.support.TransactionSynchronizationManager.initSynchronization();
+        try {
+            processor.review(90);
+            for (var sync : org.springframework.transaction.support.TransactionSynchronizationManager.getSynchronizations()) sync.afterCommit();
+        } finally { org.springframework.transaction.support.TransactionSynchronizationManager.clearSynchronization(); }
+        processor.review(90);
 
         assertEquals(oldUntil, profile.getBookingBlockedUntil());
         verify(auditService, never()).log(any(), eq("BOOKING_BLOCK_APPLIED"), anyString(), any(), anyString());
@@ -186,12 +213,25 @@ class AttendanceFinalizationProcessorTest {
         when(enrollmentRepository.findByClassIdWithDetails(12)).thenReturn(List.of(registered));
         when(attendanceRepository.findBySessionIdAndMemberId(90,31)).thenReturn(Optional.empty());
         when(attendanceRepository.save(any(Attendance.class))).thenAnswer(call -> call.getArgument(0));
-        when(attendanceRepository.countAbsencesForMemberInRange(anyInt(),any(),any())).thenReturn(3L);
-        when(memberRepository.findByIdForUpdate(31)).thenReturn(Optional.of(profile));
         processor.process(90);
+        assertNullOrUnchangedBeforeCutoff(profile);
+        when(clock.instant()).thenReturn(Instant.parse("2026-10-16T17:00:00Z"));
+        Attendance absent = new Attendance(); absent.setMember(memberUser); absent.setState("Absent");
+        when(attendanceRepository.findCurrentAbsencesBySessionId(90)).thenReturn(List.of(absent));
+        org.springframework.transaction.support.TransactionSynchronizationManager.initSynchronization();
+        try {
+            processor.review(90);
+            for (var sync : org.springframework.transaction.support.TransactionSynchronizationManager.getSynchronizations()) sync.afterCommit();
+        } finally { org.springframework.transaction.support.TransactionSynchronizationManager.clearSynchronization(); }
+        processor.review(90);
         assertNull(profile.getBookingBlockedUntil());
         verify(attendanceRepository).save(argThat(a -> "Absent".equals(a.getState())));
         verify(notificationService,never()).send(any(),any(),any(),any());
+    }
+
+    private void assertNullOrUnchangedBeforeCutoff(Member member) {
+        verifyNoInteractions(notificationService, eventPublisher);
+        verify(memberRepository, never()).save(any());
     }
 
     private ClassEnrollment enrollment(String status) {

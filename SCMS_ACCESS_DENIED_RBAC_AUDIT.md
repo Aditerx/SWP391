@@ -42,7 +42,7 @@ Log cũ không kèm request login, cookie request/response hoặc body nên chư
 
 ### BE-03 — Ràng buộc dữ liệu Coach theo lớp được giao — Ưu tiên P0, rủi ro cần xác minh
 
-**Bổ sung Owner/kiểm local07/11:** ảnh cho thấy hai GET enrollment lớp23 trả403 qua FE proxy tới Render, thiếu auth/me/assignment/runtime SHA. Local đã kiểm hai tuyến đọc theo phân công/center, kể cả lớp hoàn tất; không mở quyền ghi enrollment. Nhóm tiếp theo sửa RP-36: chỉ Coach đúng authority/phân công được ghi giáo án/đánh giá, các role khác dù thêm quyền vẫn403; Member đọc giáo án chung qua quan hệ Registered+Paid hợp lệ. [Checkpoint hiện hành](docs/03-TODO.md#design-corrections-20261107), kết quả chuẩn tại Active/QA; chưa đóng toàn BE-03 hoặc nghiệm thu lại lớp23 live.
+**Bổ sung Owner/kiểm local07/11:** local đã kiểm hai tuyến roster theo phân công/center và guard ghi chuyên môn RP-36 theo [checkpoint](docs/03-TODO.md#design-corrections-20261107). Owner đọc roster lớp10 được200 trên FE, sau đó xác nhận UI không cập nhật theo dropdown; đã soạn [LAN-2 attendance Coach](SCMS-BAN-GIAO-FE-RBAC-LAN-2-2026-11-07.md). Chưa thử first-write đúng luồng/readback hoặc nghiệm thu ảnh lớp23 cũ. [C01–C09 Coach còn mở](docs/03-TODO.md#coach-open-items-20261107) giữ full matrix và các điểm BE/contract cần rà riêng; chưa đóng toàn BE-03. Kết quả chuẩn tại Active/QA.
 
 Frontend Coach gọi các danh sách attendance, enrollment, evaluation, training plan/result, session, feedback, học viên cần chú ý và đăng ký nâng cao. BE cần bảo đảm mỗi truy vấn chỉ trả dữ liệu thuộc lớp/học viên mà Coach hiện tại được phân công; không dựa vào việc frontend lọc kết quả.
 

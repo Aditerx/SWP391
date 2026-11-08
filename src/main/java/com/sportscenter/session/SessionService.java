@@ -86,7 +86,7 @@ public class SessionService {
                 .filter(s -> effectiveCoach == null || effectiveCoach.equals(coachId(s)))
                 .map(s -> {
             int count = s.getBookedMember() != null ? ("Cancelled".equals(s.getStatus()) ? 0 : 1) : counts.getOrDefault(s.getSportsClass().getId(), 0);
-            return SessionResponse.from(s, count);
+            return SessionResponse.from(s, count, actor, clock);
         }).toList();
     }
 
@@ -105,7 +105,7 @@ public class SessionService {
         } else requireScheduleStaff(authentication);
         int count = session.getBookedMember() != null ? ("Cancelled".equals(session.getStatus()) ? 0 : 1)
                 : (int) classEnrollmentRepository.countBySportsClassIdAndStatus(session.getSportsClass().getId(), "Registered");
-        return SessionResponse.from(session, count);
+        return SessionResponse.from(session, count, actor, clock);
     }
 
     @Transactional(readOnly = true)

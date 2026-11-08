@@ -35,7 +35,7 @@ public class Attendance {
     @Column(name = "state", nullable = false, length = 20)
     private String state = "Present";
 
-    @Column(name = "note")
+    @Column(name = "note", columnDefinition = "text")
     private String note;
 
     @Column(name = "absence_notice_id")

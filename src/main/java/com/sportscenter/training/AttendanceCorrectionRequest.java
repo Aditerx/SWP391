@@ -1,16 +1,18 @@
 package com.sportscenter.training;
 
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
+import io.swagger.v3.oas.annotations.media.Schema;
 
 public record AttendanceCorrectionRequest(
-        @NotNull(message = "attendanceId is required")
-        Integer attendanceId,
+        @Schema(description = "Exactly one target: attendanceId OR sessionId + memberId") Integer attendanceId,
 
-        @NotBlank(message = "newState is required")
-        String newState,
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED, allowableValues = {"Present", "Absent"}) String newState,
 
-        @NotBlank(message = "reason is required for attendance correction")
-        String reason
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED, description = "Internal audit reason; trimmed, required, at most 1000 characters") String reason,
+        Integer sessionId,
+        Integer memberId,
+        @Schema(nullable = true, description = "Plain text, at most 1000 characters after trim; omitted/null preserves, blank clears") String note
 ) {
+    public AttendanceCorrectionRequest(Integer attendanceId, String newState, String reason) {
+        this(attendanceId, newState, reason, null, null, null);
+    }
 }

@@ -47,6 +47,9 @@ public interface AttendanceRepository extends JpaRepository<Attendance, Integer>
             @Param("memberId") Integer memberId
     );
 
+    @Query("SELECT a FROM Attendance a JOIN FETCH a.member WHERE a.session.id = :sessionId AND a.supersededAt IS NULL AND a.state = 'Absent'")
+    List<Attendance> findCurrentAbsencesBySessionId(@Param("sessionId") Integer sessionId);
+
     @Query("SELECT a FROM Attendance a " +
            "WHERE a.session IS NULL AND a.member.id = :memberId AND a.checkOutTime IS NULL " +
            "ORDER BY a.attendanceId DESC")
@@ -54,7 +57,7 @@ public interface AttendanceRepository extends JpaRepository<Attendance, Integer>
 
     @Query("SELECT COUNT(a) FROM Attendance a WHERE a.member.id = :memberId AND a.state = 'Absent' " +
             "AND a.supersededAt IS NULL AND (a.absenceNoticeId IS NULL OR a.session.attendanceFinalized = true) " +
-            "AND a.session.centerInvalidated = false AND a.session.sessionDate >= :fromDate AND a.session.sessionDate < :toDate")
+            "AND a.session.centerInvalidated = false AND a.session.status <> 'Cancelled' AND a.session.sessionDate >= :fromDate AND a.session.sessionDate < :toDate")
     long countAbsencesForMemberInRange(@Param("memberId") Integer memberId,
             @Param("fromDate") java.time.LocalDate fromDate, @Param("toDate") java.time.LocalDate toDate);
 

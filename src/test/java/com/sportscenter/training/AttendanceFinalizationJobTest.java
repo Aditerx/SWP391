@@ -29,7 +29,7 @@ class AttendanceFinalizationJobTest {
     @BeforeEach
     void setUp() {
         when(clock.instant()).thenReturn(Instant.parse("2026-10-16T03:00:00Z"));
-        when(clock.getZone()).thenReturn(ZoneId.of("Asia/Ho_Chi_Minh"));
+        lenient().when(clock.getZone()).thenReturn(ZoneId.of("Asia/Ho_Chi_Minh"));
         ReflectionTestUtils.setField(job, "lookbackDays", 3);
     }
 
@@ -54,5 +54,13 @@ class AttendanceFinalizationJobTest {
         session.setSessionDate(date);
         session.setEndTime(LocalTime.of(9, 0));
         return session;
+    }
+
+    @Test void finalizedReviewsArePolledSeparatelyFromLifecycle() {
+        when(sessionRepository.findSessionsReadyForAttendanceReview(LocalDate.of(2026,10,16)))
+                .thenReturn(List.of(session(23,LocalDate.of(2026,10,15))));
+        job.finalizeEndedSessions();
+        verify(processor).review(23);
+        verify(processor,never()).process(23);
     }
 }

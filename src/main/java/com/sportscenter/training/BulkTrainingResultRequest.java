@@ -15,6 +15,11 @@ public record BulkTrainingResultRequest(
             Integer memberId,
             String attendanceStatus,
             String content,
-            String reason
-    ) {}
+            String reason,
+            String note
+    ) {
+        public Item(Integer memberId, String attendanceStatus, String content, String reason) {
+            this(memberId, attendanceStatus, content, reason, null);
+        }
+    }
 }

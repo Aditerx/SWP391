@@ -58,7 +58,7 @@ public class TrainingResultService {
             coachId = coach.getId();
         }
         return trainingResultRepository.searchResults(sessionId, memberId, coachId).stream()
-                .map(TrainingResultResponse::from)
+                .map(tr -> TrainingResultResponse.from(tr, attendanceRepository.findBySessionIdAndMemberId(tr.getSession().getId(), tr.getMember().getId()).orElse(null)))
                 .toList();
     }
 
@@ -89,6 +89,7 @@ public class TrainingResultService {
         if (actor != null && !coachActor) validateStaffAttendance(session, member, request.content());
 
         String status = normalizeAttendanceStatus(request.attendanceStatus());
+        SessionAttendancePolicy.note(request.note());
 
         TrainingResult result = trainingResultRepository.findBySessionIdAndMemberId(session.getId(), member.getId())
                 .orElseGet(TrainingResult::new);
@@ -105,20 +106,20 @@ public class TrainingResultService {
         result.setSession(session);
         result.setMember(member);
         result.setCoach(coach);
-        result.setContent(request.content());
+        if (request.content() != null) result.setContent(request.content());
         result.setAttendanceStatus(status);
         result.setRecordedAt(LocalDateTime.now(clock));
 
         TrainingResult saved = trainingResultRepository.save(result);
 
         // Sync with Attendance record
-        syncAttendanceRecord(session, member, coach, status);
+        Attendance attendance = syncAttendanceRecord(session, member, actor, status, request.note());
 
         auditService.log(actor != null ? actor.getId() : coach.getId(), "RECORD_RESULT", "training_results", saved.getResultId(),
                 "Recorded attendance (" + status + ") and result for member " + member.getFullName() +
                         " in session #" + session.getId() + (correction ? "; previous=" + previousStatus + "; reason=" + request.reason() : ""));
 
-        return TrainingResultResponse.from(saved);
+        return TrainingResultResponse.from(saved, attendance);
     }
 
     @Transactional
@@ -162,6 +163,7 @@ public class TrainingResultService {
                 if (actor != null && !coachActor) validateStaffAttendance(session, member, item.content());
 
                 String status = normalizeAttendanceStatus(item.attendanceStatus());
+                SessionAttendancePolicy.note(item.note());
 
                 TrainingResult tr = trainingResultRepository.findBySessionIdAndMemberId(session.getId(), member.getId())
                         .orElseGet(TrainingResult::new);
@@ -176,9 +178,9 @@ public class TrainingResultService {
                 tr.setRecordedAt(LocalDateTime.now(clock));
 
                 TrainingResult saved = trainingResultRepository.save(tr);
-                syncAttendanceRecord(session, member, coach, status);
+                Attendance attendance = syncAttendanceRecord(session, member, actor, status, item.note());
 
-                responses.add(TrainingResultResponse.from(saved));
+                responses.add(TrainingResultResponse.from(saved, attendance));
             }
         }
 
@@ -188,9 +190,11 @@ public class TrainingResultService {
         return responses;
     }
 
-    private void syncAttendanceRecord(Session session, User member, User recordedBy, String state) {
+    private Attendance syncAttendanceRecord(Session session, User member, User recordedBy, String state, String note) {
         Attendance att = attendanceRepository.findBySessionIdAndMemberId(session.getId(), member.getId())
                 .orElseGet(Attendance::new);
+        String oldNote = att.getNote();
+        if (note != null) att.setNote(SessionAttendancePolicy.note(note));
 
         att.setSession(session);
         att.setMember(member);
@@ -203,7 +207,10 @@ public class TrainingResultService {
             }
         }
 
-        attendanceRepository.save(att);
+        Attendance saved = attendanceRepository.save(att);
+        if (!java.util.Objects.equals(oldNote, att.getNote()))
+            auditService.log(recordedBy.getId(), "ATTENDANCE_NOTE", "attendances", saved.getAttendanceId(), SessionAttendancePolicy.noteAudit(oldNote, att.getNote()));
+        return saved;
     }
 
     private void ensureCoachCanRecord(Session session, User member, User coach) {

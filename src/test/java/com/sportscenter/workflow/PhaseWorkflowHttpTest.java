@@ -372,13 +372,14 @@ public class PhaseWorkflowHttpTest {
         call(coach,"POST","/api/attendances/scan",Map.of("memberId",memberId,"sessionId",scheduledId,"code",ended.get("payload").asText()),400);
         finalizer.process(scheduledId);finalizer.process(scheduledId);
         assertTrue(jdbc.queryForObject("SELECT attendance_finalized FROM sessions WHERE session_id=?",Boolean.class,scheduledId));
-        call(coach,"POST","/api/attendances/correct",Map.of("attendanceId",aid,"newState","Absent","reason","Correction request"),403);
+        // Owner09/11 D15: the assigned Coach may reconcile after end until local midnight.
+        call(coach,"POST","/api/attendances/correct",Map.of("attendanceId",aid,"newState","Absent","reason","Correction request"),200);
         call(manager,"POST","/api/attendances/correct",Map.of("attendanceId",aid,"newState","Late","reason","Unsupported new state"),400);
         call(manager,"POST","/api/attendances/correct",Map.of("attendanceId",aid,"newState","Absent","reason","Manager verified recorded result"),200);
         call(manager,"POST","/api/attendances/correct",Map.of("attendanceId",aid,"newState","Present","reason","Manager verified actual attendance"),200);
         assertEquals(11,credit());assertEquals(1,jdbc.queryForObject("SELECT count(*) FROM attendances WHERE session_id=? AND superseded_at IS NULL",Integer.class,scheduledId));
         assertEquals(2,jdbc.queryForObject("SELECT count(*) FROM attendances WHERE session_id=?",Integer.class,scheduledId));
-        proof("QR-WINDOW-REPLAY-CORRECTION","D15,D17,D18","Assigned Coach and Member QR; start-1s/start/end; Manager correction after finalizer","TTL 1 then 30; early/old step/replay/end rejected; one Present attendance; only Manager corrects Present/Absent; credit unchanged; Coach report 403","SELECT attendance_id,state FROM attendances WHERE session_id=?",scheduledId);
+        proof("QR-WINDOW-REPLAY-CORRECTION","D15,D17,D18","Assigned Coach and Member QR; start-1s/start/end; Coach correction before midnight and Manager correction after finalizer","TTL 1 then 30; early/old step/replay/end rejected; one Present attendance; assigned Coach and Manager correct Present/Absent; credit unchanged; Coach report 403","SELECT attendance_id,state FROM attendances WHERE session_id=?",scheduledId);
     }
     @Test @Order(7) void externalRefundAndNarrowCashCorrectionKeepOriginalReceiptsAndMoneyPeriods() throws Exception {
         at("2026-11-01T09:00:00");

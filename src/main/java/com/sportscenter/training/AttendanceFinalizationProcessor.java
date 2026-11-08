@@ -47,10 +47,9 @@ public class AttendanceFinalizationProcessor {
         scheduleWriteLock.acquire(center.get());
         Session session = sessionRepository.findByIdForUpdate(sessionId).orElse(null);
         if (session == null || session.isAttendanceFinalized() || session.isCenterInvalidated() || "Cancelled".equalsIgnoreCase(session.getStatus())) return;
-        LocalDateTime now = LocalDateTime.now(clock);
+        LocalDateTime now = SessionAttendancePolicy.now(clock);
         LocalDateTime endsAt = LocalDateTime.of(session.getSessionDate(), session.getEndTime());
         if (endsAt.isAfter(now)) return;
-        List<Integer> noShowMemberIds = new java.util.ArrayList<>();
         if (session.getBookedMember() != null) {
             Integer memberId = session.getBookedMember().getId();
             if (attendanceRepository.findBySessionIdAndMemberId(sessionId, memberId).isEmpty()) {
@@ -60,9 +59,8 @@ public class AttendanceFinalizationProcessor {
                 absent.setState("Absent");
                 absent.setRecordedBy(null);
                 attendanceRepository.save(absent);
-                noShowMemberIds.add(memberId);
-                auditService.log(null, "NO_SHOW_PRIVATE_SESSION", "SESSION", sessionId,
-                        "Member " + memberId + " marked Absent (No-show) for private session " + sessionId + ". 1 credit consumed.");
+                auditService.log(null, "ATTENDANCE_AUTO_ABSENT", "SESSION", sessionId,
+                        "Member " + memberId + " provisionally Absent; review cutoff=" + SessionAttendancePolicy.cutoff(session));
             }
         } else {
             List<ClassEnrollment> registered = enrollmentRepository.findByClassIdWithDetails(session.getSportsClass().getId()).stream()
@@ -76,21 +74,10 @@ public class AttendanceFinalizationProcessor {
                 absent.setState("Absent");
                 absent.setRecordedBy(null);
                 attendanceRepository.save(absent);
-                noShowMemberIds.add(memberId);
-
-                LocalDate monthStart = now.toLocalDate().withDayOfMonth(1);
-                long absences = attendanceRepository.countAbsencesForMemberInRange(memberId, monthStart, monthStart.plusMonths(1));
-                Member member = memberRepository.findByIdForUpdate(memberId).orElse(null);
-                if (bookingBlockEnabled && absences >= 3 && member != null && (member.getBookingBlockedUntil() == null || !member.getBookingBlockedUntil().isAfter(now))) {
-                    member.setBookingBlockedUntil(now.plusDays(7));
-                    memberRepository.save(member);
-                    auditService.log(null, "BOOKING_BLOCK_APPLIED", "members", memberId,
-                            "Blocked class bookings until " + member.getBookingBlockedUntil() + " after " + absences + " absences");
-                    safeNotify(memberId, "Class booking restricted", "Class bookings are blocked for seven days after repeated absences.", "System");
-                }
             }
         }
         session.setAttendanceFinalized(true);
+        session.setAttendanceReviewPending(true);
         session.setStatus("Completed");
         sessionRepository.save(session);
         if (session.getBookedMember() != null && session.getMemberPackage() != null) {
@@ -108,12 +95,49 @@ public class AttendanceFinalizationProcessor {
                         e.setStatus("Completed"); enrollmentRepository.save(e);
                     });
         }
-        if (!noShowMemberIds.isEmpty()) {
-            eventPublisher.publishEvent(NotificationTemplates.event(NotificationType.NO_SHOW_RECORDED,
-                    noShowMemberIds,
-                    NotificationTemplates.noShow(session.getSessionDate(), session.getStartTime(), session.getEndTime()),
-                    "SESSION", session.getId(), "NO_SHOW_RECORDED:" + session.getId()));
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void review(Integer sessionId) {
+        var center = sessionRepository.findCenterIdById(sessionId);
+        if (center.isEmpty()) return;
+        scheduleWriteLock.acquire(center.get());
+        Session session = sessionRepository.findByIdForUpdate(sessionId).orElse(null);
+        if (session == null || !session.isAttendanceFinalized() || !session.isAttendanceReviewPending()) return;
+        LocalDateTime now = SessionAttendancePolicy.now(clock);
+        if (now.isBefore(SessionAttendancePolicy.cutoff(session))) return;
+        if (!session.isCenterInvalidated() && "Completed".equals(session.getStatus())) {
+            List<Integer> noShowMemberIds = attendanceRepository.findCurrentAbsencesBySessionId(sessionId).stream()
+                    .map(a -> a.getMember().getId()).distinct().sorted().toList();
+            if (bookingBlockEnabled && session.getBookedMember() == null) {
+                for (Integer memberId : noShowMemberIds) {
+                    LocalDate monthStart = session.getSessionDate().withDayOfMonth(1);
+                    LocalDate monthEnd = monthStart.plusMonths(1);
+                    // Exclude all sessions still inside their Coach correction window.
+                    LocalDate toDate = now.toLocalDate().isBefore(monthEnd) ? now.toLocalDate() : monthEnd;
+                    long absences = attendanceRepository.countAbsencesForMemberInRange(memberId, monthStart, toDate);
+                    Member member = memberRepository.findByIdForUpdate(memberId).orElse(null);
+                    if (absences >= 3 && member != null && (member.getBookingBlockedUntil() == null || !member.getBookingBlockedUntil().isAfter(now))) {
+                        member.setBookingBlockedUntil(now.plusDays(7)); memberRepository.save(member);
+                        auditService.log(null, "BOOKING_BLOCK_APPLIED", "members", memberId,
+                                "Blocked class bookings until " + member.getBookingBlockedUntil() + " after " + absences + " absences");
+                        // Delivery happens after commit, like no-show; rolled-back reviews cannot notify.
+                        org.springframework.transaction.support.TransactionSynchronizationManager.registerSynchronization(
+                                new org.springframework.transaction.support.TransactionSynchronization() {
+                                    @Override public void afterCommit() { safeNotify(memberId, "Class booking restricted", "Class bookings are blocked for seven days after repeated absences.", "System"); }
+                                });
+                    }
+                }
+            }
+            if (!noShowMemberIds.isEmpty()) {
+                eventPublisher.publishEvent(NotificationTemplates.event(NotificationType.NO_SHOW_RECORDED,
+                        noShowMemberIds,
+                        NotificationTemplates.noShow(session.getSessionDate(), session.getStartTime(), session.getEndTime()),
+                        "SESSION", session.getId(), "NO_SHOW_RECORDED:" + session.getId()));
+            }
         }
+        session.setAttendanceReviewPending(false);
+        sessionRepository.save(session);
     }
 
     private void safeNotify(Integer userId, String title, String content, String type) {
