@@ -167,4 +167,7 @@ public interface SessionRepository extends JpaRepository<Session, Integer> {
     List<Session> findSessionsReadyForAttendanceFinalization(@Param("today") LocalDate today,
             @Param("nowTime") LocalTime nowTime, @Param("cutoffDate") LocalDate cutoffDate,
             @Param("cutoffTime") LocalTime cutoffTime);
+
+    @Query("SELECT s FROM Session s WHERE s.attendanceReviewPending = true AND s.attendanceFinalized = true AND s.sessionDate < :today")
+    List<Session> findSessionsReadyForAttendanceReview(@Param("today") LocalDate today);
 }

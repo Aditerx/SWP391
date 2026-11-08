@@ -69,6 +69,11 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(AccessDeniedException.class)
     ResponseEntity<Map<String, Object>> forbidden(AccessDeniedException ex) {
+        if (ex.getMessage() != null && ex.getMessage().startsWith("ATTENDANCE_CORRECTION_")) {
+            int separator = ex.getMessage().indexOf(':');
+            if (separator > 0) return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of(
+                    "code", ex.getMessage().substring(0, separator), "message", ex.getMessage().substring(separator + 1).trim()));
+        }
         return error(HttpStatus.FORBIDDEN, ex.getMessage());
     }
 

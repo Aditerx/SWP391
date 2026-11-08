@@ -109,6 +109,23 @@ Entity User có google_sub; DB ứng dụng đã tồn tại cần [13_google_lo
 
 GOOGLE_CLIENT_ID là audience của GIS ID token; GOOGLE_AUTO_REGISTER mặc định true theo source, false thì email chưa đăng ký bị từ chối. Login thường/Google cùng session JSESSIONID; cấu hình CORS/cookie theo mục1. Bản ghép giữ tính năng hiện có từ main; kiểm token giả lập local không thay nghiệm thu Google thật hoặc Render. Trạng thái thực thi DB/deploy xem docs00/QA; agent không tự chạy migration cloud.
 
+<a id="attendance-review-20261109"></a>
+### Attendance cuối ngày/note — Owner09/11
+
+BE attendance mới cần [17_attendance_review_postgres.sql](../database/migrations/17_attendance_review_postgres.sql) trước deploy. Baseline cần sessions/attendance14 và attendances.note TEXT; dependency Google13 hiện có vẫn cần kiểm riêng. SQL17 chỉ thêm marker/index, không reset/seed hoặc chạy lại16. Hai schema gộp chưa nhúng17: dùng riêng migration cho DB cũ hoặc sau dựng baseline mới. Không chạy schema dựng lại trên dữ liệu cần giữ.
+
+Migration đặt marker mới false cho dữ liệu hiện có, không queue buổi đã finalized trước nâng cấp; replay giữ pending của finalizer mới. Khi phát hành cần thay bản BE/job cũ bằng cùng bản mới, tránh để finalizer cũ tiếp tục gửi no-show tại end. Finalizer mới vẫn hoàn tất lifecycle tại end; review đọc Absent hiện hành sau00:00 hôm sau, bỏ buổi hủy/invalidated, tắt pending cùng transaction và giữ dedupe notification. Job trễ không đổi cutoff Coach; booking-block vẫn default false.
+
+Kiểm local không.env/cloud:
+
+```powershell
+python scripts/test-attendance-review-postgres.py --database scms_phases_attendance_migration_<ma_moi>
+python scripts/test-phases-postgres.py --database scms_phases_attendance_<ma_moi> --minimal-fixture
+.\mvnw.cmd '-DargLine=-Duser.timezone=Asia/Ho_Chi_Minh' '-Dtest=AttendanceCorrectionIntegrationTest' '-Dscms.attendance.pg-url=jdbc:postgresql://127.0.0.1:55440/scms_phases_attendance_<ma_moi>' test
+```
+
+Chạy Maven từ bản sao source hiện hành không.env; DB mới loopback55440 đúng runner. Integration test mặc định H2, opt-in PG chỉ nhận URL local đã ghim, ddl-auto=none; fixture login/auth-me thật rồi kiểm response/DB sau commit và race. Có thể xuất schema từ cùng app bằng `-Dscms.attendance.openapi=<duong_dan_raw_openapi.json>`; chỉ cập nhật snapshot sau khi kiểm đạt. Test đích rồi clean test theo mục2. Bằng chứng/SHA/count hiện hành chỉ ghi ở docs00/QA; FE/Render/CRUD nghiệm thu đợt chung, lượt này không mutation cloud.
+
 <a id="retire-legacy-memberships"></a>
 ### Bỏ dữ liệu gói hội viên chung — migration16
 

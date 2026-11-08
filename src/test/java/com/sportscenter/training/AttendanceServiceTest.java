@@ -72,6 +72,7 @@ class AttendanceServiceTest {
         sampleReceptionist.setEmail("staff@example.test");
         sampleReceptionist.setFullName("Đỗ Thị Mai");sampleReceptionist.setStatus("Active");
         var role=new com.sportscenter.user.Role();role.setName("CenterManager");sampleReceptionist.setRole(role);
+        var permission = new com.sportscenter.user.Permission(); permission.setName("MANAGE_CLASSES"); role.getPermissions().add(permission);
         var memberRole=new com.sportscenter.user.Role();memberRole.setName("Member");sampleMember.setRole(memberRole);sampleMember.setStatus("Active");
         lenient().when(actors.actor(memberAuth)).thenReturn(sampleMember);
 

@@ -68,6 +68,10 @@ public class Session {
     @Column(name = "attendance_finalized", nullable = false)
     private boolean attendanceFinalized;
 
+    // Only the new finalizer queues reviews; upgrading does not replay historical no-show notifications.
+    @Column(name = "attendance_review_pending", nullable = false)
+    private boolean attendanceReviewPending;
+
     public boolean isPrivateSession() {
         return bookedMember != null || (sportsClass != null && sportsClass.isAdvanced());
     }

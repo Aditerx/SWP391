@@ -226,19 +226,64 @@ GET `/api/sessions/catalog/{classId}` là lịch Normal trước mua cho ngườ
 <a id="attendance"></a>
 ## 12. Attendance và QR — D15/D17
 
-| API / actor | Contract |
+| API / actor | Hành vi BE attendance (trạng thái kiểm/deploy ở docs00) |
 |---|---|
 | GET `/api/attendances/me/checkin-code` — Member | Chỉ payload/expiresInSeconds; TTL còn lại1–30 giây |
 | GET `/api/training-results` — Member Active; Coach hoặc MANAGE_CLASSES/MANAGE_USERS theo quyền hiện có | Filter tùy chọn `sessionId`, `memberId`, `coachId`. Member luôn chỉ đọc mình từ phiên; `memberId` khác →403; không có kết quả →200 `[]`. Coach bị ép `coachId` theo phiên |
 | POST `/api/attendances/scan` — staff/Coach có quyền | memberId,code,sessionId; Coach được giao, Paid, trong[start,end), bước hiện tại/chống replay |
-| POST `/api/training-results`, `/bulk` — Coach được giao | Manual result/attendance chỉ trong buổi, Present/Absent mới; schema có các field kết quả khác |
-| POST `/api/attendances/correct` — Manager/Admin+MANAGE_CLASSES | attendanceId,newState,reason; sau end, audit/sync result, không đổi credit |
+| POST `/api/training-results`, `/bulk` — Coach được giao | Manual result/attendance chỉ trong buổi, Present/Absent mới; note tùy chọn, response ghi trả note đã lưu |
+| POST `/api/attendances/correct` — Coach được giao+RECORD_RESULT hoặc Manager/Admin+MANAGE_CLASSES | attendanceId **hoặc** sessionId+memberId, newState,reason,note; quyền/hạn và lỗi theo contract09/11 dưới đây |
 
 Alias `/api/attendance` và `/checkin-code`/`/api/members/me/checkin-code` còn để tương thích; chọn1canonical trên FE. QR phải refresh khi hết hạn/foreground, không log payload/secret. Code trong bằng chứng đã redact, không dùng scan. Check-in/out cửa có code nhưng toggle mặc định tắt, không thay attendance ca. Giữ lịch sử Late/Excused; finalizer sau end không tính buổi invalidated và không trừ credit lần hai.
 
+Tên “Check-in/Điểm danh” trong bản thiết kế gốc từng chỉ attendance theo buổi với phạm vi30phút trước/sau. Attendance hiện tách check-in cửa; mốc correction mới Owner chốt09/11 được đặc tả riêng bên dưới. Chọn endpoint theo chức năng và phiên bản đã triển khai, không suy nghĩa từ riêng tên nút. D15 không tự hạn chế thời gian ghi nhận tiến độ/đánh giá chuyên môn ngoài attendance.
+
+**Chọn luồng ghi:** POST `/api/training-results` hoặc `/bulk` chỉ ghi trong buổi, Present/Absent và đúng sessionId; sau end dùng correct theo quyền/hạn09/11 dưới đây. Check-in cửa mặc định tắt (400 LOBBY_CHECKIN_DISABLED), root attendances không có POST (405). Không thử API dự phòng để vượt lỗi hoặc coi GET200 sau POST lỗi là ghi thành công. Gợi ý FE xác nhận lưu sau response ghi thành công/readback; cách thể hiện do FE quyết định.
+
+Ngữ cảnh dữ liệu khi đổi lớp/buổi gồm sessionId, attendance, note và record sửa; roster cùng lớp có thể giống nhau nhưng state/attendanceId/note thuộc từng buổi. Gợi ý FE đồng bộ dữ liệu/form với lựa chọn và tránh áp response cũ hoặc gửi record buổi cũ trong lúc tải; cơ chế UI do FE chọn.
+
+**Ghép record trên màn hình attendance:** GET `/api/attendances?sessionId={id}` là record điểm danh của đúng buổi trong phạm vi actor; chọn record bằng sessionId+memberId và giữ attendanceId riêng khi correction. Không dùng attendanceId như sessionId hoặc lấy trạng thái gần nhất của Member qua buổi/lớp khác. Buổi chưa có record không mặc định Present. GET `/api/sessions/catalog/{classId}` chỉ trả session Scheduled của lớp Normal đã công bố, không là lịch sử đầy đủ để dựng màn hình quản lý attendance; dùng GET `/api/sessions?classId={id}` hoặc `/{sessionId}` có phiên cho thông tin ngày/giờ/status trong phạm vi được phép. OPTIONS200 là preflight; GET tải lại200 sau POST403 không là ghi thành công.
+
+**Tách dữ liệu:** content nằm ở training_results.content; note nằm ở attendances.note và được trả cho đúng owner/scope. reason của correct chỉ lưu audit nội bộ, không echo thành note hoặc trả trong AttendanceResponse. Lý do báo vắng gốc giữ ở notice qua absenceNoticeId; không backfill/parse audit thành note. Khi ghi trong buổi, bỏ content giữ content chuyên môn đã có.403 không ghi mutation/reason; badge FE hoặc Payload không là xác nhận đã lưu. Không mở audit-log toàn cục cho Coach.
+
+<a id="attendance-correction-20261109"></a>
+**Contract Owner09/11 — BE đã triển khai, phạm vi kiểm/deploy xem docs00:** [Bàn giao flow và gợi ý FE](../SCMS-BAN-GIAO-FE-ATTENDANCE-2026-11-09.md); bố trí UI/câu chữ do FE quyết định, các giới hạn dưới đây được BE thực thi.
+
+| Method/path | Input/actor và hành vi |
+|---|---|
+| POST `/api/training-results` hoặc `/bulk` | Giữ ghi trong `[start,end)`; thêm note tùy chọn (bulk trên từng item), không đổi tên attendanceStatus/content hoặc mở quyền chuyên môn |
+| POST `/api/attendances/correct` | Chọn đúng một cách định danh: attendanceId **hoặc** sessionId+memberId. newState:Present/Absent, reason bắt buộc, note tùy chọn. Coach Active+RECORD_RESULT, được giao/cùng center, chỉ từ end tới trước00:00 ngày kế tiếp ngày buổi. Quản lý theo quyền correction hiện hành sau end, không áp cutoff Coach.200 trả AttendanceResponse sau commit |
+| GET `/api/attendances?sessionId=...` | Giữ scope hiện hành, trả thêm note nullable; Member chỉ đọc bản ghi của mình. Không trả reason/audit qua note |
+
+Correction theo sessionId+memberId tìm/upsert record hiện hành dưới khóa khi finalizer chưa tạo, kiểm Member thuộc đúng buổi và quyền học tại buổi; không suy thiếu bằng chứng lịch sử hoặc chặn chỉ vì finalizer vừa đổi enrollment/entitlement thành Completed. Không cho sửa superseded/buổi hủy/centerInvalidated. Đồng bộ attendance_status của TrainingResult nếu có, không tạo content chuyên môn giả, không đổi credit/lịch/hạn/checkInTime gốc hoặc giả timestamp tới lớp. Cùng transaction lưu state/note và audit actor/time, trước-sau, reason; retry/no-op không tạo record/thông báo trùng.
+
+| Field | Kiểu/ngữ nghĩa |
+|---|---|
+| note (request) | string nullable/optional; plain text, tối đa1000ký tự sau trim. Bỏ/null giữ nguyên; rỗng sau trim xóa có audit. Ghi mới không có note lưu null |
+| note (response) | string nullable, giá trị đã lưu; thêm vào AttendanceResponse và response ghi training-results/bulk. Không lấy từ reason hoặc content. Giữ absenceNoticeId/notice.reason gốc |
+| reason (correct) | string bắt buộc, không trắng, tối đa1000ký tự sau trim; kể cả chỉ sửa note bằng newState hiện có. Lưu audit nội bộ, không tự công bố cho Member |
+| correctionAllowed | boolean theo actor/resource trên response attendance và session có phiên phục vụ màn điểm danh; chỉ nói quyền dùng correct lúc BE đánh giá, không phải quyền ghi trong buổi hoặc quyền được bảo đảm ở lần POST sau |
+| correctionDeadline | datetime có offset+07:00, exclusive00:00 hôm sau của ngày buổi, biểu diễn hạn Coach; không có hạn Coach áp dụng thì null. Member có thể nhận hạn đối soát của buổi để diễn giải kết quả, không được quyền ghi |
+| serverTime | datetime có offset+07:00 tại BE để đối chiếu deadline; BE vẫn kiểm Clock ở mutation dù UI đã mở form |
+
+| HTTP/code | Ý nghĩa |
+|---|---|
+|400 INVALID_ATTENDANCE_STATE | State mới ngoài Present/Absent |
+|400 NOTE_TOO_LONG / REASON_REQUIRED / REASON_TOO_LONG | Note/reason không đạt giới hạn; thiếu/trắng reason correction |
+|400 INVALID_ATTENDANCE_TARGET | Thiếu/mâu thuẫn hai cách định danh hoặc sessionId+memberId không đầy đủ |
+|400 USE_SESSION_ATTENDANCE | Gọi correct trước end, dùng luồng ghi trong buổi khi đủ điều kiện |
+|403 ATTENDANCE_CORRECTION_FORBIDDEN | Không đúng quyền/phân công; thông báo rõ không thể sửa/ghi chú buổi không được giao, không tiết lộ dữ liệu ngoài scope |
+|403 ATTENDANCE_CORRECTION_DEADLINE_PASSED | Coach đã đạt scope nhưng hết hạn, liên hệ quản lý; không gán mã này cho mọi403 |
+
+Giữ code SESSION_NOT_HELD/ATTENDANCE_SUPERSEDED cho buổi không tổ chức/record superseded và401/403 tài khoản hiện có; xác minh quyền/phạm vi trước thông báo thời gian. Trạng thái Render xem docs00; không suy từ source local thành đã deploy.
+
+Finalizer vẫn hoàn tất buổi/lifecycle tại end và có thể tạo Absent thiếu; kết quả còn có thể điều chỉnh tới cutoff. NO_SHOW_RECORDED/chế tài vắng xử lý sau cutoff bằng state hiện hành, chống lặp; job trễ không kéo dài quyền Coach. Giữ chế tài default tắt. Ví dụ buổi09/11 kết thúc07:30, tự Absent rồi Coach sửa Present09:00: không gửi báo vắng khi job xử lý sau00:00 ngày10/11. Đây không là gia hạn giờ học hoặc credit.
+
+**Gợi ý FE khi chưa nối note:** API đã lưu không chứng minh UI đã hiển thị. Có thể dùng note đã đọc để điền form, gửi note khi lưu và hiển thị giá trị server sau thành công/tải lại; Member đọc note của đúng buổi. note:null là chưa có ghi chú; thiếu field note là cần đối chiếu phiên bản contract/build, không tự kết luận DB chưa lưu. Caption/form/badge và cơ chế tải lại do FE quyết định; đối chiếu OpenAPI bàn giao và build BE đang dùng; không suy BE local thành Render đã deploy.
+
 Ngoại lệ ghi trước buổi duy nhất ở đây là Absent do Member báo vắng hợp lệ theo D05; manual/QR vẫn tuân thủ cửa sổ trong buổi. Attendance response thêm `absenceNoticeId` nullable để truy về notice/reason, kể cả sau khi Coach xác nhận kết quả thực tế.
 
-GET training-results trả danh sách `TrainingResultResponse`: resultId,sessionId,sessionDate,classId,className,memberId,memberName,coachId,coachName,content,attendanceStatus,recordedAt. FE Member có thể bỏ `memberId`; mọi filter còn lại chỉ thu hẹp dữ liệu cá nhân. Thiếu phiên →401; tài khoản Member không còn Active/đúng role hoặc cố đọc Member khác →403. Member mặc định không được POST/bulk; không cấp thêm quyền quản trị để xử lý lỗi đọc. Kết quả kiểm và giới hạn môi trường ở docs00; GET không thay dữ liệu.
+GET training-results trả danh sách `TrainingResultResponse`: resultId,sessionId,sessionDate,classId,className,memberId,memberName,coachId,coachName,content,attendanceStatus,recordedAt,note. FE Member có thể bỏ `memberId`; mọi filter còn lại chỉ thu hẹp dữ liệu cá nhân. Thiếu phiên →401; tài khoản Member không còn Active/đúng role hoặc cố đọc Member khác →403. Member mặc định không được POST/bulk; không cấp thêm quyền quản trị để xử lý lỗi đọc. Kết quả kiểm và giới hạn môi trường ở docs00; GET không thay dữ liệu.
 
 Member đọc toàn bộ content của kết quả thuộc mình. GET `/api/training-plans` (coachId,classId,memberId tùy chọn) và `/api/training-plans/{id}` đọc kế hoạch; GET `/api/evaluations` (memberId,coachId tùy chọn) và `/api/evaluations/{id}` đọc đánh giá/comment/progressScore. Service kiểm ownership của Member; danh sách không có dữ liệu →200 `[]`, yêu cầu dữ liệu Member khác →403. Không suy các mô tả này là nghiệm thu toàn bộ Coach/role/owner của BE-03/BE-04.
 

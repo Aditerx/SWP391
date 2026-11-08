@@ -23,7 +23,7 @@ public class AttendanceFinalizationJob {
 
     @Scheduled(fixedDelay = 600_000L)
     public void finalizeEndedSessions() {
-        LocalDateTime now = LocalDateTime.now(clock);
+        LocalDateTime now = SessionAttendancePolicy.now(clock);
         LocalDateTime cutoff = now.minusDays(lookbackDays);
         for (Session session : sessionRepository.findSessionsReadyForAttendanceFinalization(
                 now.toLocalDate(), now.toLocalTime(), cutoff.toLocalDate(), cutoff.toLocalTime())) {
@@ -31,6 +31,10 @@ public class AttendanceFinalizationJob {
             if (sessionEnd.isBefore(cutoff)) continue;
             try { processor.process(session.getId()); }
             catch (RuntimeException error) { log.error("Attendance finalization failed for session {}", session.getId(), error); }
+        }
+        for (Session session : sessionRepository.findSessionsReadyForAttendanceReview(now.toLocalDate())) {
+            try { processor.review(session.getId()); }
+            catch (RuntimeException error) { log.error("Attendance review failed for session {}", session.getId(), error); }
         }
     }
 }

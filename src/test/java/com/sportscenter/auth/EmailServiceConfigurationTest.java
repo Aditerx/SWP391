@@ -7,6 +7,8 @@ import org.eclipse.angus.mail.smtp.SMTPAddressFailedException;
 import org.eclipse.angus.mail.smtp.SMTPSendFailedException;
 import org.eclipse.angus.mail.smtp.SMTPSenderFailedException;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -36,6 +38,22 @@ import static org.mockito.Mockito.*;
 
 @ExtendWith(OutputCaptureExtension.class)
 class EmailServiceConfigurationTest {
+    private ch.qos.logback.classic.Logger smtpLogger;
+    private ch.qos.logback.classic.Level previousSmtpLogLevel;
+
+    @BeforeEach
+    void enableSmtpInfoLogs() {
+        // Cached Spring contexts may leave the root logger at WARN. This fixture asserts INFO events.
+        smtpLogger = (ch.qos.logback.classic.Logger) org.slf4j.LoggerFactory.getLogger(EmailService.class);
+        previousSmtpLogLevel = smtpLogger.getLevel();
+        smtpLogger.setLevel(ch.qos.logback.classic.Level.INFO);
+    }
+
+    @AfterEach
+    void restoreSmtpLogLevel() {
+        smtpLogger.setLevel(previousSmtpLogLevel);
+    }
+
     private static final String PRIVATE_DETAILS = "private-smtp-key recipient@example.com secret-server-reply";
     private final JavaMailSender sender = mock(JavaMailSender.class);
     private final ApplicationContextRunner contextRunner = new ApplicationContextRunner()

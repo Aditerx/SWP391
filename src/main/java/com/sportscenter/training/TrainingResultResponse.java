@@ -15,9 +15,13 @@ public record TrainingResultResponse(
         String coachName,
         String content,
         String attendanceStatus,
-        LocalDateTime recordedAt
+        LocalDateTime recordedAt,
+        String note
 ) {
     public static TrainingResultResponse from(TrainingResult tr) {
+        return from(tr, null);
+    }
+    public static TrainingResultResponse from(TrainingResult tr, Attendance attendance) {
         if (tr == null) return null;
 
         Integer sessionId = tr.getSession() != null ? tr.getSession().getId() : null;
@@ -45,7 +49,7 @@ public record TrainingResultResponse(
                 coachName,
                 tr.getContent(),
                 tr.getAttendanceStatus(),
-                tr.getRecordedAt()
+                tr.getRecordedAt(), attendance == null ? null : attendance.getNote()
         );
     }
 }

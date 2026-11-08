@@ -57,7 +57,7 @@ for filename in ['06_schedule_safety_postgres.sql','07_session_subscription_post
                  '08_advanced_entitlements_postgres.sql','09_approved_catalog_postgres.sql',
                  '10_session_incidents_postgres.sql','11_holiday_history_postgres.sql','12_payment_resolutions_postgres.sql',
                  '13_room_catalog_postgres.sql','14_absence_attendance_postgres.sql',
-                 '13_google_login_postgres.sql']:
+                 '13_google_login_postgres.sql','17_attendance_review_postgres.sql']:
     migration=(root/'database/migrations'/filename).read_text(encoding='utf-8')
     sql(migration)
     sql(migration)

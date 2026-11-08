@@ -27,7 +27,10 @@ public record SessionResponse(
         Integer makeupForSessionId,
         boolean creditReturned,
         Integer createdBy,
-        java.time.LocalDateTime agreementConfirmedAt
+        java.time.LocalDateTime agreementConfirmedAt,
+        boolean correctionAllowed,
+        java.time.OffsetDateTime correctionDeadline,
+        java.time.OffsetDateTime serverTime
 ) {
     public SessionResponse(
             Integer id,
@@ -49,7 +52,7 @@ public record SessionResponse(
     ) {
         this(id, classId, className, subjectId, subjectName, coachId, coachName,
                 roomId, roomName, roomLocation, sessionDate, startTime, endTime,
-                status, enrolledCount, maxCapacity, null, null, false,false,null,false,null,null);
+                status, enrolledCount, maxCapacity, null, null, false,false,null,false,null,null,false,null,null);
     }
 
     public static SessionResponse from(Session session) {
@@ -57,7 +60,11 @@ public record SessionResponse(
     }
 
     public static SessionResponse from(Session session, Integer enrolledCount) {
+        return from(session, enrolledCount, null, null);
+    }
+    public static SessionResponse from(Session session, Integer enrolledCount, com.sportscenter.user.User actor, java.time.Clock clock) {
         if (session == null) return null;
+        var metadata = clock == null ? null : com.sportscenter.training.SessionAttendancePolicy.metadata(session, actor, clock);
         var sc = session.getSportsClass();
         var room = session.getRoom();
         var coach = session.getCoach() != null ? session.getCoach() : (sc != null ? sc.getCoach() : null);
@@ -82,7 +89,8 @@ public record SessionResponse(
                 sc != null ? sc.getMaxCapacity() : (room != null ? room.getCapacity() : null),
                 bookedMember != null ? bookedMember.getId() : null,
                 bookedMember != null ? bookedMember.getFullName() : null,
-                isPrivate,session.isCenterInvalidated(),session.getMakeupFor()==null?null:session.getMakeupFor().getId(),session.isCreditReturned(),session.getCreatedBy(),session.getAgreementConfirmedAt()
+                isPrivate,session.isCenterInvalidated(),session.getMakeupFor()==null?null:session.getMakeupFor().getId(),session.isCreditReturned(),session.getCreatedBy(),session.getAgreementConfirmedAt(),
+                metadata != null && metadata.correctionAllowed(), metadata == null ? null : metadata.correctionDeadline(), metadata == null ? null : metadata.serverTime()
         );
     }
 }

@@ -37,6 +37,8 @@ Mỗi file dùng transaction. Bản dựng lại chỉ drop danh sách bảng SC
 
 Phê duyệt Owner29/10 cho phép chuẩn bị script dựng lại để Owner tự chạy; không mở quyền tự reset cloud cho session debug tiếp theo. Khi sửa thiết kế trên DB có dữ liệu cần giữ, dùng migration riêng có guard/replay và kiểm tương thích theo [docs02](../docs/02-DEPLOYMENT-GUIDE.md).
 
+**Attendance09/11:** BE mới cần chạy riêng [17_attendance_review_postgres.sql](migrations/17_attendance_review_postgres.sql) sau baseline attendance14 (cột note TEXT đã có). Script thêm `sessions.attendance_review_pending` mặc định false và index; không sửa state/note/chứng từ, không đưa buổi đã hoàn tất cũ vào hàng chờ thông báo. Finalizer mới bật marker tại end; review sau cutoff tắt marker cùng transaction. Replay giữ marker đang pending. Không chạy lại schema dựng lại hoặc SQL16 để thêm cột này; vận hành theo [docs02](../docs/02-DEPLOYMENT-GUIDE.md#attendance-review-20261109).
+
 ## 3. Các bảng dễ nhầm và dữ liệu tham chiếu
 
 | Bảng | Ý nghĩa hiện hành |
@@ -119,6 +121,7 @@ Migration13 giữ nguyên ID và dữ liệu phòng cũ bằng mã `C01-LEGACY-<
 | [13_google_login_postgres.sql](migrations/13_google_login_postgres.sql) | Thêm google_sub/index cho DB cũ trước BE ghép Google; độc lập với room/capacity cùng prefix13; không seed/reset |
 | `14_absence_attendance_postgres.sql` | Nguồn notice, attendance superseded và unique cho bản hiện hành; không backfill lịch sử |
 | [16_retire_legacy_memberships_postgres.sql](migrations/16_retire_legacy_memberships_postgres.sql) | Loại mô hình gói chung theo guard/phân loại; Owner đã xác nhận Supabase PASS, không yêu cầu chạy lại |
+| [17_attendance_review_postgres.sql](migrations/17_attendance_review_postgres.sql) | Hàng chờ đối soát attendance sau cutoff, không backfill lịch sử; cần trước BE attendance09/11 |
 
 `05_reseed_demo_users_and_coaches.sql` là script reset demo cũ, không thuộc chuỗi nâng cấp an toàn cho DB dùng chung/live. File `*_mssql.sql` dành cho SQL Server, không chạy trên PostgreSQL; runtime SQL Server chưa được nghiệm thu.
 
