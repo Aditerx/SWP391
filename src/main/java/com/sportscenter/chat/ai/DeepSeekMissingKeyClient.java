@@ -7,7 +7,7 @@ import java.util.List;
 
 @Component
 @ConditionalOnProperty(name = "scms.ai.chat.provider", havingValue = "deepseek")
-@ConditionalOnExpression("'${scms.ai.chat.deepseek.api-key:}' == ''")
+@ConditionalOnExpression("'${scms.ai.chat.deepseek-api-key:}'.trim().length() == 0")
 public class DeepSeekMissingKeyClient implements AiCompletionClient {
     @Override public AiCompletion complete(String systemPrompt, List<AiChatMessage> messages, int maxTokens) {
         throw new AiProviderException("missing_api_key");

@@ -9,6 +9,18 @@ import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientResponseException;
 import org.springframework.web.client.ResourceAccessException;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Bean;
+import org.springframework.core.env.PropertiesPropertySource;
+import org.springframework.boot.context.properties.bind.Binder;
+import org.springframework.boot.context.properties.source.ConfigurationPropertySources;
+import java.io.InputStream;
+import java.util.Properties;
+import java.lang.reflect.Field;
+import java.net.InetSocketAddress;
+import com.sun.net.httpserver.HttpServer;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import static org.junit.jupiter.api.Assertions.*;
@@ -16,24 +28,91 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 class DeepSeekChatClientTest {
+    @Test void bindsFlatConfigurationAndSendsTrimmedAuthorizationHeader() throws Exception {
+        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        java.util.concurrent.atomic.AtomicReference<String> authorization = new java.util.concurrent.atomic.AtomicReference<>();
+        server.createContext("/chat/completions", exchange -> {
+            authorization.set(exchange.getRequestHeaders().getFirst("Authorization"));
+            byte[] response = "{\"model\":\"deepseek-flash\",\"choices\":[{\"message\":{\"content\":\"Hello\"}}]}".getBytes(StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().set("Content-Type", "application/json");
+            exchange.sendResponseHeaders(200, response.length);
+            exchange.getResponseBody().write(response);
+            exchange.close();
+        });
+        server.start();
+        try {
+            new ApplicationContextRunner()
+                    .withUserConfiguration(DeepSeekHttpConfiguration.class, DeepSeekChatClient.class, DeepSeekMissingKeyClient.class, TestRestClientConfiguration.class)
+                    .withPropertyValues("scms.ai.chat.provider=deepseek", "scms.ai.chat.deepseek-api-key=  integration-key  ",
+                            "scms.ai.chat.deepseek-base-url=http://127.0.0.1:" + server.getAddress().getPort())
+                    .run(context -> {
+                        assertEquals("integration-key", context.getBean(ChatAiProperties.class).getDeepseekApiKey());
+                        assertTrue(context.containsBean("deepSeekChatClient"));
+                        assertFalse(context.containsBean("deepSeekMissingKeyClient"));
+                        AiCompletion result = context.getBean(DeepSeekChatClient.class).complete("system", List.of(new AiChatMessage("user", "question")), 20);
+                        assertEquals("Hello", result.text());
+                    });
+            assertEquals("Bearer integration-key", authorization.get());
+        } finally {
+            server.stop(0);
+        }
+    }
+
+    @Test void whitespaceKeyCreatesOnlyMissingKeyClient() {
+        new ApplicationContextRunner()
+                .withUserConfiguration(DeepSeekHttpConfiguration.class, DeepSeekChatClient.class, DeepSeekMissingKeyClient.class, TestRestClientConfiguration.class)
+                .withPropertyValues("scms.ai.chat.provider=deepseek", "scms.ai.chat.deepseek-api-key=   ")
+                .run(context -> {
+                    assertEquals("", context.getBean(ChatAiProperties.class).getDeepseekApiKey());
+                    assertFalse(context.containsBean("deepSeekChatClient"));
+                    assertFalse(context.containsBean("deepseekRequestFactory"));
+                    assertTrue(context.containsBean("deepSeekMissingKeyClient"));
+                });
+    }
+
+    @Test void everyChatAiApplicationPropertyHasAChatAiPropertiesField() throws Exception {
+        Properties values = new Properties();
+        try (InputStream input = getClass().getResourceAsStream("/application.properties")) { values.load(input); }
+        values.replaceAll((key, value) -> value.toString().replaceAll("\\$\\{[^:}]+:([^}]*)}", "$1"));
+        for (String key : values.stringPropertyNames()) {
+            if (!key.startsWith("scms.ai.chat.")) continue;
+            String property = key.substring("scms.ai.chat.".length());
+            String fieldName = java.util.Arrays.stream(property.split("[-.]"))
+                    .map(part -> part.substring(0, 1).toUpperCase(java.util.Locale.ROOT) + part.substring(1))
+                    .collect(java.util.stream.Collectors.joining());
+            String matchingField = Character.toLowerCase(fieldName.charAt(0)) + fieldName.substring(1);
+            assertDoesNotThrow(() -> ChatAiProperties.class.getDeclaredField(matchingField), key + " must have a matching field");
+        }
+        var source = new PropertiesPropertySource("application", values);
+        ChatAiProperties bound = new Binder(ConfigurationPropertySources.from(source)).bind("scms.ai.chat", ChatAiProperties.class).get();
+        assertEquals("https://api.deepseek.com", bound.getDeepseekBaseUrl());
+        assertEquals("deepseek-flash", bound.getDeepseekModel());
+    }
+
+    @Configuration(proxyBeanMethods = false)
+    @EnableConfigurationProperties(ChatAiProperties.class)
+    static class TestRestClientConfiguration {
+        @Bean RestClient.Builder restClientBuilder() { return RestClient.builder(); }
+    }
+
     @Test void mockAndFaqProvidersNeverCreateDeepseekHttpBeansAndMissingKeyUsesLocalFallback() {
         new ApplicationContextRunner()
                 .withUserConfiguration(DeepSeekHttpConfiguration.class, DeepSeekChatClient.class, DeepSeekMissingKeyClient.class)
-                .withPropertyValues("scms.ai.chat.provider=mock", "scms.ai.chat.deepseek.api-key=")
+                .withPropertyValues("scms.ai.chat.provider=mock", "scms.ai.chat.deepseek-api-key=")
                 .run(context -> {
                     assertFalse(context.containsBean("deepseekRequestFactory"));
                     assertFalse(context.containsBean("deepSeekChatClient"));
                 });
         new ApplicationContextRunner()
                 .withUserConfiguration(DeepSeekHttpConfiguration.class, DeepSeekChatClient.class, DeepSeekMissingKeyClient.class)
-                .withPropertyValues("scms.ai.chat.provider=faq", "scms.ai.chat.deepseek.api-key=")
+                .withPropertyValues("scms.ai.chat.provider=faq", "scms.ai.chat.deepseek-api-key=")
                 .run(context -> {
                     assertFalse(context.containsBean("deepseekRequestFactory"));
                     assertFalse(context.containsBean("deepSeekChatClient"));
                 });
         new ApplicationContextRunner()
                 .withUserConfiguration(DeepSeekHttpConfiguration.class, DeepSeekChatClient.class, DeepSeekMissingKeyClient.class)
-                .withPropertyValues("scms.ai.chat.provider=deepseek", "scms.ai.chat.deepseek.api-key=")
+                .withPropertyValues("scms.ai.chat.provider=deepseek", "scms.ai.chat.deepseek-api-key=")
                 .run(context -> {
                     assertFalse(context.containsBean("deepseekRequestFactory"));
                     assertFalse(context.containsBean("deepSeekChatClient"));

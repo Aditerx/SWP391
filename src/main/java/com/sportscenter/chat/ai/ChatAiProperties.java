@@ -7,6 +7,7 @@ import org.springframework.stereotype.Component;
 @ConfigurationProperties(prefix = "scms.ai.chat")
 public class ChatAiProperties {
     private boolean enabled;
+    private String newConversationHandler = "STAFF";
     private String provider = "mock";
     private String model = "";
     private String apiKey = "";
@@ -31,6 +32,8 @@ public class ChatAiProperties {
 
     public boolean isEnabled() { return enabled; }
     public void setEnabled(boolean enabled) { this.enabled = enabled; }
+    public String getNewConversationHandler() { return newConversationHandler; }
+    public void setNewConversationHandler(String value) { this.newConversationHandler = value; }
     public String getProvider() { return provider; }
     public void setProvider(String provider) { this.provider = provider; }
     public String getModel() { return model; }
@@ -67,8 +70,8 @@ public class ChatAiProperties {
     public void setDeepseekBaseUrl(String value) { this.deepseekBaseUrl = value; }
     public String getDeepseekModel() { return deepseekModel; }
     public void setDeepseekModel(String value) { this.deepseekModel = value; }
-    public String getDeepseekApiKey() { return deepseekApiKey; }
-    public void setDeepseekApiKey(String value) { this.deepseekApiKey = value; }
+    public String getDeepseekApiKey() { return deepseekApiKey == null ? "" : deepseekApiKey.trim(); }
+    public void setDeepseekApiKey(String value) { this.deepseekApiKey = value == null ? "" : value.trim(); }
     public int getDeepseekTimeoutSeconds() { return deepseekTimeoutSeconds; }
     public void setDeepseekTimeoutSeconds(int value) { this.deepseekTimeoutSeconds = value; }
     public int getDeepseekMaxTokens() { return deepseekMaxTokens; }

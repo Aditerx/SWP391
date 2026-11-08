@@ -11,7 +11,7 @@ import java.time.Duration;
 
 @Configuration
 @ConditionalOnProperty(name = "scms.ai.chat.provider", havingValue = "deepseek")
-@ConditionalOnExpression("'${scms.ai.chat.deepseek.api-key:}' != ''")
+@ConditionalOnExpression("'${scms.ai.chat.deepseek-api-key:}'.trim().length() > 0")
 public class DeepSeekHttpConfiguration {
     @Bean
     public ClientHttpRequestFactory deepseekRequestFactory(ChatAiProperties properties) {

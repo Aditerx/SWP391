@@ -1,7 +1,7 @@
 # SCMS — Tiến độ và nghiệm thu
 
 ## Active
-**AI chat DeepSeek / 08-11-2026:** Them provider `deepseek`, FAQ deterministic theo KB, system prompt + knowledge base UTF-8 co dau, fallback/handoff, metadata va quota AI 30/ngay theo Asia/Ho_Chi_Minh; khong migration. `mvnw clean test` PASS tren local working tree: 451 tests, 0 failure/error, 28 skip (423 pass), tang 5 test so voi baseline 446; skip khong tinh pass. Test FAQ khong goi mang that. Chua kiem key/provider that, PostgreSQL, FE hoac Render; chi tiet tai [ban giao AI chat](../SCMS-BAN-GIAO-FE-AI-CHAT-2026-11-07.md).
+**AI chat DeepSeek / 08-11-2026:** Them provider `deepseek`, FAQ deterministic theo KB, system prompt + knowledge base UTF-8 co dau, fallback/handoff, metadata va quota AI 30/ngay theo Asia/Ho_Chi_Minh; khong migration. Sua thong nhat binding DeepSeek sang khoa phang `scms.ai.chat.deepseek-*`, trim key va fallback khi key rong/chi whitespace. `mvnw clean test` PASS tren local working tree: 454 tests, 0 failure/error, 28 skip (426 pass); skip khong tinh pass. Test Spring xac nhan binding/header qua HTTP server gia lap va ra soat truong cho moi khoa `scms.ai.chat.*`. Chua kiem provider that, PostgreSQL, FE hoac Render; chi tiet tai [ban giao AI chat](../SCMS-BAN-GIAO-FE-AI-CHAT-2026-11-07.md).
 
 **Cách mở session:** đọc AGENTS → Active → đúng Dxx trong docs04; khi sửa DB đọc [database/README](../database/README.md) và source/trigger/test liên quan. Đọc docs01 theo API, docs02 theo nhu cầu test/migration. Kết quả bên dưới luôn theo đúng mốc/source/môi trường đã ghi.
 
@@ -42,6 +42,12 @@
 - Giữ feature flag mặc định false và handler mới STAFF cho tới khi Owner chốt; thêm Member handoff `POST /api/chat/conversations/{id}/escalate`. Tái dùng metadata/chat schema, không migration/không dùng `ai_consultations`; cập nhật API/config/handoff ngày07/11.
 - Baseline `clean test`: 397 tests,369 pass,28 skip,0 fail/error. Sau thay đổi `clean test`: 402 tests,374 pass,28 skip,0 fail/error; BUILD SUCCESS. Test unit/API không là nghiệm thu PostgreSQL, browser hoặc provider.
 - Theo D11/D19: PostgreSQL17.11 local service và port5432 hoạt động, nhưng local role cần password; không kết nối DB, không đọc `.env`, không tạo DB/schema. Chưa xác định source FE hiện hành; backend health, auth `/api/auth/me`, polling, FE browser và Anthropic đều NOT_RUN. Chi tiết/việc tiếp tục tại [handoff AI Chat](../SCMS-BAN-GIAO-FE-AI-CHAT-2026-11-07.md).
+
+### [08/11/2026] Sửa binding key DeepSeek
+
+- Chuẩn hóa năm thuộc tính DeepSeek trong `application.properties` sang tên phẳng khớp `ChatAiProperties`; cập nhật condition của client, HTTP config, missing-key client và test sang `deepseek-api-key`.
+- Trim key trước khi dùng; key rỗng hoặc chỉ whitespace không tạo DeepSeek HTTP client. Test Spring nạp cấu hình phẳng, xác nhận `ChatAiProperties`, request header chính xác qua server giả, và thiếu key chọn missing-key client. Thêm test đối chiếu mỗi khóa `scms.ai.chat.*` với field bindable; phát hiện và bổ sung `newConversationHandler`.
+- `clean test` PASS local working tree: 454 tests,426 pass,28 skip,0 failure/error. Không gọi dịch vụ DeepSeek thật; chưa kiểm key/provider thật, PostgreSQL, FE hoặc Render. Chi tiết tại [handoff AI Chat](../SCMS-BAN-GIAO-FE-AI-CHAT-2026-11-07.md).
 
 ### [04/11/2026] Sửa quyền Member đọc kết quả và đánh giá tập luyện
 

@@ -17,7 +17,7 @@ import java.util.Map;
 
 @Component
 @ConditionalOnProperty(name = "scms.ai.chat.provider", havingValue = "deepseek")
-@ConditionalOnExpression("'${scms.ai.chat.deepseek.api-key:}' != ''")
+@ConditionalOnExpression("'${scms.ai.chat.deepseek-api-key:}'.trim().length() > 0")
 public class DeepSeekChatClient implements AiCompletionClient {
     private final RestClient restClient;
     private final ChatAiProperties properties;
