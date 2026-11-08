@@ -14,6 +14,8 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Intege
     Optional<ChatMessage> findByConversation_IdAndSender_IdAndClientMessageId(Integer conversationId, Integer senderId, String clientMessageId);
     long countBySender_IdAndCreatedAtAfter(Integer senderId, LocalDateTime after);
     Optional<ChatMessage> findFirstBySender_IdAndCreatedAtAfterOrderByCreatedAtAsc(Integer senderId, LocalDateTime after);
+    @Query("select count(m) from ChatMessage m where m.conversation.member.id=:memberId and m.senderType='AI' and m.createdAt>=:start and m.createdAt<:end")
+    long countAiRepliesForMemberBetween(@Param("memberId") Integer memberId, @Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
     @Query("select coalesce(max(m.id),0) from ChatMessage m where m.conversation.id=:conversationId")
     Integer latestId(@Param("conversationId") Integer conversationId);
     @Query("select count(m) from ChatMessage m where m.conversation.id=:conversationId and m.id>:afterId and " +

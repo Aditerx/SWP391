@@ -361,7 +361,7 @@ Owner/staff scope được kiểm lại ở service cho message/read.429 có Ret
 
 FE render chat bằng text, không HTML. Có thể poll messages mỗi3–5giây khi mở chat, unread count mỗi30–60giây; không dùng WebSocket. Notification legacy giữ type cũ, loại mới lưu notification_type và trả qua field type. CHAT_MEMBER_MESSAGE/CHAT_STAFF_REPLY chỉ thông báo khi người nhận chuyển từ không có tin chưa đọc sang có tin chưa đọc; lỗi lưu notification không rollback message.
 
-Điểm mở rộng AI giữ ChatResponder/ChatResponderDispatcher: xử lý nền khi handler_type=AI, lỗi/timeout không rollback tin Member; reply senderType=AI, không có sender_user_id. escalateToStaff chuyển STAFF, ghi SYSTEM message và thông báo staff Active đúng center. Không có AI provider/lời gọi ngoài bật mặc định.
+- Khi chatbot chuyển nhân viên, tin SYSTEM hiển thị: “Mình đã chuyển cuộc trò chuyện cho nhân viên hỗ trợ. Nhân viên sẽ phản hồi bạn sớm nhất có thể.” Mã nguyên nhân nằm trong metadata.reasonCode; không hiển thị tiền tố kỹ thuật. FAQ chào hỏi và chủ đề khớp KB không chuyển người; câu không khớp lần đầu gợi ý chủ đề, lặp lần hai mới handoff. Chủ đề nhạy cảm/yêu cầu người thật chuyển ngay.
 
 Các API CRUD/training/evaluation/feedback/audit còn lại tra OpenAPI. Đây không đồng nghĩa mọi role/owner/center/error đã nghiệm thu. Chi tiết thiết kế cũ của OTP/chat/notification truy qua Git tại a4f3cd0 nếu cần, không phải một tài liệu bàn giao độc lập nữa.
 
@@ -436,3 +436,41 @@ Nghiệm thu theo từng điều kiện Dxx: actor+fixture →request →respons
 Đối chiếu lịch sử nằm trong `authenticatedAcceptance.cases` của [QA duy nhất](../artifacts/qa/latest.json), response tham chiếu `local.exchanges`. Room/báo vắng02/11 dùng `roomAbsenceReview.postgresHttp.cases` và `exchanges` cùng section; không dùng matrix lịch sử để đóng yêu cầu mới. `authenticatedAcceptance.remaining` và Active giữ phần chưa nghiệm thu. [Bảng đối chiếu1:1](00-MASTER-CHECKLIST.md#report-trace) ghi rõ kết luận từng phát hiện gốc và phần capture SQL còn thiếu; test có assertion PASS không đồng nghĩa mọi giá trị đã được trích đầy đủ vào QA.
 
 Bộ contract/schema có thể còn thiếu hoặc sai ở phần chưa chạy. [docs00](00-MASTER-CHECKLIST.md#active) giữ các cổng chưa nghiệm thu; không dùng số route/assertion hoặc bản ghi local để ký full production/FE acceptance.
+FE có thể poll `GET /api/notifications/me/unread-count` mỗi 30–60 giây để cập nhật badge. Module không dùng WebSocket. Các bản ghi legacy giữ nguyên nội dung và cột `type`; các loại nghiệp vụ mới lưu trong `notification_type` và được API trả dưới tên trường `type`.
+
+## 16. Chat hỗ trợ Member – Receptionist
+
+Toàn bộ API dùng session đăng nhập hiện tại. Member chỉ đọc/ghi conversation của chính mình; truy cập conversation khác trả `404 CHAT_CONVERSATION_NOT_FOUND`. Receptionist và CenterManager cần quyền `HANDLE_CHAT`; Coach bị từ chối. Tin nhắn là text thuần, tối đa 2000 ký tự sau trim; FE phải render bằng text để tránh XSS.
+
+| Method | Endpoint | Mô tả |
+|---|---|---|
+| `POST` | `/api/chat/conversations` | Member lấy conversation `OPEN` hoặc tạo mới; body tùy chọn `{"subject":"Payment question"}`. |
+| `GET` | `/api/chat/conversations/me/active` | Conversation đang mở của member; 404 `CHAT_ACTIVE_CONVERSATION_NOT_FOUND` nếu chưa có. |
+| `GET` | `/api/chat/me/unread-count` | Tổng số tin chưa đọc trong các conversation của member: `{"unreadCount":2}`. |
+| `GET` | `/api/chat/conversations/{id}/messages?afterId=0&limit=30` | Poll theo ID tăng dần; mặc định 30, giới hạn tối đa 50. |
+| `POST` | `/api/chat/conversations/{id}/messages` | Gửi `{ "content":"Hello", "clientMessageId":"uuid" }`; ID client tùy chọn để retry an toàn. |
+| `POST` | `/api/chat/conversations/{id}/escalate` | Member có `CHAT_AS_MEMBER` chuyển cuộc hội thoại của chính mình sang STAFF; không nhận memberId từ body, trả conversation hiện tại. Retry không tạo thêm SYSTEM message nếu đã chuyển. |
+| `POST` | `/api/chat/conversations/{id}/read` | Đánh dấu đã đọc tới message mới nhất cho user hiện tại. |
+| `GET` | `/api/chat/conversations?status=OPEN&assigned=true&unreadOnly=false&page=0&size=30` | Hộp thư staff, mới hoạt động gần nhất trước; `assigned=true` lọc hội thoại của người đang xem, `false` lọc hội thoại chưa được nhận; mỗi hàng kèm last message và unread của staff đang xem. |
+| `POST` | `/api/chat/conversations/{id}/claim` / `/release` | Nhận hội thoại hoặc tự nhả hội thoại đã nhận. |
+| `PATCH` | `/api/chat/conversations/{id}/close` / `/reopen` | Đóng/mở lại hội thoại. Reopen trả 409 nếu member đã có hội thoại khác đang mở. |
+
+Message response gồm `id`, `conversationId`, `senderType`, `senderName`, `isMine`, `content`, `contentType`, `metadata`, `clientMessageId`, `createdAt`. Thời gian trả ISO-8601 cùng offset `+07:00`. Ví dụ: `{ "id":4021,"conversationId":88,"senderType":"STAFF","senderName":"Tran Thi Huong","isMine":false,"content":"Hello","createdAt":"2026-10-24T09:15:00+07:00" }`.
+
+Các mã lỗi chính: `CHAT_CONVERSATION_NOT_FOUND` (404), `CHAT_ACTIVE_CONVERSATION_NOT_FOUND` (404), `CHAT_CONVERSATION_CLOSED` (409), `CHAT_RATE_LIMITED` (429, tối đa 20 tin/phút/người; response có `retryAfterSeconds` và header `Retry-After`), `CHAT_MESSAGE_EMPTY`, `CHAT_MESSAGE_TOO_LONG`, `CHAT_ALREADY_CLAIMED`, `CHAT_NOT_ASSIGNED_TO_ACTOR`, `CHAT_OPEN_CONVERSATION_EXISTS`. FE nên poll message mỗi 3–5 giây khi cửa sổ chat mở, unread count mỗi 30–60 giây, và gửi `clientMessageId` cho mỗi tin.
+
+### Mở rộng chat AI
+
+`ChatService` chỉ xử lý nghiệp vụ; `ChatResponder` dùng một interface `AiCompletionClient` và implementation mock hoặc Anthropic. `ChatResponderDispatcher` chạy nền và gọi responder đầu tiên hỗ trợ conversation khi `handler_type=AI`; lỗi hoặc timeout không rollback hay chặn response của tin member và tự chuyển STAFF bằng SYSTEM message. Reply được lưu `sender_type=AI`, `sender_user_id=NULL`, metadata `model`, `latencyMs` và token counts nếu provider trả về. Không có responder AI hoặc lời gọi dịch vụ ngoài được bật mặc định; config `SCMS_AI_CHAT_ENABLED` mặc định false và hội thoại mới mặc định STAFF. `POST /conversations/{id}/escalate` cho Member chuyển hội thoại của mình sang STAFF; BE suy ra Member từ Authentication, không dùng danh tính từ body. Nhân viên nhận thông báo theo quy tắc unread hiện hành.
+
+Chat notification types persisted in `notification_type`: `CHAT_MEMBER_MESSAGE` (member message or escalation to staff) and `CHAT_STAFF_REPLY` (staff/AI reply to member). Notifications are emitted only on that viewer's unread transition from zero to one; storage failures do not roll back the chat message.
+
+## 17. Kết quả và đánh giá quá trình tập luyện
+
+| Method | Endpoint | Quyền và phạm vi |
+|---|---|---|
+| `GET` | `/api/training-results?sessionId={id}&memberId={id}&coachId={id}` | MANAGE_CLASSES, MANAGE_USERS, COACH hoặc MEMBER. Member chỉ đọc kết quả của chính mình; BE lấy User từ session Authentication, tự áp `memberId` hiện tại nếu bỏ trống và trả 403 nếu `memberId` khác. Coach giữ scope hiện có; quyền quản lý giữ hành vi hiện có. |
+| `GET` | `/api/training-plans?coachId={id}&classId={id}&memberId={id}` và `/api/training-plans/{id}` | Member được đọc kế hoạch của chính mình; service kiểm tra ownership. |
+| `GET` | `/api/evaluations?memberId={id}&coachId={id}` và `/api/evaluations/{id}` | Member được đọc đánh giá của chính mình; service kiểm tra ownership. |
+
+Member được xem toàn bộ `content` của training result và `comment` cùng `progressScore` của evaluation do Coach ghi nhận. Không dùng memberId, role hoặc actor từ client để xác định danh tính. Các GET danh sách trả `200` với danh sách rỗng khi không có kết quả phù hợp; truy cập dữ liệu của Member khác trả `403`.
