@@ -7,7 +7,7 @@ import java.util.List;
 @Component
 @ConditionalOnProperty(name = "scms.ai.chat.provider", havingValue = "faq")
 public class FaqAiCompletionClient implements AiCompletionClient {
-    private static final String REPLY = "Xin ch\u00e0o! Hi\u1ec7n t\u00f4i ch\u01b0a c\u00f3 th\u00f4ng tin ph\u00f9 h\u1ee3p trong t\u00e0i li\u1ec7u. T\u00f4i s\u1ebd chuy\u1ec3n c\u00e2u h\u1ecfi \u0111\u1ebfn nh\u00e2n vi\u00ean \u0111\u1ec3 h\u1ed7 tr\u1ee3 b\u1ea1n. [HANDOFF]";
+    private static final String REPLY = "Xin ch\u00e0o! M\u00ecnh l\u00e0 tr\u1ee3 l\u00fd SCMS. B\u1ea1n mu\u1ed1n t\u00ecm hi\u1ec3u th\u00f4ng tin g\u00ec?";
     @Override public AiCompletion complete(String systemPrompt, List<AiChatMessage> messages, int maxTokens) {
         return new AiCompletion(REPLY, "faq", 0, 0);
     }

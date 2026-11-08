@@ -10,6 +10,6 @@ import java.util.List;
 @ConditionalOnExpression("'${scms.ai.chat.deepseek.api-key:}' == ''")
 public class DeepSeekMissingKeyClient implements AiCompletionClient {
     @Override public AiCompletion complete(String systemPrompt, List<AiChatMessage> messages, int maxTokens) {
-        return new AiCompletion("Tro ly AI chua duoc cau hinh. Toi se chuyen ban den nhan vien de ho tro. [HANDOFF]", "faq-fallback", 0, 0);
+        throw new AiProviderException("missing_api_key");
     }
 }

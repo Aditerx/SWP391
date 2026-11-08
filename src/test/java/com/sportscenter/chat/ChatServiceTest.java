@@ -156,9 +156,11 @@ class ChatServiceTest {
         ChatConversation c=conversation(6,member); c.setHandlerType(ChatHandlerType.AI); when(conversations.findByIdForUpdate(6)).thenReturn(Optional.of(c));
         when(users.findActiveReceptionists(null)).thenReturn(List.of());
         when(messages.saveAndFlush(any())).thenAnswer(inv->{ChatMessage m=inv.getArgument(0);m.setId(60);return m;});
-        service.escalateToStaff(6,"needs a person");
+        service.escalateToStaff(6,"SENSITIVE_TOPIC");
         assertEquals(ChatHandlerType.STAFF,c.getHandlerType());
-        verify(messages).saveAndFlush(argThat(m->m.getSenderType()==ChatSenderType.SYSTEM&&m.getSender()==null));
+        verify(messages).saveAndFlush(argThat(m->m.getSenderType()==ChatSenderType.SYSTEM&&m.getSender()==null
+                &&m.getContent().equals("M\u00ecnh \u0111\u00e3 chuy\u1ec3n cu\u1ed9c tr\u00f2 chuy\u1ec7n cho nh\u00e2n vi\u00ean h\u1ed7 tr\u1ee3. Nh\u00e2n vi\u00ean s\u1ebd ph\u1ea3n h\u1ed3i b\u1ea1n s\u1edbm nh\u1ea5t c\u00f3 th\u1ec3.")
+                &&m.getMetadata().contains("SENSITIVE_TOPIC")&&!m.getContent().contains("Transferred to staff:")));
         verify(events).publishEvent(argThat((Object e)->e instanceof ChatMessageCreatedEvent event&&event.senderType()==ChatSenderType.SYSTEM));
     }
 

@@ -18,6 +18,10 @@ public class ChatAiProperties {
     private int maxKnowledgeBaseCharacters = 12000;
     private double temperature = 0.2;
     private int dailyLimitPerMember = 30;
+    private int faqMatchThreshold = 2;
+    private int faqMaxAnswerCharacters = 1200;
+    private int faqFallbackEscalationThreshold = 2;
+    private String faqSensitiveKeywords = "ho\u00e0n ti\u1ec1n,refund,\u0111\u1ed5i l\u1ecbch,h\u1ee7y g\u00f3i,h\u1ee7y bu\u1ed5i,thanh to\u00e1n,h\u00f3a \u0111\u01a1n,khi\u1ebfu n\u1ea1i,t\u00e0i kho\u1ea3n,s\u1ef1 c\u1ed1 s\u1ee9c kh\u1ecfe";
     private String deepseekBaseUrl = "https://api.deepseek.com";
     private String deepseekModel = "deepseek-flash";
     private String deepseekApiKey = "";
@@ -51,6 +55,14 @@ public class ChatAiProperties {
     public void setTemperature(double value) { this.temperature = value; }
     public int getDailyLimitPerMember() { return dailyLimitPerMember; }
     public void setDailyLimitPerMember(int value) { this.dailyLimitPerMember = value; }
+    public int getFaqMatchThreshold() { return faqMatchThreshold; }
+    public void setFaqMatchThreshold(int value) { this.faqMatchThreshold = value; }
+    public int getFaqMaxAnswerCharacters() { return faqMaxAnswerCharacters; }
+    public void setFaqMaxAnswerCharacters(int value) { this.faqMaxAnswerCharacters = value; }
+    public int getFaqFallbackEscalationThreshold() { return faqFallbackEscalationThreshold; }
+    public void setFaqFallbackEscalationThreshold(int value) { this.faqFallbackEscalationThreshold = value; }
+    public String getFaqSensitiveKeywords() { return faqSensitiveKeywords; }
+    public void setFaqSensitiveKeywords(String value) { this.faqSensitiveKeywords = value; }
     public String getDeepseekBaseUrl() { return deepseekBaseUrl; }
     public void setDeepseekBaseUrl(String value) { this.deepseekBaseUrl = value; }
     public String getDeepseekModel() { return deepseekModel; }

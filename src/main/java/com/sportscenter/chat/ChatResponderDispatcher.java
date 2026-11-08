@@ -24,7 +24,7 @@ public class ChatResponderDispatcher {
             conversation=chatService.loadForResponder(event.conversationId());
             if(conversation.getHandlerType()!=ChatHandlerType.AI) return;
             if (chatService.aiDailyLimitReached(event.memberUserId())) {
-                chatService.escalateToStaff(event.conversationId(), "Da dat gioi han ho tro tu dong hom nay. Nhan vien se tiep tuc ho tro ban.");
+                chatService.escalateToStaff(event.conversationId(), "AI_DAILY_LIMIT_REACHED");
                 return;
             }
             List<ChatMessage> recent=chatService.recentForResponder(event.conversationId(),20);
@@ -36,21 +36,27 @@ public class ChatResponderDispatcher {
                     boolean handoff = response.content().contains("[HANDOFF]");
                     String visible = response.content().replace("[HANDOFF]", "").trim();
                     if (!visible.isBlank()) chatService.saveResponderReply(event.conversationId(), new ChatResponderReply(visible, response.metadata()));
-                    if (handoff) chatService.escalateToStaff(event.conversationId(), "Toi chua the ho tro day du yeu cau nay. Nhan vien se tiep tuc ho tro ban.");
+                    if (handoff) chatService.escalateToStaff(event.conversationId(), handoffReason(response.metadata()));
                 }
-                else chatService.escalateToStaff(event.conversationId(), "Tro ly AI chua tao duoc cau tra loi. Nhan vien se tiep tuc ho tro ban.");
+                else chatService.escalateToStaff(event.conversationId(), "AI_EMPTY_REPLY");
                 return;
             }
-            chatService.escalateToStaff(event.conversationId(), "Tro ly AI hien khong kha dung. Nhan vien se tiep tuc ho tro ban.");
+            chatService.escalateToStaff(event.conversationId(), "AI_UNAVAILABLE");
         } catch(RuntimeException ex) {
             log.warn("Chat responder failed conversationId={} errorType={}",event.conversationId(),ex.getClass().getSimpleName());
             if (conversation != null && conversation.getHandlerType() == ChatHandlerType.AI) {
                 try {
-                    chatService.escalateToStaff(event.conversationId(), "The AI assistant is temporarily unavailable. A staff member will help you.");
+                    chatService.escalateToStaff(event.conversationId(), "AI_RUNTIME_FAILURE");
                 } catch (RuntimeException escalationFailure) {
                     log.warn("Chat escalation failed conversationId={} errorType={}",event.conversationId(),escalationFailure.getClass().getSimpleName());
                 }
             }
         }
+    }
+
+    private String handoffReason(String metadata) {
+        if (metadata == null) return "AI_HANDOFF_REQUESTED";
+        java.util.regex.Matcher matcher = java.util.regex.Pattern.compile("\\\"reasonCode\\\":\\\"([A-Z0-9_]{1,40})\\\"").matcher(metadata);
+        return matcher.find() ? matcher.group(1) : "AI_HANDOFF_REQUESTED";
     }
 }

@@ -306,7 +306,7 @@ Owner/staff scope được kiểm lại ở service cho message/read.429 có Ret
 
 FE render chat bằng text, không HTML. Có thể poll messages mỗi3–5giây khi mở chat, unread count mỗi30–60giây; không dùng WebSocket. Notification legacy giữ type cũ, loại mới lưu notification_type và trả qua field type. CHAT_MEMBER_MESSAGE/CHAT_STAFF_REPLY chỉ thông báo khi người nhận chuyển từ không có tin chưa đọc sang có tin chưa đọc; lỗi lưu notification không rollback message.
 
-Điểm mở rộng AI giữ ChatResponder/ChatResponderDispatcher: xử lý nền khi handler_type=AI, lỗi/timeout không rollback tin Member; reply senderType=AI, không có sender_user_id. escalateToStaff chuyển STAFF, ghi SYSTEM message và thông báo staff Active đúng center. Không có AI provider/lời gọi ngoài bật mặc định.
+- Khi chatbot chuyển nhân viên, tin SYSTEM hiển thị: “Mình đã chuyển cuộc trò chuyện cho nhân viên hỗ trợ. Nhân viên sẽ phản hồi bạn sớm nhất có thể.” Mã nguyên nhân nằm trong metadata.reasonCode; không hiển thị tiền tố kỹ thuật. FAQ chào hỏi và chủ đề khớp KB không chuyển người; câu không khớp lần đầu gợi ý chủ đề, lặp lần hai mới handoff. Chủ đề nhạy cảm/yêu cầu người thật chuyển ngay.
 
 Các API CRUD/training/evaluation/feedback/audit còn lại tra OpenAPI. Đây không đồng nghĩa mọi role/owner/center/error đã nghiệm thu. Chi tiết thiết kế cũ của OTP/chat/notification truy qua Git tại a4f3cd0 nếu cần, không phải một tài liệu bàn giao độc lập nữa.
 

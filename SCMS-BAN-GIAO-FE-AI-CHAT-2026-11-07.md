@@ -1,6 +1,7 @@
-﻿# SCMS ban giao FE - AI Chat - 2026-11-07
+# SCMS ban giao FE - AI Chat - 2026-11-07
 
 ## Ket qua hien tai
+- Provider faq nay chao hoi/cam on/tam biet va tra loi tu KB theo cum tu, token, ho tro dong `Tu khoa:`; hoi chu de co dau/khong dau deu match. Khong khop lan dau danh dau `metadata.fallback=true`, goi y toi da 5 chu de; lan khong khop ke tiep, chu de nhay cam hoac member yeu cau nguoi that thi handoff. SYSTEM hien thi: “Mình đã chuyển cuộc trò chuyện cho nhân viên hỗ trợ. Nhân viên sẽ phản hồi bạn sớm nhất có thể.”; ma ly do luu `metadata.reasonCode`.
 
 - Provider `deepseek` duoc bat bang `SCMS_AI_CHAT_ENABLED=true`, `SCMS_AI_CHAT_PROVIDER=deepseek` va key trong secret `DEEPSEEK_API_KEY`. Model mac dinh `deepseek-flash`, API Chat Completions qua Spring `RestClient`, thinking disabled bang `{"type":"disabled"}`.
 - System prompt tieng Viet co dau nam tai `src/main/resources/ai/system-prompt.txt`, doc bang UTF-8 tuong minh; yeu cau luon tra loi tieng Viet co dau. Knowledge base `src/main/resources/ai/knowledge-base.md` duoc doc UTF-8, khong sua noi dung; gioi han do dai mac dinh 12.000 ky tu, co log canh bao neu cat/thieu/rong. Transcript da loc du lieu nhay cam, toi da 20 tin/8.000 ky tu. Quota 30 cau tra loi AI/member/ngay theo `Asia/Ho_Chi_Minh`, rate limit chat 20 tin/phut giu nguyen.
@@ -28,7 +29,7 @@
 
 ## Viec con lai
 
-- `mvnw clean test` PASS local working tree: 446 tests, 0 failure/error, 28 skipped. Tests kiem doc prompt/knowledge-base UTF-8 co dau, mock/faq greeting, va API JSON; skip khong tinh pass.
+- `mvnw clean test` PASS local working tree: 451 tests, 0 failure/error, 28 skipped (423 pass), tang 5 test so voi baseline 446. Test FAQ/mock/deepseek dung client gia lap, khong goi mang that; skip khong tinh pass.
 - Bien moi truong: `DEEPSEEK_API_KEY` (secret); `SCMS_AI_CHAT_DEEPSEEK_BASE_URL` (`https://api.deepseek.com`); `SCMS_AI_CHAT_DEEPSEEK_MODEL` (`deepseek-flash`); `SCMS_AI_CHAT_DEEPSEEK_TIMEOUT_SECONDS` (12); `SCMS_AI_CHAT_DEEPSEEK_MAX_TOKENS` (400); `SCMS_AI_CHAT_TEMPERATURE` (0.2); `SCMS_AI_CHAT_MAX_KNOWLEDGE_BASE_CHARACTERS` (12000); `SCMS_AI_CHAT_MAX_INPUT_CHARACTERS` (8000); `SCMS_AI_CHAT_DAILY_LIMIT_PER_MEMBER` (30); cung `SCMS_AI_CHAT_ENABLED`, `SCMS_AI_CHAT_PROVIDER`, `SCMS_AI_CHAT_NEW_CONVERSATION_HANDLER`.
 - Gia tham khao DeepSeek ngay 08/11/2026: Flash peak $0.30/1M input token cache miss va $1.20/1M output token; off-peak $0.15/$0.60. Vi du 1.000 input + 400 output token, 30 luot/ngay x 30 ngay: khoang $0.70 peak hoac $0.35 off-peak/member/thang; token thuc va cache hit co the giam gia. Gia co the thay doi, can kiem tra [bang gia chinh thuc](https://api-docs.deepseek.com/quick_start/pricing/).
 - Chua xac nhan FE source hien hanh hoac deploy. Tham khao docs: [Your First API Call](https://api-docs.deepseek.com/); [Chat Completions](https://api-docs.deepseek.com/api/create-chat-completion/); [Error Codes](https://api-docs.deepseek.com/quick_start/error_codes/); [Rate Limit](https://api-docs.deepseek.com/quick_start/rate_limit/).
