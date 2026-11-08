@@ -33,6 +33,7 @@ class ChatResponderDispatcherTest {
         dispatcher=new ChatResponderDispatcher(List.of(responder),service);
         dispatcher.onMemberMessage(new ChatMessageCreatedEvent(4,5,ChatSenderType.MEMBER,false,7,List.of()));
         verify(service,never()).saveResponderReply(anyInt(),any());
+        verify(service).escalateToStaff(4, "AI_RUNTIME_FAILURE");
     }
 
     @Test void staffHandledConversationDoesNotInvokeResponder() {
@@ -40,5 +41,17 @@ class ChatResponderDispatcherTest {
         when(service.loadForResponder(4)).thenReturn(conversation); dispatcher=new ChatResponderDispatcher(List.of(responder),service);
         dispatcher.onMemberMessage(new ChatMessageCreatedEvent(4,5,ChatSenderType.MEMBER,false,7,List.of()));
         verifyNoInteractions(responder);
+    }
+
+    @Test void handoffUsesReasonCodeFromAiMetadata() {
+        ChatResponder responder=mock(ChatResponder.class);
+        when(service.loadForResponder(4)).thenReturn(conversation);
+        when(service.recentForResponder(4,20)).thenReturn(List.of());
+        when(responder.supports(conversation)).thenReturn(true);
+        when(responder.respond(eq(conversation),anyList(),eq(7))).thenReturn(Optional.of(
+                new ChatResponderReply("Ai transfer. [HANDOFF]", "{\"reasonCode\":\"SENSITIVE_TOPIC\"}")));
+        dispatcher=new ChatResponderDispatcher(List.of(responder),service);
+        dispatcher.onMemberMessage(new ChatMessageCreatedEvent(4,5,ChatSenderType.MEMBER,false,7,List.of()));
+        verify(service).escalateToStaff(4, "SENSITIVE_TOPIC");
     }
 }

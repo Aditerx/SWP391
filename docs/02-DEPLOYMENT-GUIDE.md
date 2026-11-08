@@ -20,8 +20,28 @@ Java 17/Spring Boot 3.3.5, Maven wrapper, PostgreSQL/Supabase; Dockerfile ở ro
 | MAIL_FROM_EMAIL | Địa chỉ người gửi đã xác minh; nếu không đặt dùng spring.mail.username. Tách khỏi SMTP login khi dùng Brevo |
 | REGISTRATION_DEMO_OTP | Để trống production; mã cố định chỉ cho demo đăng ký được chọn rõ |
 | CLOUDINARY_CLOUD_NAME,CLOUDINARY_API_KEY,CLOUDINARY_API_SECRET | Nếu dùng avatar, secret ngoài Git |
+| SCMS_AI_CHAT_ENABLED | false; phải bật rõ ràng mới có responder AI |
+| SCMS_AI_CHAT_PROVIDER | mock mặc định để dev FE không cần key; Anthropic chỉ khi chọn rõ |
+| SCMS_AI_CHAT_NEW_CONVERSATION_HANDLER | STAFF mặc định; chọn AI riêng cho local mock khi muốn kiểm UI trợ lý |
+| ANTHROPIC_API_KEY,SCMS_AI_CHAT_MODEL | Chỉ cần cho provider Anthropic; key lưu secret store, model là model ID đang khả dụng trong Anthropic Console |
+| SCMS_AI_CHAT_TIMEOUT_SECONDS,SCMS_AI_CHAT_MAX_TOKENS,SCMS_AI_CHAT_MAX_INPUT_CHARACTERS | timeout12s, đầu ra tối đa400 token, lịch sử tối đa8000 ký tự gửi provider |
 
 Đây là default/source, không chứng nhận dashboard đã đặt đúng; external Spring configuration có thể override. Cùng host/password chưa chứng minh cùng Supabase project. HikariCP là pool JDBC của ứng dụng, khác Supabase pooler; source default5connection/timeout30000ms. Fingerprint chỉ đối chiếu target hiệu lực, không là chứng nhận toàn API.
+
+### Chat AI local (không cần provider key)
+
+`ChatAiResponder` chỉ được đăng ký khi `SCMS_AI_CHAT_ENABLED=true`. Để thử luồng FE với câu trả lời cố định, dùng DB PostgreSQL local đã dựng theo bước Local workflow, rồi trong PowerShell khởi chạy backend với:
+
+```powershell
+$env:SCMS_AI_CHAT_ENABLED = 'true'
+$env:SCMS_AI_CHAT_PROVIDER = 'mock'
+$env:SCMS_AI_CHAT_NEW_CONVERSATION_HANDLER = 'AI'
+.\mvnw.cmd spring-boot:run
+```
+
+Khi tắt feature flag, hội thoại mới luôn là STAFF như trước. Nếu bật mock nhưng để handler STAFF thì chat vẫn chuyển đến nhân viên; lựa chọn handler mặc định hiện được giữ STAFF cho đến khi Owner chốt. Mock không gọi mạng. Provider Anthropic dùng `POST /v1/messages`, `x-api-key`, `anthropic-version`, `model`, `max_tokens`, `system` và `messages` theo [Messages API chính thức](https://platform.claude.com/docs/en/api/go/messages/create); chọn model ID có hiệu lực trong Console và chỉ đặt key qua `.env` ignored hoặc secret store. Không cần dependency SDK riêng.
+
+Mỗi request chỉ nhận tối đa20 tin mới nhất, giữ lịch sử trong giới hạn ký tự và loại tin SYSTEM. Tin có dấu hiệu password/OTP/token hoặc số thẻ được bỏ toàn bộ trước khi gửi. Không gửi member ID hoặc dữ liệu hội thoại khác. Timeout tối đa cấu hình12giây, thử lại một lần với timeout/lỗi HTTP5xx; lỗi cuối chuyển hội thoại sang STAFF bằng SYSTEM message. Log chỉ ghi loại exception và conversation ID, không ghi nội dung prompt, response hoặc key. Bộ lọc theo mẫu là lớp giảm thiểu, không thay thế rà soát dữ liệu; chatbot vẫn chưa được phép xử lý dữ liệu tài khoản/thanh toán.
 
 <a id="testing"></a>
 ## 2. Kiểm thử

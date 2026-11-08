@@ -19,6 +19,7 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
+import org.springframework.test.util.ReflectionTestUtils;
 
 class ChatServiceTest {
     ChatConversationRepository conversations=mock(ChatConversationRepository.class);
@@ -55,6 +56,24 @@ class ChatServiceTest {
         ChatConversationResponse result=service.getOrCreate(auth,new ChatConversationRequest("  Billing  "));
         assertEquals("Billing",result.subject()); assertEquals("STAFF",result.handlerType().name());
         assertEquals("2026-10-24T12:00+07:00",result.createdAt().toString());
+    }
+
+    @Test void enabledAiHandlerIsUsedOnlyWhenExplicitlyConfigured() {
+        ReflectionTestUtils.setField(service, "aiChatEnabled", true);
+        ReflectionTestUtils.setField(service, "newConversationHandler", ChatHandlerType.AI);
+        when(conversations.findFirstByMember_IdAndStatusOrderByIdDesc(7,ChatConversationStatus.OPEN)).thenReturn(Optional.empty());
+        when(conversations.saveAndFlush(any())).thenAnswer(inv->{ChatConversation c=inv.getArgument(0); c.setId(16); return c;});
+        when(messages.findByConversation_IdOrderByIdDesc(eq(16),any())).thenReturn(List.of());
+        ChatConversationResponse result=service.getOrCreate(auth,new ChatConversationRequest(null));
+        assertEquals("AI",result.handlerType().name());
+    }
+
+    @Test void memberCannotEscalateAnotherMembersConversation() {
+        User other=new User(); other.setId(8);
+        ChatConversation c=conversation(17,other);
+        when(conversations.findByIdForUpdate(17)).thenReturn(Optional.of(c));
+        assertEquals("CHAT_CONVERSATION_NOT_FOUND",assertThrows(ChatException.class,()->service.requestStaff(17,auth)).getCode());
+        verify(messages,never()).saveAndFlush(any());
     }
 
     @Test void memberCannotReadAnotherMembersConversation() {
@@ -137,9 +156,11 @@ class ChatServiceTest {
         ChatConversation c=conversation(6,member); c.setHandlerType(ChatHandlerType.AI); when(conversations.findByIdForUpdate(6)).thenReturn(Optional.of(c));
         when(users.findActiveReceptionists(null)).thenReturn(List.of());
         when(messages.saveAndFlush(any())).thenAnswer(inv->{ChatMessage m=inv.getArgument(0);m.setId(60);return m;});
-        service.escalateToStaff(6,"needs a person");
+        service.escalateToStaff(6,"SENSITIVE_TOPIC");
         assertEquals(ChatHandlerType.STAFF,c.getHandlerType());
-        verify(messages).saveAndFlush(argThat(m->m.getSenderType()==ChatSenderType.SYSTEM&&m.getSender()==null));
+        verify(messages).saveAndFlush(argThat(m->m.getSenderType()==ChatSenderType.SYSTEM&&m.getSender()==null
+                &&m.getContent().equals("M\u00ecnh \u0111\u00e3 chuy\u1ec3n cu\u1ed9c tr\u00f2 chuy\u1ec7n cho nh\u00e2n vi\u00ean h\u1ed7 tr\u1ee3. Nh\u00e2n vi\u00ean s\u1ebd ph\u1ea3n h\u1ed3i b\u1ea1n s\u1edbm nh\u1ea5t c\u00f3 th\u1ec3.")
+                &&m.getMetadata().contains("SENSITIVE_TOPIC")&&!m.getContent().contains("Transferred to staff:")));
         verify(events).publishEvent(argThat((Object e)->e instanceof ChatMessageCreatedEvent event&&event.senderType()==ChatSenderType.SYSTEM));
     }
 
