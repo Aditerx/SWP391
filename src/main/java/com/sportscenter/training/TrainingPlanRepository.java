@@ -30,4 +30,16 @@ public interface TrainingPlanRepository extends JpaRepository<TrainingPlan, Inte
             @Param("classId") Integer classId,
             @Param("memberId") Integer memberId
     );
+
+    @Query("SELECT tp FROM TrainingPlan tp " +
+            "LEFT JOIN FETCH tp.coach c LEFT JOIN FETCH tp.sportsClass cl LEFT JOIN FETCH tp.member m " +
+            "WHERE (:coachId IS NULL OR c.id=:coachId) AND (:classId IS NULL OR cl.id=:classId) " +
+            "AND (m.id=:memberId OR (tp.member IS NULL AND (cl.classType='Normal' OR cl.classType IS NULL) " +
+            "AND EXISTS (SELECT e.id FROM ClassEnrollment e WHERE e.sportsClass=tp.sportsClass " +
+            "AND e.member.id=:memberId AND e.status='Registered') " +
+            "AND EXISTS (SELECT i.invoiceId FROM Invoice i WHERE i.sportsClass=tp.sportsClass " +
+            "AND i.member.id=:memberId AND i.paymentStatus='Paid' " +
+            "AND i.reconciliationRequired=false AND i.cashConfirmationReversed=false))) ORDER BY tp.planId DESC")
+    List<TrainingPlan> searchMemberPlans(@Param("coachId") Integer coachId,
+            @Param("classId") Integer classId, @Param("memberId") Integer memberId);
 }

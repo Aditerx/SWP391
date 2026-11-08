@@ -65,6 +65,8 @@ Runner minimal lấy bootstrap cấu trúc, bỏ grants mặc định để test
 
 D01/D09: unit/MockMvc gốc chạy H2, còn `PhaseWorkflowHttpTest` kiểm HTTP login thật trên PG. Fixture ngày sinh dùng Clock cố định. Race PATCH giữ row User bằng connection riêng, chờ cả2request ở DB lock rồi thả; hai field khác nhau phải cùng còn sau commit. Directory kiểm Admin center null, scope/contact và query count không tăng theo số Coach. Snapshot account Inactive được đọc trước khi phục hồi fixture. Case Member thiếu center chỉ chạy H2 vì guard PG từ chối lưu trạng thái đó; lỗi setup không tính là pass403/400. Tích hợp này dùng schema hiện có, không thêm migration hay mở quyền cloud.
 
+RBAC theo RP-04/RP-36 và giáo án lớp: `RbacGuardIntegrationTest` mặc định chạy H2; opt-in `-Dscms.rbac.pg-url=jdbc:postgresql://127.0.0.1:55440/scms_phases_<fixture_moi>` chỉ chấp nhận DB local đúng regex này, dùng ddl-auto=none. Chuẩn bị DB mới bằng bootstrap/runner minimal và các prerequisite hiện hành theo phần trên; không dùng DB workflow đã có actor để chạy chồng fixture. Fixture dùng môn chuẩn, subtype Coach/Member/Receptionist, ngày tham gia và Paid invoice có nguồn hợp lệ; không nới FK/NOT NULL để ép test qua. Kiểm target row lock bằng blocker metadata của đúng H2 hoặc PostgreSQL. Chạy trên bản sao không.env; kết quả/source/XML chuẩn ở docs00/QA, không suy PG local thành Supabase hoặc tự chạy migration cloud.
+
 Ngoài exchanges, runner giữ `acceptance-cases.json` (Dxx/fixture/expected/SQL state và index response), `actors.json` và XML trong raw run. Sau khi kiểm kết quả, ghi vào QA chuẩn bằng lệnh dưới; lấy checkout từ `verification.json`. Chỉ chạy với test đã commit hoặc bản test được copy có hash khớp; không gọi kết quả checkout cũ là kết quả working tree mới.
 
 ```powershell
@@ -86,6 +88,19 @@ Mặc định offline, đọc một OpenAPI/QA để kiểm route/source và com
 Báo cáo đủ: `Dxx/case →actor/fixture →expected →response+state →PASS/FAIL/BLOCKED/NOT_RUN →môi trường/SHA →một tham chiếu`. Không lấy số request/assertion làm mức hoàn tất; chỉ mở đúng scenario/index trong QA khi cần.
 
 ## 3. Deploy
+
+<a id="rbac-fe-verification"></a>
+### Kiểm phản hồi FE sau bản sửa RBAC
+
+Đối chiếu source/merge/CI tại docs00/QA trước, rồi GET `/api/health` trên BE mà FE thật sự gọi: `buildCommit` phải thuộc bản đã phát hành. HTTP200 health chỉ xác nhận ứng dụng trả lời, không nghiệm thu nghiệp vụ hoặc migration Google. Không chạy lại SQL16/reset DB cho lượt này. Dùng tài khoản và record kiểm thử được phép; không thay role/trạng thái/mật khẩu tài khoản vận hành để thử.
+
+1. **Coach/roster theo ảnh đã gửi:** đăng xuất/đăng nhập lại, kiểm GET `/api/auth/me`200 có role Coach và đúng user. Trong màn hình **Điểm danh**, chọn đúng lớp được giao (lớp23 chỉ dùng nếu đã xác minh phân công). Quan sát Network: GET `/api/classes/{id}/enrollments` trả200 danh sách đúng lớp là đúng; tuyến dự phòng `/api/enrollments?classId={id}` có thể không cần chạy khi tuyến đầu thành công. Lớp hoàn tất vẫn đọc roster, giữ banner khóa sửa attendance.403 ở lớp không được giao là đúng;401 hoặc role sai phải giải quyết phiên trước, không tính là kiểm quyền thành công.
+2. **Giáo án/đánh giá:** qua màn hình hiện hành có gọi `training-plans`/`evaluations`, Coach được giao tạo/sửa/xóa record kiểm thử phải nhận201/200/204 và tải lại giữ đúng nội dung/target. Manager cố ghi cùng API phải403 dù có authority quản lý lớp; FE có thể ẩn thao tác theo quyền. Không đổi attendance correction D15 thành bài kiểm ghi giáo án.
+3. **Member:** GET `/api/training-plans`200 chỉ gồm plan riêng của mình và plan chung lớp Normal Registered+Paid hợp lệ, đúng center; ID plan lớp/người khác403. Danh sách trống200[] chỉ đúng nếu không có plan đủ điều kiện. GET `payment-resolutions`403 vẫn là đúng quyền Member; FE cần ngừng gọi theo bàn giao RBAC lần1.
+4. **Quản trị tài khoản:** bằng record kiểm thử riêng, Admin đủ authority được quản lý Manager; Manager quản lý target Manager/Admin hoặc chuyển role thường thành Manager phải403 và tải lại không có thay đổi. Kiểm đúng các tuyến users/staff/status/role/reissue cần dùng; không gọi cấp lại mật khẩu tài khoản thật để thử.
+5. **Phiên đang mở (tùy fixture):** thay permission của role kiểm thử bằng Admin rồi request kế tiếp phải áp quyền mới; đổi role trả403 `SESSION_ROLE_CHANGED` và yêu cầu đăng nhập lại; Inactive trả403 `ACCOUNT_NOT_ACTIVE`; cấp lại/đổi password quản trị thu hồi phiên thành401. Chỉ dùng role/account kiểm thử riêng để không thay quyền của cả nhóm người dùng.
+
+Chỉ hướng dẫn click/menu đã có ảnh hoặc giao diện hiện hành; nếu màn hình giáo án/quản trị khác hoặc chưa có nút tương ứng, lấy ảnh đúng vùng đó trước khi chỉ tiếp, không suy từ FE_Project-main cũ. Gửi kết quả theo role → thao tác → method/path → status/body liên quan và thông báo UI; che email/cookie/token. Không gửi OTP/mật khẩu. Nếu request lỗi, giữ response và xác minh auth/me cùng phiên trước khi đổi quyền. Xong nhóm kiểm FE thì Owner xác nhận kết quả; sau đó mới sắp xếp, giải thích và đề xuất phần tiếp theo, không tự mở policy mới.
 
 <a id="google-login"></a>
 ### Google login/avatar nhập từ main

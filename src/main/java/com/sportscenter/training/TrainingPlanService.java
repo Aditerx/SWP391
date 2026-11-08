@@ -19,6 +19,7 @@ import java.util.List;
 @Service
 @RequiredArgsConstructor
 public class TrainingPlanService {
+    private final TrainingAccessPolicy access;
     private final java.time.Clock clock;
     private final TrainingPlanRepository trainingPlanRepository;
     private final UserRepository userRepository;
@@ -28,6 +29,7 @@ public class TrainingPlanService {
     @Transactional(readOnly = true)
     public List<TrainingPlanResponse> searchPlans(Integer coachId, Integer classId, Integer memberId,
                                                   Authentication authentication) {
+        User actor = access.actor();
         User currentUser = null;
         boolean memberRole = hasRole(authentication, "ROLE_MEMBER");
         boolean coachRole = hasRole(authentication, "ROLE_COACH");
@@ -46,7 +48,11 @@ public class TrainingPlanService {
             }
             coachId = currentUser.getId();
         }
-        return trainingPlanRepository.searchPlans(coachId, classId, memberId).stream()
+        List<TrainingPlan> plans = memberRole
+                ? trainingPlanRepository.searchMemberPlans(coachId, classId, memberId)
+                : trainingPlanRepository.searchPlans(coachId, classId, memberId);
+        return plans.stream()
+                .filter(p -> access.readable(actor, p.getCoach(), p.getSportsClass(), p.getMember()))
                 .map(TrainingPlanResponse::from)
                 .toList();
     }
@@ -55,9 +61,14 @@ public class TrainingPlanService {
     public TrainingPlanResponse findById(Integer id, Authentication authentication) {
         TrainingPlan plan = trainingPlanRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Training plan not found: " + id));
-        if (hasRole(authentication, "ROLE_MEMBER") && (plan.getMember() == null
-                || !plan.getMember().getId().equals(currentUserId(authentication)))) {
-            throw new AccessDeniedException("Members may only view their own training plans");
+        if (!access.readable(access.actor(), plan.getCoach(), plan.getSportsClass(), plan.getMember()))
+            throw new AccessDeniedException("Training plan belongs to another center");
+        if (hasRole(authentication, "ROLE_MEMBER")) {
+            User member = access.actor();
+            boolean ownPrivatePlan = plan.getMember() != null && plan.getMember().getId().equals(member.getId());
+            boolean ownClassPlan = plan.getMember() == null && access.memberCanReadClassPlan(member, plan.getSportsClass());
+            if (!ownPrivatePlan && !ownClassPlan)
+                throw new AccessDeniedException("Members may only view their own training plans");
         }
         if (hasRole(authentication, "ROLE_COACH") && (plan.getCoach() == null
                 || !plan.getCoach().getId().equals(currentUserId(authentication)))) {
@@ -103,6 +114,8 @@ public class TrainingPlanService {
             throw new BusinessException("End date cannot be before start date");
         }
 
+        User actor = access.write(coach, sportsClass, member, true);
+
         TrainingPlan plan = new TrainingPlan();
         plan.setCoach(coach);
         plan.setSportsClass(sportsClass);
@@ -117,7 +130,7 @@ public class TrainingPlanService {
         TrainingPlan saved = trainingPlanRepository.save(plan);
 
         String target = sportsClass != null ? "Class: " + sportsClass.getName() : "Member: " + member.getFullName();
-        auditService.log(coach.getId(), "MANAGE_TRAINING_PLAN", "training_plans", saved.getPlanId(),
+        auditService.log(actor.getId(), "MANAGE_TRAINING_PLAN", "training_plans", saved.getPlanId(),
                 "Created plan '" + saved.getTitle() + "' for " + target);
 
         return TrainingPlanResponse.from(saved);
@@ -127,6 +140,11 @@ public class TrainingPlanService {
     public TrainingPlanResponse updatePlan(Integer id, TrainingPlanRequest request) {
         TrainingPlan plan = trainingPlanRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Training plan not found: " + id));
+        User actor = access.write(plan.getCoach(), plan.getSportsClass(), plan.getMember(), true);
+        if (!java.util.Objects.equals(request.coachId(), plan.getCoach().getId())
+                || request.classId() != null && !java.util.Objects.equals(request.classId(), plan.getSportsClass() == null ? null : plan.getSportsClass().getId())
+                || request.memberId() != null && !java.util.Objects.equals(request.memberId(), plan.getMember() == null ? null : plan.getMember().getId()))
+            throw new BusinessException("TRAINING_TARGET_IMMUTABLE: Update the existing target without changing its Coach/class/member");
 
         if (request.title() != null && !request.title().isBlank()) {
             plan.setTitle(request.title());
@@ -150,7 +168,7 @@ public class TrainingPlanService {
 
         TrainingPlan saved = trainingPlanRepository.save(plan);
 
-        auditService.log(plan.getCoach() != null ? plan.getCoach().getId() : null,
+        auditService.log(actor.getId(),
                 "MANAGE_TRAINING_PLAN", "training_plans", saved.getPlanId(),
                 "Updated plan '" + saved.getTitle() + "'");
 
@@ -161,10 +179,11 @@ public class TrainingPlanService {
     public void deletePlan(Integer id) {
         TrainingPlan plan = trainingPlanRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Training plan not found: " + id));
+        User actor = access.write(plan.getCoach(), plan.getSportsClass(), plan.getMember(), true);
 
         trainingPlanRepository.delete(plan);
 
-        auditService.log(plan.getCoach() != null ? plan.getCoach().getId() : null,
+        auditService.log(actor.getId(),
                 "DELETE_TRAINING_PLAN", "training_plans", id,
                 "Deleted plan '" + plan.getTitle() + "'");
     }

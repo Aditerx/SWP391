@@ -42,7 +42,7 @@ public class SecurityConfig {
 
     @Bean
     UserDetailsService userDetailsService(UserRepository repository) {
-        // Session authentication keeps this permission snapshot until the user logs in again.
+        // CurrentAccountFilter refreshes the effective permissions before each protected API request.
         return email -> {
             User user = repository.findForAuthentication(email)
                     .orElseThrow(() -> new UsernameNotFoundException("User not found"));
@@ -112,7 +112,8 @@ public class SecurityConfig {
     SecurityFilterChain securityFilterChain(HttpSecurity http,
                                              SecurityContextRepository securityContextRepository,
                                              CorsConfigurationSource corsConfigurationSource,
-                                             FirstLoginPasswordFilter firstLoginPasswordFilter) throws Exception {
+                                             FirstLoginPasswordFilter firstLoginPasswordFilter,
+                                             UserRepository users, SessionRegistry sessions) throws Exception {
         return http
                 .cors(cors -> cors.configurationSource(corsConfigurationSource))
                 .csrf(csrf -> csrf.disable())
@@ -135,6 +136,7 @@ public class SecurityConfig {
                 .securityContext(context -> context.securityContextRepository(securityContextRepository))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED))
                 .addFilterBefore(firstLoginPasswordFilter, AuthorizationFilter.class)
+                .addFilterBefore(new CurrentAccountFilter(users, sessions, securityContextRepository), FirstLoginPasswordFilter.class)
                 .build();
     }
 }

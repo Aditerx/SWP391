@@ -81,7 +81,7 @@ class NormalEnrollmentMembershipIntegrationTest {
             memberRole = role("Member"); coachRole = role("Coach"); receptionistRole = role("Receptionist");
             Permission p = new Permission(); p.setName("MANAGE_INVOICES"); em.persist(p);
             receptionistRole.getPermissions().add(p);
-            for (String name : List.of("MANAGE_SUBSCRIPTIONS", "MANAGE_PACKAGES")) {
+            for (String name : List.of("REGISTER_MEMBER", "MANAGE_SUBSCRIPTIONS", "MANAGE_PACKAGES")) {
                 Permission permission = new Permission(); permission.setName(name); em.persist(permission);
                 receptionistRole.getPermissions().add(permission);
             }
@@ -185,7 +185,11 @@ class NormalEnrollmentMembershipIntegrationTest {
         mvc.perform(post(path()).session(login(otherCenter)).contentType("application/json").content("{\"paymentMethod\":\"Cash\"}"))
                 .andExpect(status().isForbidden());
         jdbc.update("UPDATE users SET status='Inactive' WHERE user_id=?", member.getId());
-        mvc.perform(post(path()).session(session)).andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("MEMBER_NOT_ACTIVE"));
+        // Inactive actor is now rejected before the enrollment business handler. Staff targeting an inactive Member is a distinct case.
+        mvc.perform(post(path()).session(session)).andExpect(status().isForbidden()).andExpect(jsonPath("$.code").value("ACCOUNT_NOT_ACTIVE"));
+        mvc.perform(post(path()).session(login(cashier)).contentType("application/json")
+                        .content(json.writeValueAsString(Map.of("memberId", member.getId(), "paymentMethod", "Cash"))))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("MEMBER_NOT_ACTIVE"));
         jdbc.update("UPDATE users SET status='Active' WHERE user_id=?", member.getId());
         jdbc.update("UPDATE members SET booking_blocked_until=? WHERE user_id=?", NOW.plusHours(1), member.getId());
         mvc.perform(post(path()).session(session)).andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("BOOKING_BLOCKED"));

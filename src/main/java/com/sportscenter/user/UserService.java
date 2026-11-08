@@ -1,6 +1,7 @@
 package com.sportscenter.user;
 
 import com.sportscenter.audit.AuditService;
+import com.sportscenter.common.AccountScope;
 import com.sportscenter.center.CenterContext;
 import com.sportscenter.auth.EmailService;
 import com.sportscenter.auth.TemporaryPasswordGenerator;
@@ -48,9 +49,11 @@ public class UserService {
 
     @Transactional(readOnly = true)
     public List<UserResponse> findAllUsers(String roleFilter, String search) {
+        User actor = AccountScope.actor(userRepository);
         List<User> users = userRepository.findAll();
 
         return users.stream()
+                .filter(u -> AccountScope.visible(actor, u.getCenterId()))
                 .filter(u -> {
                     if (roleFilter != null && !roleFilter.isBlank() && !"all".equalsIgnoreCase(roleFilter)) {
                         if (u.getRole() == null || !roleFilter.equalsIgnoreCase(u.getRole().getName())) {
@@ -76,11 +79,13 @@ public class UserService {
     public UserResponse findById(Integer id) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + id));
+        AccountScope.require(AccountScope.actor(userRepository), user.getCenterId());
         return UserResponse.from(user);
     }
 
     @Transactional
     public UserResponse createUser(UserRequest request) {
+        User actingUser = AccountScope.actor(userRepository);
         if (userRepository.findForAuthentication(request.email().trim()).isPresent()) {
             throw new BusinessException("Email already exists: " + request.email());
         }
@@ -96,7 +101,7 @@ public class UserService {
             role = roleRepository.findByNameIgnoreCase("Member")
                     .orElseThrow(() -> new BusinessException("Default Member role not found"));
         }
-        assertCanManageAdminRole(null, role);
+        assertCanManagePrivilegedRole(null, role);
 
         User user = new User();
         user.setFullName(request.fullName().trim());
@@ -122,7 +127,7 @@ public class UserService {
                     .ifPresent(coach -> coachSpecializationAssignmentService.assign(coach, request.specializationIds()));
         }
 
-        auditService.log(null, "CREATE_USER", "USER", savedUser.getId(),
+        auditService.log(actingUser.getId(), "CREATE_USER", "USER", savedUser.getId(),
                 "Created user " + savedUser.getFullName() + " (" + savedUser.getEmail() + ") with role " + role.getName());
         boolean emailSent = emailService.sendWelcomeEmail(savedUser.getEmail(), savedUser.getFullName(), temporaryPassword);
         return UserResponse.from(savedUser).withEmailDelivery(emailSent,
@@ -131,9 +136,11 @@ public class UserService {
 
     @Transactional
     public UserResponse updateUser(Integer id, UserRequest request) {
-        User user = userRepository.findById(id)
+        User actingUser = AccountScope.actor(userRepository);
+        User user = userRepository.findByIdForUpdate(id)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + id));
-        assertCanManageAdminRole(user, null);
+        AccountScope.require(actingUser, user.getCenterId());
+        assertCanManagePrivilegedRole(user, null);
 
         if (request.fullName() != null && !request.fullName().isBlank()) {
             user.setFullName(request.fullName().trim());
@@ -160,14 +167,14 @@ public class UserService {
         if (request.roleId() != null && (user.getRole() == null || !request.roleId().equals(user.getRole().getId()))) {
             Role newRole = roleRepository.findById(request.roleId())
                     .orElseThrow(() -> new ResourceNotFoundException("Role not found with id: " + request.roleId()));
-            assertCanManageAdminRole(user, newRole);
+            assertCanManagePrivilegedRole(user, newRole);
             user.setRole(newRole);
             syncSubtypeRecord(user, newRole.getName());
         } else if (request.roleName() != null && !request.roleName().isBlank() &&
                 (user.getRole() == null || !request.roleName().equalsIgnoreCase(user.getRole().getName()))) {
             Role newRole = roleRepository.findByNameIgnoreCase(request.roleName().trim())
                     .orElseThrow(() -> new BusinessException("Role not found with name: " + request.roleName()));
-            assertCanManageAdminRole(user, newRole);
+            assertCanManagePrivilegedRole(user, newRole);
             user.setRole(newRole);
             syncSubtypeRecord(user, newRole.getName());
         }
@@ -178,24 +185,28 @@ public class UserService {
             coachRepository.findById(savedUser.getId())
                     .ifPresent(coach -> coachSpecializationAssignmentService.assign(coach, request.specializationIds()));
         }
-        auditService.log(null, "UPDATE_USER", "USER", savedUser.getId(),
+        auditService.log(actingUser.getId(), "UPDATE_USER", "USER", savedUser.getId(),
                 "Updated user " + savedUser.getFullName() + " (" + savedUser.getEmail() + ")");
+
+        if (request.password() != null && !request.password().isBlank()) expireSessions(savedUser);
 
         return UserResponse.from(savedUser);
     }
 
     @Transactional
     public UserResponse updateUserStatus(Integer id, String status) {
-        User user = userRepository.findById(id)
+        User actingUser = AccountScope.actor(userRepository);
+        User user = userRepository.findByIdForUpdate(id)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + id));
-        assertCanManageAdminRole(user, null);
+        AccountScope.require(actingUser, user.getCenterId());
+        assertCanManagePrivilegedRole(user, null);
 
         String previousStatus = user.getStatus();
         String newStatus = normalizeUserStatus(status);
         user.setStatus(newStatus);
         User savedUser = userRepository.save(user);
 
-        auditService.log(null, "CHANGE_USER_STATUS", "USER", savedUser.getId(),
+        auditService.log(actingUser.getId(), "CHANGE_USER_STATUS", "USER", savedUser.getId(),
                 previousStatus + " -> " + newStatus);
 
         return UserResponse.from(savedUser);
@@ -225,13 +236,14 @@ public class UserService {
 
     @Transactional
     public UserResponse reissuePassword(Integer id) {
-        User user = userRepository.findById(id)
+        User user = userRepository.findByIdForUpdate(id)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + id));
         Authentication actor = SecurityContextHolder.getContext().getAuthentication();
         boolean canManageUsers = hasAuthority(actor, "MANAGE_USERS");
         boolean canRegisterMember = hasAuthority(actor, "REGISTER_MEMBER");
         boolean canManagePermissions = hasAuthority(actor, "MANAGE_PERMISSIONS");
-        User actingUser = actor == null ? null : userRepository.findByEmailIgnoreCase(actor.getName()).orElse(null);
+        User actingUser = AccountScope.actor(userRepository);
+        assertCanManagePrivilegedRole(user, null);
         boolean targetIsAdmin = user.getRole() != null && "Admin".equalsIgnoreCase(user.getRole().getName());
         boolean targetIsMember = user.getRole() != null && "Member".equalsIgnoreCase(user.getRole().getName());
 
@@ -248,12 +260,9 @@ public class UserService {
         user.setPasswordHash(temporaryPasswordGenerator.hash(temporaryPassword));
         user.setFirstLogin(true);
         User saved = userRepository.save(user);
-        var principal = userDetailsService.loadUserByUsername(saved.getEmail());
-        for (SessionInformation session : sessionRegistry.getAllSessions(principal, false)) {
-            session.expireNow();
-        }
+        expireSessions(saved);
         boolean emailSent = emailService.sendWelcomeEmail(saved.getEmail(), saved.getFullName(), temporaryPassword);
-        auditService.log(null, "REISSUE_TEMPORARY_PASSWORD", "USER", saved.getId(),
+        auditService.log(actingUser.getId(), "REISSUE_TEMPORARY_PASSWORD", "USER", saved.getId(),
                 "Temporary password reissued");
         return UserResponse.from(saved).withEmailDelivery(emailSent,
                 emailSent ? null : "Tạo tài khoản thành công nhưng gửi email thất bại. Dùng chức năng cấp lại mật khẩu để gửi lại.");
@@ -264,27 +273,43 @@ public class UserService {
                 .anyMatch(granted -> authority.equals(granted.getAuthority()));
     }
 
+    private void expireSessions(User user) {
+        Runnable revoke = () -> {
+            var principal = userDetailsService.loadUserByUsername(user.getEmail());
+            sessionRegistry.getAllSessions(principal, false).forEach(SessionInformation::expireNow);
+        };
+        if (org.springframework.transaction.support.TransactionSynchronizationManager.isSynchronizationActive()) {
+            org.springframework.transaction.support.TransactionSynchronizationManager.registerSynchronization(
+                    new org.springframework.transaction.support.TransactionSynchronization() {
+                        @Override public void afterCommit() { revoke.run(); }
+                    });
+        } else revoke.run();
+    }
+
     @Transactional
     public UserResponse updateUserRole(Integer id, Integer roleId) {
-        User user = userRepository.findById(id)
+        User actingUser = AccountScope.actor(userRepository);
+        User user = userRepository.findByIdForUpdate(id)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + id));
+        AccountScope.require(actingUser, user.getCenterId());
 
         Role newRole = roleRepository.findById(roleId)
                 .orElseThrow(() -> new ResourceNotFoundException("Role not found with id: " + roleId));
-        assertCanManageAdminRole(user, newRole);
+        assertCanManagePrivilegedRole(user, newRole);
 
         String previousRole = user.getRole() != null ? user.getRole().getName() : "None";
         user.setRole(newRole);
         User savedUser = userRepository.save(user);
         syncSubtypeRecord(savedUser, newRole.getName());
 
-        auditService.log(null, "CHANGE_USER_ROLE", "USER", savedUser.getId(),
+        auditService.log(actingUser.getId(), "CHANGE_USER_ROLE", "USER", savedUser.getId(),
                 previousRole + " -> " + newRole.getName());
 
         return UserResponse.from(savedUser);
     }
 
-    private void assertCanManageAdminRole(User currentUser, Role requestedRole) {
+    private void assertCanManagePrivilegedRole(User currentUser, Role requestedRole) {
+        AccountScope.manageRole(AccountScope.actor(userRepository), currentUser, requestedRole == null ? null : requestedRole.getName());
         boolean touchesAdminRole = (currentUser != null && currentUser.getRole() != null
                 && "Admin".equalsIgnoreCase(currentUser.getRole().getName()))
                 || (requestedRole != null && "Admin".equalsIgnoreCase(requestedRole.getName()));

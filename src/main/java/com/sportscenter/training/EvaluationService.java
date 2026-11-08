@@ -18,6 +18,7 @@ import java.util.List;
 @Service
 @RequiredArgsConstructor
 public class EvaluationService {
+    private final TrainingAccessPolicy access;
     private final java.time.Clock clock;
     private final EvaluationRepository evaluationRepository;
     private final UserRepository userRepository;
@@ -25,6 +26,7 @@ public class EvaluationService {
 
     @Transactional(readOnly = true)
     public List<EvaluationResponse> searchEvaluations(Integer memberId, Integer coachId, Authentication authentication) {
+        User actor = access.actor();
         User currentUser = null;
         boolean memberRole = hasRole(authentication, "ROLE_MEMBER");
         boolean coachRole = hasRole(authentication, "ROLE_COACH");
@@ -44,6 +46,7 @@ public class EvaluationService {
             coachId = currentUser.getId();
         }
         return evaluationRepository.searchEvaluations(memberId, coachId).stream()
+                .filter(e -> access.readable(actor, e.getCoach(), null, e.getMember()))
                 .map(EvaluationResponse::from)
                 .toList();
     }
@@ -52,6 +55,8 @@ public class EvaluationService {
     public EvaluationResponse findById(Integer id, Authentication authentication) {
         Evaluation ev = evaluationRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Evaluation not found: " + id));
+        if (!access.readable(access.actor(), ev.getCoach(), null, ev.getMember()))
+            throw new AccessDeniedException("Evaluation belongs to another center");
         if (hasRole(authentication, "ROLE_MEMBER") && !ev.getMember().getId().equals(currentUserId(authentication))) {
             throw new AccessDeniedException("Members may only view their own evaluations");
         }
@@ -79,6 +84,7 @@ public class EvaluationService {
 
         User coach = userRepository.findById(request.coachId())
                 .orElseThrow(() -> new ResourceNotFoundException("Coach not found: " + request.coachId()));
+        User actor = access.write(coach, null, member, false);
 
         if (request.progressScore() != null) {
             if (request.progressScore().compareTo(BigDecimal.ZERO) < 0 || request.progressScore().compareTo(BigDecimal.TEN) > 0) {
@@ -95,7 +101,7 @@ public class EvaluationService {
 
         Evaluation saved = evaluationRepository.save(ev);
 
-        auditService.log(coach.getId(), "RECORD_RESULT", "evaluations", saved.getEvaluationId(),
+        auditService.log(actor.getId(), "RECORD_RESULT", "evaluations", saved.getEvaluationId(),
                 "Coach " + coach.getFullName() + " evaluated member " + member.getFullName() +
                         " (Score: " + saved.getProgressScore() + "/10)");
 
@@ -106,6 +112,10 @@ public class EvaluationService {
     public EvaluationResponse updateEvaluation(Integer id, EvaluationRequest request) {
         Evaluation ev = evaluationRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Evaluation not found: " + id));
+        User actor = access.write(ev.getCoach(), null, ev.getMember(), false);
+        if (!java.util.Objects.equals(request.coachId(), ev.getCoach().getId())
+                || !java.util.Objects.equals(request.memberId(), ev.getMember().getId()))
+            throw new BusinessException("TRAINING_TARGET_IMMUTABLE: Update the existing Coach/member target");
 
         if (request.comment() != null) {
             ev.setComment(request.comment());
@@ -122,7 +132,7 @@ public class EvaluationService {
 
         Evaluation saved = evaluationRepository.save(ev);
 
-        auditService.log(ev.getCoach() != null ? ev.getCoach().getId() : null,
+        auditService.log(actor.getId(),
                 "RECORD_RESULT", "evaluations", saved.getEvaluationId(),
                 "Updated evaluation for member #" + (ev.getMember() != null ? ev.getMember().getId() : "N/A"));
 
@@ -133,10 +143,11 @@ public class EvaluationService {
     public void deleteEvaluation(Integer id) {
         Evaluation ev = evaluationRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Evaluation not found: " + id));
+        User actor = access.write(ev.getCoach(), null, ev.getMember(), false);
 
         evaluationRepository.delete(ev);
 
-        auditService.log(ev.getCoach() != null ? ev.getCoach().getId() : null,
+        auditService.log(actor.getId(),
                 "RECORD_RESULT", "evaluations", id,
                 "Deleted evaluation #" + id);
     }

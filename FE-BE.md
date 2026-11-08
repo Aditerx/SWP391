@@ -1,3 +1,5 @@
+> **TÀI LIỆU LỊCH SỬ — KHÔNG DÙNG LÀM CONTRACT HIỆN HÀNH.** Các mục bên dưới (kể cả mục mang tên “Contract ... hiện đang triển khai”) có rule/endpoint đã bị thay thế: gói chung, giữ chỗ15phút, callback sau hạn tự cấp quyền, Member tự book và luồng AI. Dùng [quyết định D01–D19](docs/04-DEBUG-NOTE.md), [contract FE](docs/01-API-CONTRACT-FE-BE.md) và [Active](docs/00-MASTER-CHECKLIST.md#active). Giữ nội dung cũ để truy nguồn; không dùng nó mở quyền hoặc reset DB.
+
 **FE ↔ BE:** Kết nối qua Internet bằng giao thức **HTTP/HTTPS** (cụ thể là thông qua **RESTful API**). chung quy là giao tiếp bằng API
 
 **BE ↔ DB:** Kết nối qua Internet bằng giao thức **TCP/IP** (BE Java dùng thư viện JDBC để kết nối với lõi PostgreSQL của Supabase).

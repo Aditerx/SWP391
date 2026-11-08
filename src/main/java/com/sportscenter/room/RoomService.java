@@ -1,6 +1,8 @@
 package com.sportscenter.room;
 
 import com.sportscenter.audit.AuditService;
+import com.sportscenter.common.AccountScope;
+import com.sportscenter.user.UserRepository;
 import com.sportscenter.common.exception.BusinessException;
 import com.sportscenter.common.exception.ResourceNotFoundException;
 import lombok.RequiredArgsConstructor;
@@ -12,13 +14,16 @@ import java.util.List;
 @Service
 @RequiredArgsConstructor
 public class RoomService {
+    private final UserRepository users;
     private final RoomRepository repository;
     private final AuditService auditService;
     private final java.time.Clock clock;
 
     @Transactional(readOnly = true)
     public List<RoomResponse> findAll() {
+        var actor = AccountScope.actor(users);
         return repository.findAll().stream()
+                .filter(r -> AccountScope.visible(actor, r.getCenterId()))
                 .filter(r -> !("Closed".equals(r.getStatus()) && r.getRoomCode()!=null && r.getRoomCode().contains("-LEGACY-")))
                 .map(RoomResponse::from).toList();
     }
@@ -26,9 +31,11 @@ public class RoomService {
     @Transactional
     public RoomResponse create(RoomRequest request) {
         Room room = new Room();
+        var actor = AccountScope.actor(users);
+        room.setCenterId(actor.getCenterId() == null ? 1 : actor.getCenterId());
         apply(room, request);
         Room saved = repository.save(room);
-        auditService.log(null, "CREATE_ROOM", "ROOM", saved.getId(), saved.getName());
+        auditService.log(actor.getId(), "CREATE_ROOM", "ROOM", saved.getId(), saved.getName());
         return RoomResponse.from(saved);
     }
 
@@ -56,15 +63,17 @@ public class RoomService {
         room.setStatus(normalizeRoomStatus(status));
         Room saved = repository.save(room);
         if (!previousStatus.equalsIgnoreCase(saved.getStatus())) {
-            auditService.log(null, "CHANGE_ROOM_STATUS", "ROOM", saved.getId(),
+            auditService.log(AccountScope.actor(users).getId(), "CHANGE_ROOM_STATUS", "ROOM", saved.getId(),
                     previousStatus + " -> " + saved.getStatus());
         }
         return RoomResponse.from(saved);
     }
 
     private Room getEntity(Integer id) {
-        return repository.findById(id)
+        Room room = repository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Room not found: " + id));
+        AccountScope.require(AccountScope.actor(users), room.getCenterId());
+        return room;
     }
 
     private void apply(Room room, RoomRequest request) {
@@ -113,7 +122,7 @@ public class RoomService {
 
     private void auditStatusChange(String previousStatus, Room saved, String action) {
         if (previousStatus != null && !previousStatus.equalsIgnoreCase(saved.getStatus())) {
-            auditService.log(null, action, "ROOM", saved.getId(),
+            auditService.log(AccountScope.actor(users).getId(), action, "ROOM", saved.getId(),
                     previousStatus + " -> " + saved.getStatus());
         }
     }
