@@ -188,14 +188,14 @@ class PrivateSessionServiceTest {
         advancedClass.setMaxCapacity(1);
         advancedClass.setSubject(badmintonSubject);
 
-        outdoorRoom = new Room();
+        outdoorRoom = new Room(); outdoorRoom.setActivityType(com.sportscenter.room.RoomActivity.TENNIS);
         outdoorRoom.setId(1);
         outdoorRoom.setName("Sân Tennis Ngoài Trời 1");
         outdoorRoom.setFacilityType("Outdoor");
         outdoorRoom.setCapacity(4);
         outdoorRoom.setStatus("Available");
 
-        indoorRoom = new Room();
+        indoorRoom = new Room(); indoorRoom.setActivityType(com.sportscenter.room.RoomActivity.BADMINTON);
         indoorRoom.setId(2);
         indoorRoom.setName("Sân Cầu Lông Trong Nhà 1");
         indoorRoom.setFacilityType("Indoor");
@@ -354,6 +354,21 @@ class PrivateSessionServiceTest {
         assertEquals(11, activeSubscription.getRemainingCredit());
         verify(memberPackageRepository).save(activeSubscription);
         verify(auditService).log(eq(10), eq("BOOK_PRIVATE_SESSION"), eq("SESSION"), eq(999), contains("Remaining credit: 11"));
+    }
+
+    @Test void paidPrivateBookingRejectsAnotherIndoorSportWithoutConsumingCredit() {
+        indoorRoom.setActivityType(com.sportscenter.room.RoomActivity.BASKETBALL);
+        var request = booking(50, 10, 2, LocalDate.of(2026,10,22), LocalTime.of(7,45), LocalTime.of(9,15), 200, null);
+        when(memberPackageRepository.findByIdForUpdate(50)).thenReturn(Optional.of(activeSubscription));
+        when(userRepository.findById(10)).thenReturn(Optional.of(sampleCoach));
+        when(roomRepository.findById(2)).thenReturn(Optional.of(indoorRoom));
+        when(sportsClassRepository.findById(200)).thenReturn(Optional.of(advancedClass));
+        assertTrue(assertThrows(BusinessException.class, () -> sessionService.bookPrivateSession(request, coachAuth))
+                .getMessage().startsWith("ROOM_SUBJECT_MISMATCH:"));
+        assertEquals(12, activeSubscription.getRemainingCredit());
+        verify(sessionRepository, never()).save(any());
+        verify(memberPackageRepository, never()).save(any());
+        verifyNoInteractions(auditService, eventPublisher);
     }
 
     @Test

@@ -70,6 +70,37 @@ Lỗi400 `{code,message}` gồm NAME_REQUIRED/NAME_TOO_LONG/PHONE_TOO_LONG/ADDRE
 
 **D09 — Coach directory.** Scope lấy từ account trong phiên: tài khoản thường chỉ center của mình; Admin có center null mới đọc toàn hệ thống. `keyword` trim, không phân biệt hoa/thường, tìm tên Coach hoặc specialization; kết hợp specializationId vẫn trả toàn bộ specialization của Coach khớp. Coach không specialization có `specializations:[]`, không kết quả trả `[]`; không cam kết thứ tự list. Email/phone chỉ có giá trị với MANAGE_USERS, nếu thiếu quyền là null. Account Inactive bị403 kể cả còn cookie cũ. Runtime thiếu center trả400; fixture trạng thái sai này kiểm riêng trên H2 vì guard PostgreSQL không cho lưu Member thiếu center.
 
+<a id="phase1-account-resource-20261109"></a>
+### Bổ sung Phase1 09/11 — phạm vi hồ sơ, validation và sân
+
+**GET danh mục RBAC — Owner10/11:** GET `/api/roles`, GET `/api/roles/{id}` và GET `/api/permissions` chỉ cho tài khoản **Admin Active**, dựa trên role hiện hành trong DB; không đòi thêm MANAGE_PERMISSIONS cho quyền đọc. Manager/Receptionist/Coach/Member trả403 kể cả có authority này; anonymous401. Phiên Admin cũ của account Inactive/Locked trả403 ACCOUNT_NOT_ACTIVE; role đổi theo guard phiên hiện hành. Response thành công giữ nguyên DTO; Admin tra role không tồn tại giữ404. GET theo ID cùng gate để không đọc permissions qua tuyến chi tiết. Không thay gate PUT `/roles/{id}/permissions` trong nhóm thay đổi này.
+
+Nếu màn không phải Admin đang gọi hai danh mục này để dựng dropdown thì FE cần bỏ phụ thuộc đó; quyền thao tác trên account vẫn theo loại role được phép và BE kiểm độc lập. Không giải quyết403 bằng cấp MANAGE_PERMISSIONS cho Manager. Trạng thái kiểm/deploy xem Active/QA; không coi cập nhật contract là FE đã tích hợp.
+
+Coach/Member dùng `/api/auth/me`, hồ sơ `me`, roster/enrollment được giao và API học tập theo owner. GET `/api/users`, `/api/users/{id}`, `/api/members`, `/api/members/{id}` và `/api/staff` là DTO quản trị chứa thông tin riêng; Coach/Member bị403 kể cả được gán thêm MANAGE_USERS/REGISTER_MEMBER. GET classes/rooms và tra tài nguyên vẫn là lookup có phiên theo scope hiện hành. GET feedback có danh tính `/api/classes/{id}/feedback` cũng từ chối Coach/Member kể cả có authority quản trị; Coach dùng `/api/coaches/me/feedback` ẩn danh theo Coach trong phiên. `/api/members/at-risk` yêu cầu Admin/CenterManager+VIEW_REPORTS; Coach dùng `/api/coaches/me/at-risk-members`, không mở rộng bằng coachId client.
+
+PATCH status của users/members/staff chỉ nhận Active/Inactive/Locked, trim và không phân biệt hoa thường; Suspended là alias Locked. Thiếu/null/rỗng/sai trả400 `INVALID_ACCOUNT_STATUS`, không đổi tài khoản hoặc ghi audit thành công. Tạo mới vẫn mặc định Active khi bỏ status; PUT bỏ status giữ trạng thái cũ, gửi status sai vẫn400. Guard role/target/center hiện có giữ nguyên.
+
+PUT `/api/roles/{id}/permissions` giữ gate MANAGE_PERMISSIONS hiện hành; permissionIds phải là mảng ID dương tồn tại đầy đủ. Null/phần tử null/ID sai trả400; trường hợp service xác định ID sai dùng `INVALID_PERMISSION_IDS`, không thay một phần quyền. ID lặp được gộp, `[]` vẫn là thay bằng tập rỗng theo nghĩa API cũ. Thay toàn bộ tập dưới khóa role, audit actor và tập trước/sau cùng transaction. Không suy từ đó rằng guard quản trị viên cuối cùng hoặc policy đọc full matrix đã được chốt; GET lookup roles/permissions chưa đổi.
+
+POST/PUT/PATCH room cấu hình yêu cầu Admin/CenterManager+MANAGE_CLASSES, Active và scope center hiện hành. Request/response thêm `activityType`: TENNIS, FOOTBALL, ARCHERY, BASKETBALL, VOLLEYBALL, PICKLEBALL, BADMINTON, TABLE_TENNIS hoặc SWIMMING. Đây là loại tài nguyên phục vụ môn, độc lập tên/roomCode và `facilityType` Indoor/Outdoor. Không thêm `subjectId`, không suy môn từ mã/tên. PUT bỏ/null giữ loại cũ; chưa cấu hình trả activityType:null và khi xếp lịch mới trả400 `ROOM_ACTIVITY_UNCONFIGURED`. Giá trị không hỗ trợ400 `INVALID_ROOM_ACTIVITY`; sai môn400 `ROOM_SUBJECT_MISMATCH`. Áp dụng book/create/generate/preview/check-conflict/available-slots có subject+room, reschedule và substitute; admission chỉ tính sân đúng môn và giữ điều kiện Indoor/Outdoor hiện hành. Quy tắc giờ Outdoor D04 không đổi.
+
+Đổi activityType/capacity/facilityType khi còn buổi Scheduled từ hôm nay bị400 `ROOM_HAS_SCHEDULE`; đổi trạng thái unavailable giữ guard lịch cũ. Cấu hình room và ghi lịch cùng khóa center rồi room/record cần thiết, tránh race làm lịch dùng sân sai môn. Đổi tên/mã không đổi loại sân. Nâng cấp dữ liệu20sân dùng snapshot đã duyệt theo [docs02](02-DEPLOYMENT-GUIDE.md#phase1-migrations-20261109), không lấy ID fixture hoặc cấu hình suy từ màn hình.
+
+Mapping dữ liệu để FE đối chiếu môn/tài nguyên, không dùng tên/mã hiển thị thay mapping này; BE luôn kiểm lại khi ghi:
+
+| activityType | Subject.slug |
+|---|---|
+| TENNIS | quan-vot-tennis |
+| FOOTBALL | bong-da |
+| ARCHERY | ban-cung |
+| BASKETBALL | bong-ro |
+| VOLLEYBALL | bong-chuyen |
+| PICKLEBALL | pickleball |
+| BADMINTON | cau-long |
+| TABLE_TENNIS | bong-ban |
+| SWIMMING | boi-loi |
+
 <a id="states"></a>
 ## 3. Field và state cần phân biệt
 
@@ -213,11 +244,25 @@ Sĩ số tối đa là `maxCapacity` của lớp và phải vừa phòng, đồn
 
 Tách bước: POST `/api/classes` tạo Normal Closed →POST `/api/sessions/preview-recurring` →POST `/api/sessions/generate` đủ12 →PUT Class Open. Không publish/enroll chỉ dựa ngày client; generate lại có SCHEDULE_ALREADY_EXISTS.
 
-POST `/api/classes/{classId}/enroll` body paymentMethod, staff thêm memberId đúng quyền →201 EnrollmentResponse. Pending có invoiceId/invoiceCode/paymentStatus/amount/paymentUrl/expiresAt; Paid mới Registered. Lớp đầy có thể Waitlisted; maxCapacity≤15, Registered+Pending giữ chỗ. CLASS_CAPACITY_EXCEEDED dùng khi giảm capacity dưới chỗ đang giữ, không mặc định lỗi mọi enrollment đầy.
+POST `/api/classes/{classId}/enroll` và POST `/api/enrollments` body paymentMethod, staff thêm memberId đúng quyền →201 EnrollmentResponse. Bỏ/null paymentMethod mặc định VNPay. Pending có invoiceId/invoiceCode/paymentStatus/amount/paymentUrl/expiresAt; Paid mới Registered. Lớp đầy có thể Waitlisted; maxCapacity≤15, Registered+Pending còn hạn giữ chỗ. CLASS_CAPACITY_EXCEEDED dùng khi giảm capacity dưới chỗ đang giữ, không mặc định lỗi mọi enrollment đầy.
 
-**Normal độc lập với gói hội viên:** Member Active có thể đăng ký Normal dù subscriptions trả `[]`; không yêu cầu gói chung hoặc Advanced. Khi có chỗ tạo Pending và hóa đơn học phí của lớp; khi đầy vào Waitlisted, xét lên chỗ trống không kiểm gói chung và vẫn chờ Paid trước Registered. Các điều kiện tài khoản, owner/center, lớp/lịch, sĩ số và trùng lịch vẫn áp dụng.
+**Normal Cash tại quầy:** chỉ Receptionist Active có cả REGISTER_MEMBER và MANAGE_INVOICES, cùng center, gửi memberId+paymentMethod:Cash qua hai tuyến trên. Cùng transaction tạo Invoice/Paid/Registered; response có status:Registered và paymentStatus:Paid. Member hoặc Manager chọn Cash bị403; không tạo đơn giữ Cash online. Không thu Cash cho Waitlisted (`NORMAL_CASH_NO_SEAT`). Gửi lại khi đã Registered trả ALREADY_ENROLLED, không nhân hóa đơn; không gọi confirm-cash lần nữa sau checkout nguyên khối. Advanced giữ flow Cash hiện hành.
 
-**Giá Normal:** POST `/api/classes/{classId}/enroll` và POST `/api/enrollments` trả400 `INVALID_PRICE` khi học phí lớp thiếu hoặc≤0; không tạo enrollment/hóa đơn, kể cả nhánh Waitlisted. Xét thăng danh sách chờ cũng kiểm học phí trước khi đổi trạng thái/tạo đơn: giá không hợp lệ thì giữ Waitlisted, không cấp Registered. Giá hợp lệ →Pending; Paid hợp lệ mới Registered. Chứng từ Paid/amount và ghi danh lịch sử không bị tự sửa theo giá hiện tại.
+**Normal độc lập với gói hội viên:** Member Active có thể đăng ký Normal dù subscriptions trả `[]`; không yêu cầu gói chung hoặc Advanced. Khi có chỗ tạo Pending VNPay và hóa đơn học phí của lớp; khi đầy vào Waitlisted. Xét chỗ trống chỉ mời đăng ký, giữ Waitlisted và không tạo hóa đơn/quyền; Member tới lượt gửi lại enroll VNPay hoặc được thu tại quầy. Chưa tới lượt trả WAITLIST_NOT_READY. Các điều kiện tài khoản, owner/center, lớp/lịch, sĩ số và trùng lịch vẫn áp dụng. Chuỗi mời lại tự động khi expire và phối hợp chuyển/hủy/Refund còn theo checkpoint Phase1, không coi lời mời là đã giữ chỗ.
+
+**Giá Normal:** POST `/api/classes/{classId}/enroll` và POST `/api/enrollments` trả400 `INVALID_PRICE` khi học phí lớp thiếu hoặc≤0; không tạo enrollment/hóa đơn, kể cả nhánh Waitlisted. Xét danh sách chờ cũng kiểm học phí: giá không hợp lệ giữ Waitlisted, không cấp Registered. VNPay có chỗ →Pending; Paid hợp lệ mới Registered. Chứng từ Paid/amount và ghi danh lịch sử không bị tự sửa theo giá hiện tại.
+
+**Lifecycle/admission bổ sung10/11:** `sportsClass.minCapacity` tùy chọn khi tạo; mặc định ceil(2×maxCapacity/3), chỉ tăng tới maxCapacity. Draft chưa công bố/chưa từng có đăng ký hoặc hóa đơn có thể chỉnh trong giới hạn; sau đó gửi giá trị khác trả NORMAL_MIN_CAPACITY_LOCKED. SportsClassResponse thêm minCapacity/openingConfirmedAt/openingConfirmedBy/postponementCount/lifecycleVersion/pricingDraft/changePending. Closed+pricingDraft=true là draft, không phải khóa đã hoàn tất.
+
+Đăng ký chỉ khi Open đã công bố, đủ12buổi tương lai, **trước** giờ buổi đầu đã lưu trừ48h; đúng cutoff trả NORMAL_REGISTRATION_CLOSED. TTL VNPay là min(thời hạn cấu hình,cutoff); Pending hết hạn được giải phóng khi job hoặc transaction admission tiếp theo xử lý. Callback hợp lệ đến muộn vẫn Paid+reconciliationRequired, không hồi sinh chỗ. Chưa xử lý khoản đã nhận cần đối soát thì không tạo thêm đơn cùng lớp (`PAYMENT_RECONCILIATION_REQUIRED`). Return không ghi Paid.
+
+POST `/api/classes/{id}/confirm-opening` chỉ CenterManager Active+MANAGE_CLASSES cùng center; body tùy chọn `{ "reason": "..." }`. Trước T−24h có thể bỏ reason; từ đúng T−24h tới trước T phải có reason1–2000ký tự, đủ sĩ số Paid+Registered và Coach/phòng/lịch hợp lệ. Chưa đủ trả NORMAL_INSUFFICIENT_PAID; đã tới T trả NORMAL_OPENING_TOO_LATE. Thành công200 SportsClassResponse lưu người/thời điểm; retry không nhân quyết định. Xác nhận không mở lại đăng ký. Job recheck rồi chuyển Ongoing khi đến T; chưa xác nhận hoặc điều kiện sai thì cảnh báo, không tự khai giảng/hủy. Finalizer đóng Closed sau12buổi hợp lệ đã chốt, giữ cửa correction D15. PUT không tự gán Open/Ongoing/Closed/Cancelled ngoài công bố draft; type bất biến, ngày Class theo lịch đã lưu (`NORMAL_LIFECYCLE_ACTION_REQUIRED`, `CLASS_TYPE_IMMUTABLE`, `NORMAL_SCHEDULE_ACTION_REQUIRED`).
+
+**Chưa có API mới cho dời khai giảng/chuyển/hủy trước khai giảng/Refund Normal đầy đủ.** Không dùng generic PUT, đổi Session hoặc PaymentResolution cũ để thay các hành động này. Sáu bảng dự kiến trong SYSTEM-DATA không là DTO/API. Trạng thái và bước triển khai còn lại tại [checkpoint Phase1](03-TODO.md#normal-phase1-foundation-20261110).
+
+**RP-13 — giá lúc tạo/công bố, Phase1 09/11:** POST `/api/classes`, POST `/api/classes/normal-with-sessions` và PUT Class yêu cầu Admin/CenterManager+MANAGE_CLASSES, Active và center hợp lệ. Normal nhận tuitionFee tùy chọn: bỏ/null lúc tạo lấy Subject.normalPrice; gửi giá công bố dương, biểu diễn được NUMERIC(12,2), ví dụ950000 thì Class và đơn Normal mới dùng950000. Không nhận giá bán từ amount do Member gửi. Tạo Normal riêng luôn Closed; đủ12buổi hợp lệ mới công bố Open. Draft mới chưa từng công bố/chưa có enrollment hoặc invoice có thể chọn giá lúc PUT công bố lần đầu; bỏ giá khi PUT giữ giá đã chọn. Subject đổi giá không tự đổi Class đã tạo, đơn Pending/Paid hay purchaseAmount cũ. Advanced vẫn lấy Subject.advancedPrice khi order.
+
+Lớp legacy không có chứng cứ chưa công bố và lớp đã công bố/có đơn không được tự mở quyền định giá lại. PUT Normal gửi giá khác trong nhóm này trả409 `CLASS_REPRICING_NOT_APPROVED`, giữ giá/lịch/chứng từ và không audit thành công. Metadata cùng giá hoặc bỏ giá tiếp tục theo guard hiện hành. Điều kiện đổi giá sau công bố/đã có Pending/người học chờ Owner review riêng. Gửi lại enroll hiện có giữ400 `ALREADY_ENROLLED`, không tạo đơn mới; khác với retry requestId của tạo lớp nguyên khối.
 
 GET `/api/sessions/catalog/{classId}` là lịch Normal trước mua cho người có phiên, không lộ private Member/subscription. Lịch cá nhân qua `/api/sessions` bị ép owner/Coach/center theo phiên. Normal chỉ bù do TT theo mục9; không hủy/notice cá nhân.
 
@@ -291,6 +336,47 @@ Member đọc toàn bộ content của kết quả thuộc mình. GET `/api/trai
 
 **Member đọc giáo án lớp:** GET `/api/training-plans` và `/{id}` giữ đọc plan gán trực tiếp đúng Member, đồng thời đọc plan chung của đúng lớp Normal có enrollment Registered và invoice Paid hợp lệ (không đối soát/không đảo xác nhận Cash), cùng center. Plan lớp không cần memberId; lọc bằng quan hệ Member→enrollment→Class, không nhân bản nội dung cho mỗi người. List chỉ trả phạm vi hợp lệ; ID plan lớp/Member khác hoặc thiếu quyền lớp403; filter memberId khác403. Pending/Waitlisted/Cancelled hoặc invoice đang đối soát không cấp quyền đọc chung. Plan riêng của Member giữ rule lịch sử hiện có, không tự áp rule lớp để xóa quyền đọc riêng. Các ca hủy/đảo quyền/lịch sử ngoài phạm vi này vẫn cần đối chiếu, không cam kết mọi trường hợp.
 
+<a id="normal-changes-20261110"></a>
+## Normal dời/chuyển/hủy trước khai giảng
+
+Manager Active+MANAGE_CLASSES, cùng center; dùng version hiện tại, không gán status qua PUT. Thành công200; [bàn giao riêng](../SCMS-BAN-GIAO-FE-NORMAL-LIFECYCLE-2026-11-10.md).
+
+| Method/path | Input và xử lý |
+|---|---|
+| GET `/api/classes/{id}/normal-proposals` | Manager xem lựa chọn; Member chỉ proposal có Invoice của mình và phản hồi chính mình. schedule là snapshot cụ thể, không tính lại theo lịch mới |
+| POST cùng path | kind:Postpone/shiftDays/version/reason hoặc kind:Transfer/targetClassId/version/reason. Postpone do thiếu sĩ số, tối đa1lần; Transfer cùng môn/giá/center. Trả id/version/fingerprint/schedule/choices; preview không giữ chỗ |
+| POST `/api/normal-proposals/{id}/respond` — Member | version/fingerprint/choice:Accept hoặc Refund. Accept Transfer khóa/recheck và commit quyền ngay; Refund mở nghĩa vụ và rút quyền cũ. Accept Postpone là consent chờ apply. Retry cùng lựa chọn không nhân quyền; đổi lựa chọn đã ghi409 |
+| POST `/api/normal-proposals/{id}/apply` — Manager | version; mọi Member phải phản hồi. Postpone recheck rồi áp lịch/cutoff, đặt lại confirmation; không tự khai giảng. Transfer đã chuyển từng Member; lớp gốc còn chặn nhận mới/chạy cho tới khi Manager xử lý hủy |
+| POST `/api/classes/{id}/cancel-before-opening` — Manager | version/reason, chỉ Normal Open trước buổi đầu. Hủy Pending/waitlist/lịch, tạo Refund từng khoản Paid đủ điều kiện; Ongoing bị chặn |
+
+changePending=true chặn admission/confirm/job start. Im lặng không là đồng ý; nhắc Member theo ngày VN có dedupe. Waitlist hết hạn mời/order từ hàng chờ quay cuối hàng, job mời tiếp, không autoCash; TTL mời cùng payment.expire-minutes, chưa là quyền học.
+
+Sau chuyển, Invoice.classId/className/amount giữ lớp mua gốc; entitlementClassId chỉ lớp nhận quyền hiện tại (bằng classId khi chưa chuyển). Enrollment cũ Cancelled có link/lý do, đích Registered; lịch/attendance/plan/result/report nhận quyền đích và giữ lịch sử. Không thanh toán lần nữa. NORMAL_CHANGE_PENDING/NORMAL_PRESTART_REQUIRED/NORMAL_POSTPONEMENT_LIMIT/NORMAL_PROPOSAL_STALE/MEMBER_RESPONSES_PENDING/NORMAL_CHOICE_ALREADY_RECORDED/NORMAL_TRANSFER_INCOMPATIBLE/NORMAL_RECEIPT_NOT_ELIGIBLE/CLASS_FULL/REFUND_ALREADY_EXISTS trả400/409 theo response;409 tải lại version/lịch/chỗ. Lịch đề xuất đã đổi chặn Accept cũ nhưng không tước lựa chọn Refund của Member.
+
+<a id="normal-refunds-20261110"></a>
+## Refund Normal trước khai giảng — ngân hàng thủ công
+
+[Bàn giao FE riêng](../SCMS-BAN-GIAO-FE-NORMAL-REFUND-2026-11-10.md). Nguồn hồ sơ CenterCancellation/MemberChoice/LateReceipt sau TT hủy; Pending chưa thu không phát sinh chuyển hoàn. Không áp Member tự hủy lớp đang vận hành hoặc sau Ongoing. Paid/amount gốc giữ nguyên, không có lệnh chuyển ngân hàng tự động. Thành công200.
+
+| Method/path trong `/api/normal-refunds` | Actor/input/kết quả |
+|---|---|
+| GET collection hoặc `/{id}` | Member chủ; Manager tài chính cùng center; Receptionist tài chính chỉ việc Approved trở đi. View có amount/status/version/receiverId/receiverVerified/dueAt/firstDueAt/overdue/issueNote/attempts; Member nhận accountNumber che phần đầu, contactPhone chỉ staff đúng quyền để FE tùy dùng |
+| POST `/{id}/receiver` | Member: bank/accountNumber/accountName/version. Tạo phiên bản mới và hủy duyệt cũ; cấm khi claim chưa đối soát hoặc Completed |
+| POST `/{id}/verify-receiver` | Manager+MANAGE_INVOICES: version/source xác minh Member/người nhận; chưa duyệt chuyển |
+| POST `/{id}/approve` | Manager: version; receiver đã xác minh, amount từ Invoice. Approved và SLA7ngày TT mở tính ngày mở tiếp theo; giữ firstDueAt cũ |
+| POST `/{id}/request-information` | Manager: version/note; yêu cầu sửa thông tin, giữ nghĩa vụ/lịch sử |
+| POST `/{id}/claim` | Receptionist+MANAGE_INVOICES: version/requestId UUID. Một attempt với amount/receiver đã duyệt; retry key cũ trả attempt cũ. Không tự hết claim rồi chuyển lại khi bank chưa rõ |
+| POST `/{id}/attempts/{attempt}/submit` | Receptionist đã claim: reference/amount/currency:VND/performedAt, đúng amount/from claim tới now; reference duy nhất, metadata đã nộp không ghi đè. Attempt Submitted/hồ sơ AwaitingVerification |
+| POST `/{id}/attempts/{attempt}/documents` | Receptionist đã claim: multipart file PNG/JPEG/PDF đúng MIME/signature, tối đa1MiB theo multipart HTTP mặc định hiện hành; append-only, retry cùng bytes giữ ID; chưa Completed |
+| GET `/{id}/documents/{document}` | Manager/Receptionist tài chính cùng center; attachment bytes/no-store/private/nosniff, Member/Coach/Admin403. Không public URL/avatar |
+| POST `/{id}/attempts/{attempt}/verify` | Manager: version/outcome:Success,Pending,Failed,Reversed/bankSource/note. Success cần proof và reference/amount/receiverId/performedAt khớp nguồn bank độc lập mới Completed. Pending giữ NeedsReview, Failed/Reversed giữ lịch sử và phải duyệt lại trước attempt khác |
+| GET `/{id}/history` | Chỉ Manager tài chính cùng center; các receiver/nguồn xác minh và từng lần đối soát cũ |
+| POST `/{id}/issues` | Member chủ hoặc staff đúng quyền: version/note; tiếp nhận khiếu nại cả Completed, không tự chuyển lần nữa |
+
+State: AwaitingReceiver→AwaitingApproval→Approved→Processing→AwaitingVerification→Completed; NeedsReview khi bank chưa rõ. Approved/upload không là đã hoàn. Version sai409 REFUND_VERSION_STALE; claim/receiver xung đột409; amount/receiver/proof/time chưa đúng400; role/owner/center403. Tài chính yêu cầu role AND MANAGE_INVOICES; Member chỉ các action nêu trên.
+
+Báo cáo trừ Refund Completed theo performedAt, giữ kỳ thu Invoice riêng; Pending/Approved/NeedsReview/CashCorrection không bị trừ như hoàn. approve/complete cũ bị USE_NORMAL_REFUND_WORKFLOW với hồ sơ mới; D10 tiền đến muộn chưa cấp quyền và D16 Advanced CashCorrection giữ phạm vi. State/data/source đối soát giữ lịch sử, nhắc thiếu thông tin/quá hạn không tự xóa nghĩa vụ. Trạng thái kiểm/deploy ở docs00/QA.
+
 <a id="resolutions"></a>
 ## 13. Refund/CashCorrection — D10/D16
 
@@ -340,6 +426,15 @@ GET `/api/reports/dashboard`, `/members`, `/revenue?startDate=YYYY-MM-DD&endDate
 FE tự quyết layout/chỉ số chính. Dữ liệu legacy thiếu provenance tách reconciliation; người có nhiều đăng ký chỉ đếm1ở chỉ số người.
 
 Dashboard không nhận khoảng ngày và lấy toàn kỳ; revenue áp dụng khoảng ngày đã gửi. Query hiện lọc theo center của actor, kể cả Admin: Admin center NULL trả dữ liệu rỗng, không tự tổng hợp toàn hệ thống. Chức năng chọn center/tổng hợp cho Admin chưa thuộc contract này; không gán Admin center1 để chữa số liệu0.
+
+<a id="audit-scope-20261109"></a>
+### RP-43 — nhật ký hoạt động, Phase1 09/11
+
+GET `/api/audit-logs` yêu cầu Admin/CenterManager AND VIEW_AUDIT_LOG, tài khoản Active. Admin đọc loại SYSTEM_SECURITY; Manager đọc BUSINESS trong center của mình. Coach/Member/Receptionist có thêm authority vẫn403. Filter chỉ thu hẹp scope: startDate/endDate bao gồm trọn ngày Asia/Ho_Chi_Minh, action/targetEntity khớp chính xác, actorId là người ghi sự kiện. Không có tham số cho client chọn center hay mở loại log khác.
+
+Response200 vẫn là **mảng**, mới nhất trước theo createdAt rồi id giảm dần; `page` từ0 mặc định0, `size`1–100 mặc định50. Header `X-Total-Count`, `X-Page`, `X-Page-Size` sau scope/filter, đã expose qua CORS. Không đọc như Page.content và không mặc định một trang là toàn bộ dữ liệu. Filter/range/page sai400 `INVALID_AUDIT_FILTER` hoặc400 binding của framework.
+
+Giữ id/userId/action/targetEntity/targetId/detail/createdAt; thêm category/centerId/scopeSource chỉ đọc. Sự kiện mới xác định center từ target tin cậy ngay trong transaction, lưu snapshot `TARGET_AT_EVENT`; cấu hình toàn cục dùng `GLOBAL_CONFIGURATION_AT_EVENT`. Không dùng center hiện tại của actor để gán lịch sử. Log legacy hoặc target không đủ nguồn được giữ DB với provenance chưa rõ và **không trả qua API scope này**; đây là giới hạn dữ liệu, không phải đã xóa hoặc đã xác minh phạm vi cũ. Bulk generate mới trỏ target CLASS/id của lớp; xóa session chụp provenance trước xóa. Report/dashboard theo D13/D18 ở trên, không đổi Admin-null thành report toàn hệ thống.
 
 ## 15. Notification, chat và nhóm bổ trợ
 

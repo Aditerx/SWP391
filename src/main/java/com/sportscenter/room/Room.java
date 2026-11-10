@@ -41,6 +41,10 @@ public class Room {
     @Column(name = "facility_type", length = 20)
     private String facilityType = "Indoor";
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "activity_type", length = 24)
+    private RoomActivity activityType;
+
     @Column(name = "center_id", nullable = false)
     private Integer centerId = 1;
 

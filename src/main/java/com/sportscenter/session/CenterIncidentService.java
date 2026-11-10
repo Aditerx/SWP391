@@ -141,6 +141,7 @@ public class CenterIncidentService {
             }
         }else{
             // Re-open the same obligation; the linked makeup later replaces this invalid session.
+            if("Closed".equals(s.getSportsClass().getStatus()) && !s.getSportsClass().isPricingDraft())s.getSportsClass().setStatus("Ongoing");
             enrollments.findByClassIdWithDetails(s.getSportsClass().getId()).stream().filter(e->i.getAffectedMembers().contains(e.getMember().getId())&&"Completed".equals(e.getStatus()))
                     .forEach(e->e.setStatus("Registered"));
         }

@@ -1,24 +1,484 @@
 # SCMS — Checklist xác minh Access Denied / RBAC
 
-Mở04/11/2026; cập nhật07/11/2026. Nguồn: [bản audit](../SCMS_ACCESS_DENIED_RBAC_AUDIT.md) và phản ánh Owner. Làm lần lượt **0 → 0.1 → BE-01 → BE-07**; không mặc định nội dung audit là lỗi. Khi còn mơ hồ hoặc cần quyết định nghiệp vụ mới, hỏi Owner trước khi sửa. Kết quả chuẩn tại [Active](00-MASTER-CHECKLIST.md#active)/QA.
+Mở04/11/2026; cập nhật09/11/2026. Nguồn: [bản audit](../SCMS_ACCESS_DENIED_RBAC_AUDIT.md) và phản ánh Owner. Làm lần lượt **0 → 0.1 → BE-01 → BE-07**; không mặc định nội dung audit là lỗi. Khi còn mơ hồ hoặc cần quyết định nghiệp vụ mới, hỏi Owner trước khi sửa. Kết quả chuẩn tại [Active](00-MASTER-CHECKLIST.md#active)/QA.
 
 ## Checklist
+
+<a id="schema-session-handoff-20261110"></a>
+### Bàn giao session10/11 — tiếp tục hoàn thiện schema và bộ demo
+
+**Điểm nối:** phần thiết kế đã được Owner duyệt; không hỏi lại3–5. Source/schema/fixture chưa đồng bộ tới thiết kế mới. GET RBAC chỉ Admin đã sửa và kiểm local; Phase1 R3/status/permission/audit/giá/sân và attendance đã có phần kiểm local trước đó, không phải toàn bộ tính năng mới đều đã triển khai. Bằng chứng chuẩn tại [Active](00-MASTER-CHECKLIST.md#active)/QA; các bản bàn giao cũ giữ đúng ngày.
+
+**Checkpoint hiện hành:** đọc [hoàn thiện Phase1/tích hợp main](#normal-phase1-complete-20261110). Snapshot triển khai đầu ở [foundation](#normal-phase1-foundation-20261110). Chuyển lớp/Refund/bộ demo đã được bổ sung ở nhóm sau; các đoạn “chưa triển khai/chưa hoàn thành” bên dưới mô tả lúc bàn giao cũ, không thay Active/QA hiện hành.
+
+| Nguồn cần tiếp tục | Hiện trạng / cách dùng |
+|---|---|
+| [Normal Lifecycle](../SCMS_BE_Normal_Lifecycle_DA_CHOT.md), [Refund Normal](../SCMS_BE_Refund_Normal_DA_CHOT.md), Dxx trong docs04 | Yêu cầu đã chốt, gồm ngoại lệ xác nhận khai giảng muộn, chuyển lớp tương thích, contact tùyFE và7ngày TT mở. Đối chiếu source trước sửa, không tự nới quyền hoặc đổi Advanced |
+| [SYSTEM-DATA](../SYSTEM-DATA.md), [build-system-data.py](../scripts/build-system-data.py) | DATA DESIGN:47account giữ33PDF,9môn/20room/21Class; N05→N11 Pickleball. Các dòng/field/key/state là thiết kế, có phần động/asset chưa tạo, không phải dump hoặc script seed hoàn chỉnh. Generator hiện dùng anchor cố định10/11, phải đổi sang anchor được truyền/kiểm khi thực thi fixture |
+| [database/schema_postgres.sql](../database/schema_postgres.sql), [build-demo-schema.py](../scripts/build-demo-schema.py) | Bản đã kiểm trước đó chỉ có33account/9template Advanced; chưa có đầy đủ Normal/Refund/fixture47account. Không chạy bản này ngay trên Supabase. Chỉ trích guard runtime từ16, không chạy lại cleanup16 |
+| [Schema root](../schema_postgres.sql), [database README](../database/README.md) | Root là biến thể bảo toàn baseline cũ, không phải file đích dựng lại mới. README có đoạn mô tả reset tham chiếu cũ; cập nhật khi chốt bản mới, không lấy tên file/marker làm bằng chứng đã đồng bộ |
+| [Migrations18](../database/migrations/18_audit_scope_postgres.sql)/[19](../database/migrations/19_room_activity_postgres.sql)/[20](../database/migrations/20_class_publication_price_postgres.sql) | Owner từng chạy18 thành công,19 rollback vì ca164,20 chưa chạy. Audit/đọc lại không thay việc kiểm baseline khi deploy. Owner đã chuyển sang dựng lại demo, không tiếp tục vá ca164 hoặc yêu cầu consent ca demo cũ |
+| docs01/docs02/OpenAPI | Contract hiện công bố khác với DTO/enum mới đang thiết kế. Chỉ cập nhật API đã implement/kiểm; không biến SYSTEM-DATA thành contract. Một canonical OpenAPI, không tạo bản Markdown trùng |
+
+**Điều đã chốt mang sang:** giữ toàn bộ33account PDF và mật khẩu demo đã duyệt, chỉ bổ sung14account riêng;47account/21Class; N11 Pickleball làm đích N05 cùng1.800.000đ/center1, không tăng lớp. Normal12buổi, min=ceil(2*max/3), chỉ được tăng trong giới hạn khi tạo, khóa khi có đăng ký kể cảPending; chốt đăng ký48h, hạn chuẩn xác nhận khai giảng24h, Manager được xác nhận trễ trước T có reason/đủ điều kiện, không mở lại đăng ký. Ongoing không hủy thường; ưu tiên dời/thay/bù thật. Cash Normal thu tại quầy nguyên khối, không Member Cash online hoặc thăng waitlist tự tạo Cash. Chuyển cùng môn/giá/center và đủ lịch/chỗ/consent, recheck dưới khóa, giữ invoice/link chuyển quyền. Refund100% đúng phạm vi trước khai giảng: Manager duyệt→Receptionist chuyển ngoàiSCMS/nộpchứngtừ→Manager đối soát mớiCompleted. Contact từ hồ sơ Member đúng quyền, FE quyết định dùng/hiển thị; không nằm trong chứng từ hoặc thay xác minh.7ngày làm việc theo ngày TT mở, kể cảT7/CN trừHoliday, không dùng lịch nghỉCoach; ngày mở tiếp theo làngày1. Giữ D15 end/cutoff, D16 CashCorrection hẹp, D12 Advanced45ngày sử dụng và các toggle default tắt.
+
+**Các điểm dễ làm sai cần kiểm chủ động:** Class Closed draft khác Closed kết thúc; nhánh makeup hiện kiểm Class Completed sai mô hình. Finalizer/lifecycle tại end vẫn cho correction Coach tới trước00:00, không để Class/EnrollmentCompleted vô tình chặn đọc/sửa hợp lệ. Chuyển quyền giữ invoice lớp gốc thì các query attendance/plan/result/report/eligibility phải nhận liên kết chuyển, không sửa Invoice.class/amount cho tiện. Schema53mục trong SYSTEM-DATA gồm47bảng hiện hành và6tênbảng dự kiến kỹ thuật, chưa chứng minh phải tạo đúng6bảng nếu có thể tái dùng mô hình tốt hơn. Chứng từ phải private; MediaService avatar/publicURL không tự đáp ứng PDF tài chính. Pending/QR/OTP cần tạo đúng thời điểm demo, không kéoTTL/giảcheck-in/đổiClockRender để giữ fixture sống.
+
+**Giữ phạm vi thao tác:** session này chưa commit/push/deploy/reset/seed cloud. Tiếp tục trên working tree hiện có, giữ cả untracked/tài liệu/script/BE/test đã có. Có quyền chuẩn bị/kiểm local bundle demo, không tự suy thành được chạy Supabase/Render, chuyển khoản thật, gửi email/provider hoặc live tests. Backup/dump/credential riêng tư không đưa Git/báo cáo. Không reset DB ngoài DB local mới do runner tạo; không chạy lại SQL16. Nếu cần dữ liệu cloud mới thì chỉ đọc đúng câu hỏi/phạm vi, không nạp.env vào tests. A/B cùngcenter, giữ test/guard center đã có, không mở lượt rà center khác.
+
+**Prompt copy sang session mới** (phần tiếp theo trong tài liệu là checklist thực thi):
+
+```text
+Tiếp tục tại D:\Projects\SWP391 theo checkpoint:
+docs/03-TODO.md#schema-session-handoff-20261110.
+
+Mục tiêu: làm Phase1 tại docs/03-TODO.md#remaining-two-phases-20261110,
+hoàn thiện BE/schema/bộ demo Normal Lifecycle và Normal Refund đã được duyệt.
+Không chỉ thêm bảng hoặc sinh lại SYSTEM-DATA rồi báo đã hoàn tất schema.
+
+Trước sửa:
+- Đọc AGENTS.md, phần đầu Active của docs/00-MASTER-CHECKLIST.md,
+  bảng quyết định và đúng Dxx trong docs/04-DEBUG-NOTE.md, database/README.md.
+- Đọc SCMS_BE_Normal_Lifecycle_DA_CHOT.md và SCMS_BE_Refund_Normal_DA_CHOT.md
+  đã cập nhật10/11, checkpoint này, SYSTEM-DATA.md và script sinh dữ liệu/schema.
+- Kiểm git status/diff và source/test thực tế. Giữ toàn bộ thay đổi hiện có,
+  cả untracked. QA chỉ mở đúng nhóm liên quan, không nạp log/history hàng loạt.
+
+Đã chốt, không hỏi lại:
+- Giữ33account System Account.pdf, bổ sung riêng thành47account;21Class.
+  N11 Pickleball là đích N05, cùng1.800.000đ/center1.
+- Normal12buổi; minCapacity=ceil(2*max/3), chỉ tăng trong giới hạn lúc tạo,
+  khóa khi có đăng ký kể cả Pending; chốt đăng ký48h.
+- Manager xác nhận khai giảng chuẩn24h; được xác nhận trễ trước buổi đầu
+  nếu có reason và đủ điều kiện. Không tự khai giảng/hủy hoặc mở lại đăng ký.
+- Cash Normal do Receptionist đăng ký và thu ngay; waitlist không tự tạo Cash online.
+- Chuyển cùng môn/giá/center, đủ lịch/chỗ/consent; khóa và kiểm lại khi xác nhận,
+  giữ Invoice gốc và link chuyển quyền; không phù hợp thì phương án hợp lệ/Refund.
+- Refund Normal trước khai giảng: chủ động có nghĩa vụ khi TT hủy;
+  Manager duyệt → Receptionist chuyển ngoài SCMS/nộp chứng từ → Manager xác minh
+  → Completed. Giữ Paid/amount gốc, không hoàn trùng, không mở hoàn sau khai giảng.
+- BE chuẩn bị phone liên hệ từ hồ sơ đúng quyền, FE quyết định dùng/hiển thị;
+  không đưa phone vào chứng từ/log chung, không thay bằng chứng ngân hàng.
+- 7ngày làm việc là ngày TT mở kể cả T7/CN trừ Holiday;
+  ngày mở tiếp theo là ngày1. Không áp T2–T6 hoặc đổi thành7ngày lịch.
+- Giữ Advanced/D15/D16 và toggle default tắt. GET roles/permissions/role detail
+  chỉ Admin đã kiểm local, không mở lại vì snapshot cũ.
+
+Thực hiện:
+1. Đối chiếu nguồn; lập mapping bảng/field/state/action/transaction/job với code,
+   ưu tiên tái sử dụng. SYSTEM-DATA là DATA DESIGN, chưa phải seed/API hoàn chỉnh.
+2. Làm theo P1.1→P1.6. Hoàn tất từng nhóm có kiểm và checkpoint rõ;
+   không nhận toàn bộ schema đã xong khi mới có DDL hoặc data mẫu.
+3. Schema dựng lại đích là database/schema_postgres.sql qua generator phù hợp;
+   schema root là baseline bảo toàn cũ. Bản reset hiện tại mới có33account/9template,
+   không được dùng để reset cloud. Không chạy lại cleanup SQL16.
+4. Hoàn thiện fixture động và private DEMO assets, anchor được truyền theo Clock VN,
+   FK/tiền/quyền học/lịch/RBAC. Xuất lại SYSTEM-DATA từ cùng nguồn đã kiểm.
+5. Test local cô lập, không.env/cloud: test đích rồi clean test cho mỗi nhóm BE;
+   PostgreSQL mới riêng cho SQL/lock/race/replay/commit. Không hai Maven clean cùng target.
+6. Cập nhật docs đúng vai; chỉ sinh OpenAPI sau implementation đã kiểm.
+   FE quyết định UI, không sửa LAN-2 ngày07/11 bằng thay đổi mới.
+
+Không tự seed/reset Supabase, deploy Render, chuyển tiền hoặc gọi provider thật.
+Không gộp R1/R2, validation tên/khu vực sân, policy quản trị/đổi giá sau công bố,
+AI/QueryDR/Google/avatar vào Phase1 này. Giữ test/guard center đã có,
+không mở lượt rà center khác. Nghiệp vụ mới cần nêu ví dụ cụ thể và hỏi trước sửa;
+không hỏi lại các mục đã duyệt. Xưng Tôi–Bạn.
+
+Cuối session: cập nhật Active/TODO/QA, báo phần BE/schema/fixture đã kiểm,
+phần còn thiếu và bước tiếp. Không gọi DATA DESIGN/local PASS là Supabase,
+FE/Render/CRUD/live đã nghiệm thu. Giữ diff hiện có cho session sau.
+```
+
+<a id="remaining-two-phases-20261110"></a>
+### Toàn bộ việc còn lại — kế hoạch hai phase hiện hành10/11
+
+Kế hoạch này thay **thứ tự điều phối** của hai phase09/11 bên dưới, giữ kết quả/lịch sử và các điểm còn phải duyệt. Chỉ công việc có căn cứ/đã duyệt mới triển khai; một hàng “review” không tự mở quyền sửa policy. Không bắt chạy lại phần đã đạt chỉ để đủ số lượng.
+
+#### Phase1 — Hoàn thiện BE, schema và bộ demo đã duyệt; nghiệm thu local
+
+| Mã / thứ tự | Việc còn làm | Đầu ra và điều kiện hoàn thành |
+|---|---|---|
+| P1.1 | Đối chiếu thiết kế, source, ORM, schema và data; chốt mapping kỹ thuật/migration/compatibility/lock order | Tái dùng phần đúng, tách state Class/draft/Session/Enrollment/Invoice/Refund.6tên bảng/field trong SYSTEM-DATA là thiết kế, không phải API đã có |
+| P1.2 | Normal lifecycle:12buổi/Open, minCapacity,48h/24h và xác nhận trễ, start/close, dời khai giảng1lần, lựa chọn/chuyển lớp, hủy trước khai giảng | Guard mọi alias/job/callback; không hủy Ongoing thường hoặc đóng khi còn bù. Consent/version và khóa/recheck; giữ invoice/link quyền, đọc lịch sử và report đúng sau chuyển |
+| P1.3 | Cash quầy nguyên khối, VNPay/Pending/cutoff/waitlist và tiền đến muộn | Không Member Cash online Normal hoặc autoCash khi lên waitlist; giữ TTL cấu hình trong cutoff. Không trùng suất/tiền; khoản nhận muộn cần đối soát, không bỏ tiền/cấp lại quyền. Giữ Advanced/CashCorrection |
+| P1.4 | Refund Normal: nghĩa vụ khi TT hủy, Member chọn hoàn, receiver/version/duyệt lại, claim/attempt/private asset/đối soát/SLA | Đúng vai trò, upload khác Completed, contact tùy FE. Bảo vệ quyền đọc, chống trùng/vượt/hoàn ngược; report đúng kỳ, audit/thông báo sau commit. Không tự chuyển tiền hoặc mở policy sau khai giảng |
+| P1.5 | Hoàn thiện schema/generator và fixture nền/động theo thiết kế được duyệt | Giữ33PDF/thêm14,21Class/N05→N11,20room/9môn; private DEMO assets, anchor/UUID/FK/credit/closure/lịch hợp lệ. Không giảm invoice_code_seq. Hoàn thiện phần hiện còn deferred trong SYSTEM-DATA |
+| P1.6 | Kiểm local unit/HTTP, clean, PostgreSQL fresh/replay/rollback/race/commit/readback; cập nhật contract/OpenAPI/docs02/DBREADME/QA/SYSTEM-DATA | Một bundle rõ scope, không đụng hạ tầng/bảng ngoài; dependency lỗi phải rollback. Nguồn đã kiểm khớp, dữ liệu xuất từ fixture đã kiểm, không còn reset rỗng. Bàn giao riêng từng luồng Normal Lifecycle/Refund, FE tự quyết UI |
+
+**Điều kiện raPhase1:** hoàn thành behavior BE đãchốt cùngschema/fixture tươngứng và kiểm local thực chất; nếu nhóm còn thiếu thì ghi đúngchưađạt, khôngphát hành bản “códata” mà API/job chưa hiểustate. Giữ code/tài liệu chưacommit, không tựchạySupabase/Render. Phần schema mới không cần đợi Google/avatar hoặc R1/R2 chưaduyệt.
+
+<a id="normal-release-handoff-20261110"></a>
+#### Điều phối mới sau Supabase PASS — phát hành tai→main, chờ smoke
+
+Owner gửi PASS cho bundle demo đã kiểm và yêu cầu merge tai vào main. Không chạy lại DB reset/SQL16 hoặc mở provider. Source khớp bản nghiệm thu; phần commit/merge phát hành gồm source/schema/fixture/docs đã kiểm, giữ mọi thay đổi có sẵn. Kết quả Git/CI/SHA và bằng chứng Owner nằm ở Active/QA. [Smoke plan theo nhóm và kết quả mong đợi](02-DEPLOYMENT-GUIDE.md#normal-release-smoke-20261110) là bước tiếp sau khi xác nhận Render đúng build. Các đoạn giữ chưa commit/push ở checkpoint bên dưới là snapshot trước yêu cầu phát hành, không thay trạng thái mới này.
+
+Chưa tự thực hiện smoke ghi dữ liệu; trước hết build/DB/login/auth-me/read scope. Cash/chuyển lớp/Refund phải dùng fixture được xác định, không tự tiêu thụ kịch bản FE hoặc làm chứng từ giả như giao dịch thật. FE browser theo đúng source/build hiện hành; R1/R2/policy chờ nhóm review riêng sau smoke.
+
+<a id="normal-phase1-complete-20261110"></a>
+#### Checkpoint P1.1–P1.6 đạt local, đã lấy main — chờ Owner review10/11
+
+Nhóm BE/schema/fixture đã hiện thực; kiểm chuẩn và trạng thái cuối ở [Active/QA](00-MASTER-CHECKLIST.md#active). Checkpoint foundation bên dưới là snapshot trước nhóm này, không còn là danh sách thiếu hiện hành. Giữ toàn bộ diff/untracked; Owner đã yêu cầu lấy main sau kiểm local rồi báo conflict để review, chưa push/deploy/reset/cloud.
+
+| Nhóm | Mapping và nghiệm thu cần đối chiếu |
+|---|---|
+| P1.1 | Tái dùng payment_resolutions/report và mutex center.22 thêm proposal/response/transfer, receiver/attempt/document/verification; Invoice.class_id/amount gốc, entitlement_class_id hiện tại. Chuyển khóa center→Class theo ID tăng→Invoice; tài chính center→Invoice, không provider thật |
+| P1.2 | Snapshot lịch/version/fingerprint, dời1lần với mọi consent, chuyển recheck dưới khóa; source Cancelled enrollment/link đích. Im lặng không đồng ý; stale schedule chặn Accept nhưng giữ Refund. Hủy Open trước buổi đầu tạo nghĩa vụ chủ động, Ongoing bị chặn; giữ start/close/D15 |
+| P1.3 | Cash quầy nguyên khối, cutoff48h/TTL, callback muộn Paid+đối soát; sau TT hủy có đúng một nghĩa vụ hoàn. Waitlist hết hạn/order hết hạn quay cuối hàng rồi mời tiếp, không tự Cash |
+| P1.4 | Member receiver immutable version, Manager xác minh/duyệt, Receptionist UUID claim/nộp metadata/proof, Manager nguồn bank độc lập mới Completed. Pending/Failed/Reversed và khiếu nại giữ lịch sử; cần duyệt lại trước retry. Private proof/protected download/history, contact đúng quyền, SLA/ngày mở và nhắc; report kỳ thu/hoàn riêng |
+| P1.5 | Schema55bảng SCMS và4backup cũ trong đúng phạm vi;47account/21Class/20room/9môn,2PDF DEMO private BYTEA, lịch sử tổng hợp rõ nhãn. N05→N11 thật qua API, M01/M03 Waiting, M02 Refund/mất quyền cũ. Advanced credit/hết hạn/phần động theo cùng nguồn đã kiểm |
+| P1.6 | Test HTTP login/auth-me/commit/race/readback, clean; PostgreSQL fresh/replay/guard/FK+view rollback/sequence và fixture thật; OpenAPI từ app đã kiểm. SYSTEM-DATA xuất từ DB fixture nguyên trạng riêng, vẫn DATA DESIGN; hai bản bàn giao theo luồng, không sửa LAN-2 ngày07/11 |
+
+**Sai lệch đã sửa khi double-check:** tag CUSTOM không hợp lệ chuyển CENTER_EVENT; không giữ Accepted khi chưa chuyển quyền; thêm credit bị thu hồi cho Advanced Expired; DTO Decision trùng schema Advanced được đặt tên riêng; GET chứng từ ghi audit chuyển sang transaction cho phép audit; stale target không được chặn Member chọn Refund; kiểm lại Paid/đối soát/liên kết quyền ngay lúc nhận chuyển; tách lịch sử verification/snapshot để không ghi đè chứng cứ. Expected fixture33account/rỗng/Member Cash Pending trước đây được cập nhật vì thiết kế47account/có kịch bản và Cash quầy đã duyệt, không nới quyền/đổi rule để test xanh.
+
+**Kết quả lấy main:** đã pull origin/main vào tai bằng fast-forward; không có conflict. Main mới chỉ ghi merge PR21, nội dung tree bằng base trước pull; giữ nguyên toàn bộ code đã kiểm/diff/untracked, không thêm merge commit hoặc push Phase1. Hash trước/sau và bằng chứng source khớp ở Active/QA; có bản sao/stash phục hồi riêng. Không chạy lại BE chỉ vì SHA merge đổi nhưng nội dung không đổi.
+
+| Phần review tích hợp | Kết quả / quyết định |
+|---|---|
+| Conflict nội dung từ main | Không có; không cần chọn ours/theirs hoặc sửa logic từ main |
+| Diff/untracked có sẵn và Phase1 mới | Đã khôi phục nguyên nội dung/line ending bằng hash với snapshot trước pull; các thay đổi còn chưa commit |
+| Cache Python sinh lúc kiểm maintenance | Chỉ bỏ cache mới của lượt này/khôi phục cache tracked vốn không nằm trong diff đầu session; không xóa artifact/source của Owner |
+| Kiểm sau pull | Tree commit không đổi; đã giữ diff/source đúng byte. Sau đó bổ sung guard Paid/đối soát/liên kết quyền tại commit chuyển và chạy lại HTTP PostgreSQL/clean trên nguồn cuối; kết quả chuẩn ở Active/QA |
+
+**Đề xuất để Owner duyệt tiếp:** review diff Phase1 và hai bản bàn giao trước; duyệt P2.1 với ngày VN chạy demo để tái sinh anchor/kiểm bundle đúng ngày, kế hoạch reset/phát hành BE và smoke FE có auth-me/readback. Chỉ sau smoke mới trình riêng P2.2 (R1/R2/policy) và P2.3–P2.7 (matrix/CRUD/FE/live/AI/QueryDR/Google/avatar theo thứ tự). Chưa duyệt thì chưa reset Supabase, SQL16, deploy Render, push hoặc gọi provider thật.
+
+<a id="normal-phase1-foundation-20261110"></a>
+#### Checkpoint triển khai Normal Phase1 — phần lõi, chưa đạt điều kiện ra Phase1
+
+Phạm vi lượt này là phần lõi P1.1/P1.2/P1.3 và kiểm tương ứng P1.6. Kết quả kiểm chuẩn, môi trường và fingerprint source ở [Active](00-MASTER-CHECKLIST.md#active)/QA; không dùng bằng chứng này để nghiệm thu các hàng còn thiếu.
+
+Bàn giao riêng phần đã có API: [Normal Lifecycle10/11](../SCMS-BAN-GIAO-FE-NORMAL-LIFECYCLE-2026-11-10.md). Chưa có bản bàn giao Refund mới vì chưa có implementation/kiểm tương ứng.
+
+| Nhóm | Đã có trong source/schema | Còn phải thực hiện trước khi đánh dấu hoàn thành |
+|---|---|---|
+| P1.1 | Mapping bên dưới; migration21 additive, metadata legacy giữ NULL, reset generator nhúng21; không chạy DML16 | Mapping/migration/compatibility của proposal, transfer, receiver/attempt/private document và Refund chưa implement |
+| P1.2 | minCapacity lúc tạo, khóa sau công bố/đăng ký; Manager confirm-opening chuẩn24h/trễ có reason trước T; job recheck rồi Ongoing; finalizer đóng Closed sau12buổi hợp lệ, giữ correction; chặn PUT trạng thái/type/ngày độc lập và alias sửa session trước khai giảng của mô hình mới | Dời khai giảng1lần với consent/version; proposal/lựa chọn; chuyển lớp giữ invoice/liên kết quyền; hủy trước khai giảng cùng nghĩa vụ hoàn. Các API hành động này **chưa có**, không dùng PUT hoặc incident để giả hoàn tất |
+| P1.3 | VNPay mặc định; Cash chỉ Receptionist có REGISTER_MEMBER+MANAGE_INVOICES, tạo/thu/Paid+Registered nguyên khối;48h theo buổi đã lưu; TTL=min(cấu hình,cutoff); admission giải phóng hold đã hết; callback trễ giữ Paid+reconciliation; waitlist chỉ mời, không tạo Cash/quyền | Hoàn thiện mời lại/xếp hàng khi expire, retry/race kết hợp proposal/chuyển/hủy/Refund và chống bỏ sót nghĩa vụ tiền đến sau hủy. Không lấy kiểm suất cuối hiện có thay toàn bộ các race này |
+| P1.4 | Đã đối chiếu PaymentResolutionService: Refund hiện có chỉ tiền Paid chưa cấp quyền; CashCorrection giữ phạm vi D16 | Toàn bộ Normal Refund, Member response/receiver/version/xác minh/duyệt lại/claim/attempt/private asset/đối soát/SLA07ngày TT mở/contact tùyFE/report/audit và thông báo sau commit |
+| P1.5 | Bản schema tham chiếu cũ đã thêm cột lifecycle; guard FK ngoài phạm vi/sequence vẫn được kiểm | Vẫn33account/9template, **chưa47account/21Class**, chưa private DEMO assets/fixture động/anchor thực thi. SYSTEM-DATA và build-system-data vẫn DATA DESIGN; không dùng schema hiện tại reset cloud |
+| P1.6 | Test đích và bộ kiểm local của phần lõi; runner migration21/fresh/replay/rollback; contract/OpenAPI chỉ phần implement | Kiểm hợp nhất toàn bộ Phase1, xuất dữ liệu từ fixture đã kiểm và bàn giao Refund riêng; nghiệm thu FE/Render/live nằm Phase2 |
+
+**Mapping kỹ thuật đã đối chiếu:**
+
+| Đối tượng | Nguồn hiện có / cách tiếp tục |
+|---|---|
+| Class/draft | `classes.status` chỉ Open/Ongoing/Closed/Cancelled; `pricing_draft` phân biệt Closed chưa công bố với đã kết thúc. `min_capacity`, opening actor/time/reason, postponement_count và lifecycle_version do migration21 thêm; không có Class Completed. Source: SportsClassService/NormalClassCreationService/NormalLifecycleService/NormalClassPolicy |
+| Session/attendance | Tái dùng SessionService, incident/makeup và AttendanceFinalizationProcessor. Completed là Session/Enrollment; center_invalidated/makeup_for giữ buổi không tổ chức. Guard mới không cho finalizer/attendance tạo lịch sử học trước khi mô hình mới đã Ongoing. Closed sau buổi cuối không bỏ cửa correction D15; sự cố muộn mở lại đúng nghĩa vụ Ongoing |
+| Enrollment/Invoice | Pending giữ chỗ có hạn, Registered cần Paid hợp lệ. Invoice amount/class gốc bất biến. Admission/Cash/IPN/QueryDR dùng center mutex trước; nhánh Normal khóa Class rồi Invoice trước thay quyền. Không tự biến một hóa đơn Paid cũ thành hóa đơn lớp đích |
+| Proposal/transfer — còn thiết kế kỹ thuật | Dùng nhóm `normal_class_events`, `normal_member_responses`, `normal_enrollment_transfers` của DATA DESIGN nếu phù hợp; payload phương án cụ thể + version/fingerprint lịch. Preview không giữ chỗ, Member response không tự là quyền đã chuyển. Confirm dưới center mutex rồi khóa hai Class theo ID tăng, Invoice/Enrollment và recheck; update mọi truy vấn Paid/attendance/plan/result/report để theo link chuyển |
+| Refund — còn thiết kế kỹ thuật | Có thể mở rộng `payment_resolutions` với scope Normal, nhưng phải chặn endpoint generic bỏ qua workflow mới. Tái dùng unique invoice/type và report tiền riêng; thêm receiver revision/approval snapshot, attempt claim/idempotency, private document và independent verification. Sáu tên bảng trong DATA DESIGN không buộc tạo đúng sáu bảng. MediaService avatar/public URL không đáp ứng chứng từ tài chính |
+| Job/thông báo | NormalLifecycleJob cảnh báo cutoff/thiếu xác nhận và không tự hủy; NotificationEvent sau commit có dedupe. Giữ finalizer/review D15, expiry D10 và toggle chế tài tắt. SLA Refund tương lai dùng Holiday global hiện hành, kể cả T7/CN mở; giữ lịch sử hạn cũ khi thay receiver |
+
+**Tiếp tục session sau:** giữ toàn bộ diff/untracked, đọc checkpoint này cùng yêu cầu đã chốt. Hoàn thiện P1.2 còn thiếu gắn với P1.4 trước khi xuất fixture; không dựng7hồ sơ Completed mẫu khi API chưa kiểm được chuỗi actor/chứng từ/đối soát. Sau đó hoàn tất P1.3 liên quan, P1.5 và nghiệm thu P1.6; chỉ lúc đủ mới đánh dấu Phase1 đạt. Không chạy Supabase/Render/SQL16/provider thật hoặc mở Phase2. Hướng dẫn kiểm riêng migration/local tại docs02; schema root bảo toàn chưa được nâng21.
+
+#### Phase2 — Phát hành, nghiệm thu chung và xử lý phần thiết kế/tích hợp còn lại
+
+| Mã / thứ tự | Việc còn làm | Điều kiện / giới hạn |
+|---|---|---|
+| P2.1 | Owner chạy bundle demo đã kiểm; xác nhận schema/row state; sau đó push tai/merge main/deploy và smoke FE đơn giản | Kiểm baseline/recovery/build trước. Không suy quyền chuẩn bị script thành quyền reset cloud. Không chạy16/18/19/20 nối tiếp máy móc nếu bundle đã nhúng. Giữ thay đổi main mới và kiểm tích hợp; smoke không thay nghiệm thu chung |
+| P2.2 | Sau smoke, trình lại mục5cũ: R1/R2, validation tên/khu vực sân và policy còn mở | R1 lọc ngày attendance; R2 content sau buổi/chưa có record/đổi Coach. Room name50/location100, giá sau công bố/đã Pending/người học, lịch sử sau hủy/đảo quyền, guard quản trị cuối cùng/PUT phân quyền. Chỉ sửa sau duyệt cụ thể; không hỏi lại policy đã chốt |
+| P2.3 | Hoàn thiện matrix BE-01–BE-07/CRUD/error/deprecation/readiness | Năm role, actor/authority/owner/assignment/state; tái dùng kiểm đã đạt, giữ guard/test center. Rà phần còn thiếu của cookie/timeout/proxy, Coach/Member, Cash/Refund, report/audit,401/403/error contract. Đối chiếu phạm vi nhãn P1.5/gói T cũ, không coi tên gói là nghiệm thu |
+| P2.4 | Nghiệm thu chung FE hiện hành/Render/CRUD theo matrix và bộ demo | Xác định repo/branch/build FE thật. Auth/me trước nhóm có phiên; response + SQL sau commit + retry/race cho tiền/quyền/lịch. Normal/Advanced, attendance/note/QR, plan/result/evaluation/feedback/at-risk, roster/catalog, room/holiday/incident/makeup, report/log/chat/notification. Phiên UI kiểm sau flow; live chỉ đúng phạm vi đã cho phép |
+| P2.5 | Rà/chốt QueryDR, hoàn thiện AI còn thiếu và kiểm tích hợp liên quan | QueryDR độc lập OTP: đối chiếu quyết định/config được phép xem/hành vi rồi chốt dùng/tắt/để sau; không tự bật hoặc xóa pay attempt. AI còn thiếu: chốt FAQ/provider/quota/fallback/handoff, fake provider trước. OTP chính đã Owner xác nhận xong, chỉ cân nhắc biên sai/hết hạn/dùng lại/rate khi liên quan; không triển khai lại |
+| P2.6 — sau bàn giao các phần khác | Google login và avatar | Giữ code ghép từ main; kiểm config/migration/provider/browser/storage đúng quyền. Không chặn bàn giao các phần khác vì Google/avatar; không suy cột Google có trong DB là live PASS |
+| P2.7 | Chốt nghiệm thu và tài liệu cuối | Từng tiêu chí PASS/FAIL/BLOCKED/NOT_RUN đúng môi trường/build/actor, có giới hạn và Owner acceptance; cập nhật Active/HISTORY/QA, bàn giao theo luồng, không sao count/SHA hoặc sửa LAN-2 ngày07/11 |
+
+**Tái kiểm có điều kiện:** F05/F06/F12 đãOwnerOK; cácphát hiệnFE khác làlịchsử/cầnkiểmlạitrênbuildmới, không tựcoicònlỗi. Nghiệmthu luồng mở rộng Normal/Refund mới không làm mất xácnhận cũ, nhưng không dùng xácnhận cũ để bỏ kiểm hànhvi mới. Chế tàibooking/check-incửa giữdefaulttắt; SQLServer/ticket/ai_consultations chưađược chọn làmphạmvi triểnkhai, không tự thêmviệc chỉvì cóbảng/code.
+
+<a id="system-data-review-20261109"></a>
+### Bộ dữ liệu demo và rà Normal Lifecycle/Refund — review09/11, cập nhật duyệt10/11
+
+**Cập nhật Owner10/11:** đồng ý bộ đề xuất chung, yêu cầu bảo toàn bộ account trong `System Account.pdf`; đã đồng ý chuyển lớp cùng giá/cùng center, đang hỏi thêm để hiểu Cash/waitlist, xác nhận khai giảng24h, xác minh người nhận, lịch7ngày làm việc và log theo trung tâm. Không coi các câu hỏi này là đã chọn hết ngoại lệ hoặc cho phép triển khai ngay. Đã đối chiếu lại PDF với seed: đủ33email/họ tên, thông tin liên hệ/ngày sinh và mật khẩu demo khớp;14account bổ sung không thay danh tính gốc. Các lựa chọn chi tiết tiếp tục ở E/F; chưa đổi BE/SQL hoặc xuất SYSTEM-DATA.
+
+**Chốt tiếp10/11:** Owner duyệt Cash/waitlist, xác nhận khai giảng muộn có kiểm soát ở E3 và hướng log center ở F. Tiếp tục giải thích kiểm lớp tương thích/không có lớp phù hợp, flow người nhận/điện thoại và tính cần thiết của T2–T6; chưa coi lịch7ngày đã đổi sang ngày lịch. Riêng yêu cầu GET roles/permissions chỉ Admin được triển khai trong lượt này, gồm khóa GET role theo ID để tránh đọc permissions qua tuyến chi tiết; kiểm/trạng thái chuẩn tại Active/QA. Không gộp triển khai Normal/refund/R1/R2 vào thay đổi GET này.
+
+**Đã chốt phần3–5 sau cùng10/11:** Owner đồng ý kiểm tương thích/fallback và N11 Pickleball làm đích N05; đồng ý chuẩn bị dữ liệu liên hệ Member để FE tự quyết có dùng; đồng ý ngày làm việc theo ngày TT mở, tính T7/CN nếu không đóng theo Holiday. Các đề xuất T2–T6/đổi7ngày lịch trước đó đã bỏ. Yêu cầu Refund đã đồng bộ quyết định; chuẩn bị [SYSTEM-DATA](../SYSTEM-DATA.md) theo từng bảng ở mức dữ liệu gốc đã duyệt, tách rõ thiết kế với DB đã seed. Chưa triển khai Normal/Refund hoặc chạy reset/cloud.
+
+**Yêu cầu mới nhất:** duyệt lại account/lớp/Coach và bộ kịch bản demo trước; sau duyệt mới sinh script và `SYSTEM-DATA.md` chia từng bảng để thống nhất FE. Owner đồng ý bỏ legacy, lớp/lịch thử, dữ liệu tồn, audit và backup cũ, nhưng muốn thay bằng **dữ liệu demo có kịch bản**, không để toàn bộ nhóm nghiệp vụ rỗng. **Chưa chạy bản reset rỗng trước đó; chưa sửa BE/SQL/contract/OpenAPI theo hai yêu cầu mới.** Phần này là review source tĩnh, không phải nghiệm thu tính năng mới; bằng chứng local trước đây giữ đúng phạm vi trong Active/QA.
+
+Nguồn đối chiếu: **L§n** = mục n của [Normal Lifecycle](../SCMS_BE_Normal_Lifecycle_DA_CHOT.md); **R§n** = mục n của [Refund Normal](../SCMS_BE_Refund_Normal_DA_CHOT.md). Hai file giữ nguyên nội dung Owner cung cấp. Advanced tiếp tục D03/D04/D10/D12/D15/D16, không đổi policy bằng tài liệu Normal. API đang công bố ở [docs01 Normal](01-API-CONTRACT-FE-BE.md#normal) và [resolution](01-API-CONTRACT-FE-BE.md#resolutions); tên API/bảng mới dưới đây chỉ là đề xuất.
+
+#### A. Đối chiếu logic hiện tại — tận dụng gì, thiếu gì
+
+| Phần / căn cứ | Source thực tế | Đề xuất trước triển khai |
+|---|---|---|
+| Tạo đủ12buổi rồi Open — L§1/4 | `NormalClassCreationService.create` đã tạo lớp + generate12 + publish cùng transaction, khóa center/requestId; `NormalSchedulePolicy` kiểm12buổi tương lai/sân đúng môn | Tái dùng luồng nguyên khối. Giữ khóa tài nguyên, học phí dương, sức chứa và snapshot tiền; bổ sung metadata lifecycle, không viết lại generator |
+| Chốt sĩ số48h/xác nhận24h — L§1/2 | `SportsClass`/DTO chưa có minCapacity, xác nhận khai giảng, số lần dời; enrollment chỉ kiểm Open + lịch tương lai. `findAll` đang đếm Registered+Pending thành một số | Bổ sung minCapacity theo ceil(2*max/3), khóa theo yêu cầu; tách paidRegisteredCount/reservedPendingCount/waitlistCount, deadlines từ buổi đầu thực tế. Không dùng occupancy làm sĩ số khai giảng |
+| Sức chứa khi cập nhật — L§2 | Tạo lịch có kiểm room/capacity; `SportsClassService.update` kiểm chỗ đang giữ nhưng chưa đối chiếu maxCapacity mới với tất cả room của lịch hiện có | Bổ sung kiểm dưới khóa chung. Min của Advanced để NULL/không áp dụng; min Normal không được tự sửa để hợp thức hóa đổi max sau khi khóa. Đề xuất từ chối cập nhật max nếu làm sai giới hạn min hoặc sức chứa room, không tự giảm quyền/chỗ đã thu |
+| Chặn chuyển sai trạng thái — L§4 | `SportsClassService.update/apply/normalizeClassStatus` nhận cả4trạng thái nhưng chưa có bảng chuyển trạng thái. Nhánh draft chỉ chặn Ongoing; lớp đã công bố có thể nhận Cancelled/Closed qua PUT | Cần chặn ở service trước khi mở demo lifecycle. Chuyển trạng thái qua hành động nghiệp vụ; PUT metadata không được bỏ qua guard hoặc tự tạo nghĩa vụ hoàn |
+| Bắt đầu/kết thúc — L§1/4 | Chưa tìm thấy job đổi Class Open→Ongoing/Closed. Finalizer hoàn tất Session và enrollment; không đóng Class. `NotificationScheduleJob` nhắc buổi/quyền sắp hết hạn, không quản lý lifecycle Class | Bổ sung processor idempotent cho Class, tái dùng Clock/khóa/sự kiện sau commit. Khởi động lại không nhân xác nhận/thông báo. Không đóng vì endDate đơn thuần |
+| Draft/Closed và bù — L§4/6 | Tạo tách bước đang dùng `Closed + pricing_draft=true`. `NormalMakeupService` kiểm Class `Completed`, trong khi enum/check Class không có Completed; không chặn Class Cancelled/Closed chung | Đề xuất vẫn nhận diện draft legacy bằng marker để tương thích; Closed kết thúc khác draft. Sửa nhánh Completed sai mô hình; bù trên Closed chỉ khi có incident xác minh buổi không tổ chức, mở lại nghĩa vụ học có audit. Không cho PUT tùy tiện mở lại |
+| Attendance cuối ngày — L§1/4 + D15 | Finalizer tại end, correction Coach đến trước00:00, no-show sau cutoff đã có | Giữ cả hai mốc. Đề xuất “điểm danh đã chốt” là finalized nghiệp vụ tại end, không xóa quyền correction trong khoảng đệm kể cả Class Closed. Nếu Owner muốn chốt tuyệt đối sau00:00 thì cần đối chiếu lại D15 trước sửa |
+| Dời khai giảng/chuyển lớp — L§3, R§2 | Có reschedule/substitute từng Session và session_changes; chưa có hồ sơ dời toàn khóa một lần, phản hồi từng Member hoặc chuyển enrollment có truy nguồn tiền | Thêm hồ sơ thay đổi toàn khóa + lựa chọn Member. Không dùng `memberAgreed=true` do staff gửi để giả đồng ý cả lớp. Ngày mới phải đủ12buổi, kiểm conflict và tính lại48h/24h; xác nhận Manager gắn phiên bản lịch |
+| Sự cố khi Ongoing — L§3/6 | `CenterIncidentService`, substitute/reschedule và `NormalMakeupService` đã có reason/evidence/khóa, giữ buổi gốc và liên kết makeup | Tái dùng. Không gọi incident của một buổi để thay quy trình hủy cả lớp trước khai giảng; không tự áp hoàn một phần sau khai giảng |
+| Cash tại quầy — L§5 | Member hiện được enroll với Cash →Pending; Receptionist gọi confirm-cash ở request khác. `EnrollmentService.promote` còn hardcode tạo Cash khi lên waitlist, chưa kiểm trạng thái lớp/48h trong nhánh này | Đề xuất action Receptionist đăng ký/thu Cash nguyên khối cho Normal, tái dùng createClassOrder/confirmCash và khóa. Member tự phục vụ dùng VNPay; thăng waitlist cũng phải bỏ Cash mặc định, kiểm lại cutoff/lịch/phương thức đã chọn. Không thay Cash Advanced; cần duyệt tác động FE ở E2 |
+| VNPay/giữ chỗ — L§1/5, R§7.7 | Default5phút, có env override; expire giải phóng Pending, callback kiểm chữ ký/amount/reference, retry và Paid+reconciliationRequired nếu muộn/mất quyền. Chưa kiểm48h trong pay/activation/waitlist; activation còn chấp nhận Ongoing | Giữ cấu hình TTL, không giả deadline dài để demo. Đề xuất hạn thanh toán min(now+TTL,cutoff48h); cutoff áp cho enroll/promote/order/pay/cash/activation. Tiền tới muộn giữ Paid và đối soát, không hồi sinh chỗ. Không tự bật QueryDR; runtime env chưa được xác nhận ở lượt review này |
+| Refund Normal — R§1–5 | `PaymentResolutionService.eligibility` chỉ cho Refund khi reconciliationRequired, tức tiền chưa cấp quyền; invoice Normal Paid/Registered thường bị Blocked. Chỉ staff tạo/list, Manager approve/complete | Không thể seed một Refund Completed rồi tuyên bố flow mới đã xong. Mở nhánh rõ `NORMAL_PRESTART` trong hồ sơ Refund; giữ nhánh reconciliation cũ và CashCorrection D16/Advanced nguyên trạng |
+| Phân vai/chứng từ — R§3–6/8 | Resolution chưa có Member self-service/receiver/transfer attempt/private attachment/verification. Complete hiện nhận evidence text; log còn chép evidence. MediaService phục vụ avatar, trả secure_url, chưa là private PDF workflow | Bổ sung hành động Member, hàng đợi Receptionist đã Approved, nộp chứng từ→chờ Manager xác minh. Reuse cấu hình hạ tầng chỉ sau kiểm private storage; không lấy avatar URL công khai làm chứng từ. Log chỉ ID/action, không chứa tài khoản/file URL nhạy cảm |
+| Báo cáo/tiền/không lặp — R§7/9 | ReportService đã tách thu/Refund Completed/ròng theo paymentDate/performedAt; resolution unique(invoice,type), mutex center và invoice lock | Tái dùng nền này; thêm approved-recipient version, transfer claim/idempotency, kiểm tổng tiền và verification. Báo cáo kỳ chuyển tiền chỉ tính sau xác minh thành công, không trừ Approved/ảnh upload. Invoice Paid/amount gốc giữ nguyên |
+
+Nguồn source trọng tâm: [SportsClassService](../src/main/java/com/sportscenter/sportclass/SportsClassService.java), [NormalClassCreationService](../src/main/java/com/sportscenter/sportclass/NormalClassCreationService.java), [EnrollmentService](../src/main/java/com/sportscenter/enrollment/EnrollmentService.java), [InvoiceService](../src/main/java/com/sportscenter/invoice/InvoiceService.java), [AttendanceFinalizationProcessor](../src/main/java/com/sportscenter/training/AttendanceFinalizationProcessor.java), [NormalMakeupService](../src/main/java/com/sportscenter/session/NormalMakeupService.java), [CenterIncidentService](../src/main/java/com/sportscenter/session/CenterIncidentService.java), [PaymentResolutionService](../src/main/java/com/sportscenter/invoice/PaymentResolutionService.java), [ReportService](../src/main/java/com/sportscenter/report/ReportService.java). Test workflow hiện có đã mô tả makeup13record/12hợp lệ và refund tiền đến muộn; chưa phải test cho minCapacity/48h/24h hoặc quy trình chứng từ mới.
+
+#### B. Account và Coach — đề xuất để duyệt
+
+Giữ danh tính33account hiện có trong [reference seed](../database/bootstrap/scms_demo_reference.sql), gồm Admin1/Manager2/Receptionist2/Coach18/Member10. Admin center NULL; các tài khoản vận hành center1. Không thêm center mới, không mở lượt rà center khác. Không gán Admin quyền tài chính để demo; ma trận quyền mới chưa duyệt không được seed lách.
+
+| Nhóm | Đề xuất | Mục đích / đối chiếu |
+|---|---|---|
+| Admin | Giữ `admin@gmail.com`, Active | Quản trị hệ thống; tài chính vẫn bị chặn theo baseline, không suy Admin là toàn quyền — R§3, D18 |
+| Manager | Giữ `manager1@gmail.com`, `manager2@gmail.com`, Active | Tạo/xác nhận lớp, duyệt/xác minh hoàn. Demo Manager1 duyệt, Manager2 xác minh để dễ thấy vai trò; không tự đặt rule bắt buộc hai Manager khác nhau — L§1, R§3–5 |
+| Receptionist | Giữ `receptionist1@gmail.com`, `receptionist2@gmail.com`, Active | Thu Cash; nhận khoản Approved, claim công việc và nộp chứng từ; thử hai người nhận cùng việc nhưng chỉ một claim — L§5, R§3/7 |
+| Member chính | Giữ10Member hiện có + thêm10Member demo =20Member Active | Lớp Bóng đá15chỗ, còn Member để waitlist/race; tách A/B để kiểm owner — L§2, R§9.15/17 |
+| Member kiểm trạng thái | Thêm3 riêng: Inactive, Locked, Pending | Không làm hỏng các account trình diễn chính; Pending là OTP chưa verify, không phải quyền học hợp lệ. Không seed OTP/secret thật |
+| Coach chính/thay thế | Giữ18Coach Active,2người/môn | A là phân công chính, B cùng môn chưa được giao/bổ sung khi có substitute; cover assignment/RBAC/incident — L§3, D03/D15 |
+| Coach kiểm trạng thái | Thêm1Coach Inactive, chuyên môn Cầu lông | Chặn dùng Coach inactive, không cần đổi trạng thái một Coach đang có lịch Paid |
+| **Tổng được Owner đồng ý về bộ dữ liệu10/11** | **47account:1Admin +2Manager +2Receptionist +19Coach +23Member** | 43account chính +4account kiểm trạng thái; giữ nguyên33account PDF, bổ sung14account. Chưa sửa SQL |
+
+10Member giữ lại: M01 An (`an@gmail.com`), M02 Linh, M03 Huy, M04 Mai, M05 Khang, M06 Vy, M07 Bảo, M08 Nhi, M09 Kiệt, M10 Hà; email hiện có giữ nguyên. Đề xuất M11–M20: `member11@scms.demo.invalid`…`member20@scms.demo.invalid`, tên hiển thị “Member Demo11”…”Member Demo20”; account kiểm dùng `member.inactive`, `member.locked`, `member.pending`, `coach.inactive` cùng miền `.invalid`. Mã Mxx dùng để review và manifest, FE vẫn tra ID thực từ API.
+
+| Môn / prefix email `coach.<prefix>{1,2}@gmail.com` | Coach A giữ nguyên | Coach B giữ nguyên | Vai trò trong bộ demo |
+|---|---|---|---|
+| Tennis / tennis | Nguyễn Hoàng Quân | Huỳnh Diễm My | Advanced chính/thay, Normal đủ sĩ số |
+| Bơi / swimming | Lê Minh Duy | Lê Phương Anh | Normal thiếu sĩ số |
+| Pickleball / pickleball | Võ Thanh Long | Phạm Thị Lan | Phương án dời/chuyển và phản hồi Member |
+| Bắn cung / archery | Lê Nguyễn Thiên Phúc | Hồ Thảo My | Đã dời khai giảng1lần |
+| Bóng rổ / basketball | Trần Anh Dũng | Phan Kim Ngân | Hủy trước khai giảng, nghĩa vụ hoàn chủ động |
+| Bóng đá / football | Lê Trần Phi | Trần Ngọc Yến | Lớp15chỗ, last-seat/waitlist |
+| Bóng chuyền / volleyball | Nguyễn Văn Hoàng | Phạm Thanh Thư | Ongoing, dời buổi/thay Coach |
+| Cầu lông / badminton | Võ Minh Đức | Trần Thị Hương | Thu Cash, attendance, incident/makeup và Refund |
+| Bóng bàn / tabletennis | Lê Minh Khoa | Hồ Bích Oanh | Lớp2chỗ, hoàn tất khóa |
+
+Giữ một chuyên môn hợp lệ/người theo môn, không gán mọi Coach tất cả môn. Lịch rảnh chính T2–T7,7ca/ngày; Chủ nhật làm khoảng trống để demo đóng nhận/đổi lịch rảnh. Outdoor vẫn khóa ca3/4 theo D12 dù weeklySlots có slot đó; lịch lớp Normal và Advanced phải xếp chung để không trùng Coach/phòng/Member. Có thêm một ngày nghỉ Coach B trong tương lai, không để nó đè lịch có sẵn. Đây là phần bộ dữ liệu được Owner đồng ý chung10/11, chưa seed; không đổi danh tính/tài khoản PDF.
+
+#### C. Lớp và lịch — đề xuất21Class, chưa seed
+
+Giữ9template Advanced (1môn/template, capacity1,12credit cấu hình), **thêm12lớp Normal có mục đích cụ thể**. Mỗi Normal có12buổi hợp lệ; N10 có13record do giữ buổi gốc invalidated +1makeup. 20room/9môn/18giá đã duyệt giữ nguyên. Max/min theo **lớp**, không tự tăng phòng. N01–N12 là mã fixture/manifest, không dùng thay classId trong API.
+
+| Mã / môn | Trạng thái, dữ liệu chính đề xuất | max/min | Đối chiếu và mục đích |
+|---|---|---:|---|
+| N01 Cầu lông | Open, buổi đầu D+7,1Paid; chỗ trống để demo enroll/thu quầy/VNPay | 4/3 | L§1/2/5; tạo Pending mới ngay lúc demo, không seed hold kéo dài |
+| N02 Tennis | Open,3Paid, đã chốt48h, chưa xác nhận; buổi đầu còn30–47giờ | 4/3 | L§1; Manager xác nhận trước24h. Chọn khung chuẩn tương lai trong khoảng này, không đổi Clock live |
+| N03 Bơi | Open,6Paid, đã chốt48h, còn30–47giờ, thiếu1người | 10/7 | L§1–3; Pending không cứu sĩ số, cảnh báo/dời lần đầu |
+| N04 Bắn cung | Open,3Paid, đã dời1lần có phản hồi, ngày mới D+7 | 5/4 | L§3; có thể nhận bổ sung trước cutoff mới; nếu lại thiếu khi chốt thì không dời lần2 |
+| N05 Pickleball | Open,3Paid, đề nghị phương án mới;1đồng ý/1yêu cầu hoàn/1chưa phản hồi | 4/3 | L§3, R§2A/9.01–05; chưa phản hồi không là đồng ý; tính lại sĩ số sau lựa chọn |
+| N06 Bóng rổ | Cancelled trước khai giảng,3Paid; thêm1Pending chưa thu được cancel | 8/6 | R§2B/9.04/06–08;3nghĩa vụ hoàn chủ động, Pending không có chuyển tiền hoàn |
+| N07 Bóng đá | Open,14Paid,1chỗ còn lại; đủ Member khác để race/waitlist | 15/10 | L§2/4; không seed16Registered để giả case vượt sĩ số |
+| N08 Bóng chuyền | Ongoing đã được Manager xác nhận,6Paid,4Completed+8Scheduled | 8/6 | L§1/3; cấm hủy thường, thay Coach/dời buổi chưa bắt đầu |
+| N09 Bóng bàn | Closed hoàn tất,2Paid,12buổi hợp lệ đã finalized | 2/2 | L§1/4; history/đánh giá/report; không mở lại qua PUT |
+| N10 Cầu lông | Ongoing,3Paid;8buổi hợp lệ hoàn tất,1gốc invalidated và4buổi còn lại gồm makeup | 4/3 | L§3/6, D15;13record nhưng12buổi hợp lệ, bù chỉ1lần và giữ lịch sử |
+| N11 Pickleball | Open D+7,3Paid/4chỗ, cùng giá1.800.000đ/center1 với N05, Coach B/sân Pickleball02/lịch khác; có lịch sử Expired/Failed/Cancelled chưa thu | 4/3 | Owner duyệt10/11 làm đích N05, một chỗ cho chuyển thành công rồi hết chỗ; giữ case L§1/5 retry/expire/thanh toán muộn, không tăng tổng Class |
+| N12 Cầu lông | Cancelled trước khai giảng,3Paid; hoàn ở các bước chứng từ/Completed/sự cố | 4/3 | R§4–9; nối kỳ thu trước/kỳ hoàn sau, không trừ Approved như đã hoàn |
+
+Các ngưỡng mặc định2→2,4→3,5→4,8→6,10→7,15→10 đều có trong bảng. Ví dụ Manager tăng ngưỡng7→8 và lớp8trongphòng10→min6 demo bằng tạo lớp mới. N05 chuyển sang N11 Pickleball đã được Owner duyệt10/11, cùng môn/giá/center, không tạo thêm lớp ngoài bộ21Class; không đổi hóa đơn gốc để ép khớp lớp đích.
+
+**Trục thời gian:** D là ngày dựng fixture theo Clock VN, lưu anchor cụ thể trong manifest. Ongoing/Closed có lịch sử tương đối trước D, Open có lịch tương lai; lịch final phải được giải conflict đầy đủ trước xuất. Tại thời điểm dựng dữ liệu, Paid/consent/khai giảng/incident/attendance phải có thứ tự thời gian hợp lệ, không đặt timestamp phê duyệt sau khi đã bắt đầu. N02/N03/attendance trong ngày là kịch bản có thời hạn; jobs chạy thật nên có thể đổi state sau khi demo. Pending/QR chỉ tạo tại bước trình diễn, không kéo TTL hoặc fake ngày check-in để bộ dữ liệu giữ nguyên mãi.
+
+#### D. Dữ liệu nghiệp vụ và DB đề xuất theo nhóm
+
+| Nhóm / bảng hiện có | Nội dung demo đề xuất | Dữ liệu/logic cần bổ sung, căn cứ |
+|---|---|---|
+| `classes`, `normal_class_requests`, `sessions` | A01–A09 Advanced templates + N01–N12; requestId nhất quán, lịch không trùng | Thêm min_capacity, confirmation actor/time + schedule version, postponed_count0..1; deadline server tính từ buổi đầu, không tin client. Không thêm enum Completed cho Class — L§1–4 |
+| `users`, subtype, `coach_specializations`, schedules/slots/days_off | Bộ B;2Coach/môn,1Inactive riêng | Giữ quyền mặc định, không đổi role để chữa403; quyền Coach theo assignment, không chỉ cùng chuyên môn — L§3,R§3,D15 |
+| `invoices`, `class_enrollments`, `advanced_registrations`, `member_packages` | Normal Paid/Registered/Pending/Waitlisted/Expired/Failed/Cancelled; Advanced Requested/Accepted/Rejected, Pending0credit, Active còn12/cònít/0nhưngcònbuổi, Completed, Expired;1case CashCorrection thật sự “chưa nhận tiền” | Chứng từ demo được gắn rõ DEMO trong manifest/mã tham chiếu; không tạo receipt/provider ref giả trông như gateway thật. CashCorrection giữ D16; Paid/amount/purchase_amount không chỉnh theo seed mới — L§1/5,R§1/7,D03/D10/D16 |
+| `session_changes`, `center_incidents`, `incident_affected_members`, `subscription_pauses` | Dời buổi/thay Coach/makeup; Advanced có hủy>=12h, báo vắng sát giờ và một pause hợp lệ có nguồn | Không tạo incident để chữa dữ liệu seed sai; không chia sẻ incident Normal sang Advanced. Không mở báo vắng/hủy cá nhân Normal — L§3, D05–D08/D12/D15 |
+| `attendances`, `session_absence_notices` | Present/Absent, note có/rỗng; notice gốc và bản superseded; case sau end trước cutoff và quá cutoff | Không seed Late mới. Buổi hôm nay chọn theo thời điểm chạy; kiểm mọi biên bằng Clock local, không sửa Clock Render. Không giả check-in bằng giờ correction — L§1/4, D15 |
+| `training_plans`, `training_results`, `evaluations`, `class_feedbacks` | Plan lớp Normal, plan cá nhân Advanced; kết quả/đánh giá của buổi có chuyên môn; một Member có hai đăng ký | Coach A viết đúng assignment; Member A chỉ đọc phần mình, B không thấy. Finalizer Absent không tự sinh nội dung chuyên môn — L§1, D15/RP-36 |
+| `normal_class_events` **đề xuất mới** | Đề xuất dời/chuyển, xác nhận khai giảng/hủy, snapshot lịch cũ/mới, reason/actor/version | Thay đổi toàn khóa khác session_changes từng buổi; số lần dời và xác nhận gắn version lịch. Sinh12buổi nguyên khối, không hủy lịch gốc để giấu sự cố — L§1/3/4 |
+| `normal_member_responses` **đề xuất mới** | Accept/RefundRequested/WaitingResponse, người phản hồi/kênh/xác nhận phương án cụ thể | Unique(event,member), revision/retry; không phản hồi vẫn chờ. Nhân viên tiếp nhận thay phải lưu source/evidence, không tự giả lựa chọn — L§3, R§2/3 |
+| `normal_enrollment_transfers` **đề xuất mới** | Enrollment gốc/đích, khoản Paid gốc, consent và lịch sử bàn giao quyền | Không sửa lớp/amount trên invoice gốc; read/report/eligibility cần đọc link chuyển quyền. Không thu hai lần/cấp hai quyền; chênh giá chờ E — L§3, R§1/2/7 |
+| `payment_resolutions` **mở rộng theo scope Normal** | Refund từ N05/N06/N12: thiếu tài khoản nhận, chờ duyệt, Approved, chờ xác minh, Completed, sự cố | Thêm scope/origin/class-event/enrollment; số tiền theo từng bước, recipient snapshot/version, người duyệt/xác minh, hạn7ngày làm việc. State hiện tại không đủ; mở nhánh Normal riêng, không đổi CashCorrection/Refund legacy — R§2–7 |
+| `refund_transfer_attempts` **đề xuất mới** | Receptionist1 claim; Receptionist2 không nhận trùng; success/submitted/failed/unknown | Request key, approved version, bank reference, amount/time/actor. Unknown/timeout phải đối soát trước lần chuyển mới; DB không ngăn được chuyển ngoài ngân hàng sai quy trình — R§4/7 |
+| `refund_documents` **đề xuất mới** | Ảnh/PDF mẫu có chữ DEMO, gắn đúng attempt; sửa bằng revision có lý do | Private object key, uploader/time/type/size/checksum, không public URL; kiểm role/owner/center. Đề xuất JPEG/PNG/PDF≤5MB/file; chưa chọn provider trước khi kiểm private delivery — R§6.2 |
+| `refund_verifications` **đề xuất mới** | Manager so khớp thành công/không khớp/hoàn ngược, nguồn đối soát và thời điểm | Không lấy ảnh Receptionist làm nguồn độc lập. Chỉ verified success mới Completed; thay người nhận/amount sau Approve làm mất hiệu lực bản duyệt cũ — R§4–7 |
+| `notifications`, recipients, `system_logs`, chat tables | Nhắc lớp, phản hồi, chờ tài khoản/Approved/chờ xác minh/Completed; chat Member–Receptionist đã đọc/chưa đọc; audit mới có provenance | Bỏ audit cũ nhưng sinh audit demo mới đúng actor/source, chống lặp; thông tin ngân hàng không vào notification/log. Authority phụ không mở dữ liệu người khác — R§6.3/8, D15 |
+| `holidays`, `coach_days_off`, `support_requests`, `ai_consultations` | Một ngày nghỉ TT tương lai không đè lịch; một ngày nghỉ Coach; hỗ trợ khiếu nại qua chat hiện có | Không tự triển khai ticket/AI/Google/avatar để lấp DB; bảng chưa dùng để trống có lý do. QueryDR không bật lại chỉ vì có pay-attempt — R§8/9.20, D12/D14 |
+
+**Các mốc Refund phải demo rõ:** chờ phản hồi ở change response, chờ tài khoản, chờ duyệt, Approved, đang chuyển, AwaitingVerification, Completed, NeedInformation/Failed/Unknown. Rejected chỉ dành cho hồ sơ sai có lý do, không xóa nghĩa vụ trung tâm. Hủy N06 tự tạo3case; chưa có tài khoản nhận vẫn còn case. Pending chưa thu không có khoản chuyển hoàn. N12 có một Completed kèm transaction/verification giả lập đánh dấu DEMO và một case chưa xác minh không tính hoàn. 20case R§9 sẽ có matrix “fixture/thao tác/expected”; không cần20bản copy dữ liệu lỗi. Hoàn ngược sau Completed phải ghi sự cố/xác minh mới và điều chỉnh kết quả báo cáo theo dòng tiền thực, không xóa chứng từ cũ hoặc tự chuyển lần2.
+
+**Mapping đủ20case Refund — đề xuất expected, chưa chạy nghiệm thu:**
+
+| Case R§9 | Fixture / bước trình diễn | Expected cần kiểm |
+|---|---|---|
+| 01 | N05, Member đồng ý lịch mới | Không tạo Refund cho cùng quyền |
+| 02 | N05, Member từ chối dời và chọn Refund | Chờ Manager, đúng Invoice/Member |
+| 03 | N05, từ chối lớp đích tạo trong bước chuyển | Được yêu cầu hoàn100% đúng phạm vi |
+| 04 | N06, action hủy lớp có3Paid | Tự tạo3nghĩa vụ; retry không nhân case |
+| 05 | N05, Member chưa trả lời | WaitingResponse, không tự đồng ý hoặc mất quyền |
+| 06 | N06, case thiếu tài khoản nhận | Không chuyển/Completed; còn công việc phải xử lý |
+| 07 | N06, Pending chưa thu | Hủy giữ chỗ, không chuyển hoàn |
+| 08 | N12, hóa đơn Cầu lông900.000đ | Nghĩa vụ đủ900.000đ, không trừ phí |
+| 09 | N06, Receptionist thử chuyển case chưa Approved | Bị chặn; không phát sinh attempt hợp lệ |
+| 10 | N06, sửa amount/receiver sau Approve | Không dùng bản duyệt cũ, Manager duyệt lại |
+| 11 | N12, Receptionist upload mẫu DEMO | AwaitingVerification, chưa Completed |
+| 12 | N12, mới có ảnh và chưa kiểm nguồn ngân hàng độc lập | Manager không được Complete thiếu bước xác minh |
+| 13 | N12, Manager xác minh khớp giao dịch thành công | Completed; đúng báo cáo/thông báo/audit sau commit |
+| 14 | N12, attempt failed/pending/reversed | Không báo hoàn thành; giữ hồ sơ, không tự chuyển tiếp |
+| 15 | N06, request trùng/hai Receptionist claim | Một case/claim đang hiệu lực, không hai lần chuyển |
+| 16 | N12 Completed, gửi lại thao tác | Không hoàn lần2; lịch sử còn đọc được |
+| 17 | Member A/B, Coach, Admin mặc định; guard center hiện có | Chỉ đúng người/role/center đọc chứng từ; giữ test center cũ, không mở rà center mới |
+| 18 | N12, thu ở tháng trước, chuyển/xác minh tháng này | Phân biệt kỳ thu/kỳ hoàn, Approved không trừ tiền |
+| 19 | N11, callback ký hợp lệ sau expiry/cutoff/hủy | Paid cần đối soát; không mất tiền hoặc cấp lại chỗ |
+| 20 | N12 Completed, Member chat chưa nhận tiền | Truy nguồn receiver/attempt/verification, không kết luận chỉ dựa ảnh |
+
+**RBAC và biên thời gian của bộ demo:** Member A đọc/lựa chọn/cung cấp tài khoản của mình, không có approve/upload thay Receptionist/complete; B bị chặn dữ liệu A. Receptionist chỉ nhận case Normal đã Approved/đủ dữ liệu và thao tác attempt/chứng từ, không tự duyệt hoặc complete. Manager quản lý cùng center, có action riêng approve/verify; Coach không đọc tài chính và chỉ ghi chuyên môn đúng phân công. Admin giữ ma trận cũ, không cấp thêm MANAGE_INVOICES để làm demo pass. Các test center đã có được giữ lại. Kiểm request sai, sửa vai trò/ID, retry và race qua API, không seed dữ liệu vi phạm.
+
+Biên bắt buộc trước triển khai fixture cuối: T−48h−1ms/T−48h/T−48h+1ms; T−24h; T buổi đầu; minCapacity thấp hơn mặc định/bằng mặc định/bằng max/vượt max; Pending không tính khai giảng và khóa sửa min dù chưa Paid; cutoff end/23:59:59.999/00:00; callback tới trước/sau chốt với giữ chỗ đã hết; finalize/makeup/Refund retry đồng thời. Đây là danh sách kiểm cho phần sẽ triển khai, không là kết quả PASS của lượt review.
+
+**Cách tạo bộ nền sau duyệt:** schema baseline → fixture demo riêng có anchor/requestKeys/manifest → kiểm SQL/JPA/API sau commit → mới xuất SYSTEM-DATA. Dữ liệu demo được phân biệt với bản ghi gateway/ngân hàng thật; case quyền, tài chính và chống lặp vẫn phải kiểm qua API local. Fixture không gọi mail/VNPay/ngân hàng hoặc đổi toggle chế tài. Case sai thực hiện bằng request bị từ chối, không seed malformed rows để phá constraint. Chưa viết fixture theo state/API chưa triển khai.
+
+**SYSTEM-DATA.md sau duyệt:** một mục cho mỗi bảng hiện hành sau khi chốt migration, gồm mục đích, row demo/ID/FK/trạng thái/thời gian, case liên quan và trường cố ý NULL/rỗng. Có đầy đủ account/lớp/Coach và mapping mã fixture→ID thực để FE đối chiếu, không hardcode ID. Giữ nguyên tắc mã invoice không tái dùng; không xuất password_hash, OTP/QR secret, cookie/token, credential hoặc số tài khoản thật. Chứng từ chỉ là mẫu giả lập. Ngày/ID và nội dung file sinh từ cùng manifest với script để tránh hai bản lệch nhau; chưa tạo file trước duyệt.
+
+#### E. Các lựa chọn — đã được Owner chốt10/11, chưa triển khai Normal/Refund
+
+| Điểm | Ví dụ và đề xuất cụ thể |
+|---|---|
+| E1 — account/lớp/Coach | Owner đồng ý bộ dữ liệu chung10/11:47account,21Class,18Coach Active+1Inactive, lịch rảnh T2–T7. Bộ33account PDF giữ nguyên danh tính/hồ sơ/email/role và mật khẩu demo đã duyệt; chỉ thêm14account. ID liên kết sẽ thống nhất trong manifest khi reset, FE không dựa ID lịch sử. Các mốc48h/24h/2/3/dời1lần đã chốt, không hỏi lại |
+| E2 — Cash Normal tại quầy | **Owner duyệt10/11.** Member tự đăng ký Normal online dùng VNPay; Cash do Receptionist đăng ký + thu tiền nguyên khối. Giữ xử lý Pending cũ và Advanced. Cash tại quầy khi lớp đầy chỉ vào waitlist, chưa thu; khi lên chỗ không tự tạo Cash online nữa, kiểm lại cutoff/sĩ số/lịch và phương thức Member chọn. Chưa triển khai phần này trong lượt chỉ sửa GET RBAC |
+| E3 — thiếu xác nhận ởT−24h | **Owner duyệt phân tích/đề xuất10/11.** 24h là xác nhận khai giảng, khác Open nhận đăng ký;48h chốt đăng ký giữ nguyên. Lỡ24h thì cảnh báo, không tự khai giảng hoặc tự hủy; Manager được xác nhận trễ có reason, đủ mọi điều kiện và trước T. Đến T vẫn chưa có xác nhận thì chặn Ongoing, xử lý dời/hủy đúng policy. Lưu actor/time/lý do trễ và phiên bản lịch, không mở lại đăng ký để cứu sĩ số |
+| E4 — chuyển lớp/chênh giá | **Owner duyệt10/11:** cùng môn/giá/center, Member đồng ý rõ, lớp đích còn hạn/chỗ, chưa bắt đầu, đủ12buổi hợp lệ và không trùng lịch. Preview rồi recheck dưới khóa khi xác nhận, giữ hóa đơn gốc/link chuyển quyền; không phù hợp thì phương án hợp lệ khác hoặc hoàn đúng phạm vi. N11 Pickleball làm đích N05, tổng21Class giữ nguyên. Không mở chuyển khác giá/center hoặc sau cutoff |
+| E5 — xác minh người nhận | **Owner duyệt10/11:** BE chuẩn bị contact phone từ hồ sơ Member đúng quyền; FE quyết định dùng/hiển thị. Chỉ liên hệ khi bất thường và lưu kết quả; không thêm điện thoại ngân hàng/OTP/KYC, không chép phone vào chứng từ/log chung. Contact không thay xác minh người nhận hay đối soát giao dịch. Đổi receiver/amount sauApprove phải duyệt lại |
+| E6 — ngày làm việc/SLA | **Owner duyệt10/11:**7ngày TT mở theo lịch nghỉ, tính T7/CN nếu không đóng; không áp T2–T6 hoặc đổi7ngày lịch. ĐủApproved+receiver hợp lệ mới tính; ngày TT mở tiếp theo là ngày1, hết ngày7 giờVN là hạn chuyển. Thiếu thông tin vẫn giữ nghĩa vụ; quá hạn cảnh báo, không đóng case. Không dùng ngày nghỉ Coach làm ngày TT đóng |
+
+**Làm rõ E4 — kiểm tương thích và fallback:** chỉ đề xuất Normal cùng môn/cùng center, học phí đích khớp khoản học phí đã Paid của quyền gốc (không tin giá client, không dùng giá Subject mới để đổi chứng từ). Lớp đích Open, còn hạn nhận đăng ký48h, chưa bắt đầu, đủ12buổi hợp lệ tương lai; Coach Active/đủ chuyên môn, room đúng môn/Available/vừa maxCapacity, không vướng ngày nghỉ và lịch Member. Tính chỗ gồm Registered, Pending chưa hết hạn và chỗ chuyển đang được giữ hợp lệ; không lấy paidCount khai giảng làm occupancy. Chưa yêu cầu mọi lớp đích đã xác nhận khai giảng vì xác nhận có thể nằm sau cutoff nhận đăng ký; trả trạng thái/sĩ số để Member biết, không hứa chắc lớp sẽ mở chỉ từ preview.
+
+Preview không giữ chỗ. Khi Member đồng ý, transaction khóa đúng thứ tự và kiểm lại lịch/sĩ số/giá/quyền gốc/trạng thái hoàn tiền; giữ Invoice gốc, link chuyển quyền và không để vừa học lớp cũ/đích vừa hoàn cùng khoản. Nếu đã hết chỗ hoặc đổi lịch thì báo lựa chọn không còn hợp lệ, không tự thay bằng lớp khác. Nếu không có lớp phù hợp: trả danh sách rỗng và lý do; Manager có thể lập lớp mới hợp lệ hoặc dời khai giảng nếu còn đúng phạm vi một lần/consent. Nếu TT không cung cấp được trước khai giảng, Member được chọn hoàn100%; TT hủy hẳn thì chủ động tạo nghĩa vụ. Không phản hồi vẫn chờ, thiếu tài khoản nhận vẫn còn nghĩa vụ. Khác môn/giá/center và chuyển sau cutoff không tự mở ngoại lệ.
+
+**Làm rõ E5 — flow gốc và bước liên hệ đề xuất:** flow trong R§4 là Member cung cấp/xác nhận tài khoản → Manager duyệt → Receptionist chuyển ngoài SCMS/nộp chứng từ → Manager đối soát độc lập → Completed. File yêu cầu xác minh trường hợp khác tên/đổi bất thường, nhưng không bắt gọi điện và không có flow điện thoại. Bổ sung tối giản đề xuất chỉ chen **trước Approve**: khi thấy khác tên/nghi vấn, Manager dùng `users.phone` đã có để liên hệ làm rõ lựa chọn của Member, ghi kết quả rồi mới duyệt; nếu chưa rõ thì NeedInformation, không mất quyền hoàn. Không thêm số điện thoại ngân hàng, API gọi điện hoặc OTP mới; phone hồ sơ hiện chưa được xác thực bằng OTP, cuộc gọi không tự chứng minh tài khoản ngân hàng thuộc ai. Trường hợp bình thường đi thẳng qua bước duyệt; receiver thay sau Approve phải duyệt lại trước chuyển. Chưa có số liên hệ thì yêu cầu bổ sung/kênh xác nhận phù hợp, không tự từ chối nghĩa vụ.
+
+**Lịch sử thảo luận E6 — định nghĩa ở bảng trên đã thay thế phương án này:** T2–T6 là giả định lịch xử lý hành chính do BE đề xuất để định nghĩa “ngày làm việc”, không phải giới hạn chuyển khoản hay yêu cầu riêng từ file. Với project demo có thể bỏ lịch cuối tuần/ngày nghỉ bằng cách **đổi chính sách thành7ngày lịch liên tục** từ khi đã duyệt và đủ thông tin hợp lệ, ví dụ10/11 10:00→17/11 10:00 giờ VN. Không cần calendar mới/job nghỉ/SLA theo bank; chỉ dueAt, cảnh báo quá hạn và lý do xử lý. Tuy nhiên file R§7.10 đang chốt7ngày làm việc, nên phương án7ngày lịch là thay đổi cần Owner duyệt trước sửa, chưa tự đổi chữ trong file. Giữ Complete phụ thuộc xác minh thực tế, không vào thời hạn đơn thuần.
+
+#### F. Log theo trung tâm — giải thích và đề xuất10/11
+
+| Phần | Hiện trạng đã đọc ở source/contract | Đề xuất |
+|---|---|---|
+| Lưu center | `SystemLog` có category/centerId/scopeSource; `AuditProvenance` lấy target tin cậy ngay lúc ghi, không dùng center hiện tại của người thao tác để gán lịch sử | Tái sử dụng, mở mapping cho hồ sơ lifecycle/refund mới theo center của lớp/hồ sơ. Audit mới của fixture phải có nguồn, không đưa số tài khoản/chứng từ nhạy cảm vào detail |
+| Lọc quyền BE | `AuditQueryService` ép Manager BUSINESS+own-center, Admin SYSTEM_SECURITY; controller role AND VIEW_AUDIT_LOG. Không có center filter cho client | Manager không cần chọn center: BE tự khóa scope. Giữ guard hiện có, không tự mở Admin đọc toàn bộ log BUSINESS |
+| FE hiển thị | Contract trả mảng, centerId/category/scopeSource và header phân trang; chưa kiểm FE hiện hành đã đọc field/build đúng | Đề xuất nhãn trung tâm đang xem, thời gian/người/hành động/đối tượng/nội dung ngắn; center từ response/context tin cậy. Bố trí do FE quyết định. Đổi filter không được mở scope |
+| Cũ/không rõ nguồn | Migration18 thêm cột, không tự biết center của log cũ; log thiếu provenance không trả qua API scope này | Owner đã đồng ý bỏ audit demo cũ; tạo audit mới đúng nguồn trong fixture. Không backfill theo actor hôm nay để làm log “có center” |
+| Trạng thái phát hành | Nhóm scope log Phase1 đã có kiểm local; vẫn trong working tree chưa phát hành. Owner từng báo18 thành công, chưa chứng minh BE/FE mới đang chạy | Kiểm sau deploy bằng Manager đăng nhập/auth-me → GET audit-logs → đối chiếu center trong response và DB snapshot. Chưa gọi việc đọc source là nghiệm thu FE/live |
+
+Nguồn: [AuditQueryService](../src/main/java/com/sportscenter/audit/AuditQueryService.java), [AuditProvenance](../src/main/java/com/sportscenter/audit/AuditProvenance.java), [contract RP-43](01-API-CONTRACT-FE-BE.md#audit-scope-20261109). Đây là tái sử dụng scope đã triển khai; đề nghị mở Admin chọn center để đọc log nghiệp vụ toàn hệ thống, nếu có sau này, là quyết định quyền riêng.
+
+#### G. Kiểm lại DB demo, nguồn thiết kế và ngày làm việc —10/11
+
+**Dữ liệu thực tế:** đã đọc lại Supabase bằng transaction READ ONLY (không seed/reset/sửa lịch). Lớp19 Cầu lông Open,4Paid/Registered,900.000đ,center1, buổi đầu20/11; lớp21 Cầu lông Open cùng giá/center, buổi đầu23/11,12buổi Scheduled tương lai,2Paid/Registered trên max4. Sàng lọc bổ sung không thấy room/Coach/chuyên môn/ngày nghỉ hoặc overlap tài nguyên của lịch21 bị lỗi;2Member nguồn chưa ở21 và không thấy xung đột lịch khác,2Member nguồn đã có ghi danh21 nên không chuyển chồng. Có dữ liệu ứng viên nhưng không thể coi4người đều được chuyển vào2chỗ. Đây là quan sát tại thời điểm query, chưa có consent/transaction chuyển quyền hoặc API mới; cột activity19 cũng chưa có trên DB này, kiểm môn sân dựa snapshot bất biến migration13. Số liệu/mốc/query và giới hạn ở `normalDemoReadiness20261110` trong QA, không là nghiệm thu flow live.
+
+**Phân biệt dữ liệu:** bản `database/schema_postgres.sql` đã kiểm trước đây chỉ seed9template Advanced, không có Normal để demo chuyển lớp sau reset. Bộ21Class đang duyệt cũng mới là kế hoạch, chưa được seed. Trong kế hoạch, N05 Pickleball chưa có lớp đích Pickleball seed sẵn vì trước đó dự kiến tạo đích ở bước demo. Đề xuất điều chỉnh dữ liệu **N11 từ Cầu lông sang Pickleball, giá1.800.000đ** như N05, cùng center1, sân Pickleball02/Coach B/lịch khác và3Paid trên4chỗ; giữ luôn case Pending hết hạn/thanh toán muộn ở N11. Như vậy có sẵn cặp N05→N11, một chỗ để demo chuyển thành công rồi hết chỗ/fallback, không tăng số account/Class. Điều chỉnh fixture đã được Owner duyệt sau cùng10/11 và cập nhật bảng C; script reset chưa được đổi. Ví dụ Refund900.000đ vẫn dùng N12 Cầu lông. Không lấy cặp lớp rehearsal cũ làm bộ dữ liệu chuẩn cuối cùng.
+
+**Nguồn điều kiện tương thích:** L§3 yêu cầu chuyển lớp có Member đồng ý và giữ quyền lợi; R§1/2 yêu cầu phương án thay thế hoặc hoàn khi TT không tổ chức được. Cùng giá/cùng center được Owner duyệt10/11; cùng môn/đủ12buổi/tài nguyên/lịch/sĩ số là đề xuất kỹ thuật dựa guard hiện có của `NormalSchedulePolicy`, `SessionService`, `CoachCapacityService` và enrollment/payment, không lấy từ một đặc tả “lớp tương thích” có sẵn hoặc quy định bên ngoài. File chưa liệt kê đầy đủ bộ lọc nên phải ghi rõ đâu là yêu cầu/đâu là đề xuất. Dời ngày khai giảng giữ Class khác với chuyển19→21; dời giữ lớp phải đối chiếu toàn bộ12buổi mới và consent chứ không tìm lớp đích.
+
+**Điện thoại không phải file đính kèm:** Response resolution hiện chưa có contactPhone hay quy trình gọi điện. Thiết kế đề xuất hiển thị số liên hệ từ `users.phone` trong chi tiết Member/hồ sơ cho Manager có quyền; chỉ case bất thường mới liên hệ trước duyệt, ghi actor/time/kênh/kết quả gắn phiên bản người nhận trong lịch sử hồ sơ. Không yêu cầu đưa số vào ảnh/PDF ngân hàng, `evidence` text hoặc log chung. Khi đối soát sau chuyển, Manager kiểm giao dịch/số tiền/tài khoản/nguồn ngân hàng độc lập; cuộc gọi không thay chứng từ hay chứng minh tiền đã đến. Không thêm API điện thoại/OTP hoặc tự coi phone hiện có đã được xác minh.
+
+**Kết quả rà ngày làm việc:** chưa có định nghĩa lịch hành chính/SLA Refund riêng trong tài liệu quyết định/source/schema. `centers` hiện chỉ có id/name; không có working_weekdays/opening calendar. Source nhận daysOfWeek1..7 và weeklySlots MONDAY..SUNDAY; DB có slot Coach cả7ngày, buổi thực tế T2–T7, không suy Chủ nhật đóng chỉ vì chưa có buổi. Có `holidays`/ngày nghỉ Coach; D12 và `EntitlementTimePolicy` tính thời gian hoạt động sau khi trừ closure, không mặc định loại T7/CN. `Member.pdf`/`analysis 2410.pdf` không tìm thấy quy định lịch tuần chung qua phần text liên quan; ví dụ thứ Hai trong bản analysis là minh họa, không định nghĩa lịch trung tâm.
+
+Vì vậy T2–T6 từng nêu **không phải rule có sẵn**. Sau đối chiếu, đề xuất ưu tiên đơn giản **ngày làm việc Refund = ngày TT mở theo lịch nghỉ đã cấu hình; tính cả T7/CN nếu không đóng**. Tái dùng dữ liệu Holiday, không dùng ngày nghỉ cá nhân Coach để dừng SLA, không cần lịch ngân hàng/bảng tuần riêng. Owner đã duyệt cách hiểu này ở lượt chốt sau cùng10/11; file R đã được đồng bộ, không đổi thành7ngày lịch. Đề xuất7ngày lịch trước đó là phương án thảo luận, chưa được duyệt hoặc triển khai. Lịch Holiday hiện global nên không tự suy đã có calendar riêng cho từng center.
+
+**Trình tự đề xuất sau review:** (1) Owner sửa/duyệt B–E và các diễn giải A/D; (2) session triển khai riêng phần lifecycle/tiền/chứng từ đã thống nhất, có migration/test và giữ Advanced; (3) sinh fixture demo đã kiểm, xuất SYSTEM-DATA, đối chiếu FE; (4) chốt schema/deploy/FE smoke theo phạm vi Owner duyệt. Các thiết kế khác, mục5/R1/R2/validation tên sân để session mới. Không chạy reset còn thiếu bộ demo trước khi chốt dữ liệu này.
 
 **Yêu cầu đã thực hiện:** review06/11 tại [bản rà thiết kế](#design-review-20261106); sau đó Owner duyệt nhóm guard ưu tiên, xử lý tài liệu cũ và thêm kiểm từ ảnh BE-03. Phần local đã hoàn tất tại [checkpoint07/11](#priority-guards-20261107), kết quả chuẩn ở Active/QA. [P1–P7](#pending-policy-20261107) đã đối chiếu lại và rút bảng A/B; không hỏi lại các yêu cầu thiết kế đã rõ; không đóng toàn BE-01–BE-07.
 
 **Cập nhật sau xử lý conflict06/11:** bản ghép main/tai và kiểm hồi quy mới xem [Active](00-MASTER-CHECKLIST.md#active)/PR18; giữ các quyết định0/0.1, không coi merge là nghiệm thu FE/Render hoặc hoàn tất cả mục audit. Mốc Git/source của bàn giao trước chỉ mô tả lúc ghi; khi mở session mới phải kiểm git status/diff hiện tại.
+
+<a id="fe-refresh-plan-20261109"></a>
+### FE vừa cập nhật — danh sách cần kiểm lại và đề xuất hai phase — 09/11/2026
+
+**Chỉ đạo mới của Owner:** FE vừa có đợt cập nhật; các phát hiện UI/API đã báo được giữ làm **lịch sử/cần kiểm lại trên build mới**. Chưa có kết quả xác minh mới để kết luận đã sửa hoặc còn lỗi. Khi đọc các checkpoint/bàn giao cũ, trạng thái “FE chưa sửa”, ảnh401/403/400/405/500 và các checkbox là snapshot ở thời điểm ghi. LAN-1/LAN-2 giữ nguyên ngày/nội dung lịch sử; attendance dùng contract09/11 cho lần kiểm tới.
+
+**Mốc lập kế hoạch, trước triển khai Phase1:** lỗi từng quan sát, request bị từ chối đúng contract, yêu cầu tích hợp chưa nghiệm thu và khoảng trống BE từ review source là các loại khác nhau. FE cập nhật không thay bằng chứng kiểm BE đã có; chỉ mở bug hiện tại khi tái hiện trên đúng FE/BE build và có expected độc lập. Lúc lập danh sách chỉ sắp xếp tài liệu; kết quả triển khai sau đó ở [review1–4](#phase1-review-20261109), bằng chứng hiện hành tại Active/QA.
+
+| Mã | Điều đã báo/đưa vào bàn giao | Loại và điều cần kiểm trên FE mới |
+|---|---|---|
+| F01 | Coach đổi dropdown buổi nhưng detail, attendance/form sửa còn dữ liệu buổi cũ; payload từng dùng attendanceId85 | Quan sát UI cũ. Kiểm đổi buổi/đổi nhanh, response về muộn, sessionId+memberId+attendanceId và form cùng ngữ cảnh; record chưa có không lấy kết quả buổi trước. Chưa kết luận riêng hàm gửi ID sai |
+| F02 | Ghi attendance từng gọi correct403, check-in400 LOBBY_CHECKIN_DISABLED hoặc POST root attendances405 | Request cũ theo policy/build cũ. Kiểm chọn đúng training-results trong buổi và correct sau end theo D15 mới; Coach đúng phân công/trong cutoff được sửa, Coach khác/quá hạn vẫn bị chặn. Check-in cửa vẫn tắt, root vẫn không có POST |
+| F03 | Payload từng có Late; chưa chứng minh ghi thành công/readback; note trước đây chưa có trong response | State mới chỉ Present/Absent, dữ liệu Late lịch sử vẫn đọc được. Kiểm first-write/bulk/QR nếu dùng, badge sau POST lỗi, note đọc→gửi→lưu→tải lại ở Coach/Member và metadata hạn sửa. Note/cutoff09/11 là tích hợp mới cần nghiệm thu, không mặc định FE đang thiếu |
+| F04 | Coach từng gặp403 ở hai GET enrollment lớp23; sau đó roster lớp10 đã trả200 | Giữ cả lỗi cũ và kết quả thành công đúng phạm vi. Kiểm phân công/tài khoản/authority trước khi kết luận403 sai; không tự mở quyền hoặc coi mọi roster đã đạt |
+| F05 | Member GET training-results403; Member gọi payment-resolutions403 | **Owner xác nhận OK09/11** cho mục đã báo. Giữ lịch sử và quyền hiện hành; không mở lại chỉ vì thiếu log của snapshot cũ, không suy thành nghiệm thu toàn bộ ma trận Member |
+| F06 | Normal từng bị PACKAGE_EXPIRED dù chưa mua gói chung; catalog lớp17 từng404 | **Owner xác nhận OK09/11** cho mục đã báo, gồm nhánh catalog trong nhóm này. Không yêu cầu kiểm lại mặc định; chỉ mở lại khi có diff/failure/nghi vấn liên quan |
+| F07 | Nội dung trống “sau khi Backend ghi nhận”, tên “Gói hội viên”, thao tác mua/gia hạn gói chung hoặc enroll Advanced qua tuyến chung | Yêu cầu tích hợp/câu chữ của LAN-1, không phải mọi mục đều có request lỗi đã xác nhận. Kiểm FE mới phản ánh đúng quyền Advanced/khóa Normal, dùng advanced-registrations và không còn đi vào API legacy đã đóng. FE quyết định cách trình bày |
+| F08 | Các màn chưa thống nhất quyền confirm-cash của Receptionist/Manager và quyền xử lý hồ sơ tiền | Điểm rà/bàn giao, cần đối chiếu UI mới với D10/D16. Receptionist xác nhận Cash theo quyền hiện hành; duyệt/hoàn tất CashCorrection là thao tác khác, không suy thêm quyền từ nút hiển thị |
+| F09 | Log401 cũ trên auth/me và nhiều API; phản hồi Access Denied/phiên | Chưa quy nguyên nhân cho BE hoặc kết luận login hiện tại hỏng. Kiểm cookie/proxy và cách FE xử lý401, ACCOUNT_NOT_ACTIVE, SESSION_ROLE_CHANGED, PASSWORD_CHANGE_REQUIRED;403 nghiệp vụ không mặc định logout |
+| F10 | Báo vắng từng200 nhưng thiếu Absent; room/sĩ số thay đổi cần FE tải lại | BE đã sửa/kiểm local, room/capacity migration cũ đã có xác nhận Owner. Kiểm notice+Absent/readback, roster/roomCode/maxCapacity theo response. Không mặc định FE còn hardcode hoặc yêu cầu chạy lại migration cũ |
+| F11 | GET me/subscriptions sai tuyến; Admin dashboard0, activeSubscriptions11, revenue khác dashboard,12buổi nhưng13session, F-06/F-07 từng500 | Nhóm API/số liệu lịch sử cần đối chiếu riêng. Có trường hợp đúng contract/cách đếm; F-06/F-07 từng có lượt trả200. Dùng đúng endpoint/kỳ/phạm vi/buổi hợp lệ, không ép số liệu demo hoặc sửa dữ liệu để khớp snapshot |
+| F12 | VNPay từng thành công ở gateway nhưng Pending/Expired tại SCMS; tích hợp xác minh/readback | **Owner xác nhận OK09/11** cho luồng VNPay đã báo. QueryDR là nhánh riêng: Owner nhớ đã tắt/không dùng; rà/chốt lại khi đến Phase2 mục3, không coi xác nhận này là QueryDR live PASS và không tự bật lại |
+
+Nguồn chi tiết: [LAN-2](../SCMS-BAN-GIAO-FE-RBAC-LAN-2-2026-11-07.md), [LAN-1](../SCMS-BAN-GIAO-FE-RBAC-LAN-1-2026-11-06.md), [room/báo vắng](../SCMS-BAN-GIAO-FE-2026-11-02.md), [VNPay](../SCMS-BAN-GIAO-FE-VNPAY-2026-11-04.md), [attendance09/11](../SCMS-BAN-GIAO-FE-ATTENDANCE-2026-11-09.md). Không dùng expected “Coach luôn403 sau end” của LAN-2 cho contract mới.
+
+**Phase1 đã được Owner duyệt — thực hiện mục1–4, dừng trước mục5.** Số thứ tự dưới đây đồng bộ với phần trả lời Owner đã duyệt: mục4 gồm giá lớp **và** sân đúng môn; mục5 là R1/R2. Giữ diff hiện có. Ưu tiên kiểm/chốt được bao nhiêu trước bàn giao thì làm bấy nhiêu để FE nhận nhanh; không tự chạy cloud/seed/live ngoài phạm vi.
+
+**Điều phối mới nhất — Owner09/11, audit và dựng lại DB demo:** thay phương án sửa riêng buổi164 bằng rà toàn DB hiện tại và chuẩn bị một [schema dựng lại sạch](../database/schema_postgres.sql). Mọi dữ liệu SCMS là demo; đã bổ sung nguyên tắc double-check/phản biện và xưng Tôi–Bạn trong AGENTS.md. Phạm vi đọc cloud, kiểm local và script chạy lại theo [Active](00-MASTER-CHECKLIST.md#active)/QA; hướng dẫn tại [docs02](02-DEPLOYMENT-GUIDE.md#demo-rebuild-20261109). Không tiếp tục yêu cầu consent cho ca164 hoặc tự tạo incident để vượt19. Sau Owner chạy schema thành công mới push/deploy, kiểm FE đơn giản rồi trình đề xuất mục5, validation độ dài tên/khu vực sân và policy chưa chốt để duyệt; chưa triển khai các mục đó.
+
+**Lịch sử deployment buổi164 — đã được yêu cầu dựng lại thay thế:** query xác nhận Tennis Advanced dùng sân Bắn cung nên guard19 chặn đúng. Không có thao tác đổi sân/consent/incident nào được thực hiện. Pending của user40 là trạng thái OTP hợp lệ, không là dữ liệu rác; audit đã sửa tiêu chí. Log thiếu provenance là legacy cần phân biệt với lỗi dữ liệu, không tự suy toàn DB hỏng từ vài phát hiện. Giữ lịch sử phản ánh FE để kiểm lại trên build mới.
+
+| Thứ tự | Nhóm công việc | Phạm vi/kết quả cần có |
+|---|---|---|
+| 1 | R3, BE-01/03/04: scope và ma trận quyền | Coach A/B, Member A/B cùng center; roster/session/attendance/result/plan/evaluation/assigned members/feedback/at-risk/Advanced. Tái dùng kiểm đã đạt, bổ sung ô thiếu; tách lookup chung khỏi dữ liệu riêng. Giữ guard/test center đã có, không mở lượt rà center khác |
+| 2 | TK08/TK10: validation và RBAC | Status thiếu/sai không tự thành Active; permission ID sai không âm thầm thay tập quyền một phần. Tách lookup role khỏi xem/sửa full matrix. Guard quản trị cuối cùng hoặc quyền đọc chưa đủ căn cứ không được tự thành rule mới |
+| 3 | RP-43, BE-06: audit/report | Scope Admin hệ thống/bảo mật, Manager nghiệp vụ/tiền trong center; query/provenance/filter/phân trang, giới hạn log legacy. Không suy center lịch sử từ actor hiện tại hoặc xóa log; report theo D13/D18 |
+| 4 | RP-13/P5 và TK05/P4: giá lớp, sân đúng môn | Subject là mặc định, actor có quyền định giá Normal khi tạo/công bố; giữ Invoice/purchaseAmount cũ và Advanced lấy Subject. Tài nguyên đúng môn dùng kiểm nhất quán, theo mô hình đã duyệt; không thêm rooms.subject_id hoặc suy quan hệ từ mã/tên có thể sửa. Điều kiện đổi giá sau công bố/Pending/người học còn thiếu phải trình riêng |
+| 5 | **DỪNG — review1–4 và đề xuất R1/R2 cho session mới** | Làm bảng trước/sau hoặc hỏi/trả lời cho mục1–4: thay đổi/giữ lại, API/DB/FE ảnh hưởng, expected và kiểm đã đạt/chưa đạt, điểm còn cần Owner chốt. Sau đó đề xuất riêng R1/R2 để Owner duyệt trước khi tiếp tục ở session mới; không triển khai R1/R2 trong lượt1–4 |
+| 6 | BE-01–BE-07/TK11 và readiness còn lại | Contract/error/legacy, ma trận còn thiếu, build/schema/bàn giao và phạm vi P1.5/gói T. Chưa triển khai vượt điểm dừng mục5; không chạy lại SQL16 hoặc tự coi API/DB/cloud đã nghiệm thu |
+
+**Điều kiện ra Phase1:** mỗi nhóm nêu expected độc lập, fixture và phần đạt/chưa đạt; test đích rồi clean test cho nhóm BE, PostgreSQL local khi query/lock/commit cần kiểm; contract/schema/bàn giao khớp source đã kiểm. Các lựa chọn nghiệp vụ còn thiếu được trình bằng ca cụ thể, không hỏi lại Dxx đã chốt. Phê duyệt rà/sửa phần đã rõ không mặc nhiên phê duyệt mọi phương án R1/R2, quyền đọc full matrix, ca lịch sử hoặc guard quản trị cuối cùng.
+
+<a id="phase1-review-20261109"></a>
+### Review Phase1 mục1–4 — trước điểm dừng mục5
+
+**Phạm vi:** implementation BE local, contract và migration riêng. Không sửa FE, không sửa LAN-2 ngày07/11, không thực thi SQL cloud/SQL16 hoặc phát hành bản BE Phase1. Trạng thái test/SHA/fingerprint chuẩn duy nhất tại [Active](00-MASTER-CHECKLIST.md#active)/`phase1Implementation20261109` trong QA; chưa suy thành nghiệm thu FE/Render/CRUD/live.
+
+| Mục | Trước | Sau / phần giữ lại | Ảnh hưởng và giới hạn cần review |
+|---|---|---|---|
+| **1 — R3** | Có owner/assignment/center guard ở các luồng học tập; thêm authority vẫn có thể đi qua API feedback có danh tính, at-risk toàn center và DTO hồ sơ quản trị | Chặn Coach/Member đọc DTO staff kể cả thêm quyền; Coach dùng roster và feedback ẩn danh/at-risk `me`. Kiểm ID/filter/coachId trên session/attendance/result/plan/evaluation và hàng chờ Advanced; denied không mutation/audit. Giữ lookup classes/rooms và guard/test center hiện có | FE gọi đúng endpoint theo luồng; không mở rộng quyền để tránh403. Các trường hợp đổi phân công rồi đọc lịch sử, hủy/đảo quyền chưa có quyết định vẫn giữ giới hạn cũ. Không đóng toàn bộ BE-01–BE-07 hoặc full CRUD từ nhóm này |
+| **2 — TK08/TK10** | Status thiếu/sai rơi về Active; ID permission sai có thể làm thay tập quyền một phần | Status explicit thiếu/sai400, default khi tạo vẫn riêng. Validate toàn bộ permission IDs trước thay, khóa role và audit trước/sau cùng transaction; ID lặp gộp, tập rỗng giữ nghĩa API cũ | FE xử lý400, không tự coi tài khoản đã mở khóa hoặc lưu quyền thành công. GET role lookup chưa đổi; quyền đọc full matrix và guard quản trị viên cuối cùng chưa tự bổ sung |
+| **3 — RP-43/report** | GET audit chỉ có authority, trả toàn bộ log, thiếu center/loại/provenance/phân trang | Admin SYSTEM_SECURITY, Manager BUSINESS own-center; snapshot target tại sự kiện, query/filter/date/page không mở scope, mảng+header tổng số. Report giữ D13/D18, Admin center NULL không thành report global | Migration18; log legacy/target chưa rõ vẫn giữ DB nhưng chưa trả qua API scope. FE cần đọc mảng và header phân trang. Không suy center lịch sử từ actor hiện tại hoặc gán lại dữ liệu cũ |
+| **4 — giá Normal/sân đúng môn** | tuitionFee nhận nhưng override bị bỏ; room chỉ kiểm Indoor/Outdoor/capacity, chưa chứng minh phục vụ đúng môn | Admin/Manager+MANAGE_CLASSES chọn giá tạo/công bố đầu tiên; Subject mặc định, đơn lấy Class đã duyệt, tiền cũ giữ nguyên, Advanced theo Subject. Thêm activityType độc lập tên/mã, dùng chung guard/khóa khi cấu hình và ghi lịch, admission chỉ tính sân đúng môn | Migration19–20. Chưa rõ loại sân thì chặn lịch mới, không sửa lịch sử. Giá khác ở lớp đã công bố/legacy/có đơn trả409 rõ; quyền định giá lại sau công bố/Pending/người học chưa mở. Indoor/Outdoor và giờ D04 giữ rule hiện hành |
+
+**Ma trận bằng chứng theo luồng:** dưới đây là nhóm đã kiểm/reuse trong suite local hiện hành; không phải bảng cấp thêm quyền.
+
+| Nhóm API | Expected bảo vệ / kiểm được | Bằng chứng hoặc phần còn mở |
+|---|---|---|
+| Roster/enrollment và Member được giao | Coach đúng lớp đọc; B cùng center không lấy roster A bằng classId/memberId hoặc thêm authority; Member owner từ phiên | RbacGuardIntegrationTest và PhaseWorkflowHttpTest giữ các kiểm đã có; không suy mọi alias/CRUD đều đã nghiệm thu FE |
+| Session, attendance, result | List/filter chỉ thu hẹp owner/Coach; detail sai phân công403, list không trả record ngoài scope; lịch sử/note/check-in không bị test đọc sửa | RbacGuardIntegrationTest, SessionPrivacyTest, TrainingResultAccessIntegrationTest, AttendanceCorrectionIntegrationTest |
+| Plan/evaluation | Coach đúng authority/phân công; Manager/Member có thêm authority không ghi chuyên môn. Member đọc plan lớp của mình, không đọc plan riêng người khác | RbacGuardIntegrationTest; chưa mở quyền cho ca lịch sử sau hủy/đổi Coach |
+| Feedback/at-risk/DTO staff | Feedback Coach ẩn danh, filter Coach khác không mở dữ liệu; at-risk theo phiên. DTO quản trị riêng không thành lookup Coach/Member | Test phiên login/auth-me thật với extra authority, read không ghi audit; common classes/rooms vẫn đọc được |
+| Advanced queue/decision/book/reschedule | Coach A/B chỉ thấy hàng chờ mình; B không quyết định đơn A, Member không order đơn người khác; retry decision không audit lặp. Book/dời/thay dùng quyền Paid/phân công/lịch và sân đúng môn | RbacGuardIntegrationTest, PhaseWorkflowHttpTest, PrivateSessionServiceTest, SessionIncidentServiceTest, ScheduleDatabaseTest theo môi trường được bật. Skip không là PASS |
+| Audit/report | Scope khác nhau theo role/authority, date trọn ngày, filter/page không vượt scope; đổi center actor không chuyển log cũ; log thiếu provenance vẫn giữ DB | RbacGuardIntegrationTest và ReportServiceTest; kết quả PG/commit/migration tại Active/QA. Không thay report scope của Admin |
+| Giá/tài nguyên | Giá950000 đã công bố tạo đơn950000 dù Member gửi amount1; Subject đổi không đổi đơn; giá975000 ở draft lần công bố đầu, giá không hợp lệ từ chối. Cấu hình room và tạo lịch tranh chấp không tạo lịch sai môn | PublicationResourceHttpTest với trạng thái sau commit/race; migration guard/replay/snapshot bất biến theo runner riêng. Không có kiểm FE/Render mới |
+
+**Giải trình fixture:** rule sân đúng môn cần fixture khai báo activityType và Subject chuẩn, thay cho room chưa rõ loại/custom slug không phải môn catalog. Các test tiền/enrollment/Coach/QueryDR giả lập giữ expected nghiệp vụ; test totalSpent của staff DTO dùng actor Manager hợp lệ, vẫn giữ assertion chỉ cộng Paid. Test đăng ký Normal lặp giữ400 ALREADY_ENROLLED hiện hành và kiểm không nhân đơn, không đổi endpoint thành trả lại201. Không nới rule hoặc đổi dữ liệu thật để làm test xanh.
+
+**Khoảng trống kỹ thuật phát hiện khi kiểm PG, để mục6/CRUD sau điểm dừng:** DB giới hạn room_name50/location100, nhưng RoomRequest/JPA chưa diễn đạt đầy đủ các giới hạn này; tên quá dài hiện có thể409 do constraint thay vì400 validation rõ. Fixture mới dùng tên hợp lệ; không tăng giới hạn DB hoặc tự sửa luồng CRUD ngoài nhóm được duyệt. Đây là quan sát BE local từ dữ liệu kiểm, không phải lỗi FE mới đã xác nhận. Fixture hóa đơn Cash cần đủ subtype Receptionist và flush trước invoice theo FK PostgreSQL; không đổi model/guard tài chính để bỏ FK.
+
+<a id="phase1-item5-proposal-20261109"></a>
+### Mục5 — đề xuất để Owner duyệt cho session mới, chưa triển khai
+
+| Mục | Ví dụ cụ thể / đề nghị | Giới hạn cần Owner duyệt |
+|---|---|---|
+| **R1 — nên làm tiếp** | Session05/11 có Present và Absent với checkInTime:null. Lọc ngày05/11 hiện có thể bỏ Absent vì so timestamp check-in. Đề nghị startDate/endDate của attendance gắn Session lọc theo sessionDate, bao gồm trọn hai đầu ngày; record lobby lịch sử không Session giữ checkInTime | Chốt nghĩa filter này trước sửa contract/source/test. Chỉ GET, giữ scope và bản ghi cũ; correction muộn không giả giờ check-in. Kiểm Present/Absent/null/date boundaries/filter kết hợp và lobby legacy local; không cần setup buổi trên cloud |
+| **R2 — đề nghị chưa mở API mới** | Buổi kết thúc07:30, Coach muốn bổ sung content chuyên môn08:00. Correct D15 đã sửa note/state tới trước nửa đêm, không đồng nghĩa sửa content; evaluations không gắn sessionId nên không tự thay thế mọi nội dung theo buổi | Ưu tiên xác nhận nhu cầu thực tế trên FE mới. Nếu Owner cần, đề xuất riêng content-only cho result có sẵn, đúng Active Coach+RECORD_RESULT/phân công/center, end→cutoff ngày buổi, audit trước/sau và reason nội bộ; không đổi attendance/check-in/credit/lịch. Chưa có result, buổi hủy/không tổ chức/đổi Coach cần xét riêng; không tự tạo nội dung hoặc mở quyền lịch sử |
+
+**Điểm dừng:** Owner review bảng1–4 và chọn/chỉnh hướng R1/R2; chỉ tiếp tục mục5 sau phê duyệt trong session mới. Mục6/readiness và Phase2 chưa được suy là đã hoàn tất. Flow/câu chữ/bố trí UI vẫn do FE quyết định.
+
+**Phase2 được đồng ý với điều chỉnh — nghiệm thu chung FE mới / Render / CRUD.** Chỉ chạy ca phụ thuộc khi đúng source/build/schema và account/fixture được phép.
+
+1. Xác định build mới rồi kiểm các mục lịch sử còn lại; F05/F06/F12 đã được Owner xác nhận OK, chỉ kiểm lại khi có diff/failure/nghi vấn liên quan. Mỗi kết quả có môi trường/build/actor/response/readback phù hợp; không mặc định lỗi cũ còn tồn tại.
+2. Gom CRUD/nghiệp vụ năm role: Coach attendance/note/correction/plan/evaluation/feedback/at-risk/Advanced; Member và staff Normal/Advanced/catalog/roster/lịch/phòng/sĩ số, Cash/VNPay/receipt/resolution,12h/45 ngày/credit/báo vắng/hủy/dời/sự cố/bù theo Dxx. Kiểm lưu sau commit và retry; A/B cùng center, giữ guard/test center đã có.
+3. **Tích hợp — rà/chốt khi đến mục này:** Google/avatar để **sau khi bàn giao các phần Phase2 khác**. OTP cơ bản register→nhận mã→verify→login đã được Owner xác nhận xong; các biên sai/hết hạn/dùng lại/giới hạn là phạm vi QA cần cân nhắc, không đồng nghĩa tính năng OTP chưa xong và không bắt chạy lại luồng đã đạt. AI chưa hoàn tất: cần rà trạng thái thực tế rồi chốt phần còn lại. QueryDR dùng xác minh thanh toán VNPay, độc lập OTP; quyết định trước ghi giữ code/bảng/migration, Owner nay nhớ đã tắt/không dùng. Khi đến đây đối chiếu quyết định, cấu hình được phép xem và hành vi thực tế để chốt dùng/tắt/để sau; **không tự bật lại, xóa metadata/bảng hoặc sửa env**. Kênh ngoài/provider/email/gateway/live chỉ theo phạm vi được duyệt.
+4. Xử lý phiên UI trong lượt chung sau flow; đối chiếu năm role và đóng từng tiêu chí bằng PASS/FAIL/BLOCKED/NOT_RUN.403 đúng quyền được giữ. Chỉ sửa lỗi còn tái hiện theo rule đã chốt; lựa chọn mới trình ví dụ cụ thể. Không gom Google/avatar vào việc chặn bàn giao các phần khác.
+
+**Điểm dừng Owner đã chốt:** thực hiện Phase1 mục1–4 theo thứ tự; trước mục5 gửi bảng so sánh/review và đề xuất mục5 để duyệt cho session mới. Phê duyệt này không mở quyền seed/reset/SQL cloud/live test. Không chỉnh các bản bàn giao ngày cũ thành bằng chứng FE mới.
+
 
 - [x] **0 — Hai403 của Member, phần BE local và tài liệu:** đã sửa training-results, rà năm role payment-resolutions và ghi yêu cầu FE. Chưa deploy/nghiệm thu Render/FE.
 - [x] **0.1 — Bỏ điều kiện gói chung cho Normal, phần BE local/tài liệu:** đã sửa và kiểm đăng ký/waitlist, thanh toán, owner/center/lịch, retry/race và giữ liên kết cũ. 0.1-B/C đã kiểm local, SQL16 đã được Owner xác nhận PASS; chưa deploy/kiểm Render/FE. Catalog/17 còn mở.
 - [x] **0.1-B — Đóng tuyến ghi danh Advanced cũ:** hai tuyến enroll chỉ nhận Normal; không tự thăng waitlist Advanced. Test đích/clean đã đạt; final PG workflow sau migration cũng đạt. Chưa deploy Render.
 - [x] **0.1-D — Loại mô hình gói chung:** BE đóng API cũ đã kiểm local; Owner gửi SQL16 PASS trên Supabase, model_retired=true, tất cả bộ đếm xóa/tháo liên kết0. DB không có dữ liệu cũ cần xóa; trigger/marker đã áp dụng theo kết quả này. Agent không tự truy vấn cloud; BE còn cần deploy.
 - [x] **0.1-A — CashCorrection, BE local:** sau Owner xác nhận SQL16 PASS đã bỏ suy luận phụ thuộc theo thời gian; Normal Pending/Paid độc lập không chặn. Giữ liên kết thật/D16, kiểm lại khi Complete, giữ hóa đơn/ghi danh Normal và Paid/amount gốc; kiểm H2/PG theo docs00/QA, chưa deploy.
-- [ ] **BE-01 — Ma trận quyền:** đã bắt đầu đối chiếu contract/controller/service/test, ghi [ma trận quan sát và điểm chờ Owner](#be01-review-20261106); chưa công bố policy toàn API/năm role. Giữ phần đã chốt ở0/0.1; dừng trước sửa quyền đọc roles/permissions vì chưa có quyết định nghiệp vụ.
+- [ ] **BE-01 — Ma trận quyền:** đã bắt đầu đối chiếu contract/controller/service/test, ghi [ma trận quan sát và điểm chờ Owner](#be01-review-20261106); chưa công bố policy toàn API/năm role. Giữ phần đã chốt ở0/0.1; GET roles/permissions/role detail đã được Owner chốt và kiểm local10/11, phần matrix/quyền ghi còn lại vẫn mở.
 - [ ] **BE-02 — Phiên và401:** đã kiểm local quyền hiện hành/Inactive/đổi role/registry thu hồi/password và public IPN; chưa đủ nghiệm thu vòng đời cookie/timeout/proxy/Render hoặc quy nguyên nhân401 cũ. Xem checkpoint07/11.
 - [ ] **BE-03 — Phạm vi Coach:** đã kiểm hai GET enrollment đúng/sai phân công, bỏ filter/thêm authority/khác center/buổi kết thúc và giữ chặn ghi; guard ghi plan/evaluation có kiểm actor/phân công. Ảnh lớp23 chưa có auth/me/assignment/runtime SHA để kết luận live. Các nhóm Coach còn lại và toàn bộ ma trận vẫn mở.
 - [ ] **BE-04 — Phạm vi Member/IDOR:** training-results đã kiểm ID từ phiên, bỏ filter/đổi ID/thêm authority; Normal từ chối gửi memberId khác. Tái sử dụng workflow invoice/subscription làm bằng chứng riêng từng API; chưa bao phủ toàn bộ nhóm.
 - [ ] **BE-05 — Xác nhận Cash:** có policy Receptionist+MANAGE_INVOICES và workflow center/state/retry/race/commit; chưa đủ ma trận riêng năm role. Không nhầm với quyền Manager duyệt CashCorrection ở0.1-A.
-- [ ] **BE-06 — Report/audit log:** chưa rà riêng; D18 cho report, policy audit riêng; kiểm role/authority/center và filter/phân trang.
+- [ ] **BE-06 — Report/audit log:** nhóm RP-43 đã triển khai scope/provenance/filter/phân trang và kiểm local theo [review Phase1](#phase1-review-20261109); report giữ D13/D18. Chưa đóng toàn bộ ma trận/legacy hoặc nghiệm thu FE/Render.
 - [ ] **BE-07 — Contract401/403:** chưa rà riêng; đối chiếu filter/handler/OpenAPI; tách yêu cầu có sẵn khỏi đề xuất error code/request ID mới.
 
 ## 0 — Hai request403 của Member
@@ -138,9 +598,9 @@ Nguồn thực thi: [EnrollmentService](../src/main/java/com/sportscenter/enroll
 
 | Method / endpoint | Role/authority tại controller hiện tại | Phạm vi owner/center trong source đã đọc | Từ chối theo source / phần thiếu |
 |---|---|---|---|
-| GET `/api/roles` | Không yêu cầu role/authority bổ sung: cả năm role có phiên đều qua gate | RoleService đọc danh mục role toàn hệ thống, trả cả danh sách permission của từng role; không filter center | Anonymous401; chưa có403 riêng theo role. Chờ Owner chốt ai được đọc |
-| GET `/api/roles/{id}` | Như GET roles | Đọc role theo ID toàn hệ thống, gồm permissions | Anonymous401; ID không có404; chưa có403 riêng theo role. Chờ cùng quyết định |
-| GET `/api/permissions` | Như GET roles | Đọc toàn danh mục permission, gồm id/name/description | Anonymous401; chưa có403 riêng theo role. Chờ cùng quyết định |
+| GET `/api/roles` | Owner10/11: Admin Active; role khác403 dù có authority quản trị | Đọc danh mục role toàn hệ thống, gồm permissions; không filter center | Anonymous401; trạng thái kiểm/phát hành ở Active/QA, thay gate cũ cho cả năm role |
+| GET `/api/roles/{id}` | Cùng gate Admin để tránh lách qua ID | Đọc role toàn hệ thống, gồm permissions | Admin: ID không có404; role khác403 trước đọc dữ liệu |
+| GET `/api/permissions` | Owner10/11: Admin Active | Toàn danh mục permission, giữ DTO | Anonymous401; role khác403; không tự đổi gate ghi PUT |
 | PUT `/api/roles/{id}/permissions` | `MANAGE_PERMISSIONS`; không AND role Admin | Đổi permission của role dùng chung toàn hệ thống; service lấy actor để audit, không có scope center | Thiếu authority403; role không có404. Chưa có quyết định xác nhận chỉ authority là đủ; chưa đổi quyền |
 | GET `/api/users`, `/api/users/{id}` | `MANAGE_USERS` OR `MANAGE_RBAC`; không gate theo tên role | UserService dùng findAll/findById, chưa thấy filter owner/center ở hai đường đọc này | Thiếu authority403; ID không có404. Thiếu đối chiếu đầy đủ policy/fixture center, không coi findAll là quyết định cho phép xuyên center |
 | GET `/api/members`, `/api/members/{id}`; GET `/api/staff` | members: `MANAGE_USERS` OR `REGISTER_MEMBER`; staff: `MANAGE_USERS` | Các đường đọc đã xem dùng danh sách/ID toàn cục, chưa thấy scope center; không lấy guard tạo tài khoản làm guard cho đọc | Thiếu authority403; member ID không có404. Chưa nghiệm thu role/owner/center của CRUD; chưa sửa trong lượt này |
@@ -150,7 +610,7 @@ Source đối chiếu: [RoleController](../src/main/java/com/sportscenter/user/R
 
 **Test/chứng cứ:** [RoleServiceTest](../src/test/java/com/sportscenter/user/RoleServiceTest.java) chỉ kiểm actor audit khi đổi permission bằng gọi service trực tiếp với authority rỗng; không chứng minh HTTP cho phép/từ chối role đó. Tìm literal ba nhóm `/api/roles`, `/api/permissions`, `/api/audit-logs` trong `src/test` chưa thấy test HTTP đích; không suy không có mọi hình thức test gián tiếp. [AuthorizationHttpTest](../src/test/java/com/sportscenter/config/AuthorizationHttpTest.java) dùng service mock cho gate một số workflow, không kiểm center/state commit. Bằng chứng integration đã có cho0/0.1 tiếp tục dùng đúng phạm vi tại Active/QA, không chạy lại hoặc gán thành PASS mới.
 
-**Điểm dừng cần Owner chốt:** Member đã đăng nhập, không first-login, gọi GET `/api/roles` hiện có thể đi đến response chứa cả quyền của Admin/Manager; GET `/api/permissions` cũng không có gate quản trị. Audit xếp nhóm này dưới Admin nhưng không phải quyết định Owner; docs01 chưa chốt ai được đọc. Cần xác nhận giữ ba GET cho cả năm role hay giới hạn người quản trị (chỉ rõ role/authority, ví dụ Admin AND `MANAGE_PERMISSIONS`). Không dùng quyền ghi PUT để tự suy quyền đọc và không tự thêm/bỏ gate.
+**Đã được Owner chốt10/11:** ba GET danh mục/chi tiết chỉ Admin Active, không thêm yêu cầu MANAGE_PERMISSIONS cho quyền đọc; không dùng authority phụ để mở Manager/Coach/Member/Receptionist. Triển khai/kiểm theo Active/QA. Quyết định này thay điểm chờ ai được đọc trước đây, không tự chốt quyền ghi hoặc guard quản trị cuối cùng.
 
 **Phần ma trận còn thiếu / bước tiếp sau quyết định:**
 
@@ -328,7 +788,7 @@ Căn cứ trực tiếp: [Member.pdf](../Member.pdf) trang6 RP-04/RP-13/RP-36/RP
 
 | Nhóm | Trạng thái thực tế | Phần còn thiếu / bước đúng phạm vi |
 |---|---|---|
-| C01 — Attendance UI và first-write | UI không đồng bộ đã có evidence; LAN-2 đã soạn, source FE chưa sửa. Coach correction403 và lobby400 đã giải thích | Owner đã chọn chờ phản hồi FE; ghi đơn/bulk/readback, QR nếu dùng và correction quản lý đưa vào đợt nghiệm thu chung sau. FE xác định source Pages và xử lý LAN-2; không chặn lượt rà BE bằng việc đợi test UI. D15 ngày09/11 đã mở correction của Coach đúng buổi tới hết ngày; BE đã triển khai theo checkpoint09/11/Active; ca trong hạn đưa vào nghiệm thu FE/live sau. Coach khác/quá hạn vẫn bị chặn |
+| C01 — Attendance UI và first-write | Lịch sử07/11 có evidence UI không đồng bộ và các request đã giải thích trong LAN-2. Owner09/11 báo FE vừa cập nhật; trạng thái hiện tại cần kiểm lại theo [kế hoạch mới](#fe-refresh-plan-20261109), chưa kết luận còn lỗi | Gom ghi đơn/bulk/readback, QR nếu dùng và correction vào đợt chung. Xác định FE build mới rồi kiểm lại, chỉ sửa phần còn tái hiện. D15 ngày09/11 cho Coach đúng phân công sửa tới cutoff; BE đã triển khai theo Active. Coach khác/quá hạn vẫn bị chặn; không dùng expected Coach luôn403 sau end của bản07/11 |
 | C02 — Giáo án/đánh giá RP-36 | Guard Coach + authority + assignment/actor/center và CRUD đích đã sửa/kiểm local theo Active/QA; contract đã có | Owner để CRUD FE/Render vào đợt chung sau; chưa có bàn giao chuyên luồng mới. Lượt BE mới kiểm A/B cùng center, Member ngoài phân công, target không đổi qua PUT; reuse bằng chứng guard đã có, không thêm kiểm center khác. Không ghép triển khai này vào LAN-2 |
 | C03 — Tiến độ sau buổi và cửa sổ attendance | Member.pdf §6.2 mô tả ghi kết quả/tiến độ sau buổi; D15 chỉ chốt cửa sổ attendance. TrainingResultService.recordResult/recordBulkResults gọi requireWindow trước xử lý content, trong khi evaluations là API khác | Ví dụ buổi kết thúc07:30, Coach thêm nhận xét08:00 và không đổi attendance: nếu UI dùng training-results thì source hiện chặn cả request. Cần xác định API thực sự của màn Tiến độ và đối chiếu expected trước sửa; chưa kết luận toàn BE sai hoặc tất cả ghi chuyên môn bị khóa. Không mở cửa sổ attendance để chữa việc ghi nội dung |
 | C04 — Lọc lịch sử attendance theo ngày | searchAttendances hiện lọc startDate/endDate bằng checkInTime; record Absent có thể null trường này | Với attendance85 ngày05/11/checkInTime null, predicate filter ngày sẽ loại record. Cần đối chiếu ý nghĩa filter trong contract với ngày buổi/lượt check-in, tái hiện test phù hợp rồi mới kết luận/sửa BE. Chưa bàn giao đó là bug BE đã xác nhận và không bắt FE sửa dữ liệu bù |
@@ -343,7 +803,7 @@ Căn cứ trực tiếp: [Member.pdf](../Member.pdf) trang6 RP-04/RP-13/RP-36/RP
 <a id="coach-review-proposal-20261107"></a>
 ### Đề xuất lượt BE Coach để Owner duyệt — 07/11/2026
 
-**Trạng thái cập nhật: R3 đã được Owner duyệt, bắt đầu rà source; R1 cần giải thích thêm, R2 cần đánh giá lại độ cần thiết, chưa duyệt triển khai API mới.** Chưa sửa BE hoặc chạy test mới. Owner báo lần thử UI mới chỉ còn correct403 đã biết; ghi tiến độ FE đang phát triển, chưa suy thành lưu thành công trên BE hoặc chốt tạo Late.
+**Mốc rà trước triển khai Phase1: R3 đã được Owner duyệt, bắt đầu rà source; R1 cần giải thích thêm, R2 cần đánh giá lại độ cần thiết, chưa duyệt triển khai API mới.** Tại mốc lập đề xuất chưa sửa BE hoặc chạy test mới; trạng thái hiện hành theo [review Phase1](#phase1-review-20261109). Owner báo lần thử UI mới chỉ còn correct403 đã biết; ghi tiến độ FE đang phát triển, chưa suy thành lưu thành công trên BE hoặc chốt tạo Late.
 
 **Căn cứ double-check:** Member.pdf trang4 §6.1–6.2/trang6 RP-08/RP-34/RP-36; analysis24/10 trang8 tách check-in cửa; MVP18/10 trang18 yêu cầu không mặc định Có mặt/không trùng/không trừ hai lần và đúng phân công. Đối chiếu D15/D17/D19 hiện hành, DTO/controller/service và các test liên quan. Giữ quyết định sau thay rule30phút; không dùng code hoặc Swagger cùng nguồn sinh làm expected độc lập. Bằng chứng đọc/source/giới hạn ở QA, không gán review tĩnh thành test PASS.
 

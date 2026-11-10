@@ -36,12 +36,12 @@ public class NormalClassCreationService {
         if (r.startDate() == null || r.coachId() == null || (r.classType() != null && !"Normal".equalsIgnoreCase(r.classType()))) {
             throw new BusinessException("NORMAL_CLASS_REQUIRED: A Normal class, coach and startDate are required");
         }
-        var setup = new SportsClassRequest(r.name(), r.subjectId(), r.coachId(), r.maxCapacity(), r.tuitionFee(), r.startDate(), r.endDate(), "Closed", "Normal", 12);
+        var setup = new SportsClassRequest(r.name(), r.subjectId(), r.coachId(), r.maxCapacity(), r.tuitionFee(), r.startDate(), r.endDate(), "Closed", "Normal", 12, r.minCapacity());
         Integer id = classService.create(setup).id();
         SportsClass entity = classRepository.findById(id).orElseThrow();
         entity.setCenterId(centerId);
         sessionService.generateRecurringSessions(new SessionGenerateRequest(id, request.roomId(), r.startDate(), request.daysOfWeek(), request.startTime(), request.endTime()));
-        entity.setStatus("Open");
+        classService.publishCreatedNormal(entity);
         var saved = new NormalClassCreation();
         saved.setRequestId(request.requestId().toString()); saved.setRequestHash(hash); saved.setCenterId(centerId); saved.setSportsClass(entity);
         requests.save(saved);

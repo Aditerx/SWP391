@@ -14,7 +14,8 @@ public final class NormalSchedulePolicy {
                 || s.getSessionDate() == null || s.getStartTime() == null || s.getEndTime() == null
                 || !LocalDateTime.of(s.getSessionDate(), s.getStartTime()).isAfter(LocalDateTime.now(clock))
                 || TimeSlot.findByTime(s.getStartTime(), s.getEndTime()).isEmpty()
-                || s.getRoom() == null || !"Available".equals(s.getRoom().getStatus()))) {
+                || s.getRoom() == null || !"Available".equals(s.getRoom().getStatus())
+                || !com.sportscenter.room.RoomActivity.supports(s.getRoom(), c.getSubject()))) {
             throw new BusinessException("CLASS_NOT_READY: Normal registration requires 12 valid future sessions");
         }
     }

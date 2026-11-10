@@ -13,8 +13,18 @@ import java.util.List;
 
 @Repository
 public interface InvoiceRepository extends JpaRepository<Invoice, Integer>, org.springframework.data.jpa.repository.JpaSpecificationExecutor<Invoice>, InvoiceSequence {
-    boolean existsByMemberIdAndSportsClassIdAndPaymentStatusAndReconciliationRequiredFalseAndCashConfirmationReversedFalse(Integer memberId,Integer classId,String status);
+    boolean existsBySportsClassId(Integer classId);
+    List<Invoice> findBySportsClassIdAndPaymentStatusAndExpiresAtLessThanEqual(Integer classId, String status, LocalDateTime now);
+    @Query("select (count(i)>0) from Invoice i where i.member.id=:memberId and coalesce(i.entitlementClass.id,i.sportsClass.id)=:classId and i.paymentStatus=:status and i.reconciliationRequired=false and i.cashConfirmationReversed=false and not exists (select r.id from PaymentResolution r where r.invoice=i and r.type='Refund' and r.status='Completed')")
+    boolean existsByMemberIdAndSportsClassIdAndPaymentStatusAndReconciliationRequiredFalseAndCashConfirmationReversedFalse(@Param("memberId") Integer memberId,@Param("classId") Integer classId,@Param("status") String status);
+
+    @Query("select i from Invoice i where coalesce(i.entitlementClass.id,i.sportsClass.id)=:classId order by i.invoiceId")
+    List<Invoice> findEffectiveClassInvoices(@Param("classId") Integer classId);
     java.util.Optional<Invoice> findByInvoiceCode(String code);
+    @Query("select i.sportsClass.id from Invoice i where i.invoiceId=:id")
+    java.util.Optional<Integer> findSportsClassIdByInvoiceId(@Param("id") Integer id);
+    @Query("select i.sportsClass.id from Invoice i where i.invoiceCode=:code")
+    java.util.Optional<Integer> findSportsClassIdByInvoiceCode(@Param("code") String code);
     boolean existsByGatewayTransactionRefAndInvoiceIdNot(String reference, Integer invoiceId);
     boolean existsBySubscriptionSubscriptionIdAndPaymentStatusAndReconciliationRequiredFalseAndCashConfirmationReversedFalse(Integer id,String status);
     @org.springframework.data.jpa.repository.EntityGraph(attributePaths={"member","membershipPackage","receptionist","subscription"})

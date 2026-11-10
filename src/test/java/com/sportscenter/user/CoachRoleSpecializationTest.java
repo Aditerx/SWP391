@@ -85,7 +85,7 @@ class CoachRoleSpecializationTest {
             badmintonSpecialization.setName("Cầu lông");
             badmintonSpecialization.setSubject(badminton);
             badmintonSpecialization = specializations.saveAndFlush(badmintonSpecialization);
-            jdbc.update("INSERT INTO rooms(room_name,room_code,capacity,status,facility_type,center_id) VALUES('Sân Cầu lông 01','C01-QA-COACH',15,'Available','Indoor',1)");
+            jdbc.update("INSERT INTO rooms(room_name,room_code,capacity,status,facility_type,center_id,activity_type) VALUES('Sân Cầu lông 01','C01-QA-COACH',15,'Available','Indoor',1,'BADMINTON')");
             assertNotNull(manager.getId());
         });
     }

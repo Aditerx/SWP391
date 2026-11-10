@@ -39,10 +39,13 @@ class MemberRegistrationPaymentTest {
     @Test void totalSpentUsesPaidInvoiceSnapshotAndIgnoresPendingOrders() {
         var member = new User(); member.setId(7); member.setFullName("Test member");
         var role = new Role(); role.setName("Member"); member.setRole(role); member.setStatus("Active"); member.setCenterId(1);
+        // This is a staff financial DTO; keep the money assertion and use a legally scoped reader.
+        var actor = new User(); actor.setId(90); actor.setStatus("Active"); actor.setCenterId(1);
+        var staffRole = new Role(); staffRole.setName("CenterManager"); actor.setRole(staffRole);
         var context = org.springframework.security.core.context.SecurityContextHolder.createEmptyContext();
-        context.setAuthentication(new org.springframework.security.authentication.UsernamePasswordAuthenticationToken("member@test.invalid", "n/a", List.of()));
+        context.setAuthentication(new org.springframework.security.authentication.UsernamePasswordAuthenticationToken("manager@test.invalid", "n/a", List.of(new org.springframework.security.core.authority.SimpleGrantedAuthority("MANAGE_USERS"))));
         org.springframework.security.core.context.SecurityContextHolder.setContext(context);
-        when(users.findByEmailIgnoreCase("member@test.invalid")).thenReturn(Optional.of(member));
+        when(users.findByEmailIgnoreCase("manager@test.invalid")).thenReturn(Optional.of(actor));
         when(users.findById(7)).thenReturn(Optional.of(member));
         var pkg = new MembershipPackage(); pkg.setPrice(new BigDecimal("9999"));
         var sub = new MemberPackage(); sub.setMembershipPackage(pkg); sub.setMember(member); sub.setStatus("Active");

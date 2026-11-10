@@ -136,14 +136,17 @@ public class SessionService {
                 || !"Coach".equalsIgnoreCase(availableCoach.getRole().getName())) throw new BusinessException("COACH_INACTIVE: An active coach is required");
 
         boolean isOutdoor = false;
+        Subject requestedSubject = null;
         if (subjectId != null) {
             Subject subject = subjectRepository.findById(subjectId).orElseThrow(() -> new ResourceNotFoundException("Subject not found"));
+            requestedSubject = subject;
             if (subject != null) {
                 isOutdoor = subject.isOutdoor();
             }
         }
         if (roomId != null) {
             Room room = roomRepository.findById(roomId).orElseThrow(() -> new ResourceNotFoundException("Room not found"));
+            if (subjectId != null) com.sportscenter.room.RoomActivity.require(room, requestedSubject);
             if (room != null) {
                 isOutdoor = isOutdoor || room.isOutdoor();
             }
@@ -617,7 +620,7 @@ public class SessionService {
         sportsClassRepository.save(sportsClass);
 
         List<Session> savedList = sessionRepository.saveAll(toCreate);
-        auditService.log(null, "GENERATE_SESSIONS", "SESSION", null,
+        auditService.log(null, "GENERATE_SESSIONS", "CLASS", sportsClass.getId(),
                 "Generated " + savedList.size() + " static recurring sessions for class '" + sportsClass.getName() + "'");
 
         int count = (int) classEnrollmentRepository.countBySportsClassIdAndStatus(sportsClass.getId(), "Registered");
@@ -698,8 +701,8 @@ public class SessionService {
                 || classEnrollmentRepository.countBySportsClassIdAndStatusIn(session.getSportsClass().getId(), List.of("Registered", "Pending")) > 0) {
             throw new BusinessException("SESSION_IN_USE: Published or booked sessions cannot be deleted");
         }
-        sessionRepository.delete(session);
         auditService.log(null, "DELETE_SESSION", "SESSION", id, "Deleted session ID " + id);
+        sessionRepository.delete(session);
     }
 
     @Transactional
@@ -868,6 +871,7 @@ public class SessionService {
         }
 
         validateCoach(newCoach, session.getSportsClass());
+        validateRoomAndCapacity(session.getRoom(), session.getSportsClass());
         if(session.isPrivateSession())coachCapacityService.requireWorking(newCoach.getId(),session.getSessionDate(),session.getStartTime());
         List<Session> coachConflicts = sessionRepository.findCoachConflicts(
                 newCoach.getId(), session.getSessionDate(), session.getStartTime(), session.getEndTime(), session.getId());
@@ -937,6 +941,9 @@ public class SessionService {
     }
 
     private void requireMutableSession(Session session) {
+        var c = session.getSportsClass();
+        if (c != null && c.isNormal() && c.getMinCapacity()!=null && !c.isPricingDraft() && !"Ongoing".equals(c.getStatus()))
+            throw new BusinessException("NORMAL_LIFECYCLE_ACTION_REQUIRED: Published Normal opening changes require the class lifecycle workflow");
         if (session.isAttendanceFinalized() || "Completed".equals(session.getStatus())
                 || !LocalDateTime.of(session.getSessionDate(), session.getEndTime()).isAfter(LocalDateTime.now(clock))) {
             throw new BusinessException("SESSION_HISTORY_IMMUTABLE: Ended or finalized sessions cannot be rescheduled or deleted");
@@ -1006,6 +1013,7 @@ public class SessionService {
         }
 
         Integer coachId = request.coachId();
+        if (sportsClass != null && room != null) com.sportscenter.room.RoomActivity.require(room, sportsClass.getSubject());
         if (coachId == null && sportsClass != null && sportsClass.getCoach() != null) {
             coachId = sportsClass.getCoach().getId();
         }
@@ -1083,6 +1091,7 @@ public class SessionService {
 
     private void validateRoomAndCapacity(Room room, SportsClass sportsClass) {
         if (!java.util.Objects.equals(room.getCenterId(), sportsClass.getCenterId())) throw new AccessDeniedException("Room belongs to another center");
+        com.sportscenter.room.RoomActivity.require(room, sportsClass.getSubject());
         if (!"Available".equalsIgnoreCase(room.getStatus())) {
             throw new BusinessException("New or updated sessions require an Available room (current status: " + room.getStatus() + ")");
         }

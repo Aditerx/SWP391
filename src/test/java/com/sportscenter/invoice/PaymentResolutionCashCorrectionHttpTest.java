@@ -37,6 +37,7 @@ import static org.junit.jupiter.api.Assertions.*;
         "spring.datasource.url=jdbc:h2:mem:cash_correction;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;LOCK_TIMEOUT=15000",
         "spring.datasource.driver-class-name=org.h2.Driver", "spring.jpa.database-platform=org.hibernate.dialect.H2Dialect",
         "spring.jpa.hibernate.ddl-auto=create-drop", "spring.jpa.open-in-view=false", "spring.sql.init.mode=never",
+        "vnpay.tmn-code=LOCALTEST", "vnpay.hash-secret=local-correction-test-key", "vnpay.pay-url=http://127.0.0.1:9/no-provider",
         "logging.level.root=WARN", "debug=false"})
 @Import(PaymentResolutionCashCorrectionHttpTest.Time.class)
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
@@ -74,7 +75,7 @@ class PaymentResolutionCashCorrectionHttpTest {
                 if(System.getProperty("scms.phases.pg-url","").isBlank())jdbc.update("INSERT INTO centers(center_id) VALUES(?)",center);
                 else jdbc.update("INSERT INTO centers(center_id,center_name) VALUES(?,?)",center,"Local correction center "+center);
             }
-            memberRole=role("Member");coachRole=role("Coach");managerRole=role("CenterManager","MANAGE_INVOICES");cashierRole=role("Receptionist","MANAGE_INVOICES");
+            memberRole=role("Member");coachRole=role("Coach");managerRole=role("CenterManager","MANAGE_INVOICES");cashierRole=role("Receptionist","MANAGE_INVOICES","REGISTER_MEMBER");
         });
     }
     Role role(String name,String...authorities){
@@ -100,9 +101,9 @@ class PaymentResolutionCashCorrectionHttpTest {
             MemberPackage sub=new MemberPackage();sub.setMember(member);sub.setSubject(subject);sub.setPrimaryCoach(coach);sub.setStatus("Active");sub.setRemainingCredit(12);sub.setPurchaseAmount(new BigDecimal("3000000"));sub.setActivatedAt(NOW.minusDays(1));sub.setExpiresAt(NOW.plusDays(44));sub.setStartDate(NOW.minusDays(1).toLocalDate());sub.setEndDate(NOW.plusDays(44).toLocalDate());em.persist(sub);subId=sub.getSubscriptionId();
             // Synthetic fixture: mistaken Cash confirmation, no actual receipt. Never a live account/transaction.
             Invoice i=new Invoice();i.setMember(member);i.setSubscription(sub);i.setReceptionist(cashier);i.setAmount(sub.getPurchaseAmount());i.setInvoiceCode("CORR-"+fixture);i.setPaymentMethod("Cash");i.setPaymentStatus("Paid");i.setCreatedAt(NOW.minusDays(1));i.setPaymentDate(NOW.minusDays(1));em.persist(i);invoiceId=i.getInvoiceId();
-            Room room=new Room();room.setName("Correction room "+fixture);room.setCapacity(15);room.setStatus("Available");room.setCenterId(1);room.setFacilityType("Indoor");em.persist(room);
+            Room room=new Room();room.setActivityType(com.sportscenter.room.RoomActivity.BADMINTON);room.setName("Correction room "+fixture);room.setCapacity(15);room.setStatus("Available");room.setCenterId(1);room.setFacilityType("Indoor");em.persist(room);
             SportsClass c=new SportsClass();c.setName("Independent Normal "+fixture);c.setClassType("Normal");c.setSubject(subject);c.setCoach(coach);c.setStatus("Open");c.setCenterId(1);c.setMaxCapacity(15);c.setTuitionFee(new BigDecimal("900000"));em.persist(c);classId=c.getId();
-            for(int day=1;day<=12;day++){Session s=new Session();s.setSportsClass(c);s.setCoach(coach);s.setRoom(room);s.setSessionDate(NOW.toLocalDate().plusDays(day));s.setStartTime(LocalTime.of(7,45));s.setEndTime(LocalTime.of(9,15));em.persist(s);}
+            for(int day=1;day<=12;day++){Session s=new Session();s.setSportsClass(c);s.setCoach(coach);s.setRoom(room);s.setSessionDate(NOW.toLocalDate().plusDays(day+2));s.setStartTime(LocalTime.of(7,45));s.setEndTime(LocalTime.of(9,15));em.persist(s);}
         });
         memberClient=login(member);cashierClient=login(cashier);managerClient=login(manager);foreignClient=login(foreignManager);
     }
@@ -118,9 +119,9 @@ class PaymentResolutionCashCorrectionHttpTest {
     }
     int normalOrder(boolean paid) throws Exception {
         jdbc.execute("CREATE SEQUENCE IF NOT EXISTS invoice_code_seq START WITH 20000");
-        JsonNode e=call(memberClient,"POST","/api/classes/"+classId+"/enroll",Map.of("paymentMethod","Cash"),201);
-        assertEquals("Pending",e.path("status").asText());int id=e.path("invoiceId").asInt();
-        if(paid)call(cashierClient,"POST","/api/invoices/"+id+"/confirm-cash",Map.of("note","LOCAL TEST actual Normal tuition received"),200);
+        JsonNode e=paid?call(cashierClient,"POST","/api/classes/"+classId+"/enroll",Map.of("memberId",member.getId(),"paymentMethod","Cash"),201)
+                :call(memberClient,"POST","/api/classes/"+classId+"/enroll",Map.of("paymentMethod","VNPay"),201);
+        assertEquals(paid?"Registered":"Pending",e.path("status").asText());int id=e.path("invoiceId").asInt();
         assertNull(jdbc.queryForObject("SELECT eligibility_subscription_id FROM class_enrollments WHERE class_id=? AND member_id=?",Integer.class,classId,member.getId()));
         assertTrue(jdbc.queryForObject("SELECT enrolled_at FROM class_enrollments WHERE class_id=? AND member_id=?",LocalDateTime.class,classId,member.getId()).isAfter(NOW.minusDays(1)));
         return id;

@@ -22,20 +22,20 @@ public class RoomController {
 
     @org.springframework.web.bind.annotation.ResponseStatus(org.springframework.http.HttpStatus.CREATED)
     @PostMapping
-    @PreAuthorize("hasAuthority('MANAGE_CLASSES')")
+    @PreAuthorize("hasAnyRole('ADMIN','CENTERMANAGER') and hasAuthority('MANAGE_CLASSES')")
     public ResponseEntity<RoomResponse> create(@Valid @RequestBody RoomRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(service.create(request));
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAuthority('MANAGE_CLASSES')")
+    @PreAuthorize("hasAnyRole('ADMIN','CENTERMANAGER') and hasAuthority('MANAGE_CLASSES')")
     public ResponseEntity<RoomResponse> update(@PathVariable Integer id,
                                                @Valid @RequestBody RoomRequest request) {
         return ResponseEntity.ok(service.update(id, request));
     }
 
     @PatchMapping("/{id}/status")
-    @PreAuthorize("hasAuthority('MANAGE_CLASSES')")
+    @PreAuthorize("hasAnyRole('ADMIN','CENTERMANAGER') and hasAuthority('MANAGE_CLASSES')")
     public ResponseEntity<RoomResponse> updateStatus(@PathVariable Integer id,
                                                      @Valid @RequestBody RoomStatusRequest request) {
         return ResponseEntity.ok(service.updateStatus(id, request.status()));

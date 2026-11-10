@@ -104,6 +104,7 @@ public class CoachCapacityService {
                 Candidate c = iterator.next();
                 if (c.date().atTime(c.slot().getEndTime()).isAfter(demand.deadline()) || demand.subject().isOutdoor() && !c.slot().isOutdoorAllowed()) continue;
                 boolean roomFree = compatibleRooms.stream().anyMatch(r -> r.isOutdoor() == demand.subject().isOutdoor()
+                        && com.sportscenter.room.RoomActivity.supports(r, demand.subject())
                         && busy.stream().noneMatch(s -> Objects.equals(r.getId(),s.getRoom().getId()) && overlaps(s,c.date(),c.slot())));
                 if (roomFree) { iterator.remove(); remaining--; }
             }

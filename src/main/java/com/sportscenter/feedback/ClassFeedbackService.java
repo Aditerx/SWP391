@@ -1,6 +1,8 @@
 package com.sportscenter.feedback;
 
 import com.sportscenter.audit.AuditService;
+import com.sportscenter.common.AccountScope;
+import com.sportscenter.common.ActorPolicy;
 import com.sportscenter.common.exception.BusinessException;
 import com.sportscenter.common.exception.ResourceNotFoundException;
 import com.sportscenter.enrollment.ClassEnrollmentRepository;
@@ -97,9 +99,12 @@ public class ClassFeedbackService {
 
     @Transactional(readOnly = true)
     public ClassFeedbackSummaryResponse findForClass(Integer classId) {
-        if (!sportsClassRepository.existsById(classId)) {
-            throw new ResourceNotFoundException("Class not found: " + classId);
-        }
+        User actor = AccountScope.actor(userRepository);
+        if (ActorPolicy.role(actor, "Coach") || ActorPolicy.role(actor, "Member"))
+            throw new AccessDeniedException("Identified feedback is restricted to staff; coaches must use /api/coaches/me/feedback");
+        SportsClass sportsClass = sportsClassRepository.findById(classId)
+                .orElseThrow(() -> new ResourceNotFoundException("Class not found: " + classId));
+        AccountScope.require(actor, sportsClass.getCenterId());
         List<ClassFeedback> feedback = feedbackRepository.findForClass(classId);
         return new ClassFeedbackSummaryResponse(
                 classId,

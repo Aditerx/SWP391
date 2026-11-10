@@ -37,7 +37,7 @@ public interface TrainingPlanRepository extends JpaRepository<TrainingPlan, Inte
             "AND (m.id=:memberId OR (tp.member IS NULL AND (cl.classType='Normal' OR cl.classType IS NULL) " +
             "AND EXISTS (SELECT e.id FROM ClassEnrollment e WHERE e.sportsClass=tp.sportsClass " +
             "AND e.member.id=:memberId AND e.status='Registered') " +
-            "AND EXISTS (SELECT i.invoiceId FROM Invoice i WHERE i.sportsClass=tp.sportsClass " +
+            "AND EXISTS (SELECT i.invoiceId FROM Invoice i WHERE coalesce(i.entitlementClass.id,i.sportsClass.id)=tp.sportsClass.id " +
             "AND i.member.id=:memberId AND i.paymentStatus='Paid' " +
             "AND i.reconciliationRequired=false AND i.cashConfirmationReversed=false))) ORDER BY tp.planId DESC")
     List<TrainingPlan> searchMemberPlans(@Param("coachId") Integer coachId,

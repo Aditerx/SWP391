@@ -51,6 +51,8 @@ public class InvoiceService {
     private final com.sportscenter.membership.CoachCapacityService coachCapacityService;
     private final com.sportscenter.user.MemberRepository memberRepository;
     private final VnPayPaymentAttemptRepository paymentAttemptRepository;
+    private final com.sportscenter.session.SessionRepository normalSessions;
+    private final com.sportscenter.normal.NormalRefundService normalRefunds;
     @jakarta.persistence.PersistenceContext private jakarta.persistence.EntityManager entityManager;
 
     @Transactional
@@ -64,6 +66,7 @@ public class InvoiceService {
     @Transactional
     public InvoiceOrderResponse existingOrder(Invoice invoice, String clientIp) {
         scheduleWriteLock.acquire(invoice.getMember().getCenterId());
+        invoiceRepository.findSportsClassIdByInvoiceId(invoice.getInvoiceId()).ifPresent(sportsClassRepository::findByIdForUpdate);
         entityManager.refresh(invoice, jakarta.persistence.LockModeType.PESSIMISTIC_WRITE);
         if (!"Pending".equals(invoice.getPaymentStatus()) || expired(invoice))
             return new InvoiceOrderResponse(invoice.getInvoiceId(),invoice.getInvoiceCode(),invoice.getAmount(),invoice.getPaymentMethod(),invoice.getPaymentStatus(),invoice.getExpiresAt(),null);
@@ -136,14 +139,42 @@ public class InvoiceService {
 
     @Transactional
     public InvoiceOrderResponse createClassOrder(User member, SportsClass sportsClass, String method, String clientIp) {
+        scheduleWriteLock.acquire(member.getCenterId());
+        sportsClass = sportsClassRepository.findByIdForUpdate(sportsClass.getId()).orElseThrow(() -> new ResourceNotFoundException("Class not found"));
+        com.sportscenter.common.ActorPolicy.center(com.sportscenter.common.AccountScope.actor(userRepository), sportsClass.getCenterId());
+        com.sportscenter.sportclass.NormalClassPolicy.requireAdmission(sportsClass, normalSessions, clock);
+        if ("Cash".equalsIgnoreCase(method)) {
+            User cashier = com.sportscenter.common.AccountScope.actor(userRepository);
+            if (!com.sportscenter.common.ActorPolicy.role(cashier, "Receptionist")) throw new AccessDeniedException("NORMAL_CASH_COUNTER_ONLY: Receptionist required");
+        }
+        final Integer orderClassId = sportsClass.getId();
+        if (invoiceRepository.findByMemberId(member.getId()).stream().anyMatch(i -> i.getSportsClass()!=null
+                && orderClassId.equals(i.getSportsClass().getId()) && "Paid".equals(i.getPaymentStatus())
+                && i.isReconciliationRequired() && !"Completed".equals(i.getResolutionStatus())))
+            throw new BusinessException("PAYMENT_RECONCILIATION_REQUIRED: Resolve the previously received money before another order");
         invoiceRepository.findByMemberId(member.getId()).stream()
-                .filter(i -> i.getSportsClass() != null && sportsClass.getId().equals(i.getSportsClass().getId()))
+                .filter(i -> i.getSportsClass() != null && orderClassId.equals(i.getSportsClass().getId()))
                 .filter(i -> "Pending".equals(i.getPaymentStatus())).forEach(i -> {
                     i.setPaymentStatus("Cancelled");
                 });
         Invoice invoice = newInvoice(member, sportsClass.getTuitionFee(), method);
         invoice.setSportsClass(sportsClass);
+        if (sportsClass.isNormal()) {
+            var cutoff = com.sportscenter.sportclass.NormalClassPolicy.cutoff(sportsClass, normalSessions);
+            if (invoice.getExpiresAt().isAfter(cutoff)) invoice.setExpiresAt(cutoff);
+        }
         return orderResponse(invoiceRepository.save(invoice), clientIp);
+    }
+
+    @Transactional
+    public void expireClassReservations(SportsClass c) {
+        scheduleWriteLock.acquire(c.getCenterId());
+        for (Invoice invoice : invoiceRepository.findBySportsClassIdAndPaymentStatusAndExpiresAtLessThanEqual(c.getId(),"Pending",LocalDateTime.now(clock)))
+            expireInvoice(invoice.getInvoiceId());
+    }
+
+    public boolean hasExpiredClassOrder(Integer member,Integer classId) {
+        return invoiceRepository.findByMemberId(member).stream().anyMatch(i -> i.getSportsClass()!=null && classId.equals(i.getSportsClass().getId()) && "Expired".equals(i.getPaymentStatus()));
     }
 
     private Invoice newInvoice(User member, BigDecimal amount, String method) {
@@ -192,6 +223,10 @@ public class InvoiceService {
         User receptionist = currentUser(authentication);
         scheduleWriteLock.acquire(receptionist.getCenterId());
         Invoice invoice = lockInvoice(invoiceId);
+        if (invoice.getSportsClass()!=null && invoice.getSportsClass().isNormal()
+                && (!"Active".equalsIgnoreCase(receptionist.getStatus()) || !com.sportscenter.common.ActorPolicy.role(receptionist,"Receptionist")
+                || authentication.getAuthorities().stream().noneMatch(a -> "MANAGE_INVOICES".equals(a.getAuthority()))))
+            throw new AccessDeniedException("Active Receptionist with MANAGE_INVOICES required for Normal Cash");
         if (!java.util.Objects.equals(receptionist.getCenterId(), invoice.getMember().getCenterId())) throw new AccessDeniedException("Invoice belongs to another center");
         if (!"Cash".equals(invoice.getPaymentMethod())) throw new InvoiceConflictException("Only Cash invoices can be confirmed at the counter");
         if (!"Pending".equals(invoice.getPaymentStatus()) || expired(invoice)) throw new InvoiceConflictException("Invoice is no longer payable");
@@ -222,8 +257,7 @@ public class InvoiceService {
     public String payOnline(Integer invoiceId, Authentication authentication, String clientIp) {
         User actor = currentUser(authentication);
         scheduleWriteLock.acquire(actor.getCenterId());
-        Invoice invoice = invoiceRepository.findByIdForUpdate(invoiceId)
-                .orElseThrow(() -> new ResourceNotFoundException("Invoice not found: " + invoiceId));
+        Invoice invoice = lockInvoice(invoiceId);
         if (!invoice.getMember().getId().equals(actor.getId())) throw new ResourceNotFoundException("Invoice not found: " + invoiceId);
         if (!"VNPay".equals(invoice.getPaymentMethod()) || !"Pending".equals(invoice.getPaymentStatus()) || expired(invoice)) {
             throw new InvoiceConflictException("Invoice is not payable online");
@@ -232,6 +266,8 @@ public class InvoiceService {
     }
 
     private String issueVnpayLink(Invoice invoice, String clientIp) {
+        if (invoice.getSportsClass()!=null && invoice.getSportsClass().isNormal())
+            com.sportscenter.sportclass.NormalClassPolicy.requireAdmission(invoice.getSportsClass(),normalSessions,clock);
         VnPayGateway.PaymentLink link = vnPayGateway.createPaymentLink(invoice, clientIp);
         if (!paymentAttemptRepository.existsByInvoiceInvoiceIdAndTmnCodeAndTxnRefAndTransactionDate(
                 invoice.getInvoiceId(), link.tmnCode(), link.txnRef(), link.createDate())) {
@@ -250,6 +286,7 @@ public class InvoiceService {
         Integer centerId = invoiceRepository.findCenterIdByCode(params.get("vnp_TxnRef")).orElse(null);
         if (centerId == null) return new VnPayResult("01", "Order not found", null);
         scheduleWriteLock.acquire(centerId);
+        invoiceRepository.findSportsClassIdByInvoiceCode(params.get("vnp_TxnRef")).ifPresent(sportsClassRepository::findByIdForUpdate);
         Invoice invoice = invoiceRepository.findByInvoiceCodeForUpdate(params.get("vnp_TxnRef"))
                 .orElse(null);
         if (invoice == null) return new VnPayResult("01", "Order not found", null);
@@ -280,6 +317,7 @@ public class InvoiceService {
         if (reconcile) {
             invoice.setPaymentStatus("Paid"); invoice.setReconciliationRequired(true);
             invoice.setPaymentDate(LocalDateTime.now(clock)); cancelLinked(invoice);
+            normalRefunds.lateCancelledReceipt(invoice);
             auditService.log(null, "PAYMENT_RECONCILIATION_REQUIRED", "invoices", invoice.getInvoiceId(),
                     "Verified money received without an available entitlement; " + problem);
         } else markPaidAndActivate(invoice, null, false);
@@ -345,7 +383,7 @@ public class InvoiceService {
         Integer center = invoiceRepository.findCenterIdById(id).orElseThrow(() -> new ResourceNotFoundException("Invoice not found"));
         if (!java.util.Objects.equals(center, actor.getCenterId())) throw new ResourceNotFoundException("Invoice not found");
         scheduleWriteLock.acquire(center);
-        Invoice invoice = invoiceRepository.findByIdForUpdate(id).orElseThrow(() -> new ResourceNotFoundException("Invoice not found"));
+        Invoice invoice = lockInvoice(id);
         checkOwnInvoice(invoice, actor);
         return invoice;
     }
@@ -384,6 +422,7 @@ public class InvoiceService {
         Integer centerId = invoiceRepository.findCenterIdById(invoiceId).orElse(null);
         if (centerId == null) return false;
         scheduleWriteLock.acquire(centerId);
+        invoiceRepository.findSportsClassIdByInvoiceId(invoiceId).ifPresent(sportsClassRepository::findByIdForUpdate);
         Invoice invoice = invoiceRepository.findByIdForUpdate(invoiceId).orElse(null);
         if (invoice == null || !"Pending".equals(invoice.getPaymentStatus()) || !expired(invoice)) return false;
         invoice.setPaymentStatus("Expired");
@@ -482,6 +521,14 @@ public class InvoiceService {
         }
         if(invoice.getSportsClass()!=null){
             SportsClass c=invoice.getSportsClass();
+            if(c.isNormal()) {
+                if(c.getSubject()==null || !"Active".equalsIgnoreCase(c.getSubject().getStatus())) return "Subject is no longer active";
+                try {
+                    com.sportscenter.sportclass.NormalClassPolicy.requireAdmission(c, normalSessions, clock);
+                    com.sportscenter.session.NormalSchedulePolicy.requireReady(c,normalSessions,clock);
+                }
+                catch (BusinessException closed) { return closed.getMessage(); }
+            }
             if(!"Open".equals(c.getStatus())&&!"Ongoing".equals(c.getStatus()))return "Class is no longer open";
             var enrollment=enrollmentRepository.findByMemberIdAndSportsClassId(invoice.getMember().getId(),c.getId());
             if(enrollment.isEmpty()||!"Pending".equals(enrollment.get().getStatus()))return "Enrollment is no longer Pending";
@@ -522,6 +569,7 @@ public class InvoiceService {
     }
 
     private Invoice lockInvoice(Integer id) {
+        invoiceRepository.findSportsClassIdByInvoiceId(id).ifPresent(sportsClassRepository::findByIdForUpdate);
         return invoiceRepository.findByIdForUpdate(id).orElseThrow(() -> new ResourceNotFoundException("Invoice not found: " + id));
     }
     private boolean hasNewerPendingClassOrder(Invoice invoice) {

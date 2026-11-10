@@ -71,7 +71,7 @@ public class MemberController {
     }
 
     @GetMapping("/at-risk")
-    @PreAuthorize("hasAuthority('VIEW_REPORTS')")
+    @PreAuthorize("hasAnyRole('CENTERMANAGER','ADMIN') and hasAuthority('VIEW_REPORTS')")
     public List<AtRiskMemberResponse> atRiskMembers() {
         return churnRiskService.forCenter();
     }

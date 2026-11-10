@@ -37,6 +37,13 @@ public class Invoice {
     @JoinColumn(name = "class_id")
     private SportsClass sportsClass;
 
+    /** Current Normal entitlement; the purchased class and amount remain immutable. */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "entitlement_class_id")
+    private SportsClass entitlementClass;
+
+    public SportsClass effectiveClass() { return entitlementClass == null ? sportsClass : entitlementClass; }
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "subscription_id")
     private MemberPackage subscription;

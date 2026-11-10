@@ -44,6 +44,7 @@ class DemoSchemaLoginPostgresTest {
         registry.add("spring.jpa.database-platform",()->"org.hibernate.dialect.PostgreSQLDialect");
     }
     @MockBean PaymentExpirationJob paymentJob;
+    @MockBean com.sportscenter.sportclass.NormalLifecycleJob lifecycleJob;
     @MockBean PackageExpirationJob packageJob;
     @MockBean AttendanceFinalizationJob attendanceJob;
     @MockBean NotificationScheduleJob notificationJob;
@@ -54,7 +55,7 @@ class DemoSchemaLoginPostgresTest {
     @Test
     void everyPdfAccountCanLoginReadItsSessionAndUseItsRoleWithoutPasswordChange() throws Exception {
         List<Map<String,Object>> accounts=jdbc.queryForList("SELECT u.user_id,u.email,u.center_id,r.role_name FROM users u JOIN roles r ON r.role_id=u.role_id WHERE u.status='Active' ORDER BY u.user_id");
-        assertEquals(33,accounts.size());
+        assertEquals(43,accounts.size());
         assertEquals(0,jdbc.queryForObject("SELECT count(*) FROM users WHERE status='Active' AND (is_first_login OR failed_login_attempts<>0 OR locked_until IS NOT NULL)",Integer.class));
         Map<String,String> routes=Map.of("Member","/api/members/me","Coach","/api/coaches",
                 "Receptionist","/api/invoices","CenterManager","/api/rooms","Admin","/api/users");
@@ -73,7 +74,7 @@ class DemoSchemaLoginPostgresTest {
             call(client,"POST","/api/auth/logout",null,204);
             call(client,"GET","/api/auth/me",null,401);
         }
-        assertEquals(33,jdbc.queryForObject("SELECT count(*) FROM users WHERE status='Active' AND NOT is_first_login AND failed_login_attempts=0 AND locked_until IS NULL",Integer.class));
+        assertEquals(43,jdbc.queryForObject("SELECT count(*) FROM users WHERE status='Active' AND NOT is_first_login AND failed_login_attempts=0 AND locked_until IS NULL",Integer.class));
     }
 
     private JsonNode call(HttpClient client,String method,String path,Object body,int expected) throws Exception {

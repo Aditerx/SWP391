@@ -35,8 +35,27 @@ public class SportsClass {
     @Column(name = "max_capacity")
     private Integer maxCapacity;
 
+    @Column(name = "min_capacity")
+    private Integer minCapacity;
+    @Column(name = "opening_confirmed_by")
+    private Integer openingConfirmedBy;
+    @Column(name = "opening_confirmed_at")
+    private java.time.LocalDateTime openingConfirmedAt;
+    @Column(name = "opening_reason", length = 2000)
+    private String openingReason;
+    @Column(name = "postponement_count", nullable = false)
+    private int postponementCount;
+    @Column(name = "lifecycle_version", nullable = false)
+    private long lifecycleVersion;
+    @Column(name = "change_pending", nullable = false)
+    private boolean changePending;
+
     @Column(name = "tuition_fee", nullable = false, precision = 12, scale = 2)
     private BigDecimal tuitionFee = BigDecimal.ZERO;
+
+    /** New drafts only; historical classes retain their published price. */
+    @Column(name = "pricing_draft", nullable = false)
+    private boolean pricingDraft;
 
     @Column(name = "class_type", length = 20)
     private String classType = "Normal";

@@ -35,6 +35,7 @@ public final class SessionAttendancePolicy {
     }
     public static void requireCorrection(User actor, Session s, LocalDateTime now) {
         if (!correctionScope(actor, s)) throw forbidden();
+        requireNormalStarted(s);
         if (s.getSessionDate() == null || s.getEndTime() == null) throw new BusinessException("SESSION_TIME_REQUIRED: Reconcile the legacy session time");
         if (s.isCenterInvalidated() || !("Scheduled".equals(s.getStatus()) || "Completed".equals(s.getStatus())))
             throw new BusinessException("SESSION_NOT_HELD: Preserve incident and attendance history");
@@ -71,9 +72,15 @@ public final class SessionAttendancePolicy {
         return " | Note: " + com.fasterxml.jackson.databind.node.JsonNodeFactory.instance.objectNode().put("before", before).put("after", after);
     }
     public static void requireWindow(Session s,LocalDateTime now){
+        requireNormalStarted(s);
         if(s.getSessionDate()==null||s.getStartTime()==null||s.getEndTime()==null)throw new BusinessException("SESSION_TIME_REQUIRED: Reconcile the legacy session time");
         if(!"Scheduled".equals(s.getStatus())||s.isAttendanceFinalized()||s.isCenterInvalidated()||now.isBefore(s.getSessionDate().atTime(s.getStartTime()))||!now.isBefore(s.getSessionDate().atTime(s.getEndTime())))
             throw new BusinessException("ATTENDANCE_WINDOW_CLOSED: Attendance is allowed from session start until before session end");
+    }
+    private static void requireNormalStarted(Session s) {
+        if (s.getSportsClass()!=null && s.getSportsClass().isNormal() && s.getSportsClass().getMinCapacity()!=null
+                && !java.util.Set.of("Ongoing","Closed").contains(s.getSportsClass().getStatus()))
+            throw new BusinessException("NORMAL_NOT_STARTED: Manager-confirmed opening is required before attendance");
     }
     public static String state(String state){
         if("Present".equalsIgnoreCase(state))return "Present";

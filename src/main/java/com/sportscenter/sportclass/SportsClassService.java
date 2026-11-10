@@ -25,6 +25,7 @@ public class SportsClassService {
     private final UserRepository userRepository;
     private final ClassEnrollmentRepository classEnrollmentRepository;
     private final AuditService auditService;
+    private final com.sportscenter.invoice.InvoiceRepository invoiceRepository;
     private final EnrollmentService enrollmentService;
     private final java.time.Clock clock;
     private final com.sportscenter.session.SessionRepository sessionRepository;
@@ -49,29 +50,52 @@ public class SportsClassService {
 
     @Transactional
     public SportsClassResponse create(SportsClassRequest request) {
+        User actor = publicationActor();
         validateNewClassDate(request);
         validateDateRange(request);
         SportsClass sportsClass = new SportsClass();
-        var authentication = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
-        if (authentication != null && authentication.isAuthenticated()) {
-            sportsClass.setCenterId(userRepository.findByEmailIgnoreCase(authentication.getName()).orElseThrow().getCenterId());
-        }
+        sportsClass.setCenterId(actor.getCenterId());
         apply(sportsClass, request);
+        if (sportsClass.isNormal()) sportsClass.setMinCapacity(NormalClassPolicy.validateMinimum(sportsClass.getMaxCapacity(), request.minCapacity()));
         // The legacy two-request setup remains closed until the schedule is complete.
-        if (sportsClass.isNormal() && "Open".equals(sportsClass.getStatus())) sportsClass.setStatus("Closed");
+        if (sportsClass.isNormal()) { sportsClass.setStatus("Closed"); sportsClass.setPricingDraft(true); }
         SportsClass saved = repository.save(sportsClass);
-        auditService.log(null, "CREATE_CLASS", "CLASS", saved.getId(), saved.getName());
+        auditService.log(actor.getId(), "CREATE_CLASS", "CLASS", saved.getId(), saved.getName() + "; tuitionFee=" + saved.getTuitionFee());
         return SportsClassResponse.from(saved, 0);
     }
 
     @Transactional
     public SportsClassResponse update(Integer id, SportsClassRequest request, String actorEmail) {
+        User actor = publicationActor();
         validateDateRange(request);
         scheduleWriteLock.acquire(repository.findCenterIdById(id).orElseThrow(() -> new ResourceNotFoundException("Class center not found")));
         SportsClass sportsClass = repository.findByIdForUpdate(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Class not found: " + id));
+        if (request.classType()!=null && !request.classType().equalsIgnoreCase(sportsClass.getClassType()==null?"Normal":sportsClass.getClassType()))
+            throw new BusinessException("CLASS_TYPE_IMMUTABLE: Normal and Advanced use separate creation workflows");
         Integer previousCapacity = sportsClass.getMaxCapacity();
         BigDecimal previousFee = sportsClass.getTuitionFee();
+        boolean draft = sportsClass.isNormal() && sportsClass.isPricingDraft()
+                && !classEnrollmentRepository.existsBySportsClassId(id) && !invoiceRepository.existsBySportsClassId(id);
+        if (sportsClass.isNormal()) {
+            com.sportscenter.common.ActorPolicy.center(actor, sportsClass.getCenterId());
+            String requestedStatus = request.status() == null ? sportsClass.getStatus() : normalizeClassStatus(request.status());
+            if (!requestedStatus.equals(sportsClass.getStatus()) && !(draft && "Open".equals(requestedStatus)))
+                throw new BusinessException("NORMAL_LIFECYCLE_ACTION_REQUIRED: Use Normal lifecycle actions; status cannot be assigned by PUT");
+            if (!draft && request.minCapacity() != null && !java.util.Objects.equals(request.minCapacity(), sportsClass.getMinCapacity()))
+                throw new BusinessException("NORMAL_MIN_CAPACITY_LOCKED: Minimum capacity is fixed after creation/publication or any registration");
+            if (draft) sportsClass.setMinCapacity(NormalClassPolicy.validateMinimum(request.maxCapacity(), request.minCapacity() == null ? sportsClass.getMinCapacity() : request.minCapacity()));
+            else if (sportsClass.getMinCapacity() != null && request.maxCapacity() < sportsClass.getMinCapacity())
+                throw new BusinessException("NORMAL_CAPACITY_INVALID: Maximum cannot be below the fixed minimum");
+        }
+        if (draft && "Ongoing".equalsIgnoreCase(request.status()))
+            throw new BusinessException("NORMAL_PUBLICATION_STATUS: Publish a new Normal draft as Open after its schedule is complete");
+        if (!draft && sportsClass.isNormal() && request.tuitionFee() != null
+                && (previousFee == null || previousFee.compareTo(request.tuitionFee()) != 0))
+            throw new com.sportscenter.common.exception.BusinessConflictException("CLASS_REPRICING_NOT_APPROVED: Repricing published or legacy classes requires separate Owner review");
+        if (sportsClass.isNormal() && (request.startDate()!=null && !java.util.Objects.equals(request.startDate(), sportsClass.getStartDate())
+                || request.endDate()!=null && !java.util.Objects.equals(request.endDate(), sportsClass.getEndDate())))
+            throw new BusinessException("NORMAL_SCHEDULE_ACTION_REQUIRED: Class dates follow the persisted schedule");
         long occupied = classEnrollmentRepository.countBySportsClassIdAndStatusIn(id, List.of("Registered", "Pending"));
         if (request.maxCapacity() != null && request.maxCapacity() < occupied) throw new BusinessException("CLASS_CAPACITY_EXCEEDED: Cannot reduce capacity below reserved seats");
         if ((sessionRepository.countBySportsClassIdAndStatusNot(id, "Cancelled") > 0||sessionRepository.existsBySportsClassId(id))
@@ -83,10 +107,22 @@ public class SportsClassService {
         if (sportsClass.isNormal() && "Open".equalsIgnoreCase(request.status())) {
             com.sportscenter.session.NormalSchedulePolicy.requireReady(sportsClass, sessionRepository, clock);
         }
+        String previousStatus = sportsClass.getStatus();
+        var previousStart = sportsClass.getStartDate(); var previousEnd = sportsClass.getEndDate();
         apply(sportsClass, request);
-        // Updating metadata does not silently reprice a previously created class.
-        if (previousFee != null) sportsClass.setTuitionFee(previousFee);
+        if (request.status() == null) sportsClass.setStatus(previousStatus);
+        if (sportsClass.isNormal()) {
+            if (request.startDate()==null) sportsClass.setStartDate(previousStart);
+            if (request.endDate()==null) sportsClass.setEndDate(previousEnd);
+        }
+        // Omitted prices preserve the draft's chosen price as well as every published price.
+        if (previousFee != null && (!draft || request.tuitionFee() == null)) sportsClass.setTuitionFee(previousFee);
+        boolean publishedNow = draft && "Open".equals(sportsClass.getStatus());
+        sportsClass.setPricingDraft(draft && "Closed".equals(sportsClass.getStatus()));
         SportsClass saved = repository.save(sportsClass);
+        if (publishedNow || previousFee == null || previousFee.compareTo(saved.getTuitionFee()) != 0)
+            auditService.log(actor.getId(), publishedNow ? "PUBLISH_CLASS" : "SET_CLASS_PRICE", "CLASS", saved.getId(),
+                    "tuitionFee " + previousFee + " -> " + saved.getTuitionFee());
         if (saved.getMaxCapacity() != null && (previousCapacity == null || saved.getMaxCapacity() > previousCapacity)) {
             Integer actorId = userRepository.findByEmailIgnoreCase(actorEmail).map(User::getId).orElse(null);
             enrollmentService.promoteWaitlist(saved.getId(), actorId);
@@ -127,11 +163,11 @@ public class SportsClassService {
             sportsClass.setClassType("Normal");
             if (request.totalSessions() != null && request.totalSessions() != 12) throw new BusinessException("NORMAL_SESSION_COUNT: Normal classes require exactly 12 sessions");
             sportsClass.setTotalSessions(12);
-            // Tự động gán mức giá chuẩn từ Subject.normal_price (Freeze price logic)
-            if (subject.getNormalPrice() != null && subject.getNormalPrice().compareTo(BigDecimal.ZERO) > 0) {
-                sportsClass.setTuitionFee(subject.getNormalPrice());
+            BigDecimal price = request.tuitionFee() == null ? subject.getNormalPrice() : request.tuitionFee();
+            if (price != null && price.signum() > 0 && price.stripTrailingZeros().scale() <= 2 && price.precision() - price.scale() <= 10) {
+                sportsClass.setTuitionFee(price);
             } else {
-                throw new BusinessException("INVALID_PRICE: A positive server subject price is required; client tuition overrides are unsupported");
+                throw new BusinessException("INVALID_PRICE: Supply a positive publication price with at most two decimal places, or use a valid Subject default");
             }
         } else if ("Advanced".equalsIgnoreCase(classType)) {
             if (request.maxCapacity() != null && request.maxCapacity() != 1) {
@@ -160,6 +196,25 @@ public class SportsClassService {
         if ("Closed".equalsIgnoreCase(status)) return "Closed";
         if ("Cancelled".equalsIgnoreCase(status)) return "Cancelled";
         throw new BusinessException("Invalid class status: " + status + ". Must be Open, Ongoing, Closed, or Cancelled");
+    }
+
+    @Transactional
+    public void publishCreatedNormal(SportsClass sportsClass) {
+        User actor = publicationActor();
+        com.sportscenter.common.ActorPolicy.center(actor, sportsClass.getCenterId());
+        com.sportscenter.session.NormalSchedulePolicy.requireReady(sportsClass, sessionRepository, clock);
+        sportsClass.setStatus("Open"); sportsClass.setPricingDraft(false);
+        auditService.log(actor.getId(), "PUBLISH_CLASS", "CLASS", sportsClass.getId(), "tuitionFee=" + sportsClass.getTuitionFee());
+    }
+
+    private User publicationActor() {
+        User actor = com.sportscenter.common.AccountScope.actor(userRepository);
+        com.sportscenter.common.ActorPolicy.manager(actor);
+        var auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        if (auth.getAuthorities().stream().noneMatch(a -> "MANAGE_CLASSES".equals(a.getAuthority())))
+            throw new org.springframework.security.access.AccessDeniedException("MANAGE_CLASSES required");
+        if (actor.getCenterId() == null) throw new BusinessException("CENTER_REQUIRED: Class publication requires a center assignment");
+        return actor;
     }
 
     private SportsClass getEntity(Integer id) {

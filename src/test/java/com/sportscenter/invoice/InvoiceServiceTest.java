@@ -48,6 +48,7 @@ class InvoiceServiceTest {
     @Mock com.sportscenter.user.MemberRepository memberRepository;
     @Mock com.sportscenter.membership.EntitlementTimePolicy entitlementTimePolicy;
     @org.mockito.Spy Clock clock = Clock.system(ZoneId.of("Asia/Ho_Chi_Minh"));
+    @Mock com.sportscenter.normal.NormalRefundService normalRefunds;
     @InjectMocks InvoiceService invoiceService;
 
     @org.junit.jupiter.api.BeforeEach void centerFixtures() {

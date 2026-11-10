@@ -1,25 +1,61 @@
--- DATABASE VARIANT: OWNER-AUTHORIZED FULL SCMS REBUILD, INCLUDING AN EXISTING DATABASE.
--- Each execution REPLACES all rows in the 47 listed SCMS tables and restarts owned integer IDs.
--- This intentionally recreates reference business history; it does NOT migrate real transactions.
--- All history below is SYNTHETIC reference data, NOT evidence of actual payment or attendance.
--- Supabase auth/storage/realtime tables and unlisted application tables are never dropped.
--- DROP uses RESTRICT: an external FK/view dependency aborts the transaction instead of cascading.
--- SCMS PostgreSQL / Supabase - Owner-approved catalog and System Account.pdf.
--- Copy and run this WHOLE file in one SQL Editor execution.
--- Timezone: Asia/Ho_Chi_Minh. Never run the two schema variants in succession.
--- Owner-approved learning/demo accounts use SWP391, stored as salted BCrypt.
--- Only these 33 PDF identities skip the first-login password change.
--- ROOT corrects the previous random-password seed once, then preserves later password edits.
--- Subtype PKs equal users.user_id; composite/UUID/text keys are not integer sequences.
+-- SCMS DEMO REBUILD — Owner09/11/2026. This file DELETES the listed SCMS demo tables/data.
+-- Execute this WHOLE file once, only on the intended SCMS demo DB. Do not run the root additive variant afterwards.
+-- Scope: 55 SCMS tables + 4 obsolete SCMS backup tables observed on the current Supabase.
+-- auth/storage/realtime/extensions, unlisted tables and unrelated functions are not dropped.
+-- External dependencies fail RESTRICT and roll back. This is a reset, not an upgrade preserving demo history.
+-- Fresh data: approved 47 demo accounts, 21 classes and explicitly synthetic Normal/Advanced/refund scenarios; no provider calls.
+-- invoice_code_seq is NOT restarted: never reuse outward payment references after resetting demo rows.
 BEGIN;
-SET LOCAL search_path = public, extensions, pg_catalog;
+SET LOCAL search_path=public,extensions,pg_catalog;
 SET LOCAL TIME ZONE 'Asia/Ho_Chi_Minh';
-SET LOCAL lock_timeout = '10s';
-SELECT pg_advisory_xact_lock(391, 20261029);
+SET LOCAL lock_timeout='10s';
+SET LOCAL statement_timeout='180s';
+SELECT pg_advisory_xact_lock(391,20261109);
 CREATE SCHEMA IF NOT EXISTS extensions;
 CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA extensions;
-SET LOCAL scms.rebuild = 'true';
-DROP TABLE IF EXISTS public.scms_data_migration_audit,
+CREATE TEMP TABLE _scms_reset_before(table_name TEXT PRIMARY KEY,row_count BIGINT) ON COMMIT DROP;
+CREATE TEMP TABLE _scms_code_floor(value BIGINT NOT NULL) ON COMMIT DROP;
+
+DO $preflight$
+DECLARE n TEXT; count_rows BIGINT; highest NUMERIC:=0; seq_value BIGINT:=0; ext RECORD;
+BEGIN
+ IF to_regclass('public.users') IS NOT NULL AND NOT EXISTS(SELECT 1 FROM information_schema.columns
+   WHERE table_schema='public' AND table_name='users' AND column_name='password_hash') THEN
+  RAISE EXCEPTION 'SCMS_DEMO_WRONG_TARGET: public.users is not the expected SCMS model';
+ END IF;
+ FOR ext IN SELECT e.extname,c.relname FROM pg_depend d JOIN pg_extension e ON e.oid=d.refobjid
+   JOIN pg_class c ON c.oid=d.objid JOIN pg_namespace ns ON ns.oid=c.relnamespace
+   WHERE d.classid='pg_class'::regclass AND d.refclassid='pg_extension'::regclass AND d.deptype='e'
+     AND ns.nspname='public' AND c.relname=ANY(ARRAY['normal_refund_verifications','normal_refund_documents','normal_refund_attempts','normal_refund_receivers','normal_refunds','normal_transfers','normal_responses','normal_proposals','scms_data_migration_audit','payment_resolutions','incident_affected_members','center_incidents','session_changes','session_absence_notices','advanced_registrations','coach_days_off','coach_work_slots','coach_work_schedules','subscription_pauses','normal_class_requests','system_logs','ai_consultations','chat_read_state','chat_messages','chat_conversations','notification_recipients','notifications','support_requests','vnpay_payment_attempts','invoices','holidays','class_enrollments','member_packages','membership_packages','class_feedbacks','evaluations','attendances','training_results','sessions','training_plans','classes','rooms','coach_specializations','specializations','subjects','members','coaches','receptionists','center_managers','email_otps','users','centers','role_permissions','permissions','roles','attendances_backup_flow4','class_enrollments_backup_flow4','role_permissions_backup_n06','training_results_backup_flow4']) LOOP
+  RAISE EXCEPTION 'SCMS_DEMO_EXTENSION_OBJECT: %.% belongs to extension %','public',ext.relname,ext.extname;
+ END LOOP;
+ FOREACH n IN ARRAY ARRAY['normal_refund_verifications','normal_refund_documents','normal_refund_attempts','normal_refund_receivers','normal_refunds','normal_transfers','normal_responses','normal_proposals','scms_data_migration_audit','payment_resolutions','incident_affected_members','center_incidents','session_changes','session_absence_notices','advanced_registrations','coach_days_off','coach_work_slots','coach_work_schedules','subscription_pauses','normal_class_requests','system_logs','ai_consultations','chat_read_state','chat_messages','chat_conversations','notification_recipients','notifications','support_requests','vnpay_payment_attempts','invoices','holidays','class_enrollments','member_packages','membership_packages','class_feedbacks','evaluations','attendances','training_results','sessions','training_plans','classes','rooms','coach_specializations','specializations','subjects','members','coaches','receptionists','center_managers','email_otps','users','centers','role_permissions','permissions','roles','attendances_backup_flow4','class_enrollments_backup_flow4','role_permissions_backup_n06','training_results_backup_flow4'] LOOP
+  IF to_regclass('public.'||n) IS NOT NULL THEN
+   EXECUTE format('SELECT count(*) FROM public.%I',n) INTO count_rows;
+   INSERT INTO _scms_reset_before VALUES(n,count_rows);
+  END IF;
+ END LOOP;
+ IF to_regclass('public.invoice_code_seq') IS NOT NULL THEN
+  EXECUTE 'SELECT last_value FROM public.invoice_code_seq' INTO seq_value;
+ END IF;
+ IF EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='invoices' AND column_name='invoice_code') THEN
+  EXECUTE $q$SELECT coalesce(max(substring(invoice_code from '^INV-[0-9]{4}-([0-9]+)$')::numeric),0) FROM public.invoices$q$ INTO highest;
+ END IF;
+ -- Fresh namespace floor also protects against references whose old demo invoices were deleted previously.
+ highest:=greatest(highest,seq_value,floor(extract(epoch FROM clock_timestamp())*1000));
+ IF highest>=9223372036854775806 THEN RAISE EXCEPTION 'SCMS_DEMO_INVOICE_COUNTER_RANGE: reconcile counter before reset'; END IF;
+ INSERT INTO _scms_code_floor VALUES(highest::bigint);
+END $preflight$;
+
+DROP TABLE IF EXISTS public.normal_refund_verifications,
+ public.normal_refund_documents,
+ public.normal_refund_attempts,
+ public.normal_refund_receivers,
+ public.normal_refunds,
+ public.normal_transfers,
+ public.normal_responses,
+ public.normal_proposals,
+ public.scms_data_migration_audit,
  public.payment_resolutions,
  public.incident_affected_members,
  public.center_incidents,
@@ -65,8 +101,28 @@ DROP TABLE IF EXISTS public.scms_data_migration_audit,
  public.centers,
  public.role_permissions,
  public.permissions,
- public.roles;
-DROP SEQUENCE IF EXISTS public.invoice_code_seq;
+ public.roles,
+ public.attendances_backup_flow4,
+ public.class_enrollments_backup_flow4,
+ public.role_permissions_backup_n06,
+ public.training_results_backup_flow4 RESTRICT;
+
+DROP FUNCTION IF EXISTS public.enforce_user_center_assignment() RESTRICT;
+DROP FUNCTION IF EXISTS public.fn_classes_validate() RESTRICT;
+DROP FUNCTION IF EXISTS public.fn_member_packages_validate() RESTRICT;
+DROP FUNCTION IF EXISTS public.fn_room_code_default() RESTRICT;
+DROP FUNCTION IF EXISTS public.fn_rooms_protect() RESTRICT;
+DROP FUNCTION IF EXISTS public.fn_scms_current_advanced_only() RESTRICT;
+DROP FUNCTION IF EXISTS public.fn_scms_no_legacy_invoice() RESTRICT;
+DROP FUNCTION IF EXISTS public.fn_scms_retired_membership_catalog() RESTRICT;
+DROP FUNCTION IF EXISTS public.fn_sessions_validate() RESTRICT;
+DROP FUNCTION IF EXISTS public.fn_users_center_guard() RESTRICT;
+
+-- SOURCE: database/bootstrap/scms_structure_postgres.sql SHA256 db422245539939716443ebae6a30bace0249bd4dd794942a49e78c21103e9911
+-- No accounts, Paid invoices, active subscriptions, sessions or demo transactions.
+-- Empty public schema required. Existing databases must use reviewed incremental migrations.
+
+-- The scoped reset above preserves unrelated public objects.
 CREATE TABLE IF NOT EXISTS roles (
     role_id     SERIAL PRIMARY KEY,
     role_name   VARCHAR(50)  NOT NULL UNIQUE,
@@ -385,6 +441,13 @@ CREATE INDEX IF NOT EXISTS idx_sessions_booked_member ON sessions(booked_member_
 CREATE INDEX IF NOT EXISTS idx_sessions_coach ON sessions(coach_id);
 
 ALTER TABLE sessions ADD COLUMN IF NOT EXISTS attendance_finalized BOOLEAN NOT NULL DEFAULT FALSE;
+-- Mark sessions that already ended at migration time as finalized so the new job does not
+-- retroactively penalize historical attendance gaps. The comparison uses Vietnam local time.
+UPDATE sessions
+SET attendance_finalized = TRUE
+WHERE attendance_finalized = FALSE
+  AND session_date + end_time < (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Ho_Chi_Minh');
+
 CREATE INDEX IF NOT EXISTS idx_session_class ON sessions(class_id);
 CREATE INDEX IF NOT EXISTS idx_session_room  ON sessions(room_id);
 
@@ -536,7 +599,8 @@ CREATE INDEX IF NOT EXISTS idx_mp_member  ON member_packages(member_id);
 CREATE INDEX IF NOT EXISTS idx_mp_package ON member_packages(package_id);
 
 -- Session subscription FK must follow creation of member_packages.
--- Consolidated FK validation; no historical subscription is inferred or backfilled.
+-- PostgreSQL/public schema only. Additive upgrade; never run the demo reset.
+-- Run after 04 and 06. No historical subscription is inferred or backfilled.
 
 SET LOCAL lock_timeout = '5s';
 LOCK TABLE public.member_packages IN SHARE ROW EXCLUSIVE MODE;
@@ -732,7 +796,7 @@ CREATE TABLE IF NOT EXISTS notifications (
         CHECK (type IN ('Schedule', 'Payment', 'System', 'Promotion', 'Other')),
     notification_type VARCHAR(40),
     related_type    VARCHAR(40),
-    related_id      INT,
+    related_id      BIGINT,
     dedupe_key      VARCHAR(180),
     is_read         BOOLEAN NOT NULL DEFAULT FALSE,
     created_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -837,746 +901,12 @@ CREATE TABLE IF NOT EXISTS system_logs (
 CREATE INDEX IF NOT EXISTS idx_log_user      ON system_logs(user_id);
 CREATE INDEX IF NOT EXISTS idx_log_timestamp ON system_logs("timestamp");
 
+-- =====================================================================
+-- 12. TRIGGER FUNCTIONS (business-rule guards, PostgreSQL PL/pgSQL)
+-- Placed after schema; seed data is inserted before triggers are
+-- active so historical demo rows are not blocked.
+-- =====================================================================
 
-
--- Consolidated structure: 06_schedule_safety_postgres.sql
--- PostgreSQL only. Apply after migration 04; do NOT run destructive demo reset 05.
--- Additive, repeatable; no prices, invoices, credits or existing schedules are rewritten.
-
-ALTER TABLE subjects ADD COLUMN IF NOT EXISTS outdoor BOOLEAN;
-ALTER TABLE invoices ADD COLUMN IF NOT EXISTS reconciliation_required BOOLEAN NOT NULL DEFAULT FALSE;
-UPDATE subjects SET outdoor = TRUE WHERE outdoor IS NULL AND slug IN ('bong-da','quan-vot-tennis','boi-loi','ban-cung');
-UPDATE subjects SET outdoor = FALSE WHERE outdoor IS NULL AND slug IN ('cau-long','bong-ban','bong-ro','bong-chuyen','pickleball');
--- Unclassified custom subjects remain NULL and must be configured by the Manager.
-CREATE TABLE IF NOT EXISTS normal_class_requests (
-    request_id VARCHAR(36) PRIMARY KEY,
-    request_hash VARCHAR(64) NOT NULL,
-    center_id INTEGER NOT NULL REFERENCES centers(center_id),
-    class_id INTEGER NOT NULL UNIQUE REFERENCES classes(class_id)
-);
-ALTER TABLE member_packages DROP CONSTRAINT IF EXISTS member_packages_status_check;
-ALTER TABLE member_packages ADD CONSTRAINT member_packages_status_check CHECK (status IN ('Pending','Active','Expired','Cancelled','Completed'));
-
--- Consolidated structure: 08_advanced_entitlements_postgres.sql
--- Additive upgrade. Run only after 06_schedule_safety and 07; no seed/reset/backfill guesses.
-
--- New Advanced registrations do not use a generic package or start validity before Paid.
-ALTER TABLE member_packages ALTER COLUMN package_id DROP NOT NULL;
-ALTER TABLE member_packages ALTER COLUMN start_date DROP NOT NULL;
-ALTER TABLE member_packages ALTER COLUMN end_date DROP NOT NULL;
-ALTER TABLE member_packages ADD COLUMN IF NOT EXISTS subject_id INT REFERENCES subjects(subject_id);
-ALTER TABLE member_packages ADD COLUMN IF NOT EXISTS primary_coach_id INT REFERENCES users(user_id);
-ALTER TABLE member_packages ADD COLUMN IF NOT EXISTS purchase_amount NUMERIC(12,2);
-ALTER TABLE member_packages ADD COLUMN IF NOT EXISTS activated_at TIMESTAMP;
-ALTER TABLE member_packages ADD COLUMN IF NOT EXISTS expires_at TIMESTAMP;
-ALTER TABLE member_packages ADD COLUMN IF NOT EXISTS expiry_revoked_credit INT DEFAULT 0;
-ALTER TABLE member_packages ADD COLUMN IF NOT EXISTS expiry_processed_at TIMESTAMP;
-ALTER TABLE member_packages ADD COLUMN IF NOT EXISTS approved_extra_seconds BIGINT NOT NULL DEFAULT 0;
-ALTER TABLE invoices DROP CONSTRAINT IF EXISTS chk_invoice_target;
-ALTER TABLE invoices ADD CONSTRAINT chk_invoice_target CHECK (
-    (class_id IS NOT NULL AND package_id IS NULL AND subscription_id IS NULL) OR
-    (class_id IS NULL AND (package_id IS NOT NULL OR subscription_id IS NOT NULL))
-);
-CREATE INDEX IF NOT EXISTS idx_subscription_primary_coach ON member_packages(primary_coach_id);
-CREATE INDEX IF NOT EXISTS idx_subscription_deadline ON member_packages(status, expires_at);
-CREATE TABLE IF NOT EXISTS subscription_pauses (
-    id SERIAL PRIMARY KEY, subscription_id INT NOT NULL REFERENCES member_packages(subscription_id),
-    source_key VARCHAR(120) NOT NULL, starts_at TIMESTAMP NOT NULL, ends_at TIMESTAMP NOT NULL,
-    UNIQUE(subscription_id,source_key), CHECK(ends_at > starts_at)
-);
-CREATE TABLE IF NOT EXISTS coach_work_schedules (
-    coach_id INT PRIMARY KEY REFERENCES users(user_id), accepting_new BOOLEAN NOT NULL DEFAULT FALSE
-);
-CREATE TABLE IF NOT EXISTS coach_work_slots (
-    coach_id INT NOT NULL REFERENCES coach_work_schedules(coach_id), slot_key VARCHAR(20) NOT NULL,
-    PRIMARY KEY(coach_id,slot_key)
-);
-CREATE TABLE IF NOT EXISTS coach_days_off (
-    coach_id INT NOT NULL REFERENCES coach_work_schedules(coach_id), day_off DATE NOT NULL,
-    PRIMARY KEY(coach_id,day_off)
-);
-CREATE TABLE IF NOT EXISTS advanced_registrations (
-    id SERIAL PRIMARY KEY, member_id INT NOT NULL REFERENCES users(user_id),
-    subject_id INT NOT NULL REFERENCES subjects(subject_id), coach_id INT NOT NULL REFERENCES users(user_id),
-    request_key VARCHAR(80) NOT NULL, status VARCHAR(20) NOT NULL DEFAULT 'Requested', created_at TIMESTAMP NOT NULL,
-    accepted_by INT REFERENCES users(user_id), accepted_at TIMESTAMP, reason VARCHAR(2000),
-    subscription_id INT UNIQUE REFERENCES member_packages(subscription_id), UNIQUE(member_id,request_key)
-);
-
--- Consolidated structure: 10_session_incidents_postgres.sql
-
-ALTER TABLE sessions ADD COLUMN IF NOT EXISTS booking_key VARCHAR(80);
-ALTER TABLE sessions ADD COLUMN IF NOT EXISTS booking_hash VARCHAR(64);
-ALTER TABLE sessions ADD COLUMN IF NOT EXISTS created_by INT REFERENCES users(user_id);
-ALTER TABLE sessions ADD COLUMN IF NOT EXISTS agreement_confirmed_at TIMESTAMP;
-ALTER TABLE sessions ADD COLUMN IF NOT EXISTS support_reason VARCHAR(2000);
-ALTER TABLE sessions ADD COLUMN IF NOT EXISTS credit_returned BOOLEAN NOT NULL DEFAULT FALSE;
-ALTER TABLE sessions ADD COLUMN IF NOT EXISTS center_invalidated BOOLEAN NOT NULL DEFAULT FALSE;
-ALTER TABLE sessions ADD COLUMN IF NOT EXISTS makeup_for_session_id INT REFERENCES sessions(session_id);
-CREATE UNIQUE INDEX IF NOT EXISTS uq_session_booking_key ON sessions(subscription_id,booking_key) WHERE booking_key IS NOT NULL;
-CREATE UNIQUE INDEX IF NOT EXISTS uq_session_makeup_original ON sessions(makeup_for_session_id) WHERE makeup_for_session_id IS NOT NULL;
-ALTER TABLE member_packages ADD COLUMN IF NOT EXISTS deferred_credit_return INT NOT NULL DEFAULT 0;
-ALTER TABLE member_packages ADD COLUMN IF NOT EXISTS approved_extra_nanos INT NOT NULL DEFAULT 0;
-CREATE TABLE IF NOT EXISTS session_absence_notices (
-    id SERIAL PRIMARY KEY, session_id INT NOT NULL REFERENCES sessions(session_id), member_id INT NOT NULL REFERENCES users(user_id),
-    reported_at TIMESTAMP NOT NULL, original_start TIMESTAMP NOT NULL, original_end TIMESTAMP NOT NULL,
-    reason VARCHAR(2000) NOT NULL, active BOOLEAN NOT NULL DEFAULT TRUE, superseded_at TIMESTAMP
-);
-CREATE UNIQUE INDEX IF NOT EXISTS uq_active_absence_notice ON session_absence_notices(session_id) WHERE active;
--- Owner31/10, implemented02/11: Absent + notice atomically; retain superseded history.
-LOCK TABLE attendances IN SHARE ROW EXCLUSIVE MODE;
-ALTER TABLE attendances ADD COLUMN IF NOT EXISTS absence_notice_id INT;
-ALTER TABLE attendances ADD COLUMN IF NOT EXISTS superseded_at TIMESTAMP;
-DO $$ BEGIN
- IF NOT EXISTS(SELECT 1 FROM pg_constraint WHERE conrelid='attendances'::regclass AND conname='fk_attendance_absence_notice') THEN
-  ALTER TABLE attendances ADD CONSTRAINT fk_attendance_absence_notice FOREIGN KEY(absence_notice_id) REFERENCES session_absence_notices(id);
- END IF;
-END $$;
--- Exactly one current attendance; archived automatic records remain traceable.
-DROP INDEX IF EXISTS ux_attendance_session_member;
-CREATE UNIQUE INDEX ux_attendance_session_member ON attendances(session_id,member_id)
- WHERE session_id IS NOT NULL AND superseded_at IS NULL;
-CREATE INDEX IF NOT EXISTS idx_attendance_absence_notice ON attendances(absence_notice_id) WHERE absence_notice_id IS NOT NULL;
-
-CREATE TABLE IF NOT EXISTS session_changes (
-    id SERIAL PRIMARY KEY, session_id INT NOT NULL REFERENCES sessions(session_id), request_key VARCHAR(80) NOT NULL,
-    request_hash VARCHAR(64) NOT NULL, actor_id INT NOT NULL REFERENCES users(user_id), changed_at TIMESTAMP NOT NULL,
-    cause VARCHAR(40) NOT NULL, reason VARCHAR(2000) NOT NULL, member_agreed BOOLEAN NOT NULL,
-    before_data VARCHAR(4000) NOT NULL, after_data VARCHAR(4000) NOT NULL, UNIQUE(session_id,request_key)
-);
-CREATE TABLE IF NOT EXISTS center_incidents (
-    id SERIAL PRIMARY KEY, session_id INT NOT NULL REFERENCES sessions(session_id), request_key VARCHAR(80) NOT NULL,
-    started_at TIMESTAMP NOT NULL, ended_at TIMESTAMP, reason VARCHAR(2000) NOT NULL, evidence VARCHAR(2000) NOT NULL,
-    status VARCHAR(30) NOT NULL DEFAULT 'WaitingForRecovery', created_by INT NOT NULL REFERENCES users(user_id), created_at TIMESTAMP NOT NULL,
-    resolved_by INT REFERENCES users(user_id), resolved_at TIMESTAMP, original_deadline TIMESTAMP, deadline_before TIMESTAMP, deadline_after TIMESTAMP,
-    recovered_credits INT NOT NULL DEFAULT 0, session_compensated BOOLEAN NOT NULL DEFAULT FALSE, UNIQUE(session_id,request_key),
-    CHECK(ended_at IS NULL OR ended_at>=started_at)
-);
-CREATE TABLE IF NOT EXISTS incident_affected_members (
-    incident_id INT NOT NULL REFERENCES center_incidents(id), member_id INT NOT NULL REFERENCES users(user_id), PRIMARY KEY(incident_id,member_id)
-);
-
--- Consolidated structure: 11_holiday_history_postgres.sql
-
-ALTER TABLE holidays ADD COLUMN IF NOT EXISTS actual_closed_until TIMESTAMP;
--- No guessed backfill. An active holiday's actual past interval is captured on deactivation.
-
--- Consolidated structure: 12_payment_resolutions_postgres.sql
-
-ALTER TABLE invoices ADD COLUMN IF NOT EXISTS cash_note VARCHAR(2000);
-ALTER TABLE invoices ADD COLUMN IF NOT EXISTS cash_confirmation_reversed BOOLEAN NOT NULL DEFAULT FALSE;
-ALTER TABLE invoices ADD COLUMN IF NOT EXISTS resolution_status VARCHAR(30);
-ALTER TABLE class_enrollments ADD COLUMN IF NOT EXISTS eligibility_subscription_id INT REFERENCES member_packages(subscription_id);
-CREATE TABLE IF NOT EXISTS payment_resolutions (
-    id SERIAL PRIMARY KEY, invoice_id INT NOT NULL REFERENCES invoices(invoice_id), resolution_type VARCHAR(30) NOT NULL,
-    status VARCHAR(30) NOT NULL DEFAULT 'Open', amount NUMERIC(12,2) NOT NULL, reason VARCHAR(2000) NOT NULL,
-    evidence VARCHAR(2000), outcome_note VARCHAR(2000), created_by INT NOT NULL REFERENCES users(user_id), created_at TIMESTAMP NOT NULL,
-    approved_by INT REFERENCES users(user_id), approved_at TIMESTAMP, completed_by INT REFERENCES users(user_id), completed_at TIMESTAMP,
-    performed_at TIMESTAMP, UNIQUE(invoice_id,resolution_type), CHECK(amount>0)
-);
-
-CREATE TABLE IF NOT EXISTS scms_data_migration_audit (
-    migration_key VARCHAR(100) PRIMARY KEY,
-    captured_at TIMESTAMP NOT NULL,
-    before_data TEXT NOT NULL,
-    after_data TEXT NOT NULL
-);
-
--- TABLE PURPOSES: retained runtime, compatibility, audit and future tables.
-COMMENT ON TABLE public.roles IS 'Vai trò hệ thống: Admin, Member, Coach, Receptionist, CenterManager.';
-COMMENT ON TABLE public.permissions IS 'Danh mục quyền thao tác nghiệp vụ.';
-COMMENT ON TABLE public.role_permissions IS 'Ma trận quyền của từng vai trò; khóa ghép, không có ID riêng.';
-COMMENT ON TABLE public.centers IS 'Trung tâm và hàng khóa dùng để tuần tự hóa các thao tác tranh chấp lịch.';
-COMMENT ON TABLE public.users IS 'Danh tính đăng nhập và hồ sơ chung; mật khẩu chỉ lưu hash.';
-COMMENT ON TABLE public.email_otps IS 'OTP đăng ký/đặt lại mật khẩu, hạn dùng và chống thử lại.';
-COMMENT ON TABLE public.center_managers IS 'Hồ sơ subtype CenterManager; dùng chung user_id với users.';
-COMMENT ON TABLE public.receptionists IS 'Hồ sơ subtype Receptionist; dùng chung user_id với users.';
-COMMENT ON TABLE public.coaches IS 'Hồ sơ Coach, mô tả và chứng chỉ; chuyên môn chuẩn ở coach_specializations.';
-COMMENT ON TABLE public.members IS 'Hồ sơ Member, mục tiêu/sức khỏe và trạng thái QR/booking block.';
-COMMENT ON TABLE public.subjects IS '9 môn chuẩn, giá 12 buổi Normal/12 credit Advanced và phân loại Outdoor.';
-COMMENT ON TABLE public.specializations IS 'Danh mục chuyên môn Coach liên kết với môn học.';
-COMMENT ON TABLE public.coach_specializations IS 'Liên kết nhiều-nhiều Coach và chuyên môn; khóa ghép.';
-COMMENT ON TABLE public.rooms IS '20 tài nguyên center1 theo room.jpg; room_id số, room_code riêng; phòng legacy giữ lịch sử.';
-COMMENT ON TABLE public.classes IS 'Khóa Normal 12 buổi cố định và template Advanced theo môn.';
-COMMENT ON TABLE public.training_plans IS 'Kế hoạch đào tạo cho một lớp hoặc một Member.';
-COMMENT ON TABLE public.sessions IS 'Buổi học, tài nguyên, người học 1:1 và liên kết quyền học/buổi bù.';
-COMMENT ON TABLE public.training_results IS 'Kết quả chuyên môn và trạng thái attendance đồng bộ cho từng buổi/Member.';
-COMMENT ON TABLE public.attendances IS 'Lịch sử điểm danh từng buổi, người ghi và lý do; không trừ credit lần hai.';
-COMMENT ON TABLE public.evaluations IS 'Đánh giá tiến bộ Member của Coach theo ngày.';
-COMMENT ON TABLE public.class_feedbacks IS 'Phản hồi Member về lớp và Coach, mỗi Member một phản hồi/lớp.';
-COMMENT ON TABLE public.membership_packages IS 'Danh mục gói chung/legacy còn được API và chứng từ tham chiếu; không seed gói tháng/VIP.';
-COMMENT ON TABLE public.member_packages IS 'Quyền Advanced từng đăng ký: môn, Primary Coach, giá mua đóng băng, credit và hạn.';
-COMMENT ON TABLE public.class_enrollments IS 'Ghi danh/waitlist Normal, trạng thái thanh toán và lịch sử hủy/thăng hạng.';
-COMMENT ON TABLE public.holidays IS 'Ngày nghỉ trung tâm và phần thời gian đóng cửa thực tế đã xảy ra.';
-COMMENT ON TABLE public.invoices IS 'Chứng từ thu tiền bất biến, holding, đối soát và liên kết lớp/quyền học.';
-COMMENT ON TABLE public.support_requests IS 'Dự phòng: phiếu hỗ trợ Member có trạng thái và Receptionist phụ trách.';
-COMMENT ON TABLE public.notifications IS 'Thông báo nghiệp vụ và khóa chống gửi trùng theo sự kiện.';
-COMMENT ON TABLE public.notification_recipients IS 'Trạng thái đọc của từng người nhận thông báo.';
-COMMENT ON TABLE public.chat_conversations IS 'Hội thoại hỗ trợ Member với nhân viên/AI.';
-COMMENT ON TABLE public.chat_messages IS 'Nội dung hội thoại, người gửi và khóa chống gửi lặp.';
-COMMENT ON TABLE public.chat_read_state IS 'Con trỏ tin nhắn đã đọc của mỗi người trong hội thoại.';
-COMMENT ON TABLE public.ai_consultations IS 'Dự phòng: lịch sử yêu cầu và phản hồi tư vấn AI độc lập.';
-COMMENT ON TABLE public.system_logs IS 'Audit actor/hành động/đối tượng; giữ nguyên lịch sử khi nâng cấp.';
-COMMENT ON TABLE public.normal_class_requests IS 'UUID/hash yêu cầu tạo Normal để retry không sinh lớp/lịch lần hai.';
-COMMENT ON TABLE public.subscription_pauses IS 'Khoảng gián đoạn có căn cứ dùng khi tính hạn Advanced.';
-COMMENT ON TABLE public.coach_work_schedules IS 'Trạng thái nhận đăng ký mới của từng Coach.';
-COMMENT ON TABLE public.coach_work_slots IS 'Các ca làm việc theo thứ/ngày của Coach; khóa ghép.';
-COMMENT ON TABLE public.coach_days_off IS 'Ngày nghỉ riêng của Coach; khóa ghép.';
-COMMENT ON TABLE public.advanced_registrations IS 'Yêu cầu chọn môn/Primary Coach, quyết định nhận và liên kết subscription.';
-COMMENT ON TABLE public.session_absence_notices IS 'Báo vắng sát giờ và lịch sử supersede; không tự hoàn credit.';
-COMMENT ON TABLE public.session_changes IS 'Audit dời/thay buổi với snapshot trước/sau, consent và idempotency.';
-COMMENT ON TABLE public.center_incidents IS 'Hồ sơ sự cố trung tâm, evidence và kết quả bù/phục hồi.';
-COMMENT ON TABLE public.incident_affected_members IS 'Danh sách Member bị ảnh hưởng bởi một sự cố.';
-COMMENT ON TABLE public.payment_resolutions IS 'Hồ sơ Refund/CashCorrection, phê duyệt, chứng cứ và kết quả thực hiện.';
-COMMENT ON TABLE public.scms_data_migration_audit IS 'Dấu migration một lần; replay không ghi đè quyết định giá/quyền đã thay sau đó.';
--- Roles
-INSERT INTO roles (role_name, description) VALUES
-('CenterManager', 'Quan ly trung tam - van hanh lop hoc, goi tap, bao cao'),
-('Coach',         'Huan luyen vien'),
-('Member',        'Thanh vien / hoc vien'),
-('Receptionist',  'Nhan vien le tan'),
-('Admin',         'Quan tri vien he thong - quan tri nguoi dung va phan quyen RBAC')
-ON CONFLICT (role_name) DO NOTHING;
-
--- Permissions
-INSERT INTO permissions (permission_name, description) VALUES
-('MANAGE_USERS',         'Quan ly nguoi dung'),
-('MANAGE_CLASSES',       'Quan ly lop hoc'),
-('MANAGE_PACKAGES',      'Quan ly goi thanh vien'),
-('VIEW_REPORTS',         'Xem bao cao'),
-('MANAGE_TRAINING_PLAN', 'Tao/sua ke hoach tap luyen'),
-('RECORD_RESULT',        'Ghi nhan ket qua buoi tap'),
-('PROCESS_PAYMENT',      'Ghi nhan thanh toan, xuat hoa don'),
-('HANDLE_SUPPORT',       'Xu ly yeu cau ho tro'),
-('VIEW_AUDIT_LOG',       'Xem lich su thao tac he thong'),
-('MANAGE_RBAC',          'Phan quyen va quan tri vai tro he thong'),
-('REGISTER_MEMBER',      'Dang ky thanh vien moi tai quay'),
-('MANAGE_SUBSCRIPTIONS', 'Dang ky va gia han goi tap'),
-('MANAGE_PERMISSIONS',   'Chi quan tri vien duoc cau hinh ma tran phan quyen'),
-('MANAGE_INVOICES',      'Quan ly va xem hoa don cua cac thanh vien'),
-('CHAT_AS_MEMBER',       'Member may access their own support chat'),
-('HANDLE_CHAT',          'Receptionist and CenterManager may handle support chats'),
-('LOCK_SUBJECTS',        'Khoa hoac mo mon hoc'),
-('MANAGE_SPECIALIZATIONS', 'Quan ly chuyen mon huan luyen vien')
-ON CONFLICT (permission_name) DO NOTHING;
-
--- Role → Permission assignments by names, not sequence-specific IDs.
-INSERT INTO role_permissions (role_id, permission_id)
-SELECT r.role_id, p.permission_id
-FROM (VALUES
-    ('CenterManager', 'MANAGE_USERS'),
-    ('CenterManager', 'MANAGE_CLASSES'),
-    ('CenterManager', 'MANAGE_PACKAGES'),
-    ('CenterManager', 'VIEW_REPORTS'),
-    ('CenterManager', 'PROCESS_PAYMENT'),
-    ('CenterManager', 'HANDLE_SUPPORT'),
-    ('CenterManager', 'VIEW_AUDIT_LOG'),
-    ('CenterManager', 'MANAGE_INVOICES'),
-    ('CenterManager', 'HANDLE_CHAT'),
-    ('Coach', 'MANAGE_TRAINING_PLAN'),
-    ('Coach', 'RECORD_RESULT'),
-    ('Receptionist', 'RECORD_RESULT'),
-    ('Receptionist', 'PROCESS_PAYMENT'),
-    ('Receptionist', 'HANDLE_SUPPORT'),
-    ('Receptionist', 'REGISTER_MEMBER'),
-    ('Receptionist', 'MANAGE_SUBSCRIPTIONS'),
-    ('Receptionist', 'MANAGE_INVOICES'),
-    ('Receptionist', 'HANDLE_CHAT'),
-    ('Member', 'CHAT_AS_MEMBER'),
-    ('Admin', 'MANAGE_USERS'),
-    ('Admin', 'VIEW_REPORTS'),
-    ('Admin', 'VIEW_AUDIT_LOG'),
-    ('Admin', 'MANAGE_RBAC'),
-    ('Admin', 'MANAGE_PERMISSIONS'),
-    ('Admin', 'LOCK_SUBJECTS'),
-    ('Admin', 'MANAGE_SPECIALIZATIONS')
-) AS defaults(role_name, permission_name)
-JOIN roles r ON UPPER(r.role_name) = UPPER(defaults.role_name)
-JOIN permissions p ON p.permission_name = defaults.permission_name
-WHERE NOT EXISTS(SELECT 1 FROM scms_data_migration_audit WHERE migration_key='20261029_catalog_accounts_v1')
-ON CONFLICT DO NOTHING;
-
-
--- The following IDs are reference-list ordinals, not assumptions about an upgraded DB.
-CREATE TEMP TABLE _scms_subjects(
-    ordinal INT PRIMARY KEY, name TEXT, slug TEXT, normal_price NUMERIC, advanced_price NUMERIC,
-    outdoor BOOLEAN, room_ordinal INT, coach_code TEXT
-) ON COMMIT DROP;
-INSERT INTO _scms_subjects VALUES
-(1, 'Tennis', 'quan-vot-tennis', 2500000, 8000000, TRUE, 1, 'tennis'),
-(2, 'Bơi lội', 'boi-loi', 1500000, 4500000, TRUE, 2, 'swimming'),
-(3, 'Pickleball', 'pickleball', 1800000, 5000000, FALSE, 3, 'pickleball'),
-(4, 'Bắn cung', 'ban-cung', 2000000, 6000000, TRUE, 4, 'archery'),
-(5, 'Bóng rổ', 'bong-ro', 1200000, 3500000, FALSE, 5, 'basketball'),
-(6, 'Bóng đá', 'bong-da', 1000000, 3500000, TRUE, 6, 'football'),
-(7, 'Bóng chuyền', 'bong-chuyen', 1000000, 3500000, FALSE, 13, 'volleyball'),
-(8, 'Cầu lông', 'cau-long', 900000, 3000000, FALSE, 7, 'badminton'),
-(9, 'Bóng bàn', 'bong-ban', 800000, 2500000, FALSE, 8, 'tabletennis');
-
-CREATE TEMP TABLE _scms_rooms(ordinal INT PRIMARY KEY,code TEXT,name TEXT,location TEXT,capacity INT,facility_type TEXT) ON COMMIT DROP;
-INSERT INTO _scms_rooms VALUES
-(1,'C01-TEN-01','Sân Tennis 01','Khu A – Ngoài trời',4,'Outdoor'),
-(2,'C01-SWIM-01','Hồ bơi 01','Khu hồ bơi',10,'Outdoor'),
-(3,'C01-PICK-01','Sân Pickleball 01','Nhà thi đấu B',4,'Indoor'),
-(4,'C01-ARC-01','Khu Bắn cung 01','Khu C – Ngoài trời',5,'Outdoor'),
-(5,'C01-BR-01','Sân Bóng rổ 01','Nhà thi đấu A',8,'Indoor'),
-(6,'C01-FOOT-01','Sân Bóng đá 01','Khu B – Ngoài trời',15,'Outdoor'),
-(7,'C01-BAD-01','Sân Cầu lông 01','Nhà thi đấu B',4,'Indoor'),
-(8,'C01-TT-01','Bàn Bóng bàn 01','Phòng Bóng bàn',2,'Indoor'),
-(9,'C01-TEN-02','Sân Tennis 02','Khu A – Ngoài trời',4,'Outdoor'),
-(10,'C01-FOOT-02','Sân Bóng đá 02','Khu B – Ngoài trời',15,'Outdoor'),
-(11,'C01-ARC-02','Khu Bắn cung 02','Khu C – Ngoài trời',5,'Outdoor'),
-(12,'C01-BR-02','Sân Bóng rổ 02','Nhà thi đấu A',8,'Indoor'),
-(13,'C01-BC-01','Sân Bóng chuyền 01','Nhà thi đấu A',8,'Indoor'),
-(14,'C01-BC-02','Sân Bóng chuyền 02','Nhà thi đấu A',8,'Indoor'),
-(15,'C01-PICK-02','Sân Pickleball 02','Nhà thi đấu B',4,'Indoor'),
-(16,'C01-BAD-02','Sân Cầu lông 02','Nhà thi đấu B',4,'Indoor'),
-(17,'C01-TT-02','Bàn Bóng bàn 02','Phòng Bóng bàn',2,'Indoor'),
-(18,'C01-TT-03','Bàn Bóng bàn 03','Phòng Bóng bàn',2,'Indoor'),
-(19,'C01-TT-04','Bàn Bóng bàn 04','Phòng Bóng bàn',2,'Indoor'),
-(20,'C01-SWIM-02','Hồ bơi 02','Khu hồ bơi',10,'Outdoor');
-
-CREATE TEMP TABLE _scms_room_aliases(ordinal INT,old_name TEXT) ON COMMIT DROP;
-INSERT INTO _scms_room_aliases VALUES
-(1, 'Sân Tennis ngoài trời 1'),
-(2, 'Hồ bơi ngoài trời tiêu chuẩn'),
-(3, 'Sân Pickleball có mái che'),
-(4, 'Trường bắn ngoài trời'),
-(5, 'Nhà thi đấu đa năng (Bóng rổ & Chuyền)'),
-(6, 'Sân cỏ ngoài trời (Bóng đá)'),
-(7, 'Nhà thi đấu Cầu lông (Sàn thảm)'),
-(8, 'Phòng Bóng bàn tiêu chuẩn');
-
-CREATE TEMP TABLE _scms_accounts(ordinal INT PRIMARY KEY,role_name TEXT,name TEXT,email TEXT,phone TEXT,address TEXT,gender TEXT,birth DATE) ON COMMIT DROP;
-INSERT INTO _scms_accounts VALUES
-(1, 'Admin', 'Admin Account', 'admin@gmail.com', '0905000101', 'Văn phòng Trung tâm, Q1, TP.HCM', 'Male', '1985-08-12'),
-(2, 'Member', 'Nguyễn Minh An', 'an@gmail.com', '0901000101', 'Quận 1, TP.HCM', 'Male', '2003-05-12'),
-(3, 'Member', 'Trần Bảo Linh', 'linh@gmail.com', '0901000102', 'Quận 3, TP.HCM', 'Female', '2002-08-21'),
-(4, 'Member', 'Lê Gia Huy', 'huy@gmail.com', '0901000103', 'Quận 7, TP.HCM', 'Male', '2004-02-15'),
-(5, 'Member', 'Phạm Ngọc Mai', 'mai@gmail.com', '0901000104', 'Bình Thạnh, TP.HCM', 'Female', '2001-11-09'),
-(6, 'Member', 'Võ Đức Khang', 'khang@gmail.com', '0901000105', 'TP. Thủ Đức, TP.HCM', 'Male', '2003-07-24'),
-(7, 'Member', 'Đặng Thảo Vy', 'vy@gmail.com', '0901000106', 'Tân Bình, TP.HCM', 'Female', '2004-04-18'),
-(8, 'Member', 'Bùi Quốc Bảo', 'bao@gmail.com', '0901000107', 'Quận 10, TP.HCM', 'Male', '2002-12-03'),
-(9, 'Member', 'Hồ Khánh Nhi', 'nhi@gmail.com', '0901000108', 'Phú Nhuận, TP.HCM', 'Female', '2005-06-27'),
-(10, 'Member', 'Đỗ Tuấn Kiệt', 'kiet@gmail.com', '0901000109', 'Quận 11, TP.HCM', 'Male', '2001-09-14'),
-(11, 'Member', 'Phan Thu Hà', 'ha@gmail.com', '0901000110', 'Gò Vấp, TP.HCM', 'Female', '2003-03-30'),
-(12, 'Coach', 'Nguyễn Hoàng Quân', 'coach.tennis1@gmail.com', '0902000101', 'Quận 1, TP.HCM', 'Male', '1990-03-15'),
-(13, 'Coach', 'Huỳnh Diễm My', 'coach.tennis2@gmail.com', '0902000102', 'Quận 3, TP.HCM', 'Female', '1992-07-22'),
-(14, 'Coach', 'Lê Minh Duy', 'coach.swimming1@gmail.com', '0902000103', 'Quận 7, TP.HCM', 'Male', '1989-11-08'),
-(15, 'Coach', 'Lê Phương Anh', 'coach.swimming2@gmail.com', '0902000104', 'Bình Thạnh, TP.HCM', 'Female', '1993-05-17'),
-(16, 'Coach', 'Võ Thanh Long', 'coach.pickleball1@gmail.com', '0902000105', 'TP. Thủ Đức, TP.HCM', 'Male', '1994-09-26'),
-(17, 'Coach', 'Phạm Thị Lan', 'coach.pickleball2@gmail.com', '0902000106', 'Tân Bình, TP.HCM', 'Female', '1995-02-12'),
-(18, 'Coach', 'Lê Nguyễn Thiên Phúc', 'coach.archery1@gmail.com', '0902000107', 'Quận 10, TP.HCM', 'Male', '1991-12-04'),
-(19, 'Coach', 'Hồ Thảo My', 'coach.archery2@gmail.com', '0902000108', 'Phú Nhuận, TP.HCM', 'Female', '1996-06-19'),
-(20, 'Coach', 'Trần Anh Dũng', 'coach.basketball1@gmail.com', '0902000109', 'Quận 11, TP.HCM', 'Male', '1988-01-30'),
-(21, 'Coach', 'Phan Kim Ngân', 'coach.basketball2@gmail.com', '0902000110', 'Gò Vấp, TP.HCM', 'Female', '1992-08-14'),
-(22, 'Coach', 'Lê Trần Phi', 'coach.football1@gmail.com', '0902000111', 'Quận 12, TP.HCM', 'Male', '1987-04-25'),
-(23, 'Coach', 'Trần Ngọc Yến', 'coach.football2@gmail.com', '0902000112', 'Quận 6, TP.HCM', 'Female', '1993-10-09'),
-(24, 'Coach', 'Nguyễn Văn Hoàng', 'coach.volleyball1@gmail.com', '0902000113', 'Quận 5, TP.HCM', 'Male', '1989-02-21'),
-(25, 'Coach', 'Phạm Thanh Thư', 'coach.volleyball2@gmail.com', '0902000114', 'Quận 8, TP.HCM', 'Female', '1995-07-07'),
-(26, 'Coach', 'Võ Minh Đức', 'coach.badminton1@gmail.com', '0902000115', 'Quận 4, TP.HCM', 'Male', '1990-09-18'),
-(27, 'Coach', 'Trần Thị Hương', 'coach.badminton2@gmail.com', '0902000116', 'Tân Phú, TP.HCM', 'Female', '1996-01-11'),
-(28, 'Coach', 'Lê Minh Khoa', 'coach.tabletennis1@gmail.com', '0902000117', 'Bình Tân, TP.HCM', 'Male', '1988-05-23'),
-(29, 'Coach', 'Hồ Bích Oanh', 'coach.tabletennis2@gmail.com', '0902000118', 'Quận 3, TP.HCM', 'Female', '1994-12-16'),
-(30, 'Receptionist', 'Nguyễn Thị Ngọc Anh', 'receptionist1@gmail.com', '0903000101', 'Bình Thạnh, TP.HCM', 'Female', '1998-06-14'),
-(31, 'Receptionist', 'Trần Minh Khôi', 'receptionist2@gmail.com', '0903000102', 'TP. Thủ Đức, TP.HCM', 'Male', '1997-09-22'),
-(32, 'CenterManager', 'Nguyễn Thành Đạt', 'manager1@gmail.com', '0904000101', 'Quận 7, TP.HCM', 'Male', '1988-04-18'),
-(33, 'CenterManager', 'Trần Ngọc Diệp', 'manager2@gmail.com', '0904000102', 'Quận 3, TP.HCM', 'Female', '1990-09-25');
-
--- The one-time root pass may add catalog/identity rows but never rewrite transaction rows.
--- PDF identities are matched by EMAIL and role; names never identify an old account.
-DO $identities$
-DECLARE a RECORD; u RECORD; new_id INT; n INT; rebuild BOOLEAN:=current_setting('scms.rebuild',true)='true';
-BEGIN
- IF NOT rebuild AND EXISTS(SELECT 1 FROM scms_data_migration_audit WHERE migration_key='20261029_catalog_accounts_v1') THEN RETURN; END IF;
- FOR a IN SELECT * FROM _scms_accounts ORDER BY ordinal LOOP
-  IF (SELECT count(*) FROM users WHERE lower(email)=a.email)>1 THEN RAISE EXCEPTION 'PDF email % has multiple case-insensitive matches; reconcile identities first',a.email; END IF;
-  SELECT x.user_id,r.role_name INTO u FROM users x JOIN roles r ON r.role_id=x.role_id WHERE lower(x.email)=a.email;
-  IF FOUND THEN
-   IF u.role_name<>a.role_name THEN RAISE EXCEPTION 'PDF email % belongs to another role; reconcile identity instead of reusing an ID',a.email; END IF;
-   UPDATE users SET full_name=a.name,phone=a.phone,address=a.address,gender=a.gender,date_of_birth=a.birth,
-      status='Active',center_id=CASE WHEN a.role_name='Admin' THEN NULL ELSE 1 END WHERE user_id=u.user_id;
-   new_id:=u.user_id;
-  ELSE
-   IF rebuild THEN
-    INSERT INTO users(user_id,role_id,full_name,email,phone,password_hash,address,gender,date_of_birth,status,center_id,is_first_login)
-    SELECT a.ordinal,role_id,a.name,a.email,a.phone,crypt('SWP391',gen_salt('bf',10)),a.address,a.gender,a.birth,'Active',CASE WHEN a.role_name='Admin' THEN NULL ELSE 1 END,FALSE FROM roles WHERE role_name=a.role_name
-    RETURNING user_id INTO new_id;
-   ELSE
-    INSERT INTO users(role_id,full_name,email,phone,password_hash,address,gender,date_of_birth,status,center_id,is_first_login)
-    SELECT role_id,a.name,a.email,a.phone,crypt('SWP391',gen_salt('bf',10)),a.address,a.gender,a.birth,'Active',CASE WHEN a.role_name='Admin' THEN NULL ELSE 1 END,FALSE FROM roles WHERE role_name=a.role_name
-    RETURNING user_id INTO new_id;
-   END IF;
-  END IF;
-  IF a.role_name='CenterManager' THEN INSERT INTO center_managers VALUES(new_id) ON CONFLICT DO NOTHING;
-  ELSIF a.role_name='Receptionist' THEN INSERT INTO receptionists VALUES(new_id) ON CONFLICT DO NOTHING;
-  ELSIF a.role_name='Coach' THEN INSERT INTO coaches(user_id) VALUES(new_id) ON CONFLICT DO NOTHING;
-  ELSIF a.role_name='Member' THEN INSERT INTO members(user_id,goal,join_date,registered_by) VALUES(new_id,NULL,(CURRENT_DATE-30),NULL) ON CONFLICT DO NOTHING;
-  END IF;
- END LOOP;
- UPDATE users SET status='Inactive' WHERE lower(email) NOT IN(SELECT email FROM _scms_accounts);
- FOR a IN SELECT * FROM _scms_subjects ORDER BY ordinal LOOP
-  SELECT count(*) INTO n FROM subjects WHERE slug=a.slug;
-  IF n=0 THEN
-   IF rebuild THEN
-    INSERT INTO subjects(subject_id,subject_name,slug,normal_price,advanced_price,outdoor,status) VALUES(a.ordinal,a.name,a.slug,a.normal_price,a.advanced_price,a.outdoor,'Active');
-   ELSE
-    INSERT INTO subjects(subject_name,slug,normal_price,advanced_price,outdoor,status) VALUES(a.name,a.slug,a.normal_price,a.advanced_price,a.outdoor,'Active');
-   END IF;
-  ELSE
-   UPDATE subjects SET subject_name=a.name,normal_price=a.normal_price,advanced_price=a.advanced_price,outdoor=a.outdoor,status='Active' WHERE slug=a.slug;
-  END IF;
- END LOOP;
-END $identities$;
-
--- Owner correction for the earlier random-password seed, scoped to the PDF identities.
--- A separate key is required because catalog_accounts_v1 may already have been executed.
--- Subsequent ROOT executions preserve password changes, lock state and first-login policy.
-DO $demo_passwords$
-DECLARE account_row RECORD; identity_row RECORD;
-BEGIN
- IF EXISTS(SELECT 1 FROM scms_data_migration_audit WHERE migration_key='20261029_demo_passwords_v2') THEN RETURN; END IF;
- FOR account_row IN SELECT * FROM _scms_accounts ORDER BY ordinal LOOP
-  IF (SELECT count(*) FROM users WHERE lower(email)=account_row.email)<>1 THEN RAISE EXCEPTION 'Expected one PDF identity for %',account_row.email; END IF;
-  SELECT x.user_id,r.role_name INTO identity_row FROM users x JOIN roles r ON r.role_id=x.role_id WHERE lower(x.email)=account_row.email;
-  IF identity_row.role_name<>account_row.role_name THEN RAISE EXCEPTION 'Demo password correction: role mismatch for %',account_row.email; END IF;
-  UPDATE users SET password_hash=crypt('SWP391',gen_salt('bf',10)),
-   is_first_login=FALSE,failed_login_attempts=0,locked_until=NULL WHERE user_id=identity_row.user_id;
- END LOOP;
- IF EXISTS(SELECT 1 FROM _scms_accounts a JOIN users u ON lower(u.email)=a.email
-  WHERE crypt('SWP391',u.password_hash)<>u.password_hash OR u.is_first_login OR u.failed_login_attempts<>0 OR u.locked_until IS NOT NULL) THEN
-  RAISE EXCEPTION 'Demo password/first-login/lock postflight failed';
- END IF;
- INSERT INTO scms_data_migration_audit VALUES('20261029_demo_passwords_v2',localtimestamp,
-  'Owner-approved correction of 33 PDF demo identities only; existing IDs and business history preserved',
-  'Salted BCrypt; no forced first-login change for demo seed; replay preserves later account changes');
-END $demo_passwords$;
-
-
--- Remove only unused, noncanonical subjects. Discover ALL actual FK references first.
-DO $catalog$
-DECLARE s RECORD; fk RECORD; used BOOLEAN;
-BEGIN
- IF current_setting('scms.rebuild',true)<>'true' AND EXISTS(SELECT 1 FROM scms_data_migration_audit WHERE migration_key='20261029_catalog_accounts_v1') THEN RETURN; END IF;
- FOR s IN SELECT subject_id FROM subjects WHERE slug IS NULL OR slug NOT IN(SELECT slug FROM _scms_subjects) LOOP
-  FOR fk IN SELECT c.conrelid::regclass AS tbl,a.attname AS col,cardinality(c.conkey) AS width FROM pg_constraint c JOIN pg_attribute a ON a.attrelid=c.conrelid AND a.attnum=c.conkey[1]
-    WHERE c.contype='f' AND c.confrelid='subjects'::regclass LOOP
-   IF fk.width<>1 THEN RAISE EXCEPTION 'Composite subject FK requires manual review'; END IF;
-   EXECUTE format('SELECT EXISTS(SELECT 1 FROM %s WHERE %I=$1)',fk.tbl,fk.col) INTO used USING s.subject_id;
-   IF used THEN RAISE EXCEPTION 'Noncanonical subject % referenced by %; transaction stopped without deleting history',s.subject_id,fk.tbl; END IF;
-  END LOOP;
-  DELETE FROM subjects WHERE subject_id=s.subject_id;
- END LOOP;
-END $catalog$;
-
-DO $resources$
-DECLARE r RECORD; n INT; rid INT; sid INT; spid INT; rebuild BOOLEAN:=current_setting('scms.rebuild',true)='true';
-BEGIN
- IF NOT rebuild AND EXISTS(SELECT 1 FROM scms_data_migration_audit WHERE migration_key='20261029_catalog_accounts_v1') THEN RETURN; END IF;
- FOR r IN SELECT * FROM _scms_rooms ORDER BY ordinal LOOP
-  INSERT INTO rooms(room_id,room_code,room_name,location,capacity,status,facility_type,center_id)
-  VALUES(r.ordinal,r.code,r.name,r.location,r.capacity,'Available',r.facility_type,1);
- END LOOP;
- FOR r IN SELECT * FROM _scms_subjects ORDER BY ordinal LOOP
-  SELECT subject_id INTO sid FROM subjects WHERE slug=r.slug;
-  SELECT specialization_id INTO spid FROM specializations WHERE lower(name)=lower(r.name);
-  IF NOT FOUND AND r.ordinal=1 THEN SELECT specialization_id INTO spid FROM specializations WHERE name IN('Quần vợt (Tennis)','Quần vợt') ORDER BY specialization_id LIMIT 1; END IF;
-  IF spid IS NULL THEN
-   IF rebuild THEN INSERT INTO specializations(specialization_id,name,subject_id,status) VALUES(r.ordinal,r.name,sid,'Active') RETURNING specialization_id INTO spid;
-   ELSE INSERT INTO specializations(name,subject_id,status) VALUES(r.name,sid,'Active') RETURNING specialization_id INTO spid; END IF;
-  ELSE UPDATE specializations SET name=r.name,subject_id=sid,status='Active' WHERE specialization_id=spid; END IF;
-  DELETE FROM coach_specializations cs USING users u WHERE cs.coach_id=u.user_id AND u.email IN('coach.'||r.coach_code||'1@gmail.com','coach.'||r.coach_code||'2@gmail.com');
-  INSERT INTO coach_specializations SELECT user_id,spid FROM users WHERE email IN('coach.'||r.coach_code||'1@gmail.com','coach.'||r.coach_code||'2@gmail.com');
-  UPDATE coaches c SET specialization=r.name,certification=NULL,bio='Huấn luyện viên môn '||r.name||'.'
-   FROM users u WHERE c.user_id=u.user_id AND u.email IN('coach.'||r.coach_code||'1@gmail.com','coach.'||r.coach_code||'2@gmail.com');
-  SELECT count(*) INTO n FROM classes WHERE subject_id=sid AND class_type='Advanced' AND center_id=1;
-  IF n>1 THEN RAISE EXCEPTION 'Multiple Advanced templates for subject %; review class/session links',r.slug; END IF;
-  IF n=0 THEN
-   IF rebuild THEN INSERT INTO classes(class_id,class_name,subject_id,max_capacity,tuition_fee,status,class_type,total_sessions,center_id) VALUES(r.ordinal,r.name||' - Advanced (1:1)',sid,1,r.advanced_price,'Open','Advanced',12,1);
-   ELSE INSERT INTO classes(class_name,subject_id,max_capacity,tuition_fee,status,class_type,total_sessions,center_id) VALUES(r.name||' - Advanced (1:1)',sid,1,r.advanced_price,'Open','Advanced',12,1); END IF;
-  ELSE UPDATE classes SET class_name=r.name||' - Advanced (1:1)' WHERE subject_id=sid AND class_type='Advanced' AND center_id=1; END IF;
- END LOOP;
- -- Historical coach identity remains intact. Remove only the disallowed descriptive phrases.
- UPDATE coaches SET specialization=trim(both ' ,;' from regexp_replace(coalesce(specialization,''),'(fitness|thể hình|gym|yoga|cardio)','', 'gi')),
-   bio=CASE WHEN coalesce(bio,'')~*'(fitness|thể hình|gym|yoga|cardio)' THEN NULL ELSE bio END
- WHERE coalesce(specialization,'')~*'(fitness|thể hình|gym|yoga|cardio)' OR coalesce(bio,'')~*'(fitness|thể hình|gym|yoga|cardio)';
- DELETE FROM coach_specializations WHERE specialization_id IN(SELECT specialization_id FROM specializations WHERE lower(name) IN('fitness','thể hình','gym','yoga','cardio'));
- UPDATE specializations SET status='Inactive' WHERE lower(name) IN('fitness','thể hình','gym','yoga','cardio');
- UPDATE membership_packages SET status='Inactive' WHERE package_name IN('Gói Cơ Bản 1 Tháng','Gói Tiêu Chuẩn 3 Tháng','Gói Cao Cấp 6 Tháng','Gói VIP 12 Tháng','Gói Khóa Học 1:1 (12 Buổi Linh Hoạt)');
- UPDATE classes c SET class_name=s.name||' - Normal - K01' FROM subjects su JOIN _scms_subjects s ON su.slug=s.slug
-  WHERE c.subject_id=su.subject_id AND c.class_type='Normal' AND c.center_id=1 AND c.class_name IN('Lớp Cầu Lông Cơ Bản (K1)','Lớp Quần Vợt Phong Trào','Lớp Bơi Lội Căn Bản','Lớp Pickleball Nhập Môn','Lớp Bóng Đá Căn Bản','Lớp Bóng Bàn Căn Bản');
-END $resources$;
-ALTER TABLE subjects DROP CONSTRAINT IF EXISTS ck_approved_subject_slug;
-ALTER TABLE subjects ADD CONSTRAINT ck_approved_subject_slug CHECK(slug IS NOT NULL AND slug IN('quan-vot-tennis','boi-loi','pickleball','ban-cung','bong-ro','bong-da','bong-chuyen','cau-long','bong-ban'));
-ALTER TABLE subjects DROP CONSTRAINT IF EXISTS ck_subject_positive_prices;
-ALTER TABLE subjects ADD CONSTRAINT ck_subject_positive_prices CHECK(normal_price>0 AND advanced_price>0);
-CREATE UNIQUE INDEX IF NOT EXISTS uq_scms_rooms_center_name ON rooms(center_id,lower(room_name)) WHERE status='Available';
-
--- REFERENCE BUSINESS DATA, recreated on every DATABASE-variant execution.
--- This is an explicitly synthetic SCMS dataset, not imported payment/attendance evidence.
--- IDs below use the approved PDF account order: Admin 1; Member 2-11; Coach 12-29;
--- Receptionist 30-31; CenterManager 32-33. Subtype IDs MUST remain those user IDs.
-CREATE TEMP TABLE _scms_dates ON COMMIT DROP AS
-SELECT localtimestamp AS now_at, CURRENT_DATE AS today,
-       (CURRENT_DATE-(extract(isodow FROM CURRENT_DATE)::int-1)-21) AS course_anchor;
-
--- Whole-day holiday closures only. Payment activation below occurs at midnight;
--- the 45 usable-day deadline therefore remains exact even when crossing a holiday.
-CREATE OR REPLACE FUNCTION pg_temp.scms_reference_deadline(activated TIMESTAMP) RETURNS TIMESTAMP
-LANGUAGE plpgsql AS $$
-DECLARE deadline TIMESTAMP:=activated; used INT:=0;
-BEGIN
- WHILE used<45 LOOP
-  IF NOT EXISTS(SELECT 1 FROM holidays WHERE holiday_date=deadline::date AND is_active) THEN used:=used+1; END IF;
-  deadline:=deadline+interval '1 day';
- END LOOP;
- RETURN deadline;
-END $$;
-
--- Retain the project's configured closure dates without recreating old transactional rows.
-INSERT INTO holidays(holiday_id,holiday_date,holiday_name,tag,is_active,description)
-SELECT row_number() OVER(ORDER BY holiday_date),holiday_date,holiday_name,tag,TRUE,
-       'Ngày đóng cửa trong lịch tham chiếu SCMS; lịch học và hạn Advanced bỏ qua ngày này.'
-FROM (VALUES
- (DATE '2026-01-01','Tết Dương lịch 2026','NATIONAL_FIXED'),
- (DATE '2026-02-15','Nghỉ Tết Nguyên đán 2026 - ngày 1','LUNAR_FESTIVAL'),
- (DATE '2026-02-16','Nghỉ Tết Nguyên đán 2026 - ngày 2','LUNAR_FESTIVAL'),
- (DATE '2026-02-17','Nghỉ Tết Nguyên đán 2026 - ngày 3','LUNAR_FESTIVAL'),
- (DATE '2026-02-18','Nghỉ Tết Nguyên đán 2026 - ngày 4','LUNAR_FESTIVAL'),
- (DATE '2026-02-19','Nghỉ Tết Nguyên đán 2026 - ngày 5','LUNAR_FESTIVAL'),
- (DATE '2026-02-20','Nghỉ Tết Nguyên đán 2026 - ngày 6','LUNAR_FESTIVAL'),
- (DATE '2026-02-21','Nghỉ Tết Nguyên đán 2026 - ngày 7','LUNAR_FESTIVAL'),
- (DATE '2026-04-26','Giỗ Tổ Hùng Vương 2026','LUNAR_FESTIVAL'),
- (DATE '2026-04-30','Ngày Giải phóng miền Nam 2026','NATIONAL_FIXED'),
- (DATE '2026-05-01','Ngày Quốc tế Lao động 2026','NATIONAL_FIXED'),
- (DATE '2026-09-02','Quốc khánh 2026','NATIONAL_FIXED'),
- (DATE '2026-09-03','Nghỉ liền kề Quốc khánh 2026','NATIONAL_FIXED'),
- (DATE '2027-01-01','Tết Dương lịch 2027','NATIONAL_FIXED'),
- (DATE '2027-04-30','Ngày Giải phóng miền Nam 2027','NATIONAL_FIXED'),
- (DATE '2027-05-01','Ngày Quốc tế Lao động 2027','NATIONAL_FIXED'),
- (DATE '2027-09-02','Quốc khánh 2027','NATIONAL_FIXED'),
- (DATE '2027-09-03','Nghỉ liền kề Quốc khánh 2027','NATIONAL_FIXED')
-) AS closures(holiday_date,holiday_name,tag);
-
-UPDATE users SET created_at=(SELECT course_anchor-120 FROM _scms_dates)::timestamp;
-UPDATE members SET join_date=(SELECT course_anchor-120 FROM _scms_dates),registered_by=30;
-INSERT INTO coach_work_schedules SELECT user_id,TRUE FROM coaches ORDER BY user_id;
-INSERT INTO coach_work_slots(coach_id,slot_key)
-SELECT c.user_id,d.day||':'||slot FROM coaches c
-CROSS JOIN (VALUES('MONDAY'),('TUESDAY'),('WEDNESDAY'),('THURSDAY'),('FRIDAY'),('SATURDAY'),('SUNDAY')) d(day)
-CROSS JOIN generate_series(1,7) slot;
-
--- Nine Normal courses, each with twelve VALID sessions and an independent subject price.
--- Tennis capacity is four; Archery five; no Normal capacity exceeds its physical room.
-INSERT INTO classes(class_id,class_name,subject_id,coach_id,max_capacity,tuition_fee,start_date,end_date,status,class_type,total_sessions,center_id)
-SELECT s.ordinal+9,s.name||' - Normal - K01',s.ordinal,12+2*(s.ordinal-1),least(15,r.capacity),
- s.normal_price,d.course_anchor,d.course_anchor+60,'Ongoing','Normal',12,1
-FROM _scms_subjects s JOIN _scms_rooms r ON r.ordinal=s.room_ordinal CROSS JOIN _scms_dates d ORDER BY s.ordinal;
-
-INSERT INTO sessions(session_id,class_id,room_id,coach_id,session_date,start_time,end_time,status,attendance_finalized,created_by)
-SELECT row_number() OVER(ORDER BY subject_ordinal,lesson),subject_ordinal+9,room_ordinal,coach_id,lesson_date,
- start_at,start_at+interval '90 minutes',
- CASE WHEN lesson_date+start_at+interval '90 minutes'<d.now_at THEN 'Completed' ELSE 'Scheduled' END,
- lesson_date+start_at+interval '90 minutes'<d.now_at,32
-FROM (
- SELECT s.ordinal AS subject_ordinal,s.room_ordinal,12+2*(s.ordinal-1) AS coach_id,
-        calendar.lesson,calendar.lesson_date,CASE WHEN s.ordinal=7 THEN TIME '07:45' ELSE TIME '06:00' END AS start_at
- FROM _scms_subjects s CROSS JOIN LATERAL (
-  SELECT row_number() OVER(ORDER BY x.day) AS lesson,x.day::date AS lesson_date
-  FROM generate_series((SELECT course_anchor FROM _scms_dates),(SELECT course_anchor+100 FROM _scms_dates),interval '1 day') x(day)
-  WHERE extract(isodow FROM x.day) IN(1,4) AND NOT EXISTS(SELECT 1 FROM holidays h WHERE h.holiday_date=x.day::date AND h.is_active)
-  ORDER BY x.day LIMIT 12
- ) calendar
-) lessons CROSS JOIN _scms_dates d ORDER BY subject_ordinal,lesson;
-UPDATE classes c SET start_date=x.first_day,end_date=x.last_day FROM
- (SELECT class_id,min(session_date) first_day,max(session_date) last_day FROM sessions GROUP BY class_id) x WHERE c.class_id=x.class_id;
-
--- Cash Paid is a synthetic reference event; no gateway reference or real remittance is fabricated.
-INSERT INTO invoices(invoice_id,member_id,class_id,receptionist_id,amount,invoice_code,payment_method,payment_status,payment_date,created_at,expires_at,cash_note)
-SELECT s.ordinal,s.ordinal+1,s.ordinal+9,30,s.normal_price,'INV-SCMS-N-'||lpad(s.ordinal::text,3,'0'),
- 'Cash','Paid',(d.course_anchor-2)+TIME '08:02',(d.course_anchor-2)+TIME '08:00',
- (d.course_anchor-2)+TIME '08:05','Dữ liệu tham chiếu được dựng lại; không phải xác nhận thu tiền thực tế.'
-FROM _scms_subjects s CROSS JOIN _scms_dates d ORDER BY s.ordinal;
-INSERT INTO class_enrollments(enrollment_id,member_id,class_id,enrolled_at,status)
-SELECT s.ordinal,s.ordinal+1,s.ordinal+9,(d.course_anchor-2)+TIME '08:02','Registered'
-FROM _scms_subjects s CROSS JOIN _scms_dates d ORDER BY s.ordinal;
-
--- D15: a center-cancelled Normal session is retained and linked to exactly one makeup.
-UPDATE sessions SET status='Cancelled',center_invalidated=TRUE,attendance_finalized=TRUE,
- support_reason='Sân Tennis bảo trì đột xuất; buổi gốc không tổ chức, trung tâm xếp buổi bù.' WHERE session_id=1;
-INSERT INTO center_incidents(id,session_id,request_key,started_at,ended_at,reason,evidence,status,created_by,created_at,resolved_by,resolved_at,session_compensated)
-SELECT 1,1,'normal-tennis-maintenance-01',s.session_date+s.start_time-interval '1 hour',s.session_date+s.end_time,
- 'Sân Tennis bảo trì đột xuất, buổi học không tổ chức.',
- 'SCMS_REFERENCE: hồ sơ tham chiếu sự cố sân, xác minh không có hoạt động học trong buổi gốc.',
- 'Resolved',32,s.session_date+s.start_time-interval '1 hour',32,s.session_date+s.end_time,TRUE FROM sessions s WHERE s.session_id=1;
-INSERT INTO incident_affected_members VALUES(1,2);
-INSERT INTO sessions(session_id,class_id,room_id,coach_id,session_date,start_time,end_time,status,makeup_for_session_id,created_by,support_reason)
-SELECT 109,10,1,12,x.day::date,TIME '06:00',TIME '07:30','Scheduled',1,32,
- 'Buổi bù cho buổi Tennis không tổ chức do sân bảo trì; giữ nguyên quyền Normal.'
-FROM classes c CROSS JOIN LATERAL (
- SELECT day FROM generate_series(c.end_date+1,c.end_date+20,interval '1 day') day
- WHERE extract(isodow FROM day)=5 AND NOT EXISTS(SELECT 1 FROM holidays WHERE holiday_date=day::date AND is_active)
- ORDER BY day LIMIT 1
-) x WHERE c.class_id=10;
-UPDATE classes SET end_date=(SELECT session_date FROM sessions WHERE session_id=109) WHERE class_id=10;
-
--- Four Advanced registrations: two Paid/Active, one Pending/zero credit, one Expired.
-INSERT INTO member_packages(subscription_id,member_id,subject_id,primary_coach_id,purchase_amount,remaining_credit,validity_days,status,start_date,end_date,activated_at,expires_at,expiry_revoked_credit,expiry_processed_at)
-SELECT 1,11,8,26,3000000,9,45,'Active',d.course_anchor-1,
- pg_temp.scms_reference_deadline((d.course_anchor-1)::timestamp)::date,
- (d.course_anchor-1)::timestamp,pg_temp.scms_reference_deadline((d.course_anchor-1)::timestamp),0,NULL::timestamp FROM _scms_dates d
-UNION ALL
-SELECT 2,2,1,12,8000000,11,45,'Active',d.course_anchor-1,
- pg_temp.scms_reference_deadline((d.course_anchor-1)::timestamp)::date,
- (d.course_anchor-1)::timestamp,pg_temp.scms_reference_deadline((d.course_anchor-1)::timestamp),0,NULL FROM _scms_dates d
-UNION ALL
-SELECT 3,3,3,16,5000000,0,45,'Pending',NULL,NULL,NULL,NULL,0,NULL FROM _scms_dates
-UNION ALL
-SELECT 4,4,5,20,3500000,0,45,'Expired',d.today-80,
- pg_temp.scms_reference_deadline((d.today-80)::timestamp)::date,
- (d.today-80)::timestamp,pg_temp.scms_reference_deadline((d.today-80)::timestamp),12,
- pg_temp.scms_reference_deadline((d.today-80)::timestamp) FROM _scms_dates d;
-INSERT INTO advanced_registrations(id,member_id,subject_id,coach_id,request_key,status,created_at,accepted_by,accepted_at,reason,subscription_id)
-SELECT p.subscription_id,p.member_id,p.subject_id,p.primary_coach_id,'advanced-reference-'||p.subscription_id,
- 'Invoiced',coalesce(p.activated_at,d.now_at)-interval '1 day',p.primary_coach_id,
- coalesce(p.activated_at,d.now_at)-interval '1 hour','Primary Coach nhận đăng ký đúng môn trước khi tạo hóa đơn.',p.subscription_id
-FROM member_packages p CROSS JOIN _scms_dates d ORDER BY p.subscription_id;
-INSERT INTO invoices(invoice_id,member_id,subscription_id,receptionist_id,amount,invoice_code,payment_method,payment_status,payment_date,created_at,expires_at,cash_note)
-SELECT p.subscription_id+9,p.member_id,p.subscription_id,30,p.purchase_amount,
- 'INV-SCMS-A-'||lpad(p.subscription_id::text,3,'0'),'Cash',CASE WHEN p.status='Pending' THEN 'Pending' ELSE 'Paid' END,
- CASE WHEN p.status='Pending' THEN NULL ELSE p.activated_at END,
- coalesce(p.activated_at-interval '2 minutes',d.now_at),coalesce(p.activated_at-interval '2 minutes',d.now_at)+interval '5 minutes',
- 'Dữ liệu tham chiếu được dựng lại; giá mua được chốt độc lập với thay đổi bảng giá sau này.'
-FROM member_packages p CROSS JOIN _scms_dates d ORDER BY p.subscription_id;
-
--- Two past Cau long sessions and one future booking; total credit consumed = three.
-INSERT INTO sessions(session_id,class_id,room_id,coach_id,booked_member_id,subscription_id,booking_key,booking_hash,
- session_date,start_time,end_time,status,attendance_finalized,created_by,agreement_confirmed_at)
-SELECT 109+row_number() OVER(ORDER BY x.day),8,7,26,11,1,'badminton-reference-'||row_number() OVER(ORDER BY x.day),repeat('a',64),
- x.day::date,TIME '07:45',TIME '09:15','Completed',TRUE,26,(d.course_anchor-1)::timestamp
-FROM _scms_dates d CROSS JOIN LATERAL (
- SELECT day FROM generate_series(d.course_anchor+1,d.today-1,interval '1 day') day
- WHERE extract(isodow FROM day)=2 AND NOT EXISTS(SELECT 1 FROM holidays WHERE holiday_date=day::date AND is_active)
- ORDER BY day LIMIT 2
-) x;
-INSERT INTO sessions(session_id,class_id,room_id,coach_id,booked_member_id,subscription_id,booking_key,booking_hash,
- session_date,start_time,end_time,status,created_by,agreement_confirmed_at)
-SELECT 112,8,7,26,11,1,'badminton-reference-3',repeat('b',64),x.day::date,TIME '07:45',TIME '09:15','Scheduled',26,d.now_at
-FROM _scms_dates d CROSS JOIN LATERAL (
- SELECT day FROM generate_series(d.today+2,d.today+20,interval '1 day') day
- WHERE extract(isodow FROM day)=2 AND NOT EXISTS(SELECT 1 FROM holidays WHERE holiday_date=day::date AND is_active)
- ORDER BY day LIMIT 1
-) x;
-
--- A timely Member cancellation returns one credit; one other Tennis booking remains.
-INSERT INTO sessions(session_id,class_id,room_id,coach_id,booked_member_id,subscription_id,booking_key,booking_hash,
- session_date,start_time,end_time,status,credit_returned,attendance_finalized,created_by,agreement_confirmed_at,support_reason)
-SELECT 113,1,1,12,2,2,'tennis-reference-cancelled',repeat('c',64),x.day::date,TIME '07:45',TIME '09:15','Cancelled',TRUE,TRUE,12,
- (d.course_anchor-1)::timestamp,'Member hủy trước ít nhất 12 giờ; hoàn đúng 1 credit vào đăng ký Tennis gốc.'
-FROM _scms_dates d CROSS JOIN LATERAL (
- SELECT day FROM generate_series(d.course_anchor+1,d.today-1,interval '1 day') day
- WHERE extract(isodow FROM day)=3 AND NOT EXISTS(SELECT 1 FROM holidays WHERE holiday_date=day::date AND is_active)
- ORDER BY day LIMIT 1
-) x;
-INSERT INTO sessions(session_id,class_id,room_id,coach_id,booked_member_id,subscription_id,booking_key,booking_hash,
- session_date,start_time,end_time,status,created_by,agreement_confirmed_at)
-SELECT 114,1,1,12,2,2,'tennis-reference-next',repeat('d',64),x.day::date,TIME '07:45',TIME '09:15','Scheduled',12,d.now_at
-FROM _scms_dates d CROSS JOIN LATERAL (
- SELECT day FROM generate_series(d.today+2,d.today+20,interval '1 day') day
- WHERE extract(isodow FROM day)=3 AND NOT EXISTS(SELECT 1 FROM holidays WHERE holiday_date=day::date AND is_active)
- ORDER BY day LIMIT 1
-) x;
-INSERT INTO session_absence_notices(id,session_id,member_id,reported_at,original_start,original_end,reason,active)
-SELECT 1,111,11,session_date+start_time-interval '6 hours',session_date+start_time,session_date+end_time,
- 'Member báo không thể đến; Coach xác nhận vắng trong buổi. Không hoàn credit vì báo sát giờ.',TRUE FROM sessions WHERE session_id=111;
-
--- Attendance is recorded DURING completed sessions, only Present/Absent; no check-in/out shortcut.
-INSERT INTO attendances(attendance_id,session_id,member_id,recorded_by,state,note)
-SELECT row_number() OVER(ORDER BY x.session_id,x.member_id),x.session_id,x.member_id,x.coach_id,
- CASE WHEN x.session_id=111 OR x.member_id%3=0 AND x.session_id%5=0 THEN 'Absent' ELSE 'Present' END,
- CASE WHEN x.session_id=111 THEN 'Đã báo vắng sát giờ; giữ credit đã dùng để đặt buổi.'
-      WHEN x.member_id%3=0 AND x.session_id%5=0 THEN 'Member vắng vì lý do cá nhân; không phát sinh buổi bù.'
-      ELSE 'Coach xác nhận Member tham gia buổi học.' END
-FROM (
- SELECT s.session_id,e.member_id,s.coach_id FROM sessions s JOIN class_enrollments e ON e.class_id=s.class_id
-  WHERE s.status='Completed' AND NOT s.center_invalidated
- UNION ALL
- SELECT session_id,booked_member_id,coach_id FROM sessions WHERE booked_member_id IS NOT NULL AND status='Completed' AND NOT center_invalidated
-) x;
-UPDATE attendances SET absence_notice_id=1 WHERE session_id=111 AND member_id=11;
-INSERT INTO training_results(result_id,session_id,member_id,coach_id,content,attendance_status,recorded_at)
-SELECT a.attendance_id,a.session_id,a.member_id,a.recorded_by,
- CASE WHEN a.state='Present' THEN 'Hoàn thành nội dung kỹ thuật theo kế hoạch của môn '||su.subject_name||'.'
-      ELSE 'Không tham gia buổi học; Coach lưu vắng theo tình hình thực tế.' END,
- a.state,s.session_date+s.start_time+interval '20 minutes'
-FROM attendances a JOIN sessions s ON s.session_id=a.session_id JOIN classes c ON c.class_id=s.class_id JOIN subjects su ON su.subject_id=c.subject_id
-ORDER BY a.attendance_id;
-
-INSERT INTO training_plans(plan_id,coach_id,class_id,title,content,goal,start_date,end_date,created_at)
-SELECT s.ordinal,c.coach_id,c.class_id,'Kế hoạch '||s.name||' - Normal - K01',
- CASE s.ordinal WHEN 1 THEN 'Giao bóng, bộ chân và đánh thuận/trái tay.' WHEN 2 THEN 'An toàn dưới nước, thở và kỹ thuật bơi căn bản.'
- WHEN 3 THEN 'Luật chơi, dink và phối hợp đánh đôi.' WHEN 4 THEN 'An toàn trường bắn, tư thế và kiểm soát cung.'
- WHEN 5 THEN 'Dẫn bóng, chuyền và ném rổ.' WHEN 6 THEN 'Chuyền, kiểm soát bóng và phối hợp đội.'
- WHEN 7 THEN 'Đệm, chuyền và phát bóng.' WHEN 8 THEN 'Cầm vợt, di chuyển và cầu cao sâu.' ELSE 'Giao bóng, đỡ giao bóng và kiểm soát xoáy.' END,
- 'Hoàn thành 12 buổi hợp lệ theo khóa Normal.',c.start_date,c.end_date,(c.start_date-1)::timestamp
-FROM _scms_subjects s JOIN classes c ON c.class_id=s.ordinal+9 ORDER BY s.ordinal;
-INSERT INTO evaluations(evaluation_id,member_id,coach_id,evaluation_date,comment,progress_score)
-SELECT e.enrollment_id,e.member_id,c.coach_id,max(s.session_date),'Đã có tiến bộ qua các buổi đã tham gia; tiếp tục theo kế hoạch môn '||su.subject_name||'.',7.0
-FROM class_enrollments e JOIN classes c ON c.class_id=e.class_id JOIN subjects su ON su.subject_id=c.subject_id
-JOIN sessions s ON s.class_id=c.class_id AND s.status='Completed' AND NOT s.center_invalidated
-GROUP BY e.enrollment_id,e.member_id,c.coach_id,su.subject_name ORDER BY e.enrollment_id;
-
-INSERT INTO notifications(notification_id,user_id,sender_id,title,content,type,notification_type,related_type,related_id,dedupe_key,created_at)
-SELECT row_number() OVER(ORDER BY invoice_id),member_id,30,'Đăng ký đã được thanh toán',
- CASE WHEN class_id IS NOT NULL THEN 'Khóa Normal đã được ghi danh. Vui lòng xem đủ lịch 12 buổi hợp lệ.'
- ELSE 'Đăng ký Advanced đã được kích hoạt theo môn và Primary Coach đã chọn.' END,
- 'Payment','PAYMENT_SUCCESS','INVOICE',invoice_id,'PAYMENT_SUCCESS:INVOICE:'||invoice_id,payment_date
-FROM invoices WHERE payment_status='Paid' ORDER BY invoice_id;
-INSERT INTO notification_recipients(notification_id,user_id,is_read,created_at)
-SELECT notification_id,user_id,FALSE,created_at FROM notifications ORDER BY notification_id;
-INSERT INTO chat_conversations(id,member_user_id,assigned_staff_user_id,handler_type,subject,created_at,updated_at,last_message_at)
-SELECT 1,11,30,'STAFF','Trao đổi về lịch Cầu lông Advanced',now_at-interval '2 hours',now_at-interval '1 hour',now_at-interval '1 hour' FROM _scms_dates;
-INSERT INTO chat_messages(id,conversation_id,sender_type,sender_user_id,content,created_at)
-SELECT 1,1,'MEMBER',11,'Tôi muốn xác nhận lịch Cầu lông 1:1 sắp tới với Coach.',now_at-interval '2 hours' FROM _scms_dates
-UNION ALL
-SELECT 2,1,'STAFF',30,'Lịch đã đặt được hiển thị trong lịch cá nhân. Nếu cần dời, vui lòng trao đổi với Primary Coach trước ít nhất 12 giờ.',now_at-interval '1 hour' FROM _scms_dates;
-INSERT INTO chat_read_state(conversation_id,user_id,last_read_message_id,updated_at)
-SELECT 1,u,2,now_at FROM _scms_dates CROSS JOIN (VALUES(11),(30)) readers(u);
-
-INSERT INTO system_logs(log_id,user_id,action,target_entity,target_id,detail,"timestamp")
-SELECT row_number() OVER(ORDER BY invoice_id),30,'CONFIRM_CASH','INVOICE',invoice_id,
- 'SCMS_REFERENCE: chứng từ tham chiếu; giá chốt='||amount||'; không đại diện khoản thu thực tế.',payment_date
-FROM invoices WHERE payment_status='Paid' ORDER BY invoice_id;
-INSERT INTO system_logs(log_id,user_id,action,target_entity,target_id,detail,"timestamp")
-SELECT 13,32,'CREATE_LINKED_NORMAL_MAKEUP','SESSION',109,'SCMS_REFERENCE: original=1; incident=1; giữ buổi gốc không hợp lệ và đúng một buổi bù.',now_at-interval '1 day' FROM _scms_dates
-UNION ALL
-SELECT 14,2,'CANCEL_PRIVATE_SESSION','SESSION',113,'SCMS_REFERENCE: hủy sớm hơn 12 giờ, hoàn một credit vào subscription=2.',session_date+start_time-interval '1 day' FROM sessions WHERE session_id=113;
-
-INSERT INTO scms_data_migration_audit VALUES
- ('20261029_catalog_accounts_v1',localtimestamp,'Owner-authorized replacement of SCMS reference dataset','DATABASE variant: 33 PDF accounts; 9 subjects; 8 rooms; integer IDs rebuilt from one'),
- ('09_approved_catalog',localtimestamp,'Consolidated approved catalog','Historical price migration superseded; future replay preserves price edits');
-
--- Rebuild invariants cover relationships and business state, not just row counts.
-DO $reference_checks$
-DECLARE seq_row RECORD; n BIGINT; lo BIGINT; hi BIGINT;
-BEGIN
- IF (SELECT count(*) FROM users)<>33 OR (SELECT count(*) FROM coaches)<>18 OR (SELECT count(*) FROM members)<>10 OR (SELECT count(*) FROM rooms)<>20 THEN RAISE EXCEPTION 'Reference identity/resource counts differ from the approved lists'; END IF;
- IF EXISTS(SELECT 1 FROM member_packages p JOIN invoices i ON i.subscription_id=p.subscription_id WHERE p.purchase_amount<>i.amount OR p.status='Pending' AND (p.remaining_credit<>0 OR p.activated_at IS NOT NULL OR p.expires_at IS NOT NULL)) THEN RAISE EXCEPTION 'Advanced purchase amount or Pending entitlement is inconsistent'; END IF;
- IF EXISTS(SELECT 1 FROM invoices i JOIN member_packages p ON p.subscription_id=i.subscription_id WHERE i.member_id<>p.member_id) THEN RAISE EXCEPTION 'Invoice and Advanced subscription owners differ'; END IF;
- IF EXISTS(SELECT 1 FROM member_packages p WHERE p.status='Active' AND p.remaining_credit<>12-(SELECT count(*) FROM sessions s WHERE s.subscription_id=p.subscription_id AND s.status<>'Cancelled' AND NOT s.center_invalidated)) THEN RAISE EXCEPTION 'Advanced credit ledger does not balance'; END IF;
- IF EXISTS(SELECT 1 FROM classes c WHERE c.class_type='Normal' AND 12<>(SELECT count(*) FROM sessions s WHERE s.class_id=c.class_id AND NOT s.center_invalidated AND s.status<>'Cancelled')) THEN RAISE EXCEPTION 'Normal must have exactly twelve valid sessions'; END IF;
- IF EXISTS(SELECT 1 FROM class_enrollments e WHERE e.status='Registered' AND NOT EXISTS(SELECT 1 FROM invoices i WHERE i.class_id=e.class_id AND i.member_id=e.member_id AND i.payment_status='Paid' AND NOT i.reconciliation_required AND NOT i.cash_confirmation_reversed)) THEN RAISE EXCEPTION 'Registered Normal enrollment has no eligible Paid invoice'; END IF;
- IF EXISTS(SELECT 1 FROM sessions a JOIN sessions b ON a.session_id<b.session_id AND a.session_date=b.session_date AND a.start_time<b.end_time AND b.start_time<a.end_time WHERE a.status<>'Cancelled' AND b.status<>'Cancelled' AND NOT a.center_invalidated AND NOT b.center_invalidated AND (a.room_id=b.room_id OR a.coach_id=b.coach_id)) THEN RAISE EXCEPTION 'Room/Coach overlap in reference schedule'; END IF;
- IF EXISTS(WITH participants AS(SELECT session_id,booked_member_id AS member_id FROM sessions WHERE booked_member_id IS NOT NULL UNION SELECT s.session_id,e.member_id FROM sessions s JOIN class_enrollments e ON e.class_id=s.class_id WHERE e.status='Registered')
-  SELECT 1 FROM participants a JOIN participants b ON a.member_id=b.member_id AND a.session_id<b.session_id JOIN sessions x ON x.session_id=a.session_id JOIN sessions y ON y.session_id=b.session_id WHERE x.session_date=y.session_date AND x.start_time<y.end_time AND y.start_time<x.end_time AND x.status<>'Cancelled' AND y.status<>'Cancelled' AND NOT x.center_invalidated AND NOT y.center_invalidated) THEN RAISE EXCEPTION 'Member overlap in reference schedule'; END IF;
- IF EXISTS(SELECT 1 FROM sessions s JOIN rooms r ON r.room_id=s.room_id JOIN classes c ON c.class_id=s.class_id JOIN subjects su ON su.subject_id=c.subject_id WHERE c.max_capacity>r.capacity OR s.status<>'Cancelled' AND NOT s.center_invalidated AND (EXISTS(SELECT 1 FROM holidays h WHERE h.holiday_date=s.session_date AND h.is_active) OR su.outdoor AND s.start_time IN(TIME '09:30',TIME '13:00'))) THEN RAISE EXCEPTION 'Capacity/holiday/outdoor rule mismatch'; END IF;
- IF EXISTS(SELECT 1 FROM sessions s JOIN member_packages p ON p.subscription_id=s.subscription_id JOIN classes c ON c.class_id=s.class_id WHERE s.booked_member_id<>p.member_id OR c.subject_id<>p.subject_id OR s.coach_id<>p.primary_coach_id OR s.status<>'Cancelled' AND s.session_date+s.end_time>p.expires_at) THEN RAISE EXCEPTION 'Private session owner/subject/Coach/deadline mismatch'; END IF;
- IF EXISTS(SELECT 1 FROM attendances a JOIN training_results t ON t.session_id=a.session_id AND t.member_id=a.member_id JOIN sessions s ON s.session_id=a.session_id WHERE a.state<>t.attendance_status OR t.recorded_at<s.session_date+s.start_time OR t.recorded_at>=s.session_date+s.end_time OR s.center_invalidated OR a.recorded_by<>s.coach_id) THEN RAISE EXCEPTION 'Attendance/result history is inconsistent'; END IF;
- FOR seq_row IN SELECT table_name,column_name FROM information_schema.columns WHERE table_schema='public' AND column_default LIKE 'nextval(%' AND table_name=ANY(ARRAY['roles','permissions','role_permissions','centers','users','email_otps','center_managers','receptionists','coaches','members','subjects','specializations','coach_specializations','rooms','classes','training_plans','sessions','training_results','attendances','evaluations','class_feedbacks','membership_packages','member_packages','class_enrollments','holidays','invoices','vnpay_payment_attempts','support_requests','notifications','notification_recipients','chat_conversations','chat_messages','chat_read_state','ai_consultations','system_logs','normal_class_requests','subscription_pauses','coach_work_schedules','coach_work_slots','coach_days_off','advanced_registrations','session_absence_notices','session_changes','center_incidents','incident_affected_members','payment_resolutions','scms_data_migration_audit']) LOOP
-  EXECUTE format('SELECT count(*),min(%I),max(%I) FROM public.%I',seq_row.column_name,seq_row.column_name,seq_row.table_name) INTO n,lo,hi;
-  IF n>0 AND (lo<>1 OR hi<>n) THEN RAISE EXCEPTION 'Rebuilt integer ID sequence is not contiguous: %.%',seq_row.table_name,seq_row.column_name; END IF;
- END LOOP;
-END $reference_checks$;
 -- Guard: new Open class cannot start in the past
 CREATE OR REPLACE FUNCTION fn_classes_validate()
 RETURNS TRIGGER LANGUAGE plpgsql AS $$
@@ -1684,42 +1014,355 @@ CREATE TRIGGER trg_member_packages_validate
     FOR EACH ROW EXECUTE FUNCTION fn_member_packages_validate();
 
 -- =====================================================================
+-- SEED DATA
+-- =====================================================================
 
--- Validate every FK in these SCMS tables, including unvalidated preexisting FKs.
-DO $foreign_keys$
-DECLARE r RECORD;
+-- Roles
+INSERT INTO roles (role_name, description) VALUES
+('CenterManager', 'Quan ly trung tam - van hanh lop hoc, goi tap, bao cao'),
+('Coach',         'Huan luyen vien'),
+('Member',        'Thanh vien / hoc vien'),
+('Receptionist',  'Nhan vien le tan'),
+('Admin',         'Quan tri vien he thong - quan tri nguoi dung va phan quyen RBAC')
+ON CONFLICT (role_name) DO NOTHING;
+
+-- Permissions
+INSERT INTO permissions (permission_name, description) VALUES
+('MANAGE_USERS',         'Quan ly nguoi dung'),
+('MANAGE_CLASSES',       'Quan ly lop hoc'),
+('MANAGE_PACKAGES',      'Quan ly goi thanh vien'),
+('VIEW_REPORTS',         'Xem bao cao'),
+('MANAGE_TRAINING_PLAN', 'Tao/sua ke hoach tap luyen'),
+('RECORD_RESULT',        'Ghi nhan ket qua buoi tap'),
+('PROCESS_PAYMENT',      'Ghi nhan thanh toan, xuat hoa don'),
+('HANDLE_SUPPORT',       'Xu ly yeu cau ho tro'),
+('VIEW_AUDIT_LOG',       'Xem lich su thao tac he thong'),
+('MANAGE_RBAC',          'Phan quyen va quan tri vai tro he thong'),
+('REGISTER_MEMBER',      'Dang ky thanh vien moi tai quay'),
+('MANAGE_SUBSCRIPTIONS', 'Dang ky va gia han goi tap'),
+('MANAGE_PERMISSIONS',   'Chi quan tri vien duoc cau hinh ma tran phan quyen'),
+('MANAGE_INVOICES',      'Quan ly va xem hoa don cua cac thanh vien'),
+('CHAT_AS_MEMBER',       'Member may access their own support chat'),
+('HANDLE_CHAT',          'Receptionist and CenterManager may handle support chats'),
+('LOCK_SUBJECTS',        'Khoa hoac mo mon hoc'),
+('MANAGE_SPECIALIZATIONS', 'Quan ly chuyen mon huan luyen vien')
+ON CONFLICT (permission_name) DO NOTHING;
+
+-- Role → Permission assignments by names, not sequence-specific IDs.
+INSERT INTO role_permissions (role_id, permission_id)
+SELECT r.role_id, p.permission_id
+FROM (VALUES
+    ('CenterManager', 'MANAGE_USERS'),
+    ('CenterManager', 'MANAGE_CLASSES'),
+    ('CenterManager', 'MANAGE_PACKAGES'),
+    ('CenterManager', 'VIEW_REPORTS'),
+    ('CenterManager', 'PROCESS_PAYMENT'),
+    ('CenterManager', 'HANDLE_SUPPORT'),
+    ('CenterManager', 'VIEW_AUDIT_LOG'),
+    ('CenterManager', 'MANAGE_INVOICES'),
+    ('CenterManager', 'HANDLE_CHAT'),
+    ('Coach', 'MANAGE_TRAINING_PLAN'),
+    ('Coach', 'RECORD_RESULT'),
+    ('Receptionist', 'RECORD_RESULT'),
+    ('Receptionist', 'PROCESS_PAYMENT'),
+    ('Receptionist', 'HANDLE_SUPPORT'),
+    ('Receptionist', 'REGISTER_MEMBER'),
+    ('Receptionist', 'MANAGE_SUBSCRIPTIONS'),
+    ('Receptionist', 'MANAGE_INVOICES'),
+    ('Receptionist', 'HANDLE_CHAT'),
+    ('Member', 'CHAT_AS_MEMBER'),
+    ('Admin', 'MANAGE_USERS'),
+    ('Admin', 'VIEW_REPORTS'),
+    ('Admin', 'VIEW_AUDIT_LOG'),
+    ('Admin', 'MANAGE_RBAC'),
+    ('Admin', 'MANAGE_PERMISSIONS'),
+    ('Admin', 'LOCK_SUBJECTS'),
+    ('Admin', 'MANAGE_SPECIALIZATIONS')
+) AS defaults(role_name, permission_name)
+JOIN roles r ON UPPER(r.role_name) = UPPER(defaults.role_name)
+JOIN permissions p ON p.permission_name = defaults.permission_name
+ON CONFLICT DO NOTHING;
+INSERT INTO subjects (subject_name, description, normal_price, advanced_price, status, slug) VALUES
+('Bóng đá',            'Môn thể thao vua ngoài trời, rèn luyện thể lực và phối hợp',         1000000, 3500000, 'Active', 'bong-da'),
+('Quần vợt (Tennis)',  'Môn thể thao ngoài trời, rèn luyện phản xạ và thể lực',             2500000, 8000000, 'Active', 'quan-vot-tennis'),
+('Bơi lội',            'Môn thể thao dưới nước ngoài trời, phát triển toàn diện cơ thể',     1500000, 4500000, 'Active', 'boi-loi'),
+('Bắn cung',           'Môn ngoài trời, rèn luyện sự tập trung cao độ và tính kiên nhẫn',   2000000, 6000000, 'Active', 'ban-cung'),
+('Cầu lông',           'Môn thể thao nhanh nhẹn, linh hoạt trong nhà',                        900000, 3000000, 'Active', 'cau-long'),
+('Bóng bàn',           'Phản xạ nhanh, khéo léo với nhịp độ cao trong nhà',                   800000, 2500000, 'Active', 'bong-ban'),
+('Bóng rổ',            'Môn thể thao đồng đội tốc độ và sức bật trong nhà',                  1200000, 3500000, 'Active', 'bong-ro'),
+('Bóng chuyền',        'Phối hợp đồng đội và kỹ thuật phản xạ trên lưới trong nhà',          1000000, 3500000, 'Active', 'bong-chuyen'),
+('Pickleball',         'Môn thể thao thời thượng trong nhà, kết hợp tennis, bóng bàn',       1800000, 5000000, 'Active', 'pickleball')
+ON CONFLICT (slug) DO NOTHING;
+
+
+-- SOURCE: database/migrations/06_schedule_safety_postgres.sql SHA256 7000586a3366fe78af5ec081f7457775d543eb2f6cfff380c7b3192148d71dc4
+-- PostgreSQL only. Apply after migration 04; do NOT run destructive demo reset 05.
+-- Additive, repeatable; no prices, invoices, credits or existing schedules are rewritten.
+
+ALTER TABLE subjects ADD COLUMN IF NOT EXISTS outdoor BOOLEAN;
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS reconciliation_required BOOLEAN NOT NULL DEFAULT FALSE;
+UPDATE subjects SET outdoor = TRUE WHERE outdoor IS NULL AND slug IN ('bong-da','quan-vot-tennis','boi-loi','ban-cung');
+UPDATE subjects SET outdoor = FALSE WHERE outdoor IS NULL AND slug IN ('cau-long','bong-ban','bong-ro','bong-chuyen','pickleball');
+-- Unclassified custom subjects remain NULL and must be configured by the Manager.
+CREATE TABLE IF NOT EXISTS normal_class_requests (
+    request_id VARCHAR(36) PRIMARY KEY,
+    request_hash VARCHAR(64) NOT NULL,
+    center_id INTEGER NOT NULL REFERENCES centers(center_id),
+    class_id INTEGER NOT NULL UNIQUE REFERENCES classes(class_id)
+);
+ALTER TABLE member_packages DROP CONSTRAINT IF EXISTS member_packages_status_check;
+ALTER TABLE member_packages ADD CONSTRAINT member_packages_status_check CHECK (status IN ('Pending','Active','Expired','Cancelled','Completed'));
+-- Only backfill known, unambiguous built-in specialization names. Custom mappings remain explicit.
+UPDATE specializations sp SET subject_id = su.subject_id
+FROM subjects su, (VALUES
+    ('Tennis','quan-vot-tennis'),('Quần vợt','quan-vot-tennis'),('Quần vợt (Tennis)','quan-vot-tennis'),
+    ('Bóng đá','bong-da'),('Bơi lội','boi-loi'),('Bắn cung','ban-cung'),('Cầu lông','cau-long'),
+    ('Bóng bàn','bong-ban'),('Bóng rổ','bong-ro'),('Bóng chuyền','bong-chuyen'),('Pickleball','pickleball')
+) AS mapping(name, slug)
+WHERE sp.subject_id IS NULL AND LOWER(sp.name) = LOWER(mapping.name) AND su.slug = mapping.slug;
+
+
+-- SOURCE: database/migrations/07_session_subscription_postgres.sql SHA256 091b1a86dc34b3a345f46f1d71d8a28b1d1b41562c69ba7a77c5bdfc27a0a619
+-- PostgreSQL/public schema only. Additive upgrade; never run the demo reset.
+-- Run after 04 and 06. No historical subscription is inferred or backfilled.
+
+SET LOCAL lock_timeout = '5s';
+LOCK TABLE public.member_packages IN SHARE ROW EXCLUSIVE MODE;
+LOCK TABLE public.sessions IN ACCESS EXCLUSIVE MODE;
+ALTER TABLE public.sessions ADD COLUMN IF NOT EXISTS subscription_id INTEGER NULL;
+
+DO $migration$
+DECLARE
+    source_column SMALLINT;
+    target_column SMALLINT;
+    existing_fk RECORD;
 BEGIN
- FOR r IN SELECT conrelid::regclass AS tbl,conname FROM pg_constraint WHERE contype='f' AND NOT convalidated
-  AND conrelid IN(SELECT oid FROM pg_class WHERE relnamespace='public'::regnamespace AND relname=ANY(ARRAY['roles','permissions','role_permissions','centers','users','email_otps','center_managers','receptionists','coaches','members','subjects','specializations','coach_specializations','rooms','classes','training_plans','sessions','training_results','attendances','evaluations','class_feedbacks','membership_packages','member_packages','class_enrollments','holidays','invoices','vnpay_payment_attempts','support_requests','notifications','notification_recipients','chat_conversations','chat_messages','chat_read_state','ai_consultations','system_logs','normal_class_requests','subscription_pauses','coach_work_schedules','coach_work_slots','coach_days_off','advanced_registrations','session_absence_notices','session_changes','center_incidents','incident_affected_members','payment_resolutions','scms_data_migration_audit'])) LOOP
-  EXECUTE format('ALTER TABLE %s VALIDATE CONSTRAINT %I',r.tbl,r.conname);
- END LOOP;
- IF (SELECT count(*) FROM subjects)<>9 THEN RAISE EXCEPTION 'Expected exactly nine canonical subjects'; END IF;
- IF (current_setting('scms.rebuild',true)='true' OR NOT EXISTS(SELECT 1 FROM scms_data_migration_audit WHERE migration_key='20261029_catalog_accounts_v1')) AND EXISTS(SELECT 1 FROM _scms_accounts a LEFT JOIN users u ON lower(u.email)=a.email LEFT JOIN roles role_row ON role_row.role_id=u.role_id WHERE u.user_id IS NULL OR u.status<>'Active' OR role_row.role_name<>a.role_name OR (a.role_name='Admin' AND u.center_id IS NOT NULL) OR (a.role_name<>'Admin' AND u.center_id IS DISTINCT FROM 1)) THEN RAISE EXCEPTION 'PDF account/role/center postflight failed'; END IF;
-END $foreign_keys$;
+    SELECT attnum INTO source_column FROM pg_attribute
+    WHERE attrelid = 'public.sessions'::regclass AND attname = 'subscription_id'
+      AND NOT attisdropped AND atttypid = 'integer'::regtype AND NOT attnotnull;
+    IF source_column IS NULL THEN
+        RAISE EXCEPTION 'sessions.subscription_id must be nullable INTEGER; manual review required';
+    END IF;
+    SELECT attnum INTO target_column FROM pg_attribute
+    WHERE attrelid = 'public.member_packages'::regclass AND attname = 'subscription_id' AND NOT attisdropped;
 
--- Synchronize every owned SERIAL/IDENTITY sequence, including tables with zero rows.
--- Empty table => next ID 1. Nonempty table => next ID MAX(id)+1 (no per-role renumbering).
-DO $sequences$
-DECLARE r RECORD; top_id BIGINT; seq_name TEXT; seq_last BIGINT; seq_called BOOLEAN;
+    IF EXISTS (SELECT 1 FROM public.sessions s LEFT JOIN public.member_packages mp
+               ON mp.subscription_id = s.subscription_id
+               WHERE s.subscription_id IS NOT NULL AND mp.subscription_id IS NULL) THEN
+        RAISE EXCEPTION 'Orphan sessions.subscription_id detected; no business data was changed';
+    END IF;
+
+    -- Compare definitions, not names. Never silently retain an incompatible FK.
+    IF EXISTS (SELECT 1 FROM pg_constraint c
+               WHERE c.conrelid = 'public.sessions'::regclass AND c.contype = 'f'
+                 AND source_column = ANY(c.conkey)
+                 AND NOT (c.conkey = ARRAY[source_column]
+                     AND c.confrelid = 'public.member_packages'::regclass
+                     AND c.confkey = ARRAY[target_column]
+                     AND c.confdeltype IN ('a', 'r') AND c.confupdtype IN ('a', 'r'))) THEN
+        RAISE EXCEPTION 'Incompatible subscription foreign key; manual review required';
+    END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint c
+                   WHERE c.conrelid = 'public.sessions'::regclass AND c.contype = 'f'
+                     AND c.conkey = ARRAY[source_column]
+                     AND c.confrelid = 'public.member_packages'::regclass
+                     AND c.confkey = ARRAY[target_column]) THEN
+        IF EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid = 'public.sessions'::regclass
+                   AND conname = 'fk_session_subscription') THEN
+            RAISE EXCEPTION 'Constraint name fk_session_subscription already used by another definition';
+        END IF;
+        ALTER TABLE public.sessions ADD CONSTRAINT fk_session_subscription
+            FOREIGN KEY (subscription_id) REFERENCES public.member_packages(subscription_id);
+    END IF;
+    FOR existing_fk IN SELECT conname FROM pg_constraint
+        WHERE conrelid = 'public.sessions'::regclass AND contype = 'f'
+          AND conkey = ARRAY[source_column] AND NOT convalidated
+    LOOP
+        EXECUTE format('ALTER TABLE public.sessions VALIDATE CONSTRAINT %I', existing_fk.conname);
+    END LOOP;
+
+    -- An existing valid btree with this leading column also supports FK lookups.
+    IF NOT EXISTS (SELECT 1 FROM pg_index i JOIN pg_class ic ON ic.oid = i.indexrelid
+                   JOIN pg_am am ON am.oid = ic.relam
+                   WHERE i.indrelid = 'public.sessions'::regclass
+                     AND i.indisvalid AND i.indisready AND i.indpred IS NULL
+                     AND i.indexprs IS NULL AND i.indkey[0] = source_column AND am.amname = 'btree') THEN
+        IF to_regclass('public.idx_sessions_subscription') IS NOT NULL THEN
+            RAISE EXCEPTION 'Index name idx_sessions_subscription already used by another definition';
+        END IF;
+        CREATE INDEX IF NOT EXISTS idx_sessions_subscription ON public.sessions(subscription_id);
+    END IF;
+END
+$migration$;
+
+
+-- SOURCE: database/migrations/08_advanced_entitlements_postgres.sql SHA256 763a7b70440583498eb86a2c50963681c7c934f1a9f7e940bc3c1579902b22e8
+-- Additive upgrade. Run only after 06_schedule_safety and 07; no seed/reset/backfill guesses.
+
+-- New Advanced registrations do not use a generic package or start validity before Paid.
+ALTER TABLE member_packages ALTER COLUMN package_id DROP NOT NULL;
+ALTER TABLE member_packages ALTER COLUMN start_date DROP NOT NULL;
+ALTER TABLE member_packages ALTER COLUMN end_date DROP NOT NULL;
+ALTER TABLE member_packages ADD COLUMN IF NOT EXISTS subject_id INT REFERENCES subjects(subject_id);
+ALTER TABLE member_packages ADD COLUMN IF NOT EXISTS primary_coach_id INT REFERENCES users(user_id);
+ALTER TABLE member_packages ADD COLUMN IF NOT EXISTS purchase_amount NUMERIC(12,2);
+ALTER TABLE member_packages ADD COLUMN IF NOT EXISTS activated_at TIMESTAMP;
+ALTER TABLE member_packages ADD COLUMN IF NOT EXISTS expires_at TIMESTAMP;
+ALTER TABLE member_packages ADD COLUMN IF NOT EXISTS expiry_revoked_credit INT DEFAULT 0;
+ALTER TABLE member_packages ADD COLUMN IF NOT EXISTS expiry_processed_at TIMESTAMP;
+ALTER TABLE member_packages ADD COLUMN IF NOT EXISTS approved_extra_seconds BIGINT NOT NULL DEFAULT 0;
+ALTER TABLE invoices DROP CONSTRAINT IF EXISTS chk_invoice_target;
+ALTER TABLE invoices ADD CONSTRAINT chk_invoice_target CHECK (
+    (class_id IS NOT NULL AND package_id IS NULL AND subscription_id IS NULL) OR
+    (class_id IS NULL AND (package_id IS NOT NULL OR subscription_id IS NOT NULL))
+);
+CREATE INDEX IF NOT EXISTS idx_subscription_primary_coach ON member_packages(primary_coach_id);
+CREATE INDEX IF NOT EXISTS idx_subscription_deadline ON member_packages(status, expires_at);
+CREATE TABLE IF NOT EXISTS subscription_pauses (
+    id SERIAL PRIMARY KEY, subscription_id INT NOT NULL REFERENCES member_packages(subscription_id),
+    source_key VARCHAR(120) NOT NULL, starts_at TIMESTAMP NOT NULL, ends_at TIMESTAMP NOT NULL,
+    UNIQUE(subscription_id,source_key), CHECK(ends_at > starts_at)
+);
+CREATE TABLE IF NOT EXISTS coach_work_schedules (
+    coach_id INT PRIMARY KEY REFERENCES users(user_id), accepting_new BOOLEAN NOT NULL DEFAULT FALSE
+);
+CREATE TABLE IF NOT EXISTS coach_work_slots (
+    coach_id INT NOT NULL REFERENCES coach_work_schedules(coach_id), slot_key VARCHAR(20) NOT NULL,
+    PRIMARY KEY(coach_id,slot_key)
+);
+CREATE TABLE IF NOT EXISTS coach_days_off (
+    coach_id INT NOT NULL REFERENCES coach_work_schedules(coach_id), day_off DATE NOT NULL,
+    PRIMARY KEY(coach_id,day_off)
+);
+CREATE TABLE IF NOT EXISTS advanced_registrations (
+    id SERIAL PRIMARY KEY, member_id INT NOT NULL REFERENCES users(user_id),
+    subject_id INT NOT NULL REFERENCES subjects(subject_id), coach_id INT NOT NULL REFERENCES users(user_id),
+    request_key VARCHAR(80) NOT NULL, status VARCHAR(20) NOT NULL DEFAULT 'Requested', created_at TIMESTAMP NOT NULL,
+    accepted_by INT REFERENCES users(user_id), accepted_at TIMESTAMP, reason VARCHAR(2000),
+    subscription_id INT UNIQUE REFERENCES member_packages(subscription_id), UNIQUE(member_id,request_key)
+);
+
+
+-- SOURCE: database/migrations/09_approved_catalog_postgres.sql SHA256 3d27cf23c6ac511fdc06bccc24b1e7ea04134f1163bbe9d8bb3931492e250d81
+-- D02: guarded catalog-only cleanup. Does not change classes, invoices, or legacy subscriptions.
+
+LOCK TABLE subjects IN SHARE ROW EXCLUSIVE MODE;
+CREATE TABLE IF NOT EXISTS scms_data_migration_audit (
+    migration_key VARCHAR(100) PRIMARY KEY, captured_at TIMESTAMP NOT NULL, before_data TEXT NOT NULL, after_data TEXT NOT NULL
+);
+DO $$
+DECLARE before_snapshot TEXT; fk RECORD; used BOOLEAN;
 BEGIN
- FOR r IN SELECT table_name,column_name FROM information_schema.columns
-          WHERE table_schema='public' AND table_name=ANY(ARRAY['roles','permissions','role_permissions','centers','users','email_otps','center_managers','receptionists','coaches','members','subjects','specializations','coach_specializations','rooms','classes','training_plans','sessions','training_results','attendances','evaluations','class_feedbacks','membership_packages','member_packages','class_enrollments','holidays','invoices','vnpay_payment_attempts','support_requests','notifications','notification_recipients','chat_conversations','chat_messages','chat_read_state','ai_consultations','system_logs','normal_class_requests','subscription_pauses','coach_work_schedules','coach_work_slots','coach_days_off','advanced_registrations','session_absence_notices','session_changes','center_incidents','incident_affected_members','payment_resolutions','scms_data_migration_audit'])
-            AND (column_default LIKE 'nextval(%' OR is_identity='YES')
-          ORDER BY table_name,column_name LOOP
-  seq_name:=pg_get_serial_sequence(format('public.%I',r.table_name),r.column_name);
-  IF seq_name IS NOT NULL THEN
-   EXECUTE format('SELECT max(%I) FROM public.%I',r.column_name,r.table_name) INTO top_id;
-   EXECUTE format('SELECT last_value,is_called FROM %s',seq_name) INTO seq_last,seq_called;
-   IF current_setting('scms.rebuild',true)='true' OR top_id IS NOT NULL AND (seq_last<top_id OR seq_last=top_id AND NOT seq_called) THEN
-    PERFORM setval(seq_name,coalesce(top_id,1),top_id IS NOT NULL);
-   END IF;
-  END IF;
- END LOOP;
-END $sequences$;
+    IF EXISTS (SELECT 1 FROM scms_data_migration_audit WHERE migration_key='09_approved_catalog') THEN RETURN; END IF;
+    SELECT json_agg(s ORDER BY subject_id)::TEXT INTO before_snapshot FROM subjects s;
+    -- Only the exact unused zero-price snapshot is eligible for deletion.
+    IF EXISTS(SELECT 1 FROM subjects WHERE slug IS NULL) THEN
+        IF (SELECT count(*) FROM subjects WHERE slug IS NULL) <> 9 OR
+           EXISTS(SELECT 1 FROM subjects WHERE slug IS NULL AND NOT (
+             normal_price=0 AND advanced_price=0 AND outdoor IS NULL AND
+             (subject_id,subject_name) IN ((1,'Cầu lông'),(2,'Pickleball'),(3,'Bóng bàn'),(4,'Bắn cung'),
+                 (5,'Bóng rổ'),(6,'Bóng chuyền'),(7,'Bắn súng'),(8,'Bóng đá'),(9,'Quần vợt')))) OR
+           (SELECT count(*) FROM subjects WHERE (subject_id,slug,subject_name,normal_price,advanced_price) IN
+             ((19,'quan-vot-tennis','Quần vợt (Tennis)',1500000,10000000),(20,'boi-loi','Bơi lội',1200000,9000000),
+              (21,'pickleball','Pickleball',1100000,8500000),(22,'ban-cung','Bắn cung',1400000,9500000),
+              (23,'bong-ro','Bóng rổ',1000000,8000000),(24,'bong-da','Bóng đá',900000,8000000),
+              (25,'bong-chuyen','Bóng chuyền',900000,7000000),(26,'cau-long','Cầu lông',900000,7500000),
+              (27,'bong-ban','Bóng bàn',800000,6500000))) <> 9 THEN
+            RAISE EXCEPTION 'D02 catalog snapshot mismatch: manual reconciliation required';
+        END IF;
+        FOR fk IN SELECT conrelid::regclass AS tbl, a.attname AS col FROM pg_constraint c
+            JOIN pg_attribute a ON a.attrelid=c.conrelid AND a.attnum=c.conkey[1]
+            WHERE c.contype='f' AND c.confrelid='subjects'::regclass LOOP
+            EXECUTE format('SELECT EXISTS(SELECT 1 FROM %s WHERE %I IN (SELECT subject_id FROM subjects WHERE slug IS NULL))',fk.tbl,fk.col) INTO used;
+            IF used THEN RAISE EXCEPTION 'D02 duplicate subject has new references in %: reconcile first',fk.tbl; END IF;
+        END LOOP;
+        DELETE FROM subjects WHERE slug IS NULL AND subject_id BETWEEN 1 AND 9;
+    END IF;
+    IF (SELECT count(*) FROM subjects) <> 9 OR EXISTS(SELECT 1 FROM subjects WHERE slug NOT IN
+        ('quan-vot-tennis','boi-loi','pickleball','ban-cung','bong-ro','bong-da','bong-chuyen','cau-long','bong-ban')) THEN
+        RAISE EXCEPTION 'D02 requires exactly nine canonical subjects';
+    END IF;
+    UPDATE subjects SET normal_price = CASE slug
+        WHEN 'quan-vot-tennis' THEN 2500000 WHEN 'boi-loi' THEN 1500000 WHEN 'pickleball' THEN 1800000
+        WHEN 'ban-cung' THEN 2000000 WHEN 'bong-ro' THEN 1200000 WHEN 'bong-da' THEN 1000000
+        WHEN 'bong-chuyen' THEN 1000000 WHEN 'cau-long' THEN 900000 WHEN 'bong-ban' THEN 800000 END,
+        advanced_price = CASE slug
+        WHEN 'quan-vot-tennis' THEN 8000000 WHEN 'boi-loi' THEN 4500000 WHEN 'pickleball' THEN 5000000
+        WHEN 'ban-cung' THEN 6000000 WHEN 'bong-ro' THEN 3500000 WHEN 'bong-da' THEN 3500000
+        WHEN 'bong-chuyen' THEN 3500000 WHEN 'cau-long' THEN 3000000 WHEN 'bong-ban' THEN 2500000 END;
+    ALTER TABLE subjects ADD CONSTRAINT ck_approved_subject_slug CHECK (slug IS NOT NULL AND slug IN
+        ('quan-vot-tennis','boi-loi','pickleball','ban-cung','bong-ro','bong-da','bong-chuyen','cau-long','bong-ban'));
+    ALTER TABLE subjects ADD CONSTRAINT ck_subject_positive_prices CHECK(normal_price>0 AND advanced_price>0);
+    INSERT INTO scms_data_migration_audit VALUES('09_approved_catalog',CURRENT_TIMESTAMP,before_snapshot,
+        (SELECT json_agg(s ORDER BY subject_id)::TEXT FROM subjects s));
+END $$;
 
--- Owner02/11 room catalog; guarded, replay preserves subsequent edits.
+
+-- SOURCE: database/migrations/10_session_incidents_postgres.sql SHA256 9e4234c7b1679777de95f76d89b4f2b184f3473d3787355f79adcfb448965bbf
+
+ALTER TABLE sessions ADD COLUMN IF NOT EXISTS booking_key VARCHAR(80);
+ALTER TABLE sessions ADD COLUMN IF NOT EXISTS booking_hash VARCHAR(64);
+ALTER TABLE sessions ADD COLUMN IF NOT EXISTS created_by INT REFERENCES users(user_id);
+ALTER TABLE sessions ADD COLUMN IF NOT EXISTS agreement_confirmed_at TIMESTAMP;
+ALTER TABLE sessions ADD COLUMN IF NOT EXISTS support_reason VARCHAR(2000);
+ALTER TABLE sessions ADD COLUMN IF NOT EXISTS credit_returned BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE sessions ADD COLUMN IF NOT EXISTS center_invalidated BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE sessions ADD COLUMN IF NOT EXISTS makeup_for_session_id INT REFERENCES sessions(session_id);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_session_booking_key ON sessions(subscription_id,booking_key) WHERE booking_key IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_session_makeup_original ON sessions(makeup_for_session_id) WHERE makeup_for_session_id IS NOT NULL;
+ALTER TABLE member_packages ADD COLUMN IF NOT EXISTS deferred_credit_return INT NOT NULL DEFAULT 0;
+ALTER TABLE member_packages ADD COLUMN IF NOT EXISTS approved_extra_nanos INT NOT NULL DEFAULT 0;
+CREATE TABLE IF NOT EXISTS session_absence_notices (
+    id SERIAL PRIMARY KEY, session_id INT NOT NULL REFERENCES sessions(session_id), member_id INT NOT NULL REFERENCES users(user_id),
+    reported_at TIMESTAMP NOT NULL, original_start TIMESTAMP NOT NULL, original_end TIMESTAMP NOT NULL,
+    reason VARCHAR(2000) NOT NULL, active BOOLEAN NOT NULL DEFAULT TRUE, superseded_at TIMESTAMP
+);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_active_absence_notice ON session_absence_notices(session_id) WHERE active;
+CREATE TABLE IF NOT EXISTS session_changes (
+    id SERIAL PRIMARY KEY, session_id INT NOT NULL REFERENCES sessions(session_id), request_key VARCHAR(80) NOT NULL,
+    request_hash VARCHAR(64) NOT NULL, actor_id INT NOT NULL REFERENCES users(user_id), changed_at TIMESTAMP NOT NULL,
+    cause VARCHAR(40) NOT NULL, reason VARCHAR(2000) NOT NULL, member_agreed BOOLEAN NOT NULL,
+    before_data VARCHAR(4000) NOT NULL, after_data VARCHAR(4000) NOT NULL, UNIQUE(session_id,request_key)
+);
+CREATE TABLE IF NOT EXISTS center_incidents (
+    id SERIAL PRIMARY KEY, session_id INT NOT NULL REFERENCES sessions(session_id), request_key VARCHAR(80) NOT NULL,
+    started_at TIMESTAMP NOT NULL, ended_at TIMESTAMP, reason VARCHAR(2000) NOT NULL, evidence VARCHAR(2000) NOT NULL,
+    status VARCHAR(30) NOT NULL DEFAULT 'WaitingForRecovery', created_by INT NOT NULL REFERENCES users(user_id), created_at TIMESTAMP NOT NULL,
+    resolved_by INT REFERENCES users(user_id), resolved_at TIMESTAMP, original_deadline TIMESTAMP, deadline_before TIMESTAMP, deadline_after TIMESTAMP,
+    recovered_credits INT NOT NULL DEFAULT 0, session_compensated BOOLEAN NOT NULL DEFAULT FALSE, UNIQUE(session_id,request_key),
+    CHECK(ended_at IS NULL OR ended_at>=started_at)
+);
+CREATE TABLE IF NOT EXISTS incident_affected_members (
+    incident_id INT NOT NULL REFERENCES center_incidents(id), member_id INT NOT NULL REFERENCES users(user_id), PRIMARY KEY(incident_id,member_id)
+);
+
+
+-- SOURCE: database/migrations/11_holiday_history_postgres.sql SHA256 55fe61d4cef7e43bb3575a1cde57a9afee24480ce9082ae6fad43fc8df131e13
+
+ALTER TABLE holidays ADD COLUMN IF NOT EXISTS actual_closed_until TIMESTAMP;
+-- No guessed backfill. An active holiday's actual past interval is captured on deactivation.
+
+
+-- SOURCE: database/migrations/12_payment_resolutions_postgres.sql SHA256 4e69f22e359367843d7d6d90641e5af0acabae847558bf23eb1ca7cce3382ce6
+
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS cash_note VARCHAR(2000);
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS cash_confirmation_reversed BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS resolution_status VARCHAR(30);
+ALTER TABLE class_enrollments ADD COLUMN IF NOT EXISTS eligibility_subscription_id INT REFERENCES member_packages(subscription_id);
+CREATE TABLE IF NOT EXISTS payment_resolutions (
+    id SERIAL PRIMARY KEY, invoice_id INT NOT NULL REFERENCES invoices(invoice_id), resolution_type VARCHAR(30) NOT NULL,
+    status VARCHAR(30) NOT NULL DEFAULT 'Open', amount NUMERIC(12,2) NOT NULL, reason VARCHAR(2000) NOT NULL,
+    evidence VARCHAR(2000), outcome_note VARCHAR(2000), created_by INT NOT NULL REFERENCES users(user_id), created_at TIMESTAMP NOT NULL,
+    approved_by INT REFERENCES users(user_id), approved_at TIMESTAMP, completed_by INT REFERENCES users(user_id), completed_at TIMESTAMP,
+    performed_at TIMESTAMP, UNIQUE(invoice_id,resolution_type), CHECK(amount>0)
+);
+
+
+-- SOURCE: database/migrations/13_room_catalog_postgres.sql SHA256 aa83ac6e930161a1f9411f8da1e4b09eea8e7e51638b24684e76e6a3dae80060
 -- Owner02/11: numeric room_id + room_code; 20 center1 resources from room.jpg.
 -- Additive/atomic. Existing history remains on legacy rooms. No subject_id.
+
 SELECT center_id FROM centers WHERE center_id=1 FOR UPDATE;
 LOCK TABLE rooms, sessions, classes, class_enrollments IN SHARE ROW EXCLUSIVE MODE;
 ALTER TABLE rooms ADD COLUMN IF NOT EXISTS room_code VARCHAR(40);
@@ -1842,10 +1485,1297 @@ BEGIN
   'sessions',(SELECT jsonb_agg(to_jsonb(s) ORDER BY s.session_id) FROM sessions s JOIN _room_moves m USING(session_id)))::text);
 END $catalog$;
 
-ALTER TABLE users ADD COLUMN IF NOT EXISTS google_sub VARCHAR(255) NULL;
-CREATE UNIQUE INDEX IF NOT EXISTS uq_users_google_sub ON users (google_sub) WHERE google_sub IS NOT NULL;
 
+-- SOURCE: database/migrations/14_absence_attendance_postgres.sql SHA256 c12e96423d007a9a3e23b865ca926efda9e08ed244c52a8a122c7f364446765c
+-- Owner31/10, implemented02/11: Absent + notice atomically; retain superseded history.
+
+LOCK TABLE attendances IN SHARE ROW EXCLUSIVE MODE;
+ALTER TABLE attendances ADD COLUMN IF NOT EXISTS absence_notice_id INT;
+ALTER TABLE attendances ADD COLUMN IF NOT EXISTS superseded_at TIMESTAMP;
+DO $$ BEGIN
+ IF NOT EXISTS(SELECT 1 FROM pg_constraint WHERE conrelid='attendances'::regclass AND conname='fk_attendance_absence_notice') THEN
+  ALTER TABLE attendances ADD CONSTRAINT fk_attendance_absence_notice FOREIGN KEY(absence_notice_id) REFERENCES session_absence_notices(id);
+ END IF;
+END $$;
+-- Exactly one current attendance; archived automatic records remain traceable.
+DROP INDEX IF EXISTS ux_attendance_session_member;
+CREATE UNIQUE INDEX ux_attendance_session_member ON attendances(session_id,member_id)
+ WHERE session_id IS NOT NULL AND superseded_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_attendance_absence_notice ON attendances(absence_notice_id) WHERE absence_notice_id IS NOT NULL;
+
+
+-- SOURCE: database/migrations/15_QueryDR.sql SHA256 cc3399baa426cd599597c2cdcea13a370cf2011a4ea951182e11953d2d231af1
+-- SCMS QueryDR, Owner approved 04/11/2026.
+-- Copy this ENTIRE file into the Supabase SQL editor and run once before deploying BE.
+-- Additive only: no existing table/column/data is updated, deleted or rebuilt.
+-- A failed guard rolls back this whole transaction. Replay validates the same structure.
+
+SET LOCAL lock_timeout = '10s';
+SET LOCAL statement_timeout = '60s';
+SET LOCAL search_path = public, pg_catalog;
+SELECT pg_advisory_xact_lock(391, 15);
+
+DO $preflight$
+BEGIN
+  IF to_regclass('public.invoices') IS NULL OR NOT EXISTS (
+    SELECT 1 FROM pg_attribute
+    WHERE attrelid=to_regclass('public.invoices') AND attname='invoice_id'
+      AND atttypid='integer'::regtype AND attnotnull AND NOT attisdropped
+  ) THEN
+    RAISE EXCEPTION 'QUERYDR_PREFLIGHT: public.invoices(invoice_id integer NOT NULL) is required';
+  END IF;
+  IF to_regclass('public.vnpay_payment_attempts') IS NOT NULL AND NOT EXISTS (
+    SELECT 1 FROM pg_class WHERE oid=to_regclass('public.vnpay_payment_attempts') AND relkind='r'
+  ) THEN
+    RAISE EXCEPTION 'QUERYDR_PREFLIGHT: existing vnpay_payment_attempts is not an ordinary table';
+  END IF;
+END $preflight$;
+
+-- QUERYDR_TABLE_BEGIN
+CREATE TABLE IF NOT EXISTS public.vnpay_payment_attempts (
+  attempt_id BIGSERIAL PRIMARY KEY,
+  invoice_id INTEGER NOT NULL,
+  tmn_code VARCHAR(32) NOT NULL,
+  txn_ref VARCHAR(100) NOT NULL,
+  transaction_date VARCHAR(14) NOT NULL,
+  amount_minor BIGINT NOT NULL,
+  created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL,
+  last_query_at TIMESTAMP WITHOUT TIME ZONE NULL,
+  CONSTRAINT fk_vnpay_attempt_invoice FOREIGN KEY(invoice_id)
+    REFERENCES public.invoices(invoice_id) ON DELETE RESTRICT,
+  CONSTRAINT uq_vnpay_attempt_request UNIQUE(invoice_id,tmn_code,txn_ref,transaction_date),
+  CONSTRAINT chk_vnpay_attempt_tmn CHECK(tmn_code ~ '^[A-Za-z0-9_-]{1,32}$'),
+  CONSTRAINT chk_vnpay_attempt_ref CHECK(length(txn_ref) BETWEEN 1 AND 100 AND txn_ref !~ '[[:cntrl:]]'),
+  CONSTRAINT chk_vnpay_attempt_date CHECK(transaction_date ~ '^[0-9]{14}$'),
+  CONSTRAINT chk_vnpay_attempt_amount CHECK(amount_minor BETWEEN 1 AND 999999999999)
+);
+-- QUERYDR_TABLE_END
+
+-- Validate an existing relation before changing even this new table's permissions/indexes.
+DO $shape$
+DECLARE
+  expected RECORD;
+  actual_type TEXT;
+  actual_required BOOLEAN;
+  cols SMALLINT[];
+BEGIN
+  IF (SELECT count(*) FROM pg_attribute WHERE attrelid='public.vnpay_payment_attempts'::regclass
+      AND attnum>0 AND NOT attisdropped) <> 8 THEN
+    RAISE EXCEPTION 'QUERYDR_SCHEMA_CONFLICT: unexpected columns; no existing data was modified';
+  END IF;
+  FOR expected IN SELECT * FROM (VALUES
+    ('attempt_id','bigint',true),('invoice_id','integer',true),
+    ('tmn_code','character varying(32)',true),('txn_ref','character varying(100)',true),
+    ('transaction_date','character varying(14)',true),('amount_minor','bigint',true),
+    ('created_at','timestamp without time zone',true),('last_query_at','timestamp without time zone',false)
+  ) AS t(name,type_name,required) LOOP
+    SELECT format_type(atttypid,atttypmod),attnotnull INTO actual_type,actual_required
+    FROM pg_attribute WHERE attrelid='public.vnpay_payment_attempts'::regclass
+      AND attname=expected.name AND attnum>0 AND NOT attisdropped;
+    IF actual_type IS DISTINCT FROM expected.type_name OR actual_required IS DISTINCT FROM expected.required THEN
+      RAISE EXCEPTION 'QUERYDR_SCHEMA_CONFLICT: incompatible column %',expected.name;
+    END IF;
+  END LOOP;
+  SELECT array_agg(attnum ORDER BY array_position(ARRAY['invoice_id','tmn_code','txn_ref','transaction_date'],attname::text))
+    INTO cols FROM pg_attribute WHERE attrelid='public.vnpay_payment_attempts'::regclass
+      AND attname=ANY(ARRAY['invoice_id','tmn_code','txn_ref','transaction_date']) AND NOT attisdropped;
+  IF NOT EXISTS(SELECT 1 FROM pg_constraint WHERE conrelid='public.vnpay_payment_attempts'::regclass
+      AND contype='u' AND conname='uq_vnpay_attempt_request' AND conkey=cols) THEN
+    RAISE EXCEPTION 'QUERYDR_SCHEMA_CONFLICT: request identity unique constraint is missing/different';
+  END IF;
+  IF NOT EXISTS(SELECT 1 FROM pg_constraint c JOIN pg_attribute a ON a.attrelid=c.conrelid AND a.attnum=ANY(c.conkey)
+      WHERE c.conrelid='public.vnpay_payment_attempts'::regclass AND c.contype='p'
+      AND cardinality(c.conkey)=1 AND a.attname='attempt_id') OR NOT EXISTS (
+    SELECT 1 FROM pg_attrdef d JOIN pg_attribute a ON a.attrelid=d.adrelid AND a.attnum=d.adnum
+    WHERE a.attrelid='public.vnpay_payment_attempts'::regclass AND a.attname='attempt_id'
+      AND pg_get_expr(d.adbin,d.adrelid) LIKE 'nextval(%'
+  ) THEN
+    RAISE EXCEPTION 'QUERYDR_SCHEMA_CONFLICT: generated attempt primary key is missing/different';
+  END IF;
+  IF NOT EXISTS(SELECT 1 FROM pg_constraint c
+      JOIN pg_attribute a ON a.attrelid=c.conrelid AND a.attnum=c.conkey[1]
+      JOIN pg_attribute b ON b.attrelid=c.confrelid AND b.attnum=c.confkey[1]
+      WHERE c.conrelid='public.vnpay_payment_attempts'::regclass AND c.contype='f'
+        AND c.conname='fk_vnpay_attempt_invoice' AND c.confrelid='public.invoices'::regclass
+        AND cardinality(c.conkey)=1 AND a.attname='invoice_id' AND b.attname='invoice_id'
+        AND c.confdeltype='r' AND c.convalidated) THEN
+    RAISE EXCEPTION 'QUERYDR_SCHEMA_CONFLICT: invoice RESTRICT foreign key is missing/different';
+  END IF;
+  FOR expected IN SELECT * FROM (VALUES
+    ('chk_vnpay_attempt_tmn', $d$CHECK (((tmn_code)::text ~ '^[A-Za-z0-9_-]{1,32}$'::text))$d$),
+    ('chk_vnpay_attempt_ref', $d$CHECK ((((length((txn_ref)::text) >= 1) AND (length((txn_ref)::text) <= 100)) AND ((txn_ref)::text !~ '[[:cntrl:]]'::text)))$d$),
+    ('chk_vnpay_attempt_date', $d$CHECK (((transaction_date)::text ~ '^[0-9]{14}$'::text))$d$),
+    ('chk_vnpay_attempt_amount', $d$CHECK (((amount_minor >= 1) AND (amount_minor <= '999999999999'::bigint)))$d$)
+  ) AS t(name,definition) LOOP
+    IF NOT EXISTS(SELECT 1 FROM pg_constraint WHERE conrelid='public.vnpay_payment_attempts'::regclass
+      AND contype='c' AND convalidated AND conname=expected.name
+      AND pg_get_constraintdef(oid)=expected.definition) THEN
+      RAISE EXCEPTION 'QUERYDR_SCHEMA_CONFLICT: missing/different request guard %',expected.name;
+    END IF;
+  END LOOP;
+END $shape$;
+
+CREATE INDEX IF NOT EXISTS idx_vnpay_attempt_invoice_query
+  ON public.vnpay_payment_attempts(invoice_id,last_query_at,attempt_id DESC);
+DO $index_guard$
+BEGIN
+  IF NOT EXISTS(SELECT 1 FROM pg_index WHERE indexrelid=to_regclass('public.idx_vnpay_attempt_invoice_query')
+      AND indrelid='public.vnpay_payment_attempts'::regclass AND indisvalid AND NOT indisunique
+      AND pg_get_indexdef(indexrelid) LIKE '% USING btree (invoice_id, last_query_at, attempt_id DESC)') THEN
+    RAISE EXCEPTION 'QUERYDR_SCHEMA_CONFLICT: query index is missing/different';
+  END IF;
+END $index_guard$;
+ALTER TABLE public.vnpay_payment_attempts ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON public.vnpay_payment_attempts FROM PUBLIC;
+REVOKE ALL ON SEQUENCE public.vnpay_payment_attempts_attempt_id_seq FROM PUBLIC;
+DO $roles$
+BEGIN
+  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='anon') THEN
+    REVOKE ALL ON public.vnpay_payment_attempts FROM anon;
+    REVOKE ALL ON SEQUENCE public.vnpay_payment_attempts_attempt_id_seq FROM anon;
+  END IF;
+  IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='authenticated') THEN
+    REVOKE ALL ON public.vnpay_payment_attempts FROM authenticated;
+    REVOKE ALL ON SEQUENCE public.vnpay_payment_attempts_attempt_id_seq FROM authenticated;
+  END IF;
+END $roles$;
+COMMENT ON TABLE public.vnpay_payment_attempts IS
+  'BE-only original VNPay pay requests for QueryDR. Stores no key/full URL. Existing invoices are not backfilled or changed.';
+COMMENT ON COLUMN public.vnpay_payment_attempts.transaction_date IS
+  'Exact vnp_CreateDate sent in the original pay request, yyyyMMddHHmmss Asia/Ho_Chi_Minh; not invoice.created_at or gateway PayDate.';
+COMMENT ON COLUMN public.vnpay_payment_attempts.last_query_at IS
+  'Clock-based query claim time; used under invoice/center lock for cooldown. Does not mean payment succeeded.';
+
+SELECT 'QUERYDR_SCHEMA_READY' AS migration_status,
+  (SELECT count(*) FROM public.vnpay_payment_attempts) AS preserved_attempt_rows;
+
+
+-- SOURCE: database/migrations/13_google_login_postgres.sql SHA256 984566d55a76ceb13a136792ef898c4a187ea03594a4b69144fb8143ac5e39a7
+
+ALTER TABLE public.users ADD COLUMN IF NOT EXISTS google_sub VARCHAR(255) NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_users_google_sub ON public.users (google_sub) WHERE google_sub IS NOT NULL;
+
+
+-- SOURCE: database/migrations/17_attendance_review_postgres.sql SHA256 a6c903edab57f6ecb1d905baa753637b22d74071143058a7424e3289ae9b013b
+-- D15 Owner09/11: lifecycle at end; current no-show state is reviewed after local midnight.
+-- Run before deploying the matching BE. No seed, reset, historical notification queue, or attendance edits.
+
+DO $$ BEGIN
+ IF to_regclass('public.sessions') IS NULL OR to_regclass('public.attendances') IS NULL THEN
+  RAISE EXCEPTION 'Attendance baseline is required';
+ END IF;
+ IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='attendances' AND column_name='superseded_at') THEN
+  RAISE EXCEPTION 'Migration14 attendance history baseline is required';
+ END IF;
+END $$;
+ALTER TABLE public.sessions ADD COLUMN IF NOT EXISTS attendance_review_pending BOOLEAN NOT NULL DEFAULT FALSE;
+DO $$ BEGIN
+ IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='sessions'
+     AND column_name='attendance_review_pending' AND data_type='boolean' AND is_nullable='NO' AND column_default='false') THEN
+  RAISE EXCEPTION 'Incompatible sessions.attendance_review_pending; reconcile before deploy';
+ END IF;
+ IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='attendances'
+     AND column_name='note' AND data_type='text') THEN
+  RAISE EXCEPTION 'Expected existing attendances.note TEXT; reconcile before deploy';
+ END IF;
+END $$;
+-- FALSE for every existing row; replay preserves pending reviews created by the new finalizer.
+CREATE INDEX IF NOT EXISTS idx_sessions_attendance_review_pending
+ ON public.sessions(session_date, session_id) WHERE attendance_review_pending = TRUE;
+
+
+-- SOURCE: database/migrations/18_audit_scope_postgres.sql SHA256 2631b71044d7f6e44e85dac91b001c9d6d8c95445d782b62ba51dfa7bbf42c3c
+-- RP-43: event-time provenance for new audit events. Existing history stays unchanged.
+
+DO $$ BEGIN
+ IF to_regclass('public.system_logs') IS NULL THEN RAISE EXCEPTION 'system_logs baseline is required'; END IF;
+END $$;
+ALTER TABLE public.system_logs ADD COLUMN IF NOT EXISTS audit_category VARCHAR(24);
+ALTER TABLE public.system_logs ADD COLUMN IF NOT EXISTS center_id INTEGER;
+ALTER TABLE public.system_logs ADD COLUMN IF NOT EXISTS scope_source VARCHAR(40);
+DO $$ BEGIN
+ IF (SELECT count(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='system_logs'
+     AND ((column_name='audit_category' AND data_type='character varying' AND character_maximum_length=24 AND is_nullable='YES')
+       OR (column_name='center_id' AND data_type='integer' AND is_nullable='YES')
+       OR (column_name='scope_source' AND data_type='character varying' AND character_maximum_length=40 AND is_nullable='YES'))) <> 3 THEN
+  RAISE EXCEPTION 'Incompatible system_logs provenance columns; reconcile before deploy';
+ END IF;
+ IF EXISTS(SELECT 1 FROM public.system_logs WHERE audit_category NOT IN ('BUSINESS','SYSTEM_SECURITY')) THEN
+  RAISE EXCEPTION 'Unknown audit category; reconcile before deploy';
+ END IF;
+ IF NOT EXISTS(SELECT 1 FROM pg_constraint WHERE conrelid='public.system_logs'::regclass AND conname='ck_system_logs_category') THEN
+  ALTER TABLE public.system_logs ADD CONSTRAINT ck_system_logs_category CHECK(audit_category IN ('BUSINESS','SYSTEM_SECURITY'));
+ END IF;
+END $$;
+CREATE INDEX IF NOT EXISTS idx_system_logs_scoped_page
+ ON public.system_logs(audit_category, center_id, timestamp DESC, log_id DESC);
+-- No backfill from mutable actor/target data, no deletion and no fabricated historical center.
+
+
+-- SOURCE: database/migrations/19_room_activity_postgres.sql SHA256 6be50bb5cf81d3fe8a31ea56ba3b062ab7e266322dde665e2b38b7375b96f719
+-- Physical court type for Owner02/11's twenty resources. No rooms.subject_id, no runtime name/code inference.
+
+DO $$ BEGIN
+ IF to_regclass('public.rooms') IS NULL OR to_regclass('public.scms_data_migration_audit') IS NULL THEN
+  RAISE EXCEPTION 'Migration13 room catalog baseline is required';
+ END IF;
+END $$;
+SELECT center_id FROM public.centers WHERE center_id=1 FOR UPDATE;
+LOCK TABLE public.rooms, public.sessions, public.classes IN SHARE ROW EXCLUSIVE MODE;
+ALTER TABLE public.rooms ADD COLUMN IF NOT EXISTS activity_type VARCHAR(24);
+DO $$ BEGIN
+ IF NOT EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='rooms'
+     AND column_name='activity_type' AND data_type='character varying' AND character_maximum_length=24 AND is_nullable='YES') THEN
+  RAISE EXCEPTION 'Incompatible rooms.activity_type; reconcile before deploy';
+ END IF;
+ IF NOT EXISTS(SELECT 1 FROM pg_constraint WHERE conrelid='public.rooms'::regclass AND conname='ck_rooms_activity_type') THEN
+  ALTER TABLE public.rooms ADD CONSTRAINT ck_rooms_activity_type CHECK(activity_type IN
+   ('TENNIS','FOOTBALL','ARCHERY','BASKETBALL','VOLLEYBALL','PICKLEBALL','BADMINTON','TABLE_TENNIS','SWIMMING'));
+ END IF;
+END $$;
+DO $activity$
+DECLARE snapshot JSONB; before_state TEXT;
+BEGIN
+ IF EXISTS(SELECT 1 FROM public.scms_data_migration_audit WHERE migration_key='20261109_room_activity_v1') THEN RETURN; END IF;
+ SELECT after_data::jsonb INTO snapshot FROM public.scms_data_migration_audit WHERE migration_key='20261102_room_catalog_v1';
+ IF snapshot IS NULL THEN RAISE EXCEPTION 'Approved immutable room catalog snapshot is required; do not infer from current room names/codes'; END IF;
+ CREATE TEMP TABLE _approved_activity(room_id INT PRIMARY KEY, activity TEXT NOT NULL) ON COMMIT DROP;
+ -- These codes identify rows in the immutable approved snapshot, not the current editable catalog.
+ INSERT INTO _approved_activity
+ SELECT (r->>'room_id')::int, c.activity FROM jsonb_array_elements(snapshot->'rooms') r
+ JOIN (VALUES
+  ('C01-TEN-01','TENNIS'),('C01-TEN-02','TENNIS'),('C01-FOOT-01','FOOTBALL'),('C01-FOOT-02','FOOTBALL'),
+  ('C01-ARC-01','ARCHERY'),('C01-ARC-02','ARCHERY'),('C01-BR-01','BASKETBALL'),('C01-BR-02','BASKETBALL'),
+  ('C01-BC-01','VOLLEYBALL'),('C01-BC-02','VOLLEYBALL'),('C01-PICK-01','PICKLEBALL'),('C01-PICK-02','PICKLEBALL'),
+  ('C01-BAD-01','BADMINTON'),('C01-BAD-02','BADMINTON'),('C01-TT-01','TABLE_TENNIS'),('C01-TT-02','TABLE_TENNIS'),
+  ('C01-TT-03','TABLE_TENNIS'),('C01-TT-04','TABLE_TENNIS'),('C01-SWIM-01','SWIMMING'),('C01-SWIM-02','SWIMMING')
+ ) c(code,activity) ON r->>'room_code'=c.code;
+ IF (SELECT count(*) FROM _approved_activity)<>20 OR
+    (SELECT count(*) FROM _approved_activity a JOIN public.rooms r USING(room_id) WHERE r.center_id=1)<>20 THEN
+  RAISE EXCEPTION 'Approved twenty room IDs no longer match center1; reconcile explicitly';
+ END IF;
+ IF EXISTS(SELECT 1 FROM _approved_activity a JOIN public.rooms r USING(room_id) WHERE r.activity_type IS NOT NULL AND r.activity_type<>a.activity) THEN
+  RAISE EXCEPTION 'Existing activity conflicts with the approved snapshot; reconcile explicitly';
+ END IF;
+ SELECT jsonb_agg(to_jsonb(r) ORDER BY room_id)::text INTO before_state FROM public.rooms r JOIN _approved_activity USING(room_id);
+ UPDATE public.rooms r SET activity_type=a.activity FROM _approved_activity a WHERE r.room_id=a.room_id AND r.activity_type IS NULL;
+ INSERT INTO public.scms_data_migration_audit VALUES('20261109_room_activity_v1',clock_timestamp() AT TIME ZONE 'Asia/Ho_Chi_Minh',before_state,
+  (SELECT jsonb_agg(to_jsonb(r) ORDER BY room_id)::text FROM public.rooms r JOIN _approved_activity USING(room_id)));
+END $activity$;
+DO $$ DECLARE issues TEXT; BEGIN
+ SELECT string_agg(s.session_id::text,',' ORDER BY s.session_id) INTO issues
+ FROM public.sessions s JOIN public.classes c USING(class_id) JOIN public.subjects sub USING(subject_id) JOIN public.rooms r USING(room_id)
+ WHERE c.center_id=1 AND s.status='Scheduled' AND s.session_date+s.end_time > clock_timestamp() AT TIME ZONE 'Asia/Ho_Chi_Minh'
+ AND (r.activity_type IS NULL OR r.center_id<>c.center_id OR
+  r.activity_type IS DISTINCT FROM CASE sub.slug WHEN 'quan-vot-tennis' THEN 'TENNIS' WHEN 'bong-da' THEN 'FOOTBALL'
+   WHEN 'ban-cung' THEN 'ARCHERY' WHEN 'bong-ro' THEN 'BASKETBALL' WHEN 'bong-chuyen' THEN 'VOLLEYBALL'
+   WHEN 'pickleball' THEN 'PICKLEBALL' WHEN 'cau-long' THEN 'BADMINTON' WHEN 'bong-ban' THEN 'TABLE_TENNIS' WHEN 'boi-loi' THEN 'SWIMMING' END);
+ IF issues IS NOT NULL THEN RAISE EXCEPTION 'ROOM_ACTIVITY_SCHEDULE_CONFLICT: Reconcile existing future sessions before deploy' USING DETAIL=issues; END IF;
+END $$;
+-- Historical sessions, links, names, codes, prices and invoices are untouched. Replay preserves later authorized edits.
+
+
+-- SOURCE: database/migrations/20_class_publication_price_postgres.sql SHA256 146bf5552552d44524598b61b20bb1c67fda1fb8b1a293bbbee9fbde1a6a6628
+-- RP-13: only new, unpublished Normal drafts may choose their first publication price.
+
+DO $$ BEGIN
+ IF to_regclass('public.classes') IS NULL THEN RAISE EXCEPTION 'classes baseline is required'; END IF;
+END $$;
+ALTER TABLE public.classes ADD COLUMN IF NOT EXISTS pricing_draft BOOLEAN NOT NULL DEFAULT FALSE;
+DO $$ BEGIN
+ IF NOT EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='classes'
+     AND column_name='pricing_draft' AND data_type='boolean' AND is_nullable='NO' AND column_default='false') THEN
+  RAISE EXCEPTION 'Incompatible classes.pricing_draft; reconcile before deploy';
+ END IF;
+END $$;
+-- No guessing whether legacy Closed classes were unpublished. No price/invoice/history edits.
+-- Replay preserves drafts created by the matching BE.
+
+
+-- SOURCE: database/migrations/21_normal_lifecycle_postgres.sql SHA256 fc85176397fdceeb72324278a07835bcb914ac14001ef6dfa7f6df1e67686ab1
+-- Normal lifecycle metadata. Additive upgrade; no guessing legacy confirmation/minimum or changing receipts.
+
+DO $$ BEGIN
+ IF to_regclass('public.classes') IS NULL OR to_regclass('public.sessions') IS NULL THEN
+  RAISE EXCEPTION 'Normal lifecycle requires the classes/sessions baseline';
+ END IF;
+END $$;
+ALTER TABLE public.classes ADD COLUMN IF NOT EXISTS min_capacity INT;
+ALTER TABLE public.classes ADD COLUMN IF NOT EXISTS opening_confirmed_by INT REFERENCES public.users(user_id);
+ALTER TABLE public.classes ADD COLUMN IF NOT EXISTS opening_confirmed_at TIMESTAMP;
+ALTER TABLE public.classes ADD COLUMN IF NOT EXISTS opening_reason VARCHAR(2000);
+ALTER TABLE public.classes ADD COLUMN IF NOT EXISTS postponement_count INT NOT NULL DEFAULT 0;
+ALTER TABLE public.classes ADD COLUMN IF NOT EXISTS lifecycle_version BIGINT NOT NULL DEFAULT 0;
+DO $$ BEGIN
+ IF EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='classes'
+   AND ((column_name IN ('min_capacity','opening_confirmed_by','postponement_count') AND data_type<>'integer')
+     OR (column_name='lifecycle_version' AND data_type<>'bigint')
+     OR (column_name='opening_confirmed_at' AND data_type<>'timestamp without time zone')
+     OR (column_name='opening_reason' AND (data_type<>'character varying' OR character_maximum_length<>2000)))) THEN
+  RAISE EXCEPTION 'Incompatible Normal lifecycle columns; reconcile before upgrade';
+ END IF;
+ IF EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='classes'
+   AND column_name IN ('postponement_count','lifecycle_version') AND (is_nullable<>'NO' OR coalesce(column_default,'')<>'0')) THEN
+  RAISE EXCEPTION 'Incompatible Normal lifecycle defaults/nullability; reconcile before upgrade';
+ END IF;
+ IF NOT EXISTS(SELECT 1 FROM pg_constraint c JOIN pg_attribute a ON a.attrelid=c.conrelid AND a.attnum=ANY(c.conkey)
+   WHERE c.conrelid='public.classes'::regclass AND c.confrelid='public.users'::regclass AND c.contype='f' AND a.attname='opening_confirmed_by') THEN
+  ALTER TABLE public.classes ADD CONSTRAINT fk_normal_opening_actor FOREIGN KEY(opening_confirmed_by) REFERENCES public.users(user_id);
+ END IF;
+ IF NOT EXISTS(SELECT 1 FROM pg_constraint WHERE conrelid='public.classes'::regclass AND conname='ck_normal_lifecycle_capacity') THEN
+  ALTER TABLE public.classes ADD CONSTRAINT ck_normal_lifecycle_capacity CHECK(min_capacity IS NULL OR (min_capacity>0 AND min_capacity<=max_capacity));
+ END IF;
+ IF NOT EXISTS(SELECT 1 FROM pg_constraint WHERE conrelid='public.classes'::regclass AND conname='ck_normal_lifecycle_postponement') THEN
+  ALTER TABLE public.classes ADD CONSTRAINT ck_normal_lifecycle_postponement CHECK(postponement_count IN (0,1) AND lifecycle_version>=0);
+ END IF;
+ IF NOT EXISTS(SELECT 1 FROM pg_constraint WHERE conrelid='public.classes'::regclass AND conname='ck_normal_lifecycle_confirmation') THEN
+  ALTER TABLE public.classes ADD CONSTRAINT ck_normal_lifecycle_confirmation CHECK((opening_confirmed_by IS NULL)=(opening_confirmed_at IS NULL));
+ END IF;
+END $$;
+-- NULL minimum/confirmation on legacy rows is deliberate: the matching BE blocks confirmation until reviewed.
+
+
+-- SOURCE: database/migrations/22_normal_changes_refunds_postgres.sql SHA256 5bdcbbcb1ef1c165607667b84c8d67a08372b5149a041342993c79469585ad86
+-- Additive Normal consent/entitlement/manual-refund model. No cleanup/seed/provider operations.
+
+ALTER TABLE classes ADD COLUMN IF NOT EXISTS change_pending BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE invoices ADD COLUMN IF NOT EXISTS entitlement_class_id INT REFERENCES classes(class_id);
+DO $guard$
+BEGIN
+ IF NOT EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='classes' AND column_name='change_pending' AND data_type='boolean' AND is_nullable='NO' AND column_default='false')
+ OR NOT EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='invoices' AND column_name='entitlement_class_id' AND data_type='integer' AND is_nullable='YES') THEN
+  RAISE EXCEPTION 'Incompatible Normal change columns';
+ END IF;
+END $guard$;
+CREATE TABLE IF NOT EXISTS normal_proposals (
+ id SERIAL PRIMARY KEY, class_id INT NOT NULL REFERENCES classes(class_id), target_class_id INT REFERENCES classes(class_id),
+ kind VARCHAR(20) NOT NULL CHECK(kind IN ('Postpone','Transfer')), status VARCHAR(20) NOT NULL DEFAULT 'Pending' CHECK(status IN ('Pending','Applied','Cancelled')),
+ shift_days INT, version BIGINT NOT NULL, fingerprint VARCHAR(64) NOT NULL, schedule_json TEXT NOT NULL, reason VARCHAR(2000) NOT NULL,
+ created_by INT NOT NULL REFERENCES users(user_id), created_at TIMESTAMP NOT NULL,
+ CHECK((kind='Postpone' AND shift_days BETWEEN 1 AND 366 AND target_class_id IS NULL) OR (kind='Transfer' AND shift_days IS NULL AND target_class_id IS NOT NULL AND target_class_id<>class_id))
+);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_normal_pending_proposal ON normal_proposals(class_id) WHERE status='Pending';
+CREATE TABLE IF NOT EXISTS normal_responses (
+ id SERIAL PRIMARY KEY, proposal_id INT NOT NULL REFERENCES normal_proposals(id), invoice_id INT NOT NULL REFERENCES invoices(invoice_id),
+ member_id INT NOT NULL REFERENCES users(user_id), choice VARCHAR(20) NOT NULL CHECK(choice IN ('Waiting','Accept','Refund')),
+ version BIGINT NOT NULL, responded_at TIMESTAMP NOT NULL, UNIQUE(proposal_id,invoice_id)
+);
+CREATE TABLE IF NOT EXISTS normal_transfers (
+ id SERIAL PRIMARY KEY, proposal_id INT NOT NULL REFERENCES normal_proposals(id), invoice_id INT NOT NULL REFERENCES invoices(invoice_id),
+ source_enrollment_id INT NOT NULL REFERENCES class_enrollments(enrollment_id), target_enrollment_id INT NOT NULL REFERENCES class_enrollments(enrollment_id),
+ consented_by INT NOT NULL REFERENCES users(user_id), transferred_at TIMESTAMP NOT NULL,
+ UNIQUE(proposal_id,invoice_id), CHECK(source_enrollment_id<>target_enrollment_id)
+);
+CREATE TABLE IF NOT EXISTS normal_refunds (
+ id INT PRIMARY KEY REFERENCES payment_resolutions(id), class_id INT NOT NULL REFERENCES classes(class_id), origin VARCHAR(30) NOT NULL,
+ receiver_id INT, approved_receiver_id INT, version BIGINT NOT NULL DEFAULT 0, due_at TIMESTAMP, first_due_at TIMESTAMP, issue_note VARCHAR(2000),
+ CHECK(origin IN ('MemberChoice','CenterCancellation','LateReceipt'))
+);
+CREATE TABLE IF NOT EXISTS normal_refund_receivers (
+ id SERIAL PRIMARY KEY, refund_id INT NOT NULL REFERENCES normal_refunds(id), bank VARCHAR(120) NOT NULL, account_number VARCHAR(40) NOT NULL,
+ account_name VARCHAR(150) NOT NULL, confirmed_by INT NOT NULL REFERENCES users(user_id), confirmed_at TIMESTAMP NOT NULL,
+ verified_by INT REFERENCES users(user_id), verified_at TIMESTAMP, verification_source VARCHAR(2000), UNIQUE(id,refund_id),
+ CHECK((verified_by IS NULL AND verified_at IS NULL) OR (verified_by IS NOT NULL AND verified_at IS NOT NULL AND verification_source IS NOT NULL))
+);
+DO $fk$ BEGIN
+ IF NOT EXISTS(SELECT 1 FROM pg_constraint WHERE conrelid='normal_refunds'::regclass AND conname='fk_normal_refund_receiver') THEN
+  ALTER TABLE normal_refunds ADD CONSTRAINT fk_normal_refund_receiver FOREIGN KEY(receiver_id,id) REFERENCES normal_refund_receivers(id,refund_id);
+ END IF;
+ IF NOT EXISTS(SELECT 1 FROM pg_constraint WHERE conrelid='normal_refunds'::regclass AND conname='fk_normal_refund_approved_receiver') THEN
+  ALTER TABLE normal_refunds ADD CONSTRAINT fk_normal_refund_approved_receiver FOREIGN KEY(approved_receiver_id,id) REFERENCES normal_refund_receivers(id,refund_id);
+ END IF;
+END $fk$;
+CREATE TABLE IF NOT EXISTS normal_refund_attempts (
+ id SERIAL PRIMARY KEY, refund_id INT NOT NULL REFERENCES normal_refunds(id), receiver_id INT NOT NULL,
+ claim_key VARCHAR(36) NOT NULL UNIQUE, claimed_by INT NOT NULL REFERENCES users(user_id), claimed_at TIMESTAMP NOT NULL,
+ status VARCHAR(30) NOT NULL DEFAULT 'Claimed' CHECK(status IN ('Claimed','Submitted','Verified','Failed','Reversed')),
+ amount NUMERIC(12,2) NOT NULL CHECK(amount>0), currency VARCHAR(3) NOT NULL CHECK(currency='VND'), bank_reference VARCHAR(120) UNIQUE,
+ performed_at TIMESTAMP, verified_by INT REFERENCES users(user_id), verified_at TIMESTAMP, bank_source VARCHAR(2000), outcome_note VARCHAR(2000),
+ FOREIGN KEY(receiver_id,refund_id) REFERENCES normal_refund_receivers(id,refund_id)
+);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_normal_refund_active_attempt ON normal_refund_attempts(refund_id) WHERE status IN ('Claimed','Submitted','Verified');
+CREATE TABLE IF NOT EXISTS normal_refund_documents (
+ id SERIAL PRIMARY KEY, attempt_id INT NOT NULL REFERENCES normal_refund_attempts(id), uploaded_by INT NOT NULL REFERENCES users(user_id),
+ uploaded_at TIMESTAMP NOT NULL, content_type VARCHAR(30) NOT NULL CHECK(content_type IN ('application/pdf','image/png','image/jpeg')),
+ sha256 VARCHAR(64) NOT NULL, content BYTEA NOT NULL CHECK(octet_length(content) BETWEEN 1 AND 5242880)
+);
+CREATE TABLE IF NOT EXISTS normal_refund_verifications (
+ id SERIAL PRIMARY KEY, attempt_id INT NOT NULL REFERENCES normal_refund_attempts(id), verified_by INT NOT NULL REFERENCES users(user_id),
+ verified_at TIMESTAMP NOT NULL, outcome VARCHAR(20) NOT NULL CHECK(outcome IN ('Success','Failed','Reversed','Pending')),
+ bank_source VARCHAR(2000) NOT NULL, note VARCHAR(2000) NOT NULL
+);
+-- Column compatibility is checked on replay too; IF NOT EXISTS is not schema validation.
+DO $model$
+DECLARE item RECORD;
+BEGIN
+ FOR item IN SELECT * FROM (VALUES
+('normal_proposals','id','integer',true),
+('normal_proposals','class_id','integer',true),
+('normal_proposals','target_class_id','integer',false),
+('normal_proposals','kind','character varying(20)',true),
+('normal_proposals','status','character varying(20)',true),
+('normal_proposals','shift_days','integer',false),
+('normal_proposals','version','bigint',true),
+('normal_proposals','fingerprint','character varying(64)',true),
+('normal_proposals','schedule_json','text',true),
+('normal_proposals','reason','character varying(2000)',true),
+('normal_proposals','created_by','integer',true),
+('normal_proposals','created_at','timestamp without time zone',true),
+('normal_responses','id','integer',true),
+('normal_responses','proposal_id','integer',true),
+('normal_responses','invoice_id','integer',true),
+('normal_responses','member_id','integer',true),
+('normal_responses','choice','character varying(20)',true),
+('normal_responses','version','bigint',true),
+('normal_responses','responded_at','timestamp without time zone',true),
+('normal_transfers','id','integer',true),
+('normal_transfers','proposal_id','integer',true),
+('normal_transfers','invoice_id','integer',true),
+('normal_transfers','source_enrollment_id','integer',true),
+('normal_transfers','target_enrollment_id','integer',true),
+('normal_transfers','consented_by','integer',true),
+('normal_transfers','transferred_at','timestamp without time zone',true),
+('normal_refunds','id','integer',true),
+('normal_refunds','class_id','integer',true),
+('normal_refunds','origin','character varying(30)',true),
+('normal_refunds','receiver_id','integer',false),
+('normal_refunds','approved_receiver_id','integer',false),
+('normal_refunds','version','bigint',true),
+('normal_refunds','due_at','timestamp without time zone',false),
+('normal_refunds','first_due_at','timestamp without time zone',false),
+('normal_refunds','issue_note','character varying(2000)',false),
+('normal_refund_receivers','id','integer',true),
+('normal_refund_receivers','refund_id','integer',true),
+('normal_refund_receivers','bank','character varying(120)',true),
+('normal_refund_receivers','account_number','character varying(40)',true),
+('normal_refund_receivers','account_name','character varying(150)',true),
+('normal_refund_receivers','confirmed_by','integer',true),
+('normal_refund_receivers','confirmed_at','timestamp without time zone',true),
+('normal_refund_receivers','verified_by','integer',false),
+('normal_refund_receivers','verified_at','timestamp without time zone',false),
+('normal_refund_receivers','verification_source','character varying(2000)',false),
+('normal_refund_attempts','id','integer',true),
+('normal_refund_attempts','refund_id','integer',true),
+('normal_refund_attempts','receiver_id','integer',true),
+('normal_refund_attempts','claim_key','character varying(36)',true),
+('normal_refund_attempts','claimed_by','integer',true),
+('normal_refund_attempts','claimed_at','timestamp without time zone',true),
+('normal_refund_attempts','status','character varying(30)',true),
+('normal_refund_attempts','amount','numeric(12,2)',true),
+('normal_refund_attempts','currency','character varying(3)',true),
+('normal_refund_attempts','bank_reference','character varying(120)',false),
+('normal_refund_attempts','performed_at','timestamp without time zone',false),
+('normal_refund_attempts','verified_by','integer',false),
+('normal_refund_attempts','verified_at','timestamp without time zone',false),
+('normal_refund_attempts','bank_source','character varying(2000)',false),
+('normal_refund_attempts','outcome_note','character varying(2000)',false),
+('normal_refund_documents','id','integer',true),
+('normal_refund_documents','attempt_id','integer',true),
+('normal_refund_documents','uploaded_by','integer',true),
+('normal_refund_documents','uploaded_at','timestamp without time zone',true),
+('normal_refund_documents','content_type','character varying(30)',true),
+('normal_refund_documents','sha256','character varying(64)',true),
+('normal_refund_documents','content','bytea',true),
+('normal_refund_verifications','id','integer',true),
+('normal_refund_verifications','attempt_id','integer',true),
+('normal_refund_verifications','verified_by','integer',true),
+('normal_refund_verifications','verified_at','timestamp without time zone',true),
+('normal_refund_verifications','outcome','character varying(20)',true),
+('normal_refund_verifications','bank_source','character varying(2000)',true),
+('normal_refund_verifications','note','character varying(2000)',true)
+ ) expected(table_name,column_name,type_name,required) LOOP
+  IF NOT EXISTS(SELECT 1 FROM pg_attribute a WHERE a.attrelid=to_regclass('public.'||item.table_name) AND a.attname=item.column_name AND NOT a.attisdropped AND format_type(a.atttypid,a.atttypmod)=item.type_name AND a.attnotnull=item.required) THEN
+   RAISE EXCEPTION 'Incompatible Normal table %.%',item.table_name,item.column_name;
+  END IF;
+ END LOOP;
+ IF NOT EXISTS(SELECT 1 FROM pg_constraint WHERE conrelid='invoices'::regclass AND contype='f' AND conkey=ARRAY[(SELECT attnum FROM pg_attribute WHERE attrelid='invoices'::regclass AND attname='entitlement_class_id')]::smallint[]) THEN RAISE EXCEPTION 'Incompatible entitlement FK'; END IF;
+ IF EXISTS(SELECT 1 FROM (VALUES('uq_normal_refund_active_attempt'),('uq_normal_pending_proposal')) expected(name) WHERE NOT EXISTS(SELECT 1 FROM pg_index i JOIN pg_class c ON c.oid=i.indexrelid WHERE c.relname=expected.name AND i.indisunique AND i.indpred IS NOT NULL AND i.indisvalid)) THEN RAISE EXCEPTION 'Incompatible Normal uniqueness guards'; END IF;
+END $model$;
+
+
+-- SOURCE: database/migrations/16_retire_legacy_memberships_postgres.sql SHA256 b63c43328b1900aac8dba86f63dbbd90e4c5ff38bbb2eb7eca44b804564aaa69
+CREATE OR REPLACE FUNCTION public.fn_scms_retired_membership_catalog() RETURNS trigger
+LANGUAGE plpgsql SET search_path=pg_catalog,public AS $fn$
+BEGIN RAISE EXCEPTION 'LEGACY_MEMBERSHIP_RETIRED: shared-membership catalog is retired'; END $fn$;
+CREATE OR REPLACE TRIGGER trg_scms_retired_membership_catalog
+  BEFORE INSERT OR UPDATE ON public.membership_packages FOR EACH ROW EXECUTE FUNCTION public.fn_scms_retired_membership_catalog();
+CREATE OR REPLACE FUNCTION public.fn_scms_current_advanced_only() RETURNS trigger
+LANGUAGE plpgsql SET search_path=pg_catalog,public AS $fn$
+BEGIN
+  IF NEW.package_id IS NOT NULL OR NEW.subject_id IS NULL OR NEW.primary_coach_id IS NULL THEN
+    RAISE EXCEPTION 'LEGACY_MEMBERSHIP_RETIRED: entitlement requires subject and Primary Coach, without legacy package';
+  END IF; RETURN NEW;
+END $fn$;
+CREATE OR REPLACE TRIGGER trg_scms_current_advanced_only
+  BEFORE INSERT OR UPDATE ON public.member_packages FOR EACH ROW EXECUTE FUNCTION public.fn_scms_current_advanced_only();
+CREATE OR REPLACE FUNCTION public.fn_scms_no_legacy_invoice() RETURNS trigger
+LANGUAGE plpgsql SET search_path=pg_catalog,public AS $fn$
+BEGIN
+  IF NEW.package_id IS NOT NULL THEN RAISE EXCEPTION 'LEGACY_MEMBERSHIP_RETIRED: invoice cannot target a legacy catalog package'; END IF;
+  RETURN NEW;
+END $fn$;
+CREATE OR REPLACE TRIGGER trg_scms_no_legacy_invoice
+  BEFORE INSERT OR UPDATE ON public.invoices FOR EACH ROW EXECUTE FUNCTION public.fn_scms_no_legacy_invoice();
+
+
+SET LOCAL search_path=public,extensions,pg_catalog;
+-- Remove the obsolete package-catalog trigger; the current Advanced-only guard replaces it.
+DROP TRIGGER IF EXISTS trg_member_packages_validate ON public.member_packages;
+DROP FUNCTION IF EXISTS public.fn_member_packages_validate() RESTRICT;
+CREATE UNIQUE INDEX uq_scms_users_email_ci ON public.users(lower(email));
+ALTER TABLE public.classes ADD CONSTRAINT ck_demo_class_total_sessions CHECK(total_sessions=12);
+ALTER TABLE public.classes ADD CONSTRAINT ck_demo_class_positive_price CHECK(tuition_fee>0);
+ALTER TABLE public.invoices ADD CONSTRAINT ck_demo_invoice_positive_amount CHECK(amount>0);
+ALTER TABLE public.sessions ADD CONSTRAINT ck_demo_standard_session_slot CHECK((start_time,end_time) IN
+ ((TIME '06:00',TIME '07:30'),(TIME '07:45',TIME '09:15'),(TIME '09:30',TIME '11:00'),
+  (TIME '13:00',TIME '14:30'),(TIME '14:45',TIME '16:15'),(TIME '16:30',TIME '18:00'),(TIME '18:15',TIME '19:45')));
+
+
+-- SOURCE: database/bootstrap/scms_demo_reference.sql SHA256 feffc569aa900f427c56252e7ce1c4304c833ee4e9083b883af48133e7a1688e
+-- Public learning/demo reference seed, carried from Owner-approved account list.
+-- No payment, entitlement, attendance, training result, booking or historical date is fabricated.
+CREATE TEMP TABLE _scms_accounts(ordinal INT PRIMARY KEY,role_name TEXT,name TEXT,email TEXT,phone TEXT,address TEXT,gender TEXT,birth DATE) ON COMMIT DROP;
+INSERT INTO _scms_accounts VALUES
+(1, 'Admin', 'Admin Account', 'admin@gmail.com', '0905000101', 'Văn phòng Trung tâm, Q1, TP.HCM', 'Male', '1985-08-12'),
+(2, 'Member', 'Nguyễn Minh An', 'an@gmail.com', '0901000101', 'Quận 1, TP.HCM', 'Male', '2003-05-12'),
+(3, 'Member', 'Trần Bảo Linh', 'linh@gmail.com', '0901000102', 'Quận 3, TP.HCM', 'Female', '2002-08-21'),
+(4, 'Member', 'Lê Gia Huy', 'huy@gmail.com', '0901000103', 'Quận 7, TP.HCM', 'Male', '2004-02-15'),
+(5, 'Member', 'Phạm Ngọc Mai', 'mai@gmail.com', '0901000104', 'Bình Thạnh, TP.HCM', 'Female', '2001-11-09'),
+(6, 'Member', 'Võ Đức Khang', 'khang@gmail.com', '0901000105', 'TP. Thủ Đức, TP.HCM', 'Male', '2003-07-24'),
+(7, 'Member', 'Đặng Thảo Vy', 'vy@gmail.com', '0901000106', 'Tân Bình, TP.HCM', 'Female', '2004-04-18'),
+(8, 'Member', 'Bùi Quốc Bảo', 'bao@gmail.com', '0901000107', 'Quận 10, TP.HCM', 'Male', '2002-12-03'),
+(9, 'Member', 'Hồ Khánh Nhi', 'nhi@gmail.com', '0901000108', 'Phú Nhuận, TP.HCM', 'Female', '2005-06-27'),
+(10, 'Member', 'Đỗ Tuấn Kiệt', 'kiet@gmail.com', '0901000109', 'Quận 11, TP.HCM', 'Male', '2001-09-14'),
+(11, 'Member', 'Phan Thu Hà', 'ha@gmail.com', '0901000110', 'Gò Vấp, TP.HCM', 'Female', '2003-03-30'),
+(12, 'Coach', 'Nguyễn Hoàng Quân', 'coach.tennis1@gmail.com', '0902000101', 'Quận 1, TP.HCM', 'Male', '1990-03-15'),
+(13, 'Coach', 'Huỳnh Diễm My', 'coach.tennis2@gmail.com', '0902000102', 'Quận 3, TP.HCM', 'Female', '1992-07-22'),
+(14, 'Coach', 'Lê Minh Duy', 'coach.swimming1@gmail.com', '0902000103', 'Quận 7, TP.HCM', 'Male', '1989-11-08'),
+(15, 'Coach', 'Lê Phương Anh', 'coach.swimming2@gmail.com', '0902000104', 'Bình Thạnh, TP.HCM', 'Female', '1993-05-17'),
+(16, 'Coach', 'Võ Thanh Long', 'coach.pickleball1@gmail.com', '0902000105', 'TP. Thủ Đức, TP.HCM', 'Male', '1994-09-26'),
+(17, 'Coach', 'Phạm Thị Lan', 'coach.pickleball2@gmail.com', '0902000106', 'Tân Bình, TP.HCM', 'Female', '1995-02-12'),
+(18, 'Coach', 'Lê Nguyễn Thiên Phúc', 'coach.archery1@gmail.com', '0902000107', 'Quận 10, TP.HCM', 'Male', '1991-12-04'),
+(19, 'Coach', 'Hồ Thảo My', 'coach.archery2@gmail.com', '0902000108', 'Phú Nhuận, TP.HCM', 'Female', '1996-06-19'),
+(20, 'Coach', 'Trần Anh Dũng', 'coach.basketball1@gmail.com', '0902000109', 'Quận 11, TP.HCM', 'Male', '1988-01-30'),
+(21, 'Coach', 'Phan Kim Ngân', 'coach.basketball2@gmail.com', '0902000110', 'Gò Vấp, TP.HCM', 'Female', '1992-08-14'),
+(22, 'Coach', 'Lê Trần Phi', 'coach.football1@gmail.com', '0902000111', 'Quận 12, TP.HCM', 'Male', '1987-04-25'),
+(23, 'Coach', 'Trần Ngọc Yến', 'coach.football2@gmail.com', '0902000112', 'Quận 6, TP.HCM', 'Female', '1993-10-09'),
+(24, 'Coach', 'Nguyễn Văn Hoàng', 'coach.volleyball1@gmail.com', '0902000113', 'Quận 5, TP.HCM', 'Male', '1989-02-21'),
+(25, 'Coach', 'Phạm Thanh Thư', 'coach.volleyball2@gmail.com', '0902000114', 'Quận 8, TP.HCM', 'Female', '1995-07-07'),
+(26, 'Coach', 'Võ Minh Đức', 'coach.badminton1@gmail.com', '0902000115', 'Quận 4, TP.HCM', 'Male', '1990-09-18'),
+(27, 'Coach', 'Trần Thị Hương', 'coach.badminton2@gmail.com', '0902000116', 'Tân Phú, TP.HCM', 'Female', '1996-01-11'),
+(28, 'Coach', 'Lê Minh Khoa', 'coach.tabletennis1@gmail.com', '0902000117', 'Bình Tân, TP.HCM', 'Male', '1988-05-23'),
+(29, 'Coach', 'Hồ Bích Oanh', 'coach.tabletennis2@gmail.com', '0902000118', 'Quận 3, TP.HCM', 'Female', '1994-12-16'),
+(30, 'Receptionist', 'Nguyễn Thị Ngọc Anh', 'receptionist1@gmail.com', '0903000101', 'Bình Thạnh, TP.HCM', 'Female', '1998-06-14'),
+(31, 'Receptionist', 'Trần Minh Khôi', 'receptionist2@gmail.com', '0903000102', 'TP. Thủ Đức, TP.HCM', 'Male', '1997-09-22'),
+(32, 'CenterManager', 'Nguyễn Thành Đạt', 'manager1@gmail.com', '0904000101', 'Quận 7, TP.HCM', 'Male', '1988-04-18'),
+(33, 'CenterManager', 'Trần Ngọc Diệp', 'manager2@gmail.com', '0904000102', 'Quận 3, TP.HCM', 'Female', '1990-09-25');
+
+CREATE TEMP TABLE _scms_subjects(
+    ordinal INT PRIMARY KEY, name TEXT, slug TEXT, normal_price NUMERIC, advanced_price NUMERIC,
+    outdoor BOOLEAN, room_ordinal INT, coach_code TEXT
+) ON COMMIT DROP;
+INSERT INTO _scms_subjects VALUES
+(1, 'Tennis', 'quan-vot-tennis', 2500000, 8000000, TRUE, 1, 'tennis'),
+(2, 'Bơi lội', 'boi-loi', 1500000, 4500000, TRUE, 2, 'swimming'),
+(3, 'Pickleball', 'pickleball', 1800000, 5000000, FALSE, 3, 'pickleball'),
+(4, 'Bắn cung', 'ban-cung', 2000000, 6000000, TRUE, 4, 'archery'),
+(5, 'Bóng rổ', 'bong-ro', 1200000, 3500000, FALSE, 5, 'basketball'),
+(6, 'Bóng đá', 'bong-da', 1000000, 3500000, TRUE, 6, 'football'),
+(7, 'Bóng chuyền', 'bong-chuyen', 1000000, 3500000, FALSE, 13, 'volleyball'),
+(8, 'Cầu lông', 'cau-long', 900000, 3000000, FALSE, 7, 'badminton'),
+(9, 'Bóng bàn', 'bong-ban', 800000, 2500000, FALSE, 8, 'tabletennis');
+INSERT INTO users(user_id,role_id,full_name,email,phone,password_hash,address,gender,date_of_birth,status,center_id,is_first_login)
+SELECT a.ordinal,r.role_id,a.name,a.email,a.phone,crypt('SWP391',gen_salt('bf',10)),a.address,a.gender,a.birth,'Active',
+ CASE WHEN a.role_name='Admin' THEN NULL ELSE 1 END,FALSE
+FROM _scms_accounts a JOIN roles r ON r.role_name=a.role_name;
+INSERT INTO members(user_id,join_date) SELECT u.user_id,(clock_timestamp() AT TIME ZONE 'Asia/Ho_Chi_Minh')::date FROM users u JOIN roles r USING(role_id) WHERE r.role_name='Member';
+INSERT INTO coaches(user_id) SELECT u.user_id FROM users u JOIN roles r USING(role_id) WHERE r.role_name='Coach';
+INSERT INTO receptionists(user_id) SELECT u.user_id FROM users u JOIN roles r USING(role_id) WHERE r.role_name='Receptionist';
+INSERT INTO center_managers(user_id) SELECT u.user_id FROM users u JOIN roles r USING(role_id) WHERE r.role_name='CenterManager';
+INSERT INTO specializations(name,subject_id,status)
+SELECT x.name,s.subject_id,'Active' FROM _scms_subjects x JOIN subjects s USING(slug) ORDER BY x.ordinal;
+INSERT INTO coach_specializations(coach_id,specialization_id)
+SELECT u.user_id,sp.specialization_id FROM _scms_subjects x JOIN subjects s USING(slug)
+ JOIN specializations sp ON sp.subject_id=s.subject_id
+ JOIN users u ON u.email IN ('coach.'||x.coach_code||'1@gmail.com','coach.'||x.coach_code||'2@gmail.com');
+UPDATE coaches c SET specialization=x.name,bio='Huấn luyện viên demo môn '||x.name||'.'
+ FROM users u,_scms_subjects x WHERE c.user_id=u.user_id AND u.email IN ('coach.'||x.coach_code||'1@gmail.com','coach.'||x.coach_code||'2@gmail.com');
+-- Required by SessionService's subjectId lookup. These are unbooked templates, not purchased rights/classes.
+INSERT INTO classes(class_name,subject_id,max_capacity,tuition_fee,status,class_type,total_sessions,center_id,pricing_draft)
+SELECT x.name||' - Advanced (1:1)',s.subject_id,1,s.advanced_price,'Open','Advanced',12,1,FALSE
+ FROM _scms_subjects x JOIN subjects s USING(slug) ORDER BY x.ordinal;
+-- Published demo availability only; actual heat/holiday/conflict/credit checks remain in BE.
+INSERT INTO coach_work_schedules(coach_id,accepting_new) SELECT user_id,TRUE FROM coaches;
+INSERT INTO coach_work_slots(coach_id,slot_key)
+SELECT c.user_id,d.day||':'||slot FROM coaches c
+ CROSS JOIN (VALUES('MONDAY'),('TUESDAY'),('WEDNESDAY'),('THURSDAY'),('FRIDAY'),('SATURDAY'),('SUNDAY')) d(day)
+ CROSS JOIN generate_series(1,7) slot;
+
+
+-- SOURCE: database/bootstrap/scms_demo_scenarios.sql SHA256 04f73a8ef0aef12150605a00594e4727a89fc02e79d82917a534f952926545c6
+-- Approved synthetic demo fixture. Anchor 2026-11-10 Asia/Ho_Chi_Minh. No real bank/payment events.
+DO $anchor$ BEGIN IF CURRENT_DATE<>DATE '2026-11-10' THEN RAISE EXCEPTION 'SCMS_DEMO_STALE_ANCHOR: regenerate the bundle for the intended VN date'; END IF; END $anchor$;
+ALTER TABLE classes DISABLE TRIGGER trg_classes_validate;
+ALTER TABLE sessions DISABLE TRIGGER trg_sessions_validate;
+SELECT setval('invoice_code_seq',greatest((SELECT value FROM _scms_code_floor),(SELECT last_value FROM invoice_code_seq)),true);
+INSERT INTO users(user_id,role_id,full_name,email,password_hash,status,center_id,is_first_login) VALUES(34,(SELECT role_id FROM roles WHERE role_name='Member'),'Member Demo11','member11@scms.demo.invalid',extensions.crypt('SWP391',extensions.gen_salt('bf',10)),'Active',1,FALSE);
+INSERT INTO members(user_id,join_date) VALUES(34,'2026-11-10');
+INSERT INTO users(user_id,role_id,full_name,email,password_hash,status,center_id,is_first_login) VALUES(35,(SELECT role_id FROM roles WHERE role_name='Member'),'Member Demo12','member12@scms.demo.invalid',extensions.crypt('SWP391',extensions.gen_salt('bf',10)),'Active',1,FALSE);
+INSERT INTO members(user_id,join_date) VALUES(35,'2026-11-10');
+INSERT INTO users(user_id,role_id,full_name,email,password_hash,status,center_id,is_first_login) VALUES(36,(SELECT role_id FROM roles WHERE role_name='Member'),'Member Demo13','member13@scms.demo.invalid',extensions.crypt('SWP391',extensions.gen_salt('bf',10)),'Active',1,FALSE);
+INSERT INTO members(user_id,join_date) VALUES(36,'2026-11-10');
+INSERT INTO users(user_id,role_id,full_name,email,password_hash,status,center_id,is_first_login) VALUES(37,(SELECT role_id FROM roles WHERE role_name='Member'),'Member Demo14','member14@scms.demo.invalid',extensions.crypt('SWP391',extensions.gen_salt('bf',10)),'Active',1,FALSE);
+INSERT INTO members(user_id,join_date) VALUES(37,'2026-11-10');
+INSERT INTO users(user_id,role_id,full_name,email,password_hash,status,center_id,is_first_login) VALUES(38,(SELECT role_id FROM roles WHERE role_name='Member'),'Member Demo15','member15@scms.demo.invalid',extensions.crypt('SWP391',extensions.gen_salt('bf',10)),'Active',1,FALSE);
+INSERT INTO members(user_id,join_date) VALUES(38,'2026-11-10');
+INSERT INTO users(user_id,role_id,full_name,email,password_hash,status,center_id,is_first_login) VALUES(39,(SELECT role_id FROM roles WHERE role_name='Member'),'Member Demo16','member16@scms.demo.invalid',extensions.crypt('SWP391',extensions.gen_salt('bf',10)),'Active',1,FALSE);
+INSERT INTO members(user_id,join_date) VALUES(39,'2026-11-10');
+INSERT INTO users(user_id,role_id,full_name,email,password_hash,status,center_id,is_first_login) VALUES(40,(SELECT role_id FROM roles WHERE role_name='Member'),'Member Demo17','member17@scms.demo.invalid',extensions.crypt('SWP391',extensions.gen_salt('bf',10)),'Active',1,FALSE);
+INSERT INTO members(user_id,join_date) VALUES(40,'2026-11-10');
+INSERT INTO users(user_id,role_id,full_name,email,password_hash,status,center_id,is_first_login) VALUES(41,(SELECT role_id FROM roles WHERE role_name='Member'),'Member Demo18','member18@scms.demo.invalid',extensions.crypt('SWP391',extensions.gen_salt('bf',10)),'Active',1,FALSE);
+INSERT INTO members(user_id,join_date) VALUES(41,'2026-11-10');
+INSERT INTO users(user_id,role_id,full_name,email,password_hash,status,center_id,is_first_login) VALUES(42,(SELECT role_id FROM roles WHERE role_name='Member'),'Member Demo19','member19@scms.demo.invalid',extensions.crypt('SWP391',extensions.gen_salt('bf',10)),'Active',1,FALSE);
+INSERT INTO members(user_id,join_date) VALUES(42,'2026-11-10');
+INSERT INTO users(user_id,role_id,full_name,email,password_hash,status,center_id,is_first_login) VALUES(43,(SELECT role_id FROM roles WHERE role_name='Member'),'Member Demo20','member20@scms.demo.invalid',extensions.crypt('SWP391',extensions.gen_salt('bf',10)),'Active',1,FALSE);
+INSERT INTO members(user_id,join_date) VALUES(43,'2026-11-10');
+INSERT INTO users(user_id,role_id,full_name,email,password_hash,status,center_id,is_first_login) VALUES(44,(SELECT role_id FROM roles WHERE role_name='Member'),'Demo Inactive Member','member.inactive@scms.demo.invalid',extensions.crypt('SWP391',extensions.gen_salt('bf',10)),'Inactive',1,FALSE);
+INSERT INTO members(user_id,join_date) VALUES(44,'2026-11-10');
+INSERT INTO users(user_id,role_id,full_name,email,password_hash,status,center_id,is_first_login) VALUES(45,(SELECT role_id FROM roles WHERE role_name='Member'),'Demo Locked Member','member.locked@scms.demo.invalid',extensions.crypt('SWP391',extensions.gen_salt('bf',10)),'Locked',1,FALSE);
+INSERT INTO members(user_id,join_date) VALUES(45,'2026-11-10');
+INSERT INTO users(user_id,role_id,full_name,email,password_hash,status,center_id,is_first_login) VALUES(46,(SELECT role_id FROM roles WHERE role_name='Member'),'Demo Pending Member','member.pending@scms.demo.invalid',extensions.crypt('SWP391',extensions.gen_salt('bf',10)),'Pending',1,FALSE);
+INSERT INTO members(user_id,join_date) VALUES(46,'2026-11-10');
+INSERT INTO users(user_id,role_id,full_name,email,password_hash,status,center_id,is_first_login) VALUES(47,(SELECT role_id FROM roles WHERE role_name='Coach'),'Demo Inactive Coach','coach.inactive@scms.demo.invalid',extensions.crypt('SWP391',extensions.gen_salt('bf',10)),'Inactive',1,FALSE);
+INSERT INTO coaches(user_id) VALUES(47);
+INSERT INTO coach_specializations(coach_id,specialization_id) SELECT 47,specialization_id FROM specializations WHERE subject_id=(SELECT subject_id FROM subjects WHERE slug='cau-long');
+DELETE FROM coach_work_slots WHERE slot_key LIKE 'SUNDAY:%';
+INSERT INTO holidays(holiday_date,holiday_name,tag,is_active) VALUES('2026-12-30','DEMO trung tâm đóng cửa','CENTER_EVENT',TRUE);
+INSERT INTO coach_days_off(coach_id,day_off) VALUES(17,'2027-01-09');
+INSERT INTO classes(class_id,class_name,subject_id,coach_id,max_capacity,min_capacity,tuition_fee,status,class_type,total_sessions,center_id,pricing_draft,start_date,end_date,opening_confirmed_by,opening_confirmed_at,opening_reason,postponement_count,lifecycle_version,change_pending) VALUES(10,'Cầu lông Normal N01',(SELECT subject_id FROM subjects WHERE slug='cau-long'),26,4,3,900000,'Open','Normal',12,1,FALSE,'2026-11-18','2026-12-14',NULL,NULL,NULL,0,0,FALSE);
+INSERT INTO classes(class_id,class_name,subject_id,coach_id,max_capacity,min_capacity,tuition_fee,status,class_type,total_sessions,center_id,pricing_draft,start_date,end_date,opening_confirmed_by,opening_confirmed_at,opening_reason,postponement_count,lifecycle_version,change_pending) VALUES(11,'Tennis Normal N02',(SELECT subject_id FROM subjects WHERE slug='quan-vot-tennis'),12,4,3,2500000,'Open','Normal',12,1,FALSE,'2026-11-11','2026-12-07',NULL,NULL,NULL,0,0,FALSE);
+INSERT INTO classes(class_id,class_name,subject_id,coach_id,max_capacity,min_capacity,tuition_fee,status,class_type,total_sessions,center_id,pricing_draft,start_date,end_date,opening_confirmed_by,opening_confirmed_at,opening_reason,postponement_count,lifecycle_version,change_pending) VALUES(12,'Bơi lội Normal N03',(SELECT subject_id FROM subjects WHERE slug='boi-loi'),14,10,7,1500000,'Open','Normal',12,1,FALSE,'2026-11-11','2026-12-05',NULL,NULL,NULL,0,0,FALSE);
+INSERT INTO classes(class_id,class_name,subject_id,coach_id,max_capacity,min_capacity,tuition_fee,status,class_type,total_sessions,center_id,pricing_draft,start_date,end_date,opening_confirmed_by,opening_confirmed_at,opening_reason,postponement_count,lifecycle_version,change_pending) VALUES(13,'Bắn cung Normal N04',(SELECT subject_id FROM subjects WHERE slug='ban-cung'),18,5,4,2000000,'Open','Normal',12,1,FALSE,'2026-11-18','2026-12-14',NULL,NULL,NULL,1,1,FALSE);
+INSERT INTO classes(class_id,class_name,subject_id,coach_id,max_capacity,min_capacity,tuition_fee,status,class_type,total_sessions,center_id,pricing_draft,start_date,end_date,opening_confirmed_by,opening_confirmed_at,opening_reason,postponement_count,lifecycle_version,change_pending) VALUES(14,'Pickleball Normal N05',(SELECT subject_id FROM subjects WHERE slug='pickleball'),16,4,3,1800000,'Open','Normal',12,1,FALSE,'2026-11-17','2026-12-12',NULL,NULL,NULL,0,1,TRUE);
+INSERT INTO classes(class_id,class_name,subject_id,coach_id,max_capacity,min_capacity,tuition_fee,status,class_type,total_sessions,center_id,pricing_draft,start_date,end_date,opening_confirmed_by,opening_confirmed_at,opening_reason,postponement_count,lifecycle_version,change_pending) VALUES(15,'Bóng rổ Normal N06',(SELECT subject_id FROM subjects WHERE slug='bong-ro'),20,8,6,1200000,'Cancelled','Normal',12,1,FALSE,'2026-11-18','2026-12-14',NULL,NULL,NULL,0,1,FALSE);
+INSERT INTO classes(class_id,class_name,subject_id,coach_id,max_capacity,min_capacity,tuition_fee,status,class_type,total_sessions,center_id,pricing_draft,start_date,end_date,opening_confirmed_by,opening_confirmed_at,opening_reason,postponement_count,lifecycle_version,change_pending) VALUES(16,'Bóng đá Normal N07',(SELECT subject_id FROM subjects WHERE slug='bong-da'),22,15,10,1000000,'Open','Normal',12,1,FALSE,'2026-11-19','2026-12-15',NULL,NULL,NULL,0,0,FALSE);
+INSERT INTO classes(class_id,class_name,subject_id,coach_id,max_capacity,min_capacity,tuition_fee,status,class_type,total_sessions,center_id,pricing_draft,start_date,end_date,opening_confirmed_by,opening_confirmed_at,opening_reason,postponement_count,lifecycle_version,change_pending) VALUES(17,'Bóng chuyền Normal N08',(SELECT subject_id FROM subjects WHERE slug='bong-chuyen'),24,8,6,1000000,'Ongoing','Normal',12,1,FALSE,'2026-10-31','2026-11-26',32,'2026-10-29T13:00:00','DEMO confirmed opening',0,1,FALSE);
+INSERT INTO classes(class_id,class_name,subject_id,coach_id,max_capacity,min_capacity,tuition_fee,status,class_type,total_sessions,center_id,pricing_draft,start_date,end_date,opening_confirmed_by,opening_confirmed_at,opening_reason,postponement_count,lifecycle_version,change_pending) VALUES(18,'Bóng bàn Normal N09',(SELECT subject_id FROM subjects WHERE slug='bong-ban'),28,2,2,800000,'Closed','Normal',12,1,FALSE,'2026-09-21','2026-10-16',32,'2026-09-19T14:45:00','DEMO confirmed opening',0,1,FALSE);
+INSERT INTO classes(class_id,class_name,subject_id,coach_id,max_capacity,min_capacity,tuition_fee,status,class_type,total_sessions,center_id,pricing_draft,start_date,end_date,opening_confirmed_by,opening_confirmed_at,opening_reason,postponement_count,lifecycle_version,change_pending) VALUES(19,'Cầu lông Normal N10',(SELECT subject_id FROM subjects WHERE slug='cau-long'),26,4,3,900000,'Ongoing','Normal',12,1,FALSE,'2026-10-22','2026-11-25',32,'2026-10-20T14:45:00','DEMO confirmed opening',0,1,FALSE);
+INSERT INTO classes(class_id,class_name,subject_id,coach_id,max_capacity,min_capacity,tuition_fee,status,class_type,total_sessions,center_id,pricing_draft,start_date,end_date,opening_confirmed_by,opening_confirmed_at,opening_reason,postponement_count,lifecycle_version,change_pending) VALUES(20,'Pickleball Normal N11',(SELECT subject_id FROM subjects WHERE slug='pickleball'),17,4,3,1800000,'Open','Normal',12,1,FALSE,'2026-11-18','2026-12-14',NULL,NULL,NULL,0,0,FALSE);
+INSERT INTO classes(class_id,class_name,subject_id,coach_id,max_capacity,min_capacity,tuition_fee,status,class_type,total_sessions,center_id,pricing_draft,start_date,end_date,opening_confirmed_by,opening_confirmed_at,opening_reason,postponement_count,lifecycle_version,change_pending) VALUES(21,'Cầu lông Normal N12',(SELECT subject_id FROM subjects WHERE slug='cau-long'),26,4,3,900000,'Cancelled','Normal',12,1,FALSE,'2026-10-22','2026-11-17',NULL,NULL,NULL,0,1,FALSE);
+INSERT INTO member_packages(subscription_id,member_id,subject_id,primary_coach_id,start_date,end_date,remaining_credit,validity_days,status,purchase_amount,activated_at,expires_at,expiry_revoked_credit,expiry_processed_at) VALUES(1,3,(SELECT subject_id FROM subjects WHERE slug='quan-vot-tennis'),12,'2026-11-06','2026-12-21',12,45,'Active',8000000,'2026-11-06T08:00','2026-12-21T08:00',0,NULL);
+INSERT INTO member_packages(subscription_id,member_id,subject_id,primary_coach_id,start_date,end_date,remaining_credit,validity_days,status,purchase_amount,activated_at,expires_at,expiry_revoked_credit,expiry_processed_at) VALUES(2,4,(SELECT subject_id FROM subjects WHERE slug='quan-vot-tennis'),12,'2026-11-05','2026-12-20',10,45,'Active',8000000,'2026-11-05T08:00','2026-12-20T08:00',0,NULL);
+INSERT INTO member_packages(subscription_id,member_id,subject_id,primary_coach_id,start_date,end_date,remaining_credit,validity_days,status,purchase_amount,activated_at,expires_at,expiry_revoked_credit,expiry_processed_at) VALUES(3,5,(SELECT subject_id FROM subjects WHERE slug='cau-long'),26,'2026-11-04','2026-12-19',0,45,'Active',3000000,'2026-11-04T08:00','2026-12-19T08:00',0,NULL);
+INSERT INTO member_packages(subscription_id,member_id,subject_id,primary_coach_id,start_date,end_date,remaining_credit,validity_days,status,purchase_amount,activated_at,expires_at,expiry_revoked_credit,expiry_processed_at) VALUES(4,6,(SELECT subject_id FROM subjects WHERE slug='quan-vot-tennis'),12,'2026-10-01','2026-11-15',0,45,'Completed',8000000,'2026-10-01T08:00','2026-11-15T08:00',0,NULL);
+INSERT INTO member_packages(subscription_id,member_id,subject_id,primary_coach_id,start_date,end_date,remaining_credit,validity_days,status,purchase_amount,activated_at,expires_at,expiry_revoked_credit,expiry_processed_at) VALUES(5,7,(SELECT subject_id FROM subjects WHERE slug='quan-vot-tennis'),12,'2026-09-01','2026-10-16',0,45,'Expired',8000000,'2026-09-01T08:00','2026-10-16T08:00',10,'2026-10-16T08:00');
+INSERT INTO member_packages(subscription_id,member_id,subject_id,primary_coach_id,start_date,end_date,remaining_credit,validity_days,status,purchase_amount,activated_at,expires_at,expiry_revoked_credit,expiry_processed_at) VALUES(6,8,(SELECT subject_id FROM subjects WHERE slug='cau-long'),26,'2026-11-08','2026-12-23',12,45,'Active',3000000,'2026-11-08T08:00','2026-12-23T08:00',0,NULL);
+INSERT INTO member_packages(subscription_id,member_id,subject_id,primary_coach_id,start_date,end_date,remaining_credit,validity_days,status,purchase_amount,activated_at,expires_at,expiry_revoked_credit,expiry_processed_at) VALUES(7,9,(SELECT subject_id FROM subjects WHERE slug='boi-loi'),14,'2026-11-07','2026-12-22',0,45,'Cancelled',4500000,NULL,NULL,0,NULL);
+INSERT INTO invoices(invoice_id,member_id,class_id,subscription_id,amount,invoice_code,payment_method,payment_status,created_at,payment_date,expires_at,receptionist_id,reconciliation_required,cash_confirmation_reversed,gateway_transaction_ref) VALUES(1,2,10,NULL,900000,'INV-'||extract(year FROM DATE '2026-11-10')::int||'-'||nextval('invoice_code_seq'),'Cash','Paid','2026-11-03T08:00','2026-11-03T08:01',NULL,30,FALSE,FALSE,NULL);
+INSERT INTO invoices(invoice_id,member_id,class_id,subscription_id,amount,invoice_code,payment_method,payment_status,created_at,payment_date,expires_at,receptionist_id,reconciliation_required,cash_confirmation_reversed,gateway_transaction_ref) VALUES(2,5,11,NULL,2500000,'INV-'||extract(year FROM DATE '2026-11-10')::int||'-'||nextval('invoice_code_seq'),'Cash','Paid','2026-11-03T08:00','2026-11-03T08:01',NULL,30,FALSE,FALSE,NULL);
+INSERT INTO invoices(invoice_id,member_id,class_id,subscription_id,amount,invoice_code,payment_method,payment_status,created_at,payment_date,expires_at,receptionist_id,reconciliation_required,cash_confirmation_reversed,gateway_transaction_ref) VALUES(3,6,11,NULL,2500000,'INV-'||extract(year FROM DATE '2026-11-10')::int||'-'||nextval('invoice_code_seq'),'Cash','Paid','2026-11-03T08:00','2026-11-03T08:01',NULL,30,FALSE,FALSE,NULL);
+INSERT INTO invoices(invoice_id,member_id,class_id,subscription_id,amount,invoice_code,payment_method,payment_status,created_at,payment_date,expires_at,receptionist_id,reconciliation_required,cash_confirmation_reversed,gateway_transaction_ref) VALUES(4,7,11,NULL,2500000,'INV-'||extract(year FROM DATE '2026-11-10')::int||'-'||nextval('invoice_code_seq'),'Cash','Paid','2026-11-03T08:00','2026-11-03T08:01',NULL,30,FALSE,FALSE,NULL);
+INSERT INTO invoices(invoice_id,member_id,class_id,subscription_id,amount,invoice_code,payment_method,payment_status,created_at,payment_date,expires_at,receptionist_id,reconciliation_required,cash_confirmation_reversed,gateway_transaction_ref) VALUES(5,8,12,NULL,1500000,'INV-'||extract(year FROM DATE '2026-11-10')::int||'-'||nextval('invoice_code_seq'),'Cash','Paid','2026-11-03T08:00','2026-11-03T08:01',NULL,30,FALSE,FALSE,NULL);
+INSERT INTO invoices(invoice_id,member_id,class_id,subscription_id,amount,invoice_code,payment_method,payment_status,created_at,payment_date,expires_at,receptionist_id,reconciliation_required,cash_confirmation_reversed,gateway_transaction_ref) VALUES(6,9,12,NULL,1500000,'INV-'||extract(year FROM DATE '2026-11-10')::int||'-'||nextval('invoice_code_seq'),'Cash','Paid','2026-11-03T08:00','2026-11-03T08:01',NULL,30,FALSE,FALSE,NULL);
+INSERT INTO invoices(invoice_id,member_id,class_id,subscription_id,amount,invoice_code,payment_method,payment_status,created_at,payment_date,expires_at,receptionist_id,reconciliation_required,cash_confirmation_reversed,gateway_transaction_ref) VALUES(7,10,12,NULL,1500000,'INV-'||extract(year FROM DATE '2026-11-10')::int||'-'||nextval('invoice_code_seq'),'Cash','Paid','2026-11-03T08:00','2026-11-03T08:01',NULL,30,FALSE,FALSE,NULL);
+INSERT INTO invoices(invoice_id,member_id,class_id,subscription_id,amount,invoice_code,payment_method,payment_status,created_at,payment_date,expires_at,receptionist_id,reconciliation_required,cash_confirmation_reversed,gateway_transaction_ref) VALUES(8,11,12,NULL,1500000,'INV-'||extract(year FROM DATE '2026-11-10')::int||'-'||nextval('invoice_code_seq'),'Cash','Paid','2026-11-03T08:00','2026-11-03T08:01',NULL,30,FALSE,FALSE,NULL);
+INSERT INTO invoices(invoice_id,member_id,class_id,subscription_id,amount,invoice_code,payment_method,payment_status,created_at,payment_date,expires_at,receptionist_id,reconciliation_required,cash_confirmation_reversed,gateway_transaction_ref) VALUES(9,34,12,NULL,1500000,'INV-'||extract(year FROM DATE '2026-11-10')::int||'-'||nextval('invoice_code_seq'),'Cash','Paid','2026-11-03T08:00','2026-11-03T08:01',NULL,30,FALSE,FALSE,NULL);
+INSERT INTO invoices(invoice_id,member_id,class_id,subscription_id,amount,invoice_code,payment_method,payment_status,created_at,payment_date,expires_at,receptionist_id,reconciliation_required,cash_confirmation_reversed,gateway_transaction_ref) VALUES(10,35,12,NULL,1500000,'INV-'||extract(year FROM DATE '2026-11-10')::int||'-'||nextval('invoice_code_seq'),'Cash','Paid','2026-11-03T08:00','2026-11-03T08:01',NULL,30,FALSE,FALSE,NULL);
+INSERT INTO invoices(invoice_id,member_id,class_id,subscription_id,amount,invoice_code,payment_method,payment_status,created_at,payment_date,expires_at,receptionist_id,reconciliation_required,cash_confirmation_reversed,gateway_transaction_ref) VALUES(11,2,13,NULL,2000000,'INV-'||extract(year FROM DATE '2026-11-10')::int||'-'||nextval('invoice_code_seq'),'Cash','Paid','2026-11-03T08:00','2026-11-03T08:01',NULL,30,FALSE,FALSE,NULL);
+INSERT INTO invoices(invoice_id,member_id,class_id,subscription_id,amount,invoice_code,payment_method,payment_status,created_at,payment_date,expires_at,receptionist_id,reconciliation_required,cash_confirmation_reversed,gateway_transaction_ref) VALUES(12,3,13,NULL,2000000,'INV-'||extract(year FROM DATE '2026-11-10')::int||'-'||nextval('invoice_code_seq'),'Cash','Paid','2026-11-03T08:00','2026-11-03T08:01',NULL,30,FALSE,FALSE,NULL);
+INSERT INTO invoices(invoice_id,member_id,class_id,subscription_id,amount,invoice_code,payment_method,payment_status,created_at,payment_date,expires_at,receptionist_id,reconciliation_required,cash_confirmation_reversed,gateway_transaction_ref) VALUES(13,4,13,NULL,2000000,'INV-'||extract(year FROM DATE '2026-11-10')::int||'-'||nextval('invoice_code_seq'),'Cash','Paid','2026-11-03T08:00','2026-11-03T08:01',NULL,30,FALSE,FALSE,NULL);
+INSERT INTO invoices(invoice_id,member_id,class_id,subscription_id,amount,invoice_code,payment_method,payment_status,created_at,payment_date,expires_at,receptionist_id,reconciliation_required,cash_confirmation_reversed,gateway_transaction_ref) VALUES(14,2,14,NULL,1800000,'INV-'||extract(year FROM DATE '2026-11-10')::int||'-'||nextval('invoice_code_seq'),'Cash','Paid','2026-11-03T08:00','2026-11-03T08:01',NULL,30,FALSE,FALSE,NULL);
+INSERT INTO invoices(invoice_id,member_id,class_id,subscription_id,amount,invoice_code,payment_method,payment_status,created_at,payment_date,expires_at,receptionist_id,reconciliation_required,cash_confirmation_reversed,gateway_transaction_ref) VALUES(15,3,14,NULL,1800000,'INV-'||extract(year FROM DATE '2026-11-10')::int||'-'||nextval('invoice_code_seq'),'Cash','Paid','2026-11-03T08:00','2026-11-03T08:01',NULL,30,FALSE,FALSE,NULL);
+INSERT INTO invoices(invoice_id,member_id,class_id,subscription_id,amount,invoice_code,payment_method,payment_status,created_at,payment_date,expires_at,receptionist_id,reconciliation_required,cash_confirmation_reversed,gateway_transaction_ref) VALUES(16,4,14,NULL,1800000,'INV-'||extract(year FROM DATE '2026-11-10')::int||'-'||nextval('invoice_code_seq'),'Cash','Paid','2026-11-03T08:00','2026-11-03T08:01',NULL,30,FALSE,FALSE,NULL);
+INSERT INTO invoices(invoice_id,member_id,class_id,subscription_id,amount,invoice_code,payment_method,payment_status,created_at,payment_date,expires_at,receptionist_id,reconciliation_required,cash_confirmation_reversed,gateway_transaction_ref) VALUES(17,5,15,NULL,1200000,'INV-'||extract(year FROM DATE '2026-11-10')::int||'-'||nextval('invoice_code_seq'),'Cash','Paid','2026-11-03T08:00','2026-11-03T08:01',NULL,30,FALSE,FALSE,NULL);
+INSERT INTO invoices(invoice_id,member_id,class_id,subscription_id,amount,invoice_code,payment_method,payment_status,created_at,payment_date,expires_at,receptionist_id,reconciliation_required,cash_confirmation_reversed,gateway_transaction_ref) VALUES(18,6,15,NULL,1200000,'INV-'||extract(year FROM DATE '2026-11-10')::int||'-'||nextval('invoice_code_seq'),'Cash','Paid','2026-11-03T08:00','2026-11-03T08:01',NULL,30,FALSE,FALSE,NULL);
+INSERT INTO invoices(invoice_id,member_id,class_id,subscription_id,amount,invoice_code,payment_method,payment_status,created_at,payment_date,expires_at,receptionist_id,reconciliation_required,cash_confirmation_reversed,gateway_transaction_ref) VALUES(19,7,15,NULL,1200000,'INV-'||extract(year FROM DATE '2026-11-10')::int||'-'||nextval('invoice_code_seq'),'Cash','Paid','2026-11-03T08:00','2026-11-03T08:01',NULL,30,FALSE,FALSE,NULL);
+INSERT INTO invoices(invoice_id,member_id,class_id,subscription_id,amount,invoice_code,payment_method,payment_status,created_at,payment_date,expires_at,receptionist_id,reconciliation_required,cash_confirmation_reversed,gateway_transaction_ref) VALUES(20,8,16,NULL,1000000,'INV-'||extract(year FROM DATE '2026-11-10')::int||'-'||nextval('invoice_code_seq'),'Cash','Paid','2026-11-03T08:00','2026-11-03T08:01',NULL,30,FALSE,FALSE,NULL);
+INSERT INTO invoices(invoice_id,member_id,class_id,subscription_id,amount,invoice_code,payment_method,payment_status,created_at,payment_date,expires_at,receptionist_id,reconciliation_required,cash_confirmation_reversed,gateway_transaction_ref) VALUES(21,9,16,NULL,1000000,'INV-'||extract(year FROM DATE '2026-11-10')::int||'-'||nextval('invoice_code_seq'),'Cash','Paid','2026-11-03T08:00','2026-11-03T08:01',NULL,30,FALSE,FALSE,NULL);
+INSERT INTO invoices(invoice_id,member_id,class_id,subscription_id,amount,invoice_code,payment_method,payment_status,created_at,payment_date,expires_at,receptionist_id,reconciliation_required,cash_confirmation_reversed,gateway_transaction_ref) VALUES(22,10,16,NULL,1000000,'INV-'||extract(year FROM DATE '2026-11-10')::int||'-'||nextval('invoice_code_seq'),'Cash','Paid','2026-11-03T08:00','2026-11-03T08:01',NULL,30,FALSE,FALSE,NULL);
+INSERT INTO invoices(invoice_id,member_id,class_id,subscription_id,amount,invoice_code,payment_method,payment_status,created_at,payment_date,expires_at,receptionist_id,reconciliation_required,cash_confirmation_reversed,gateway_transaction_ref) VALUES(23,11,16,NULL,1000000,'INV-'||extract(year FROM DATE '2026-11-10')::int||'-'||nextval('invoice_code_seq'),'Cash','Paid','2026-11-03T08:00','2026-11-03T08:01',NULL,30,FALSE,FALSE,NULL);
+INSERT INTO invoices(invoice_id,member_id,class_id,subscription_id,amount,invoice_code,payment_method,payment_status,created_at,payment_date,expires_at,receptionist_id,reconciliation_required,cash_confirmation_reversed,gateway_transaction_ref) VALUES(24,34,16,NULL,1000000,'INV-'||extract(year FROM DATE '2026-11-10')::int||'-'||nextval('invoice_code_seq'),'Cash','Paid','2026-11-03T08:00','2026-11-03T08:01',NULL,30,FALSE,FALSE,NULL);
+INSERT INTO invoices(invoice_id,member_id,class_id,subscription_id,amount,invoice_code,payment_method,payment_status,created_at,payment_date,expires_at,receptionist_id,reconciliation_required,cash_confirmation_reversed,gateway_transaction_ref) VALUES(25,35,16,NULL,1000000,'INV-'||extract(year FROM DATE '2026-11-10')::int||'-'||nextval('invoice_code_seq'),'Cash','Paid','2026-11-03T08:00','2026-11-03T08:01',NULL,30,FALSE,FALSE,NULL);
+INSERT INTO invoices(invoice_id,member_id,class_id,subscription_id,amount,invoice_code,payment_method,payment_status,created_at,payment_date,expires_at,receptionist_id,reconciliation_required,cash_confirmation_reversed,gateway_transaction_ref) VALUES(26,36,16,NULL,1000000,'INV-'||extract(year FROM DATE '2026-11-10')::int||'-'||nextval('invoice_code_seq'),'Cash','Paid','2026-11-03T08:00','2026-11-03T08:01',NULL,30,FALSE,FALSE,NULL);
+INSERT INTO invoices(invoice_id,member_id,class_id,subscription_id,amount,invoice_code,payment_method,payment_status,created_at,payment_date,expires_at,receptionist_id,reconciliation_required,cash_confirmation_reversed,gateway_transaction_ref) VALUES(27,37,16,NULL,1000000,'INV-'||extract(year FROM DATE '2026-11-10')::int||'-'||nextval('invoice_code_seq'),'Cash','Paid','2026-11-03T08:00','2026-11-03T08:01',NULL,30,FALSE,FALSE,NULL);
+INSERT INTO invoices(invoice_id,member_id,class_id,subscription_id,amount,invoice_code,payment_method,payment_status,created_at,payment_date,expires_at,receptionist_id,reconciliation_required,cash_confirmation_reversed,gateway_transaction_ref) VALUES(28,38,16,NULL,1000000,'INV-'||extract(year FROM DATE '2026-11-10')::int||'-'||nextval('invoice_code_seq'),'Cash','Paid','2026-11-03T08:00','2026-11-03T08:01',NULL,30,FALSE,FALSE,NULL);
+INSERT INTO invoices(invoice_id,member_id,class_id,subscription_id,amount,invoice_code,payment_method,payment_status,created_at,payment_date,expires_at,receptionist_id,reconciliation_required,cash_confirmation_reversed,gateway_transaction_ref) VALUES(29,39,16,NULL,1000000,'INV-'||extract(year FROM DATE '2026-11-10')::int||'-'||nextval('invoice_code_seq'),'Cash','Paid','2026-11-03T08:00','2026-11-03T08:01',NULL,30,FALSE,FALSE,NULL);
+INSERT INTO invoices(invoice_id,member_id,class_id,subscription_id,amount,invoice_code,payment_method,payment_status,created_at,payment_date,expires_at,receptionist_id,reconciliation_required,cash_confirmation_reversed,gateway_transaction_ref) VALUES(30,40,16,NULL,1000000,'INV-'||extract(year FROM DATE '2026-11-10')::int||'-'||nextval('invoice_code_seq'),'Cash','Paid','2026-11-03T08:00','2026-11-03T08:01',NULL,30,FALSE,FALSE,NULL);
+INSERT INTO invoices(invoice_id,member_id,class_id,subscription_id,amount,invoice_code,payment_method,payment_status,created_at,payment_date,expires_at,receptionist_id,reconciliation_required,cash_confirmation_reversed,gateway_transaction_ref) VALUES(31,41,16,NULL,1000000,'INV-'||extract(year FROM DATE '2026-11-10')::int||'-'||nextval('invoice_code_seq'),'Cash','Paid','2026-11-03T08:00','2026-11-03T08:01',NULL,30,FALSE,FALSE,NULL);
+INSERT INTO invoices(invoice_id,member_id,class_id,subscription_id,amount,invoice_code,payment_method,payment_status,created_at,payment_date,expires_at,receptionist_id,reconciliation_required,cash_confirmation_reversed,gateway_transaction_ref) VALUES(32,42,16,NULL,1000000,'INV-'||extract(year FROM DATE '2026-11-10')::int||'-'||nextval('invoice_code_seq'),'Cash','Paid','2026-11-03T08:00','2026-11-03T08:01',NULL,30,FALSE,FALSE,NULL);
+INSERT INTO invoices(invoice_id,member_id,class_id,subscription_id,amount,invoice_code,payment_method,payment_status,created_at,payment_date,expires_at,receptionist_id,reconciliation_required,cash_confirmation_reversed,gateway_transaction_ref) VALUES(33,43,16,NULL,1000000,'INV-'||extract(year FROM DATE '2026-11-10')::int||'-'||nextval('invoice_code_seq'),'Cash','Paid','2026-11-03T08:00','2026-11-03T08:01',NULL,30,FALSE,FALSE,NULL);
+INSERT INTO invoices(invoice_id,member_id,class_id,subscription_id,amount,invoice_code,payment_method,payment_status,created_at,payment_date,expires_at,receptionist_id,reconciliation_required,cash_confirmation_reversed,gateway_transaction_ref) VALUES(34,2,17,NULL,1000000,'INV-'||extract(year FROM DATE '2026-11-10')::int||'-'||nextval('invoice_code_seq'),'Cash','Paid','2026-10-24T08:00','2026-10-24T08:01',NULL,30,FALSE,FALSE,NULL);
+INSERT INTO invoices(invoice_id,member_id,class_id,subscription_id,amount,invoice_code,payment_method,payment_status,created_at,payment_date,expires_at,receptionist_id,reconciliation_required,cash_confirmation_reversed,gateway_transaction_ref) VALUES(35,3,17,NULL,1000000,'INV-'||extract(year FROM DATE '2026-11-10')::int||'-'||nextval('invoice_code_seq'),'Cash','Paid','2026-10-24T08:00','2026-10-24T08:01',NULL,30,FALSE,FALSE,NULL);
+INSERT INTO invoices(invoice_id,member_id,class_id,subscription_id,amount,invoice_code,payment_method,payment_status,created_at,payment_date,expires_at,receptionist_id,reconciliation_required,cash_confirmation_reversed,gateway_transaction_ref) VALUES(36,4,17,NULL,1000000,'INV-'||extract(year FROM DATE '2026-11-10')::int||'-'||nextval('invoice_code_seq'),'Cash','Paid','2026-10-24T08:00','2026-10-24T08:01',NULL,30,FALSE,FALSE,NULL);
+INSERT INTO invoices(invoice_id,member_id,class_id,subscription_id,amount,invoice_code,payment_method,payment_status,created_at,payment_date,expires_at,receptionist_id,reconciliation_required,cash_confirmation_reversed,gateway_transaction_ref) VALUES(37,5,17,NULL,1000000,'INV-'||extract(year FROM DATE '2026-11-10')::int||'-'||nextval('invoice_code_seq'),'Cash','Paid','2026-10-24T08:00','2026-10-24T08:01',NULL,30,FALSE,FALSE,NULL);
+INSERT INTO invoices(invoice_id,member_id,class_id,subscription_id,amount,invoice_code,payment_method,payment_status,created_at,payment_date,expires_at,receptionist_id,reconciliation_required,cash_confirmation_reversed,gateway_transaction_ref) VALUES(38,6,17,NULL,1000000,'INV-'||extract(year FROM DATE '2026-11-10')::int||'-'||nextval('invoice_code_seq'),'Cash','Paid','2026-10-24T08:00','2026-10-24T08:01',NULL,30,FALSE,FALSE,NULL);
+INSERT INTO invoices(invoice_id,member_id,class_id,subscription_id,amount,invoice_code,payment_method,payment_status,created_at,payment_date,expires_at,receptionist_id,reconciliation_required,cash_confirmation_reversed,gateway_transaction_ref) VALUES(39,7,17,NULL,1000000,'INV-'||extract(year FROM DATE '2026-11-10')::int||'-'||nextval('invoice_code_seq'),'Cash','Paid','2026-10-24T08:00','2026-10-24T08:01',NULL,30,FALSE,FALSE,NULL);
+INSERT INTO invoices(invoice_id,member_id,class_id,subscription_id,amount,invoice_code,payment_method,payment_status,created_at,payment_date,expires_at,receptionist_id,reconciliation_required,cash_confirmation_reversed,gateway_transaction_ref) VALUES(40,2,18,NULL,800000,'INV-'||extract(year FROM DATE '2026-11-10')::int||'-'||nextval('invoice_code_seq'),'Cash','Paid','2026-09-14T08:00','2026-09-14T08:01',NULL,30,FALSE,FALSE,NULL);
+INSERT INTO invoices(invoice_id,member_id,class_id,subscription_id,amount,invoice_code,payment_method,payment_status,created_at,payment_date,expires_at,receptionist_id,reconciliation_required,cash_confirmation_reversed,gateway_transaction_ref) VALUES(41,3,18,NULL,800000,'INV-'||extract(year FROM DATE '2026-11-10')::int||'-'||nextval('invoice_code_seq'),'Cash','Paid','2026-09-14T08:00','2026-09-14T08:01',NULL,30,FALSE,FALSE,NULL);
+INSERT INTO invoices(invoice_id,member_id,class_id,subscription_id,amount,invoice_code,payment_method,payment_status,created_at,payment_date,expires_at,receptionist_id,reconciliation_required,cash_confirmation_reversed,gateway_transaction_ref) VALUES(42,2,19,NULL,900000,'INV-'||extract(year FROM DATE '2026-11-10')::int||'-'||nextval('invoice_code_seq'),'Cash','Paid','2026-10-15T08:00','2026-10-15T08:01',NULL,30,FALSE,FALSE,NULL);
+INSERT INTO invoices(invoice_id,member_id,class_id,subscription_id,amount,invoice_code,payment_method,payment_status,created_at,payment_date,expires_at,receptionist_id,reconciliation_required,cash_confirmation_reversed,gateway_transaction_ref) VALUES(43,3,19,NULL,900000,'INV-'||extract(year FROM DATE '2026-11-10')::int||'-'||nextval('invoice_code_seq'),'Cash','Paid','2026-10-15T08:00','2026-10-15T08:01',NULL,30,FALSE,FALSE,NULL);
+INSERT INTO invoices(invoice_id,member_id,class_id,subscription_id,amount,invoice_code,payment_method,payment_status,created_at,payment_date,expires_at,receptionist_id,reconciliation_required,cash_confirmation_reversed,gateway_transaction_ref) VALUES(44,4,19,NULL,900000,'INV-'||extract(year FROM DATE '2026-11-10')::int||'-'||nextval('invoice_code_seq'),'Cash','Paid','2026-10-15T08:00','2026-10-15T08:01',NULL,30,FALSE,FALSE,NULL);
+INSERT INTO invoices(invoice_id,member_id,class_id,subscription_id,amount,invoice_code,payment_method,payment_status,created_at,payment_date,expires_at,receptionist_id,reconciliation_required,cash_confirmation_reversed,gateway_transaction_ref) VALUES(45,34,20,NULL,1800000,'INV-'||extract(year FROM DATE '2026-11-10')::int||'-'||nextval('invoice_code_seq'),'Cash','Paid','2026-11-03T08:00','2026-11-03T08:01',NULL,30,FALSE,FALSE,NULL);
+INSERT INTO invoices(invoice_id,member_id,class_id,subscription_id,amount,invoice_code,payment_method,payment_status,created_at,payment_date,expires_at,receptionist_id,reconciliation_required,cash_confirmation_reversed,gateway_transaction_ref) VALUES(46,35,20,NULL,1800000,'INV-'||extract(year FROM DATE '2026-11-10')::int||'-'||nextval('invoice_code_seq'),'Cash','Paid','2026-11-03T08:00','2026-11-03T08:01',NULL,30,FALSE,FALSE,NULL);
+INSERT INTO invoices(invoice_id,member_id,class_id,subscription_id,amount,invoice_code,payment_method,payment_status,created_at,payment_date,expires_at,receptionist_id,reconciliation_required,cash_confirmation_reversed,gateway_transaction_ref) VALUES(47,36,20,NULL,1800000,'INV-'||extract(year FROM DATE '2026-11-10')::int||'-'||nextval('invoice_code_seq'),'Cash','Paid','2026-11-03T08:00','2026-11-03T08:01',NULL,30,FALSE,FALSE,NULL);
+INSERT INTO invoices(invoice_id,member_id,class_id,subscription_id,amount,invoice_code,payment_method,payment_status,created_at,payment_date,expires_at,receptionist_id,reconciliation_required,cash_confirmation_reversed,gateway_transaction_ref) VALUES(48,8,21,NULL,900000,'INV-'||extract(year FROM DATE '2026-11-10')::int||'-'||nextval('invoice_code_seq'),'Cash','Paid','2026-10-15T08:00','2026-10-15T08:01',NULL,30,FALSE,FALSE,NULL);
+INSERT INTO invoices(invoice_id,member_id,class_id,subscription_id,amount,invoice_code,payment_method,payment_status,created_at,payment_date,expires_at,receptionist_id,reconciliation_required,cash_confirmation_reversed,gateway_transaction_ref) VALUES(49,9,21,NULL,900000,'INV-'||extract(year FROM DATE '2026-11-10')::int||'-'||nextval('invoice_code_seq'),'Cash','Paid','2026-10-15T08:00','2026-10-15T08:01',NULL,30,FALSE,FALSE,NULL);
+INSERT INTO invoices(invoice_id,member_id,class_id,subscription_id,amount,invoice_code,payment_method,payment_status,created_at,payment_date,expires_at,receptionist_id,reconciliation_required,cash_confirmation_reversed,gateway_transaction_ref) VALUES(50,10,21,NULL,900000,'INV-'||extract(year FROM DATE '2026-11-10')::int||'-'||nextval('invoice_code_seq'),'Cash','Paid','2026-10-15T08:00','2026-10-15T08:01',NULL,30,FALSE,FALSE,NULL);
+INSERT INTO invoices(invoice_id,member_id,class_id,subscription_id,amount,invoice_code,payment_method,payment_status,created_at,payment_date,expires_at,receptionist_id,reconciliation_required,cash_confirmation_reversed,gateway_transaction_ref) VALUES(51,3,NULL,1,8000000,'INV-'||extract(year FROM DATE '2026-11-10')::int||'-'||nextval('invoice_code_seq'),'Cash','Paid','2026-11-06T07:50','2026-11-06T08:00',NULL,30,FALSE,FALSE,NULL);
+INSERT INTO invoices(invoice_id,member_id,class_id,subscription_id,amount,invoice_code,payment_method,payment_status,created_at,payment_date,expires_at,receptionist_id,reconciliation_required,cash_confirmation_reversed,gateway_transaction_ref) VALUES(52,4,NULL,2,8000000,'INV-'||extract(year FROM DATE '2026-11-10')::int||'-'||nextval('invoice_code_seq'),'Cash','Paid','2026-11-05T07:50','2026-11-05T08:00',NULL,30,FALSE,FALSE,NULL);
+INSERT INTO invoices(invoice_id,member_id,class_id,subscription_id,amount,invoice_code,payment_method,payment_status,created_at,payment_date,expires_at,receptionist_id,reconciliation_required,cash_confirmation_reversed,gateway_transaction_ref) VALUES(53,5,NULL,3,3000000,'INV-'||extract(year FROM DATE '2026-11-10')::int||'-'||nextval('invoice_code_seq'),'Cash','Paid','2026-11-04T07:50','2026-11-04T08:00',NULL,30,FALSE,FALSE,NULL);
+INSERT INTO invoices(invoice_id,member_id,class_id,subscription_id,amount,invoice_code,payment_method,payment_status,created_at,payment_date,expires_at,receptionist_id,reconciliation_required,cash_confirmation_reversed,gateway_transaction_ref) VALUES(54,6,NULL,4,8000000,'INV-'||extract(year FROM DATE '2026-11-10')::int||'-'||nextval('invoice_code_seq'),'Cash','Paid','2026-10-01T07:50','2026-10-01T08:00',NULL,30,FALSE,FALSE,NULL);
+INSERT INTO invoices(invoice_id,member_id,class_id,subscription_id,amount,invoice_code,payment_method,payment_status,created_at,payment_date,expires_at,receptionist_id,reconciliation_required,cash_confirmation_reversed,gateway_transaction_ref) VALUES(55,7,NULL,5,8000000,'INV-'||extract(year FROM DATE '2026-11-10')::int||'-'||nextval('invoice_code_seq'),'Cash','Paid','2026-09-01T07:50','2026-09-01T08:00',NULL,30,FALSE,FALSE,NULL);
+INSERT INTO invoices(invoice_id,member_id,class_id,subscription_id,amount,invoice_code,payment_method,payment_status,created_at,payment_date,expires_at,receptionist_id,reconciliation_required,cash_confirmation_reversed,gateway_transaction_ref) VALUES(56,8,NULL,6,3000000,'INV-'||extract(year FROM DATE '2026-11-10')::int||'-'||nextval('invoice_code_seq'),'Cash','Paid','2026-11-08T07:50','2026-11-08T08:00',NULL,30,FALSE,FALSE,NULL);
+INSERT INTO invoices(invoice_id,member_id,class_id,subscription_id,amount,invoice_code,payment_method,payment_status,created_at,payment_date,expires_at,receptionist_id,reconciliation_required,cash_confirmation_reversed,gateway_transaction_ref) VALUES(57,9,NULL,7,4500000,'INV-'||extract(year FROM DATE '2026-11-10')::int||'-'||nextval('invoice_code_seq'),'VNPay','Paid','2026-11-07T07:50','2026-11-07T08:00',NULL,NULL,TRUE,FALSE,'DEMO-LATE-RECEIPT');
+INSERT INTO class_enrollments(enrollment_id,class_id,member_id,status,enrolled_at,cancelled_at,cancelled_by,cancel_reason) VALUES(1,10,2,'Registered','2026-11-03T08:00',NULL,NULL,NULL);
+INSERT INTO class_enrollments(enrollment_id,class_id,member_id,status,enrolled_at,cancelled_at,cancelled_by,cancel_reason) VALUES(2,11,5,'Registered','2026-11-03T08:00',NULL,NULL,NULL);
+INSERT INTO class_enrollments(enrollment_id,class_id,member_id,status,enrolled_at,cancelled_at,cancelled_by,cancel_reason) VALUES(3,11,6,'Registered','2026-11-03T08:00',NULL,NULL,NULL);
+INSERT INTO class_enrollments(enrollment_id,class_id,member_id,status,enrolled_at,cancelled_at,cancelled_by,cancel_reason) VALUES(4,11,7,'Registered','2026-11-03T08:00',NULL,NULL,NULL);
+INSERT INTO class_enrollments(enrollment_id,class_id,member_id,status,enrolled_at,cancelled_at,cancelled_by,cancel_reason) VALUES(5,12,8,'Registered','2026-11-03T08:00',NULL,NULL,NULL);
+INSERT INTO class_enrollments(enrollment_id,class_id,member_id,status,enrolled_at,cancelled_at,cancelled_by,cancel_reason) VALUES(6,12,9,'Registered','2026-11-03T08:00',NULL,NULL,NULL);
+INSERT INTO class_enrollments(enrollment_id,class_id,member_id,status,enrolled_at,cancelled_at,cancelled_by,cancel_reason) VALUES(7,12,10,'Registered','2026-11-03T08:00',NULL,NULL,NULL);
+INSERT INTO class_enrollments(enrollment_id,class_id,member_id,status,enrolled_at,cancelled_at,cancelled_by,cancel_reason) VALUES(8,12,11,'Registered','2026-11-03T08:00',NULL,NULL,NULL);
+INSERT INTO class_enrollments(enrollment_id,class_id,member_id,status,enrolled_at,cancelled_at,cancelled_by,cancel_reason) VALUES(9,12,34,'Registered','2026-11-03T08:00',NULL,NULL,NULL);
+INSERT INTO class_enrollments(enrollment_id,class_id,member_id,status,enrolled_at,cancelled_at,cancelled_by,cancel_reason) VALUES(10,12,35,'Registered','2026-11-03T08:00',NULL,NULL,NULL);
+INSERT INTO class_enrollments(enrollment_id,class_id,member_id,status,enrolled_at,cancelled_at,cancelled_by,cancel_reason) VALUES(11,13,2,'Registered','2026-11-03T08:00',NULL,NULL,NULL);
+INSERT INTO class_enrollments(enrollment_id,class_id,member_id,status,enrolled_at,cancelled_at,cancelled_by,cancel_reason) VALUES(12,13,3,'Registered','2026-11-03T08:00',NULL,NULL,NULL);
+INSERT INTO class_enrollments(enrollment_id,class_id,member_id,status,enrolled_at,cancelled_at,cancelled_by,cancel_reason) VALUES(13,13,4,'Registered','2026-11-03T08:00',NULL,NULL,NULL);
+INSERT INTO class_enrollments(enrollment_id,class_id,member_id,status,enrolled_at,cancelled_at,cancelled_by,cancel_reason) VALUES(14,14,2,'Registered','2026-11-03T08:00',NULL,NULL,NULL);
+INSERT INTO class_enrollments(enrollment_id,class_id,member_id,status,enrolled_at,cancelled_at,cancelled_by,cancel_reason) VALUES(15,14,3,'Cancelled','2026-11-03T08:00','2026-11-07T00:00:00',3,'DEMO center refund obligation');
+INSERT INTO class_enrollments(enrollment_id,class_id,member_id,status,enrolled_at,cancelled_at,cancelled_by,cancel_reason) VALUES(16,14,4,'Registered','2026-11-03T08:00',NULL,NULL,NULL);
+INSERT INTO class_enrollments(enrollment_id,class_id,member_id,status,enrolled_at,cancelled_at,cancelled_by,cancel_reason) VALUES(17,15,5,'Cancelled','2026-11-03T08:00','2026-11-07T00:00:00',32,'DEMO center refund obligation');
+INSERT INTO class_enrollments(enrollment_id,class_id,member_id,status,enrolled_at,cancelled_at,cancelled_by,cancel_reason) VALUES(18,15,6,'Cancelled','2026-11-03T08:00','2026-11-07T00:00:00',32,'DEMO center refund obligation');
+INSERT INTO class_enrollments(enrollment_id,class_id,member_id,status,enrolled_at,cancelled_at,cancelled_by,cancel_reason) VALUES(19,15,7,'Cancelled','2026-11-03T08:00','2026-11-07T00:00:00',32,'DEMO center refund obligation');
+INSERT INTO class_enrollments(enrollment_id,class_id,member_id,status,enrolled_at,cancelled_at,cancelled_by,cancel_reason) VALUES(20,16,8,'Registered','2026-11-03T08:00',NULL,NULL,NULL);
+INSERT INTO class_enrollments(enrollment_id,class_id,member_id,status,enrolled_at,cancelled_at,cancelled_by,cancel_reason) VALUES(21,16,9,'Registered','2026-11-03T08:00',NULL,NULL,NULL);
+INSERT INTO class_enrollments(enrollment_id,class_id,member_id,status,enrolled_at,cancelled_at,cancelled_by,cancel_reason) VALUES(22,16,10,'Registered','2026-11-03T08:00',NULL,NULL,NULL);
+INSERT INTO class_enrollments(enrollment_id,class_id,member_id,status,enrolled_at,cancelled_at,cancelled_by,cancel_reason) VALUES(23,16,11,'Registered','2026-11-03T08:00',NULL,NULL,NULL);
+INSERT INTO class_enrollments(enrollment_id,class_id,member_id,status,enrolled_at,cancelled_at,cancelled_by,cancel_reason) VALUES(24,16,34,'Registered','2026-11-03T08:00',NULL,NULL,NULL);
+INSERT INTO class_enrollments(enrollment_id,class_id,member_id,status,enrolled_at,cancelled_at,cancelled_by,cancel_reason) VALUES(25,16,35,'Registered','2026-11-03T08:00',NULL,NULL,NULL);
+INSERT INTO class_enrollments(enrollment_id,class_id,member_id,status,enrolled_at,cancelled_at,cancelled_by,cancel_reason) VALUES(26,16,36,'Registered','2026-11-03T08:00',NULL,NULL,NULL);
+INSERT INTO class_enrollments(enrollment_id,class_id,member_id,status,enrolled_at,cancelled_at,cancelled_by,cancel_reason) VALUES(27,16,37,'Registered','2026-11-03T08:00',NULL,NULL,NULL);
+INSERT INTO class_enrollments(enrollment_id,class_id,member_id,status,enrolled_at,cancelled_at,cancelled_by,cancel_reason) VALUES(28,16,38,'Registered','2026-11-03T08:00',NULL,NULL,NULL);
+INSERT INTO class_enrollments(enrollment_id,class_id,member_id,status,enrolled_at,cancelled_at,cancelled_by,cancel_reason) VALUES(29,16,39,'Registered','2026-11-03T08:00',NULL,NULL,NULL);
+INSERT INTO class_enrollments(enrollment_id,class_id,member_id,status,enrolled_at,cancelled_at,cancelled_by,cancel_reason) VALUES(30,16,40,'Registered','2026-11-03T08:00',NULL,NULL,NULL);
+INSERT INTO class_enrollments(enrollment_id,class_id,member_id,status,enrolled_at,cancelled_at,cancelled_by,cancel_reason) VALUES(31,16,41,'Registered','2026-11-03T08:00',NULL,NULL,NULL);
+INSERT INTO class_enrollments(enrollment_id,class_id,member_id,status,enrolled_at,cancelled_at,cancelled_by,cancel_reason) VALUES(32,16,42,'Registered','2026-11-03T08:00',NULL,NULL,NULL);
+INSERT INTO class_enrollments(enrollment_id,class_id,member_id,status,enrolled_at,cancelled_at,cancelled_by,cancel_reason) VALUES(33,16,43,'Registered','2026-11-03T08:00',NULL,NULL,NULL);
+INSERT INTO class_enrollments(enrollment_id,class_id,member_id,status,enrolled_at,cancelled_at,cancelled_by,cancel_reason) VALUES(34,17,2,'Registered','2026-10-24T08:00',NULL,NULL,NULL);
+INSERT INTO class_enrollments(enrollment_id,class_id,member_id,status,enrolled_at,cancelled_at,cancelled_by,cancel_reason) VALUES(35,17,3,'Registered','2026-10-24T08:00',NULL,NULL,NULL);
+INSERT INTO class_enrollments(enrollment_id,class_id,member_id,status,enrolled_at,cancelled_at,cancelled_by,cancel_reason) VALUES(36,17,4,'Registered','2026-10-24T08:00',NULL,NULL,NULL);
+INSERT INTO class_enrollments(enrollment_id,class_id,member_id,status,enrolled_at,cancelled_at,cancelled_by,cancel_reason) VALUES(37,17,5,'Registered','2026-10-24T08:00',NULL,NULL,NULL);
+INSERT INTO class_enrollments(enrollment_id,class_id,member_id,status,enrolled_at,cancelled_at,cancelled_by,cancel_reason) VALUES(38,17,6,'Registered','2026-10-24T08:00',NULL,NULL,NULL);
+INSERT INTO class_enrollments(enrollment_id,class_id,member_id,status,enrolled_at,cancelled_at,cancelled_by,cancel_reason) VALUES(39,17,7,'Registered','2026-10-24T08:00',NULL,NULL,NULL);
+INSERT INTO class_enrollments(enrollment_id,class_id,member_id,status,enrolled_at,cancelled_at,cancelled_by,cancel_reason) VALUES(40,18,2,'Completed','2026-09-14T08:00',NULL,NULL,NULL);
+INSERT INTO class_enrollments(enrollment_id,class_id,member_id,status,enrolled_at,cancelled_at,cancelled_by,cancel_reason) VALUES(41,18,3,'Completed','2026-09-14T08:00',NULL,NULL,NULL);
+INSERT INTO class_enrollments(enrollment_id,class_id,member_id,status,enrolled_at,cancelled_at,cancelled_by,cancel_reason) VALUES(42,19,2,'Registered','2026-10-15T08:00',NULL,NULL,NULL);
+INSERT INTO class_enrollments(enrollment_id,class_id,member_id,status,enrolled_at,cancelled_at,cancelled_by,cancel_reason) VALUES(43,19,3,'Registered','2026-10-15T08:00',NULL,NULL,NULL);
+INSERT INTO class_enrollments(enrollment_id,class_id,member_id,status,enrolled_at,cancelled_at,cancelled_by,cancel_reason) VALUES(44,19,4,'Registered','2026-10-15T08:00',NULL,NULL,NULL);
+INSERT INTO class_enrollments(enrollment_id,class_id,member_id,status,enrolled_at,cancelled_at,cancelled_by,cancel_reason) VALUES(45,20,34,'Registered','2026-11-03T08:00',NULL,NULL,NULL);
+INSERT INTO class_enrollments(enrollment_id,class_id,member_id,status,enrolled_at,cancelled_at,cancelled_by,cancel_reason) VALUES(46,20,35,'Registered','2026-11-03T08:00',NULL,NULL,NULL);
+INSERT INTO class_enrollments(enrollment_id,class_id,member_id,status,enrolled_at,cancelled_at,cancelled_by,cancel_reason) VALUES(47,20,36,'Registered','2026-11-03T08:00',NULL,NULL,NULL);
+INSERT INTO class_enrollments(enrollment_id,class_id,member_id,status,enrolled_at,cancelled_at,cancelled_by,cancel_reason) VALUES(48,21,8,'Cancelled','2026-10-15T08:00','2026-10-20T16:30:00',32,'DEMO center refund obligation');
+INSERT INTO class_enrollments(enrollment_id,class_id,member_id,status,enrolled_at,cancelled_at,cancelled_by,cancel_reason) VALUES(49,21,9,'Cancelled','2026-10-15T08:00','2026-10-20T16:30:00',32,'DEMO center refund obligation');
+INSERT INTO class_enrollments(enrollment_id,class_id,member_id,status,enrolled_at,cancelled_at,cancelled_by,cancel_reason) VALUES(50,21,10,'Cancelled','2026-10-15T08:00','2026-10-20T16:30:00',32,'DEMO center refund obligation');
+INSERT INTO advanced_registrations(member_id,subject_id,coach_id,request_key,status,created_at,accepted_by,accepted_at,reason,subscription_id) VALUES(37,(SELECT subject_id FROM subjects WHERE slug='boi-loi'),14,'DEMO-AR01','Requested','2026-11-05 08:00',NULL,NULL,NULL,NULL);
+INSERT INTO advanced_registrations(member_id,subject_id,coach_id,request_key,status,created_at,accepted_by,accepted_at,reason,subscription_id) VALUES(38,(SELECT subject_id FROM subjects WHERE slug='pickleball'),16,'DEMO-AR02','Accepted','2026-11-05 08:00',16,'2026-11-06 08:00',NULL,NULL);
+INSERT INTO advanced_registrations(member_id,subject_id,coach_id,request_key,status,created_at,accepted_by,accepted_at,reason,subscription_id) VALUES(39,(SELECT subject_id FROM subjects WHERE slug='ban-cung'),18,'DEMO-AR03','Rejected','2026-11-05 08:00',NULL,NULL,'DEMO Coach từ chối yêu cầu',NULL);
+INSERT INTO advanced_registrations(member_id,subject_id,coach_id,request_key,status,created_at,accepted_by,accepted_at,reason,subscription_id) VALUES(3,(SELECT subject_id FROM subjects WHERE slug='quan-vot-tennis'),12,'DEMO-SUB01','Invoiced','2026-11-05 08:00',12,'2026-11-06 08:00',NULL,1);
+INSERT INTO advanced_registrations(member_id,subject_id,coach_id,request_key,status,created_at,accepted_by,accepted_at,reason,subscription_id) VALUES(4,(SELECT subject_id FROM subjects WHERE slug='quan-vot-tennis'),12,'DEMO-SUB02','Invoiced','2026-11-05 08:00',12,'2026-11-06 08:00',NULL,2);
+INSERT INTO advanced_registrations(member_id,subject_id,coach_id,request_key,status,created_at,accepted_by,accepted_at,reason,subscription_id) VALUES(5,(SELECT subject_id FROM subjects WHERE slug='cau-long'),26,'DEMO-SUB03','Invoiced','2026-11-05 08:00',26,'2026-11-06 08:00',NULL,3);
+INSERT INTO advanced_registrations(member_id,subject_id,coach_id,request_key,status,created_at,accepted_by,accepted_at,reason,subscription_id) VALUES(6,(SELECT subject_id FROM subjects WHERE slug='quan-vot-tennis'),12,'DEMO-SUB04','Invoiced','2026-11-05 08:00',12,'2026-11-06 08:00',NULL,4);
+INSERT INTO advanced_registrations(member_id,subject_id,coach_id,request_key,status,created_at,accepted_by,accepted_at,reason,subscription_id) VALUES(7,(SELECT subject_id FROM subjects WHERE slug='quan-vot-tennis'),12,'DEMO-SUB05','Invoiced','2026-11-05 08:00',12,'2026-11-06 08:00',NULL,5);
+INSERT INTO advanced_registrations(member_id,subject_id,coach_id,request_key,status,created_at,accepted_by,accepted_at,reason,subscription_id) VALUES(8,(SELECT subject_id FROM subjects WHERE slug='cau-long'),26,'DEMO-SUB06','Invoiced','2026-11-05 08:00',26,'2026-11-06 08:00',NULL,6);
+INSERT INTO advanced_registrations(member_id,subject_id,coach_id,request_key,status,created_at,accepted_by,accepted_at,reason,subscription_id) VALUES(9,(SELECT subject_id FROM subjects WHERE slug='boi-loi'),14,'DEMO-SUB07','Invoiced','2026-11-05 08:00',14,'2026-11-06 08:00',NULL,7);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(1,10,(SELECT room_id FROM rooms WHERE room_code='C01-BAD-01'),'2026-11-18','09:30','11:00',26,NULL,NULL,'Scheduled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(2,10,(SELECT room_id FROM rooms WHERE room_code='C01-BAD-01'),'2026-11-20','09:30','11:00',26,NULL,NULL,'Scheduled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(3,10,(SELECT room_id FROM rooms WHERE room_code='C01-BAD-01'),'2026-11-23','09:30','11:00',26,NULL,NULL,'Scheduled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(4,10,(SELECT room_id FROM rooms WHERE room_code='C01-BAD-01'),'2026-11-25','09:30','11:00',26,NULL,NULL,'Scheduled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(5,10,(SELECT room_id FROM rooms WHERE room_code='C01-BAD-01'),'2026-11-27','09:30','11:00',26,NULL,NULL,'Scheduled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(6,10,(SELECT room_id FROM rooms WHERE room_code='C01-BAD-01'),'2026-11-30','09:30','11:00',26,NULL,NULL,'Scheduled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(7,10,(SELECT room_id FROM rooms WHERE room_code='C01-BAD-01'),'2026-12-02','09:30','11:00',26,NULL,NULL,'Scheduled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(8,10,(SELECT room_id FROM rooms WHERE room_code='C01-BAD-01'),'2026-12-04','09:30','11:00',26,NULL,NULL,'Scheduled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(9,10,(SELECT room_id FROM rooms WHERE room_code='C01-BAD-01'),'2026-12-07','09:30','11:00',26,NULL,NULL,'Scheduled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(10,10,(SELECT room_id FROM rooms WHERE room_code='C01-BAD-01'),'2026-12-09','09:30','11:00',26,NULL,NULL,'Scheduled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(11,10,(SELECT room_id FROM rooms WHERE room_code='C01-BAD-01'),'2026-12-11','09:30','11:00',26,NULL,NULL,'Scheduled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(12,10,(SELECT room_id FROM rooms WHERE room_code='C01-BAD-01'),'2026-12-14','09:30','11:00',26,NULL,NULL,'Scheduled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(13,11,(SELECT room_id FROM rooms WHERE room_code='C01-TEN-01'),'2026-11-11','06:00','07:30',12,NULL,NULL,'Scheduled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(14,11,(SELECT room_id FROM rooms WHERE room_code='C01-TEN-01'),'2026-11-13','06:00','07:30',12,NULL,NULL,'Scheduled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(15,11,(SELECT room_id FROM rooms WHERE room_code='C01-TEN-01'),'2026-11-16','06:00','07:30',12,NULL,NULL,'Scheduled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(16,11,(SELECT room_id FROM rooms WHERE room_code='C01-TEN-01'),'2026-11-18','06:00','07:30',12,NULL,NULL,'Scheduled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(17,11,(SELECT room_id FROM rooms WHERE room_code='C01-TEN-01'),'2026-11-20','06:00','07:30',12,NULL,NULL,'Scheduled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(18,11,(SELECT room_id FROM rooms WHERE room_code='C01-TEN-01'),'2026-11-23','06:00','07:30',12,NULL,NULL,'Scheduled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(19,11,(SELECT room_id FROM rooms WHERE room_code='C01-TEN-01'),'2026-11-25','06:00','07:30',12,NULL,NULL,'Scheduled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(20,11,(SELECT room_id FROM rooms WHERE room_code='C01-TEN-01'),'2026-11-27','06:00','07:30',12,NULL,NULL,'Scheduled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(21,11,(SELECT room_id FROM rooms WHERE room_code='C01-TEN-01'),'2026-11-30','06:00','07:30',12,NULL,NULL,'Scheduled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(22,11,(SELECT room_id FROM rooms WHERE room_code='C01-TEN-01'),'2026-12-02','06:00','07:30',12,NULL,NULL,'Scheduled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(23,11,(SELECT room_id FROM rooms WHERE room_code='C01-TEN-01'),'2026-12-04','06:00','07:30',12,NULL,NULL,'Scheduled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(24,11,(SELECT room_id FROM rooms WHERE room_code='C01-TEN-01'),'2026-12-07','06:00','07:30',12,NULL,NULL,'Scheduled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(25,12,(SELECT room_id FROM rooms WHERE room_code='C01-SWIM-01'),'2026-11-11','06:00','07:30',14,NULL,NULL,'Scheduled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(26,12,(SELECT room_id FROM rooms WHERE room_code='C01-SWIM-01'),'2026-11-12','06:00','07:30',14,NULL,NULL,'Scheduled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(27,12,(SELECT room_id FROM rooms WHERE room_code='C01-SWIM-01'),'2026-11-14','06:00','07:30',14,NULL,NULL,'Scheduled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(28,12,(SELECT room_id FROM rooms WHERE room_code='C01-SWIM-01'),'2026-11-18','06:00','07:30',14,NULL,NULL,'Scheduled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(29,12,(SELECT room_id FROM rooms WHERE room_code='C01-SWIM-01'),'2026-11-19','06:00','07:30',14,NULL,NULL,'Scheduled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(30,12,(SELECT room_id FROM rooms WHERE room_code='C01-SWIM-01'),'2026-11-21','06:00','07:30',14,NULL,NULL,'Scheduled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(31,12,(SELECT room_id FROM rooms WHERE room_code='C01-SWIM-01'),'2026-11-25','06:00','07:30',14,NULL,NULL,'Scheduled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(32,12,(SELECT room_id FROM rooms WHERE room_code='C01-SWIM-01'),'2026-11-26','06:00','07:30',14,NULL,NULL,'Scheduled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(33,12,(SELECT room_id FROM rooms WHERE room_code='C01-SWIM-01'),'2026-11-28','06:00','07:30',14,NULL,NULL,'Scheduled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(34,12,(SELECT room_id FROM rooms WHERE room_code='C01-SWIM-01'),'2026-12-02','06:00','07:30',14,NULL,NULL,'Scheduled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(35,12,(SELECT room_id FROM rooms WHERE room_code='C01-SWIM-01'),'2026-12-03','06:00','07:30',14,NULL,NULL,'Scheduled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(36,12,(SELECT room_id FROM rooms WHERE room_code='C01-SWIM-01'),'2026-12-05','06:00','07:30',14,NULL,NULL,'Scheduled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(37,13,(SELECT room_id FROM rooms WHERE room_code='C01-ARC-01'),'2026-11-18','07:45','09:15',18,NULL,NULL,'Scheduled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(38,13,(SELECT room_id FROM rooms WHERE room_code='C01-ARC-01'),'2026-11-20','07:45','09:15',18,NULL,NULL,'Scheduled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(39,13,(SELECT room_id FROM rooms WHERE room_code='C01-ARC-01'),'2026-11-23','07:45','09:15',18,NULL,NULL,'Scheduled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(40,13,(SELECT room_id FROM rooms WHERE room_code='C01-ARC-01'),'2026-11-25','07:45','09:15',18,NULL,NULL,'Scheduled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(41,13,(SELECT room_id FROM rooms WHERE room_code='C01-ARC-01'),'2026-11-27','07:45','09:15',18,NULL,NULL,'Scheduled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(42,13,(SELECT room_id FROM rooms WHERE room_code='C01-ARC-01'),'2026-11-30','07:45','09:15',18,NULL,NULL,'Scheduled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(43,13,(SELECT room_id FROM rooms WHERE room_code='C01-ARC-01'),'2026-12-02','07:45','09:15',18,NULL,NULL,'Scheduled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(44,13,(SELECT room_id FROM rooms WHERE room_code='C01-ARC-01'),'2026-12-04','07:45','09:15',18,NULL,NULL,'Scheduled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(45,13,(SELECT room_id FROM rooms WHERE room_code='C01-ARC-01'),'2026-12-07','07:45','09:15',18,NULL,NULL,'Scheduled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(46,13,(SELECT room_id FROM rooms WHERE room_code='C01-ARC-01'),'2026-12-09','07:45','09:15',18,NULL,NULL,'Scheduled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(47,13,(SELECT room_id FROM rooms WHERE room_code='C01-ARC-01'),'2026-12-11','07:45','09:15',18,NULL,NULL,'Scheduled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(48,13,(SELECT room_id FROM rooms WHERE room_code='C01-ARC-01'),'2026-12-14','07:45','09:15',18,NULL,NULL,'Scheduled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(49,14,(SELECT room_id FROM rooms WHERE room_code='C01-PICK-01'),'2026-11-17','09:30','11:00',16,NULL,NULL,'Scheduled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(50,14,(SELECT room_id FROM rooms WHERE room_code='C01-PICK-01'),'2026-11-19','09:30','11:00',16,NULL,NULL,'Scheduled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(51,14,(SELECT room_id FROM rooms WHERE room_code='C01-PICK-01'),'2026-11-21','09:30','11:00',16,NULL,NULL,'Scheduled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(52,14,(SELECT room_id FROM rooms WHERE room_code='C01-PICK-01'),'2026-11-24','09:30','11:00',16,NULL,NULL,'Scheduled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(53,14,(SELECT room_id FROM rooms WHERE room_code='C01-PICK-01'),'2026-11-26','09:30','11:00',16,NULL,NULL,'Scheduled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(54,14,(SELECT room_id FROM rooms WHERE room_code='C01-PICK-01'),'2026-11-28','09:30','11:00',16,NULL,NULL,'Scheduled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(55,14,(SELECT room_id FROM rooms WHERE room_code='C01-PICK-01'),'2026-12-01','09:30','11:00',16,NULL,NULL,'Scheduled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(56,14,(SELECT room_id FROM rooms WHERE room_code='C01-PICK-01'),'2026-12-03','09:30','11:00',16,NULL,NULL,'Scheduled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(57,14,(SELECT room_id FROM rooms WHERE room_code='C01-PICK-01'),'2026-12-05','09:30','11:00',16,NULL,NULL,'Scheduled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(58,14,(SELECT room_id FROM rooms WHERE room_code='C01-PICK-01'),'2026-12-08','09:30','11:00',16,NULL,NULL,'Scheduled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(59,14,(SELECT room_id FROM rooms WHERE room_code='C01-PICK-01'),'2026-12-10','09:30','11:00',16,NULL,NULL,'Scheduled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(60,14,(SELECT room_id FROM rooms WHERE room_code='C01-PICK-01'),'2026-12-12','09:30','11:00',16,NULL,NULL,'Scheduled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(61,15,(SELECT room_id FROM rooms WHERE room_code='C01-BR-01'),'2026-11-18','13:00','14:30',20,NULL,NULL,'Cancelled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(62,15,(SELECT room_id FROM rooms WHERE room_code='C01-BR-01'),'2026-11-20','13:00','14:30',20,NULL,NULL,'Cancelled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(63,15,(SELECT room_id FROM rooms WHERE room_code='C01-BR-01'),'2026-11-23','13:00','14:30',20,NULL,NULL,'Cancelled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(64,15,(SELECT room_id FROM rooms WHERE room_code='C01-BR-01'),'2026-11-25','13:00','14:30',20,NULL,NULL,'Cancelled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(65,15,(SELECT room_id FROM rooms WHERE room_code='C01-BR-01'),'2026-11-27','13:00','14:30',20,NULL,NULL,'Cancelled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(66,15,(SELECT room_id FROM rooms WHERE room_code='C01-BR-01'),'2026-11-30','13:00','14:30',20,NULL,NULL,'Cancelled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(67,15,(SELECT room_id FROM rooms WHERE room_code='C01-BR-01'),'2026-12-02','13:00','14:30',20,NULL,NULL,'Cancelled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(68,15,(SELECT room_id FROM rooms WHERE room_code='C01-BR-01'),'2026-12-04','13:00','14:30',20,NULL,NULL,'Cancelled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(69,15,(SELECT room_id FROM rooms WHERE room_code='C01-BR-01'),'2026-12-07','13:00','14:30',20,NULL,NULL,'Cancelled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(70,15,(SELECT room_id FROM rooms WHERE room_code='C01-BR-01'),'2026-12-09','13:00','14:30',20,NULL,NULL,'Cancelled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(71,15,(SELECT room_id FROM rooms WHERE room_code='C01-BR-01'),'2026-12-11','13:00','14:30',20,NULL,NULL,'Cancelled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(72,15,(SELECT room_id FROM rooms WHERE room_code='C01-BR-01'),'2026-12-14','13:00','14:30',20,NULL,NULL,'Cancelled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(73,16,(SELECT room_id FROM rooms WHERE room_code='C01-FOOT-01'),'2026-11-19','07:45','09:15',22,NULL,NULL,'Scheduled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(74,16,(SELECT room_id FROM rooms WHERE room_code='C01-FOOT-01'),'2026-11-21','07:45','09:15',22,NULL,NULL,'Scheduled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(75,16,(SELECT room_id FROM rooms WHERE room_code='C01-FOOT-01'),'2026-11-24','07:45','09:15',22,NULL,NULL,'Scheduled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(76,16,(SELECT room_id FROM rooms WHERE room_code='C01-FOOT-01'),'2026-11-26','07:45','09:15',22,NULL,NULL,'Scheduled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(77,16,(SELECT room_id FROM rooms WHERE room_code='C01-FOOT-01'),'2026-11-28','07:45','09:15',22,NULL,NULL,'Scheduled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(78,16,(SELECT room_id FROM rooms WHERE room_code='C01-FOOT-01'),'2026-12-01','07:45','09:15',22,NULL,NULL,'Scheduled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(79,16,(SELECT room_id FROM rooms WHERE room_code='C01-FOOT-01'),'2026-12-03','07:45','09:15',22,NULL,NULL,'Scheduled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(80,16,(SELECT room_id FROM rooms WHERE room_code='C01-FOOT-01'),'2026-12-05','07:45','09:15',22,NULL,NULL,'Scheduled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(81,16,(SELECT room_id FROM rooms WHERE room_code='C01-FOOT-01'),'2026-12-08','07:45','09:15',22,NULL,NULL,'Scheduled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(82,16,(SELECT room_id FROM rooms WHERE room_code='C01-FOOT-01'),'2026-12-10','07:45','09:15',22,NULL,NULL,'Scheduled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(83,16,(SELECT room_id FROM rooms WHERE room_code='C01-FOOT-01'),'2026-12-12','07:45','09:15',22,NULL,NULL,'Scheduled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(84,16,(SELECT room_id FROM rooms WHERE room_code='C01-FOOT-01'),'2026-12-15','07:45','09:15',22,NULL,NULL,'Scheduled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(85,17,(SELECT room_id FROM rooms WHERE room_code='C01-BC-01'),'2026-10-31','13:00','14:30',24,NULL,NULL,'Completed',TRUE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(86,17,(SELECT room_id FROM rooms WHERE room_code='C01-BC-01'),'2026-11-03','13:00','14:30',24,NULL,NULL,'Completed',TRUE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(87,17,(SELECT room_id FROM rooms WHERE room_code='C01-BC-01'),'2026-11-05','13:00','14:30',24,NULL,NULL,'Completed',TRUE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(88,17,(SELECT room_id FROM rooms WHERE room_code='C01-BC-01'),'2026-11-07','13:00','14:30',24,NULL,NULL,'Completed',TRUE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(89,17,(SELECT room_id FROM rooms WHERE room_code='C01-BC-01'),'2026-11-10','13:00','14:30',24,NULL,NULL,'Scheduled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(90,17,(SELECT room_id FROM rooms WHERE room_code='C01-BC-01'),'2026-11-12','13:00','14:30',24,NULL,NULL,'Scheduled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(91,17,(SELECT room_id FROM rooms WHERE room_code='C01-BC-01'),'2026-11-14','13:00','14:30',24,NULL,NULL,'Scheduled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(92,17,(SELECT room_id FROM rooms WHERE room_code='C01-BC-01'),'2026-11-17','13:00','14:30',24,NULL,NULL,'Scheduled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(93,17,(SELECT room_id FROM rooms WHERE room_code='C01-BC-01'),'2026-11-19','13:00','14:30',24,NULL,NULL,'Scheduled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(94,17,(SELECT room_id FROM rooms WHERE room_code='C01-BC-01'),'2026-11-21','13:00','14:30',24,NULL,NULL,'Scheduled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(95,17,(SELECT room_id FROM rooms WHERE room_code='C01-BC-01'),'2026-11-24','13:00','14:30',24,NULL,NULL,'Scheduled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(96,17,(SELECT room_id FROM rooms WHERE room_code='C01-BC-01'),'2026-11-26','13:00','14:30',24,NULL,NULL,'Scheduled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(97,18,(SELECT room_id FROM rooms WHERE room_code='C01-TT-01'),'2026-09-21','14:45','16:15',28,NULL,NULL,'Completed',TRUE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(98,18,(SELECT room_id FROM rooms WHERE room_code='C01-TT-01'),'2026-09-23','14:45','16:15',28,NULL,NULL,'Completed',TRUE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(99,18,(SELECT room_id FROM rooms WHERE room_code='C01-TT-01'),'2026-09-25','14:45','16:15',28,NULL,NULL,'Completed',TRUE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(100,18,(SELECT room_id FROM rooms WHERE room_code='C01-TT-01'),'2026-09-28','14:45','16:15',28,NULL,NULL,'Completed',TRUE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(101,18,(SELECT room_id FROM rooms WHERE room_code='C01-TT-01'),'2026-09-30','14:45','16:15',28,NULL,NULL,'Completed',TRUE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(102,18,(SELECT room_id FROM rooms WHERE room_code='C01-TT-01'),'2026-10-02','14:45','16:15',28,NULL,NULL,'Completed',TRUE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(103,18,(SELECT room_id FROM rooms WHERE room_code='C01-TT-01'),'2026-10-05','14:45','16:15',28,NULL,NULL,'Completed',TRUE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(104,18,(SELECT room_id FROM rooms WHERE room_code='C01-TT-01'),'2026-10-07','14:45','16:15',28,NULL,NULL,'Completed',TRUE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(105,18,(SELECT room_id FROM rooms WHERE room_code='C01-TT-01'),'2026-10-09','14:45','16:15',28,NULL,NULL,'Completed',TRUE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(106,18,(SELECT room_id FROM rooms WHERE room_code='C01-TT-01'),'2026-10-12','14:45','16:15',28,NULL,NULL,'Completed',TRUE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(107,18,(SELECT room_id FROM rooms WHERE room_code='C01-TT-01'),'2026-10-14','14:45','16:15',28,NULL,NULL,'Completed',TRUE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(108,18,(SELECT room_id FROM rooms WHERE room_code='C01-TT-01'),'2026-10-16','14:45','16:15',28,NULL,NULL,'Completed',TRUE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(109,19,(SELECT room_id FROM rooms WHERE room_code='C01-BAD-01'),'2026-10-22','14:45','16:15',26,NULL,NULL,'Completed',TRUE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(110,19,(SELECT room_id FROM rooms WHERE room_code='C01-BAD-01'),'2026-10-24','14:45','16:15',26,NULL,NULL,'Completed',TRUE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(111,19,(SELECT room_id FROM rooms WHERE room_code='C01-BAD-01'),'2026-10-27','14:45','16:15',26,NULL,NULL,'Completed',TRUE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(112,19,(SELECT room_id FROM rooms WHERE room_code='C01-BAD-01'),'2026-10-29','14:45','16:15',26,NULL,NULL,'Completed',TRUE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(113,19,(SELECT room_id FROM rooms WHERE room_code='C01-BAD-01'),'2026-10-31','14:45','16:15',26,NULL,NULL,'Completed',TRUE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(114,19,(SELECT room_id FROM rooms WHERE room_code='C01-BAD-01'),'2026-11-03','14:45','16:15',26,NULL,NULL,'Completed',TRUE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(115,19,(SELECT room_id FROM rooms WHERE room_code='C01-BAD-01'),'2026-11-05','14:45','16:15',26,NULL,NULL,'Completed',TRUE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(116,19,(SELECT room_id FROM rooms WHERE room_code='C01-BAD-01'),'2026-11-07','14:45','16:15',26,NULL,NULL,'Completed',TRUE,FALSE,TRUE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(117,19,(SELECT room_id FROM rooms WHERE room_code='C01-BAD-01'),'2026-11-10','14:45','16:15',26,NULL,NULL,'Scheduled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(118,19,(SELECT room_id FROM rooms WHERE room_code='C01-BAD-01'),'2026-11-12','14:45','16:15',26,NULL,NULL,'Scheduled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(119,19,(SELECT room_id FROM rooms WHERE room_code='C01-BAD-01'),'2026-11-14','14:45','16:15',26,NULL,NULL,'Scheduled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(120,19,(SELECT room_id FROM rooms WHERE room_code='C01-BAD-01'),'2026-11-17','14:45','16:15',26,NULL,NULL,'Scheduled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(121,19,(SELECT room_id FROM rooms WHERE room_code='C01-BAD-01'),'2026-11-25','18:15','19:45',26,NULL,NULL,'Scheduled',FALSE,FALSE,FALSE,116,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(122,20,(SELECT room_id FROM rooms WHERE room_code='C01-PICK-02'),'2026-11-18','16:30','18:00',17,NULL,NULL,'Scheduled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(123,20,(SELECT room_id FROM rooms WHERE room_code='C01-PICK-02'),'2026-11-20','16:30','18:00',17,NULL,NULL,'Scheduled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(124,20,(SELECT room_id FROM rooms WHERE room_code='C01-PICK-02'),'2026-11-23','16:30','18:00',17,NULL,NULL,'Scheduled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(125,20,(SELECT room_id FROM rooms WHERE room_code='C01-PICK-02'),'2026-11-25','16:30','18:00',17,NULL,NULL,'Scheduled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(126,20,(SELECT room_id FROM rooms WHERE room_code='C01-PICK-02'),'2026-11-27','16:30','18:00',17,NULL,NULL,'Scheduled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(127,20,(SELECT room_id FROM rooms WHERE room_code='C01-PICK-02'),'2026-11-30','16:30','18:00',17,NULL,NULL,'Scheduled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(128,20,(SELECT room_id FROM rooms WHERE room_code='C01-PICK-02'),'2026-12-02','16:30','18:00',17,NULL,NULL,'Scheduled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(129,20,(SELECT room_id FROM rooms WHERE room_code='C01-PICK-02'),'2026-12-04','16:30','18:00',17,NULL,NULL,'Scheduled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(130,20,(SELECT room_id FROM rooms WHERE room_code='C01-PICK-02'),'2026-12-07','16:30','18:00',17,NULL,NULL,'Scheduled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(131,20,(SELECT room_id FROM rooms WHERE room_code='C01-PICK-02'),'2026-12-09','16:30','18:00',17,NULL,NULL,'Scheduled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(132,20,(SELECT room_id FROM rooms WHERE room_code='C01-PICK-02'),'2026-12-11','16:30','18:00',17,NULL,NULL,'Scheduled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(133,20,(SELECT room_id FROM rooms WHERE room_code='C01-PICK-02'),'2026-12-14','16:30','18:00',17,NULL,NULL,'Scheduled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(134,21,(SELECT room_id FROM rooms WHERE room_code='C01-BAD-01'),'2026-10-22','16:30','18:00',26,NULL,NULL,'Cancelled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(135,21,(SELECT room_id FROM rooms WHERE room_code='C01-BAD-01'),'2026-10-24','16:30','18:00',26,NULL,NULL,'Cancelled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(136,21,(SELECT room_id FROM rooms WHERE room_code='C01-BAD-01'),'2026-10-27','16:30','18:00',26,NULL,NULL,'Cancelled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(137,21,(SELECT room_id FROM rooms WHERE room_code='C01-BAD-01'),'2026-10-29','16:30','18:00',26,NULL,NULL,'Cancelled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(138,21,(SELECT room_id FROM rooms WHERE room_code='C01-BAD-01'),'2026-10-31','16:30','18:00',26,NULL,NULL,'Cancelled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(139,21,(SELECT room_id FROM rooms WHERE room_code='C01-BAD-01'),'2026-11-03','16:30','18:00',26,NULL,NULL,'Cancelled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(140,21,(SELECT room_id FROM rooms WHERE room_code='C01-BAD-01'),'2026-11-05','16:30','18:00',26,NULL,NULL,'Cancelled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(141,21,(SELECT room_id FROM rooms WHERE room_code='C01-BAD-01'),'2026-11-07','16:30','18:00',26,NULL,NULL,'Cancelled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(142,21,(SELECT room_id FROM rooms WHERE room_code='C01-BAD-01'),'2026-11-10','16:30','18:00',26,NULL,NULL,'Cancelled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(143,21,(SELECT room_id FROM rooms WHERE room_code='C01-BAD-01'),'2026-11-12','16:30','18:00',26,NULL,NULL,'Cancelled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(144,21,(SELECT room_id FROM rooms WHERE room_code='C01-BAD-01'),'2026-11-14','16:30','18:00',26,NULL,NULL,'Cancelled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(145,21,(SELECT room_id FROM rooms WHERE room_code='C01-BAD-01'),'2026-11-17','16:30','18:00',26,NULL,NULL,'Cancelled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(146,1,(SELECT room_id FROM rooms WHERE room_code='C01-TEN-01'),'2026-11-12','18:15','19:45',12,4,2,'Scheduled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(147,1,(SELECT room_id FROM rooms WHERE room_code='C01-TEN-01'),'2026-11-14','18:15','19:45',12,4,2,'Scheduled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(148,8,(SELECT room_id FROM rooms WHERE room_code='C01-BAD-01'),'2026-11-12','18:15','19:45',26,5,3,'Scheduled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(149,8,(SELECT room_id FROM rooms WHERE room_code='C01-BAD-01'),'2026-11-14','18:15','19:45',26,5,3,'Scheduled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(150,8,(SELECT room_id FROM rooms WHERE room_code='C01-BAD-01'),'2026-11-17','18:15','19:45',26,5,3,'Scheduled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(151,8,(SELECT room_id FROM rooms WHERE room_code='C01-BAD-01'),'2026-11-19','18:15','19:45',26,5,3,'Scheduled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(152,8,(SELECT room_id FROM rooms WHERE room_code='C01-BAD-01'),'2026-11-21','18:15','19:45',26,5,3,'Scheduled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(153,8,(SELECT room_id FROM rooms WHERE room_code='C01-BAD-01'),'2026-11-24','18:15','19:45',26,5,3,'Scheduled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(154,8,(SELECT room_id FROM rooms WHERE room_code='C01-BAD-01'),'2026-11-26','18:15','19:45',26,5,3,'Scheduled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(155,8,(SELECT room_id FROM rooms WHERE room_code='C01-BAD-01'),'2026-11-28','18:15','19:45',26,5,3,'Scheduled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(156,8,(SELECT room_id FROM rooms WHERE room_code='C01-BAD-01'),'2026-12-01','18:15','19:45',26,5,3,'Scheduled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(157,8,(SELECT room_id FROM rooms WHERE room_code='C01-BAD-01'),'2026-12-03','18:15','19:45',26,5,3,'Scheduled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(158,8,(SELECT room_id FROM rooms WHERE room_code='C01-BAD-01'),'2026-12-05','18:15','19:45',26,5,3,'Scheduled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(159,8,(SELECT room_id FROM rooms WHERE room_code='C01-BAD-01'),'2026-12-08','18:15','19:45',26,5,3,'Scheduled',FALSE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(160,1,(SELECT room_id FROM rooms WHERE room_code='C01-TEN-01'),'2026-10-06','18:15','19:45',12,6,4,'Completed',TRUE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(161,1,(SELECT room_id FROM rooms WHERE room_code='C01-TEN-01'),'2026-10-08','18:15','19:45',12,6,4,'Completed',TRUE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(162,1,(SELECT room_id FROM rooms WHERE room_code='C01-TEN-01'),'2026-10-10','18:15','19:45',12,6,4,'Completed',TRUE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(163,1,(SELECT room_id FROM rooms WHERE room_code='C01-TEN-01'),'2026-10-13','18:15','19:45',12,6,4,'Completed',TRUE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(164,1,(SELECT room_id FROM rooms WHERE room_code='C01-TEN-01'),'2026-10-15','18:15','19:45',12,6,4,'Completed',TRUE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(165,1,(SELECT room_id FROM rooms WHERE room_code='C01-TEN-01'),'2026-10-17','18:15','19:45',12,6,4,'Completed',TRUE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(166,1,(SELECT room_id FROM rooms WHERE room_code='C01-TEN-01'),'2026-10-20','18:15','19:45',12,6,4,'Completed',TRUE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(167,1,(SELECT room_id FROM rooms WHERE room_code='C01-TEN-01'),'2026-10-22','18:15','19:45',12,6,4,'Completed',TRUE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(168,1,(SELECT room_id FROM rooms WHERE room_code='C01-TEN-01'),'2026-10-24','18:15','19:45',12,6,4,'Completed',TRUE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(169,1,(SELECT room_id FROM rooms WHERE room_code='C01-TEN-01'),'2026-10-27','18:15','19:45',12,6,4,'Completed',TRUE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(170,1,(SELECT room_id FROM rooms WHERE room_code='C01-TEN-01'),'2026-10-29','18:15','19:45',12,6,4,'Completed',TRUE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(171,1,(SELECT room_id FROM rooms WHERE room_code='C01-TEN-01'),'2026-10-31','18:15','19:45',12,6,4,'Completed',TRUE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(172,1,(SELECT room_id FROM rooms WHERE room_code='C01-TEN-01'),'2026-09-08','18:15','19:45',12,7,5,'Completed',TRUE,FALSE,FALSE,NULL,32);
+INSERT INTO sessions(session_id,class_id,room_id,session_date,start_time,end_time,coach_id,booked_member_id,subscription_id,status,attendance_finalized,attendance_review_pending,center_invalidated,makeup_for_session_id,created_by) VALUES(173,1,(SELECT room_id FROM rooms WHERE room_code='C01-TEN-01'),'2026-09-10','18:15','19:45',12,7,5,'Completed',TRUE,FALSE,FALSE,NULL,32);
+INSERT INTO attendances(session_id,member_id,recorded_by,state,note) VALUES(160,6,12,'Present',NULL);
+INSERT INTO attendances(session_id,member_id,recorded_by,state,note) VALUES(161,6,12,'Present',NULL);
+INSERT INTO attendances(session_id,member_id,recorded_by,state,note) VALUES(162,6,12,'Present',NULL);
+INSERT INTO attendances(session_id,member_id,recorded_by,state,note) VALUES(163,6,12,'Present',NULL);
+INSERT INTO attendances(session_id,member_id,recorded_by,state,note) VALUES(164,6,12,'Present',NULL);
+INSERT INTO attendances(session_id,member_id,recorded_by,state,note) VALUES(165,6,12,'Present',NULL);
+INSERT INTO attendances(session_id,member_id,recorded_by,state,note) VALUES(166,6,12,'Present',NULL);
+INSERT INTO attendances(session_id,member_id,recorded_by,state,note) VALUES(167,6,12,'Present',NULL);
+INSERT INTO attendances(session_id,member_id,recorded_by,state,note) VALUES(168,6,12,'Present',NULL);
+INSERT INTO attendances(session_id,member_id,recorded_by,state,note) VALUES(169,6,12,'Present',NULL);
+INSERT INTO attendances(session_id,member_id,recorded_by,state,note) VALUES(170,6,12,'Present',NULL);
+INSERT INTO attendances(session_id,member_id,recorded_by,state,note) VALUES(171,6,12,'Present',NULL);
+INSERT INTO attendances(session_id,member_id,recorded_by,state,note) VALUES(172,7,12,'Present',NULL);
+INSERT INTO attendances(session_id,member_id,recorded_by,state,note) VALUES(173,7,12,'Present',NULL);
+INSERT INTO attendances(session_id,member_id,recorded_by,state,note) VALUES(85,2,24,'Present',NULL);
+INSERT INTO attendances(session_id,member_id,recorded_by,state,note) VALUES(85,3,24,'Present',NULL);
+INSERT INTO attendances(session_id,member_id,recorded_by,state,note) VALUES(85,4,24,'Present',NULL);
+INSERT INTO attendances(session_id,member_id,recorded_by,state,note) VALUES(85,5,24,'Present',NULL);
+INSERT INTO attendances(session_id,member_id,recorded_by,state,note) VALUES(85,6,24,'Present',NULL);
+INSERT INTO attendances(session_id,member_id,recorded_by,state,note) VALUES(85,7,24,'Present',NULL);
+INSERT INTO attendances(session_id,member_id,recorded_by,state,note) VALUES(86,2,24,'Present',NULL);
+INSERT INTO attendances(session_id,member_id,recorded_by,state,note) VALUES(86,3,24,'Present',NULL);
+INSERT INTO attendances(session_id,member_id,recorded_by,state,note) VALUES(86,4,24,'Absent','DEMO cần ôn lại kỹ thuật');
+INSERT INTO attendances(session_id,member_id,recorded_by,state,note) VALUES(86,5,24,'Present',NULL);
+INSERT INTO attendances(session_id,member_id,recorded_by,state,note) VALUES(86,6,24,'Present',NULL);
+INSERT INTO attendances(session_id,member_id,recorded_by,state,note) VALUES(86,7,24,'Present',NULL);
+INSERT INTO attendances(session_id,member_id,recorded_by,state,note) VALUES(87,2,24,'Present',NULL);
+INSERT INTO attendances(session_id,member_id,recorded_by,state,note) VALUES(87,3,24,'Present',NULL);
+INSERT INTO attendances(session_id,member_id,recorded_by,state,note) VALUES(87,4,24,'Present',NULL);
+INSERT INTO attendances(session_id,member_id,recorded_by,state,note) VALUES(87,5,24,'Present',NULL);
+INSERT INTO attendances(session_id,member_id,recorded_by,state,note) VALUES(87,6,24,'Present',NULL);
+INSERT INTO attendances(session_id,member_id,recorded_by,state,note) VALUES(87,7,24,'Present',NULL);
+INSERT INTO attendances(session_id,member_id,recorded_by,state,note) VALUES(88,2,24,'Present',NULL);
+INSERT INTO attendances(session_id,member_id,recorded_by,state,note) VALUES(88,3,24,'Present',NULL);
+INSERT INTO attendances(session_id,member_id,recorded_by,state,note) VALUES(88,4,24,'Absent','DEMO cần ôn lại kỹ thuật');
+INSERT INTO attendances(session_id,member_id,recorded_by,state,note) VALUES(88,5,24,'Present',NULL);
+INSERT INTO attendances(session_id,member_id,recorded_by,state,note) VALUES(88,6,24,'Present',NULL);
+INSERT INTO attendances(session_id,member_id,recorded_by,state,note) VALUES(88,7,24,'Present',NULL);
+INSERT INTO attendances(session_id,member_id,recorded_by,state,note) VALUES(97,2,28,'Present',NULL);
+INSERT INTO attendances(session_id,member_id,recorded_by,state,note) VALUES(97,3,28,'Present',NULL);
+INSERT INTO attendances(session_id,member_id,recorded_by,state,note) VALUES(98,2,28,'Present',NULL);
+INSERT INTO attendances(session_id,member_id,recorded_by,state,note) VALUES(98,3,28,'Present',NULL);
+INSERT INTO attendances(session_id,member_id,recorded_by,state,note) VALUES(99,2,28,'Present',NULL);
+INSERT INTO attendances(session_id,member_id,recorded_by,state,note) VALUES(99,3,28,'Present',NULL);
+INSERT INTO attendances(session_id,member_id,recorded_by,state,note) VALUES(100,2,28,'Present',NULL);
+INSERT INTO attendances(session_id,member_id,recorded_by,state,note) VALUES(100,3,28,'Present',NULL);
+INSERT INTO attendances(session_id,member_id,recorded_by,state,note) VALUES(101,2,28,'Present',NULL);
+INSERT INTO attendances(session_id,member_id,recorded_by,state,note) VALUES(101,3,28,'Present',NULL);
+INSERT INTO attendances(session_id,member_id,recorded_by,state,note) VALUES(102,2,28,'Present',NULL);
+INSERT INTO attendances(session_id,member_id,recorded_by,state,note) VALUES(102,3,28,'Present',NULL);
+INSERT INTO attendances(session_id,member_id,recorded_by,state,note) VALUES(103,2,28,'Present',NULL);
+INSERT INTO attendances(session_id,member_id,recorded_by,state,note) VALUES(103,3,28,'Present',NULL);
+INSERT INTO attendances(session_id,member_id,recorded_by,state,note) VALUES(104,2,28,'Present',NULL);
+INSERT INTO attendances(session_id,member_id,recorded_by,state,note) VALUES(104,3,28,'Present',NULL);
+INSERT INTO attendances(session_id,member_id,recorded_by,state,note) VALUES(105,2,28,'Present',NULL);
+INSERT INTO attendances(session_id,member_id,recorded_by,state,note) VALUES(105,3,28,'Present',NULL);
+INSERT INTO attendances(session_id,member_id,recorded_by,state,note) VALUES(106,2,28,'Present',NULL);
+INSERT INTO attendances(session_id,member_id,recorded_by,state,note) VALUES(106,3,28,'Present',NULL);
+INSERT INTO attendances(session_id,member_id,recorded_by,state,note) VALUES(107,2,28,'Present',NULL);
+INSERT INTO attendances(session_id,member_id,recorded_by,state,note) VALUES(107,3,28,'Present',NULL);
+INSERT INTO attendances(session_id,member_id,recorded_by,state,note) VALUES(108,2,28,'Present',NULL);
+INSERT INTO attendances(session_id,member_id,recorded_by,state,note) VALUES(108,3,28,'Present',NULL);
+INSERT INTO attendances(session_id,member_id,recorded_by,state,note) VALUES(109,2,26,'Present',NULL);
+INSERT INTO attendances(session_id,member_id,recorded_by,state,note) VALUES(109,3,26,'Present',NULL);
+INSERT INTO attendances(session_id,member_id,recorded_by,state,note) VALUES(109,4,26,'Present',NULL);
+INSERT INTO attendances(session_id,member_id,recorded_by,state,note) VALUES(110,2,26,'Present',NULL);
+INSERT INTO attendances(session_id,member_id,recorded_by,state,note) VALUES(110,3,26,'Present',NULL);
+INSERT INTO attendances(session_id,member_id,recorded_by,state,note) VALUES(110,4,26,'Absent','DEMO cần ôn lại kỹ thuật');
+INSERT INTO attendances(session_id,member_id,recorded_by,state,note) VALUES(111,2,26,'Present',NULL);
+INSERT INTO attendances(session_id,member_id,recorded_by,state,note) VALUES(111,3,26,'Present',NULL);
+INSERT INTO attendances(session_id,member_id,recorded_by,state,note) VALUES(111,4,26,'Present',NULL);
+INSERT INTO attendances(session_id,member_id,recorded_by,state,note) VALUES(112,2,26,'Present',NULL);
+INSERT INTO attendances(session_id,member_id,recorded_by,state,note) VALUES(112,3,26,'Present',NULL);
+INSERT INTO attendances(session_id,member_id,recorded_by,state,note) VALUES(112,4,26,'Absent','DEMO cần ôn lại kỹ thuật');
+INSERT INTO attendances(session_id,member_id,recorded_by,state,note) VALUES(113,2,26,'Present',NULL);
+INSERT INTO attendances(session_id,member_id,recorded_by,state,note) VALUES(113,3,26,'Present',NULL);
+INSERT INTO attendances(session_id,member_id,recorded_by,state,note) VALUES(113,4,26,'Present',NULL);
+INSERT INTO attendances(session_id,member_id,recorded_by,state,note) VALUES(114,2,26,'Present',NULL);
+INSERT INTO attendances(session_id,member_id,recorded_by,state,note) VALUES(114,3,26,'Present',NULL);
+INSERT INTO attendances(session_id,member_id,recorded_by,state,note) VALUES(114,4,26,'Present',NULL);
+INSERT INTO attendances(session_id,member_id,recorded_by,state,note) VALUES(115,2,26,'Present',NULL);
+INSERT INTO attendances(session_id,member_id,recorded_by,state,note) VALUES(115,3,26,'Present',NULL);
+INSERT INTO attendances(session_id,member_id,recorded_by,state,note) VALUES(115,4,26,'Present',NULL);
+INSERT INTO attendances(session_id,member_id,recorded_by,state,note) VALUES(116,2,26,'Present',NULL);
+INSERT INTO attendances(session_id,member_id,recorded_by,state,note) VALUES(116,3,26,'Present',NULL);
+INSERT INTO attendances(session_id,member_id,recorded_by,state,note) VALUES(116,4,26,'Present',NULL);
+INSERT INTO training_results(session_id,member_id,coach_id,content,attendance_status,recorded_at) VALUES(160,6,12,'DEMO bài tập cá nhân đã thực hiện','Present','2026-10-06 19:45');
+INSERT INTO training_results(session_id,member_id,coach_id,content,attendance_status,recorded_at) VALUES(161,6,12,'DEMO bài tập cá nhân đã thực hiện','Present','2026-10-08 19:45');
+INSERT INTO training_results(session_id,member_id,coach_id,content,attendance_status,recorded_at) VALUES(162,6,12,'DEMO bài tập cá nhân đã thực hiện','Present','2026-10-10 19:45');
+INSERT INTO training_results(session_id,member_id,coach_id,content,attendance_status,recorded_at) VALUES(163,6,12,'DEMO bài tập cá nhân đã thực hiện','Present','2026-10-13 19:45');
+INSERT INTO training_results(session_id,member_id,coach_id,content,attendance_status,recorded_at) VALUES(164,6,12,'DEMO bài tập cá nhân đã thực hiện','Present','2026-10-15 19:45');
+INSERT INTO training_results(session_id,member_id,coach_id,content,attendance_status,recorded_at) VALUES(165,6,12,'DEMO bài tập cá nhân đã thực hiện','Present','2026-10-17 19:45');
+INSERT INTO training_results(session_id,member_id,coach_id,content,attendance_status,recorded_at) VALUES(166,6,12,'DEMO bài tập cá nhân đã thực hiện','Present','2026-10-20 19:45');
+INSERT INTO training_results(session_id,member_id,coach_id,content,attendance_status,recorded_at) VALUES(167,6,12,'DEMO bài tập cá nhân đã thực hiện','Present','2026-10-22 19:45');
+INSERT INTO training_results(session_id,member_id,coach_id,content,attendance_status,recorded_at) VALUES(168,6,12,'DEMO bài tập cá nhân đã thực hiện','Present','2026-10-24 19:45');
+INSERT INTO training_results(session_id,member_id,coach_id,content,attendance_status,recorded_at) VALUES(169,6,12,'DEMO bài tập cá nhân đã thực hiện','Present','2026-10-27 19:45');
+INSERT INTO training_results(session_id,member_id,coach_id,content,attendance_status,recorded_at) VALUES(170,6,12,'DEMO bài tập cá nhân đã thực hiện','Present','2026-10-29 19:45');
+INSERT INTO training_results(session_id,member_id,coach_id,content,attendance_status,recorded_at) VALUES(171,6,12,'DEMO bài tập cá nhân đã thực hiện','Present','2026-10-31 19:45');
+INSERT INTO training_results(session_id,member_id,coach_id,content,attendance_status,recorded_at) VALUES(172,7,12,'DEMO bài tập cá nhân đã thực hiện','Present','2026-09-08 19:45');
+INSERT INTO training_results(session_id,member_id,coach_id,content,attendance_status,recorded_at) VALUES(173,7,12,'DEMO bài tập cá nhân đã thực hiện','Present','2026-09-10 19:45');
+INSERT INTO training_results(session_id,member_id,coach_id,content,attendance_status,recorded_at) VALUES(85,2,24,'DEMO thực hiện bài tập và được nhận xét tại buổi học','Present','2026-10-31 14:30');
+INSERT INTO training_results(session_id,member_id,coach_id,content,attendance_status,recorded_at) VALUES(85,3,24,'DEMO thực hiện bài tập và được nhận xét tại buổi học','Present','2026-10-31 14:30');
+INSERT INTO training_results(session_id,member_id,coach_id,content,attendance_status,recorded_at) VALUES(85,4,24,'DEMO thực hiện bài tập và được nhận xét tại buổi học','Present','2026-10-31 14:30');
+INSERT INTO training_results(session_id,member_id,coach_id,content,attendance_status,recorded_at) VALUES(85,5,24,'DEMO thực hiện bài tập và được nhận xét tại buổi học','Present','2026-10-31 14:30');
+INSERT INTO training_results(session_id,member_id,coach_id,content,attendance_status,recorded_at) VALUES(85,6,24,'DEMO thực hiện bài tập và được nhận xét tại buổi học','Present','2026-10-31 14:30');
+INSERT INTO training_results(session_id,member_id,coach_id,content,attendance_status,recorded_at) VALUES(85,7,24,'DEMO thực hiện bài tập và được nhận xét tại buổi học','Present','2026-10-31 14:30');
+INSERT INTO training_results(session_id,member_id,coach_id,content,attendance_status,recorded_at) VALUES(86,2,24,'DEMO thực hiện bài tập và được nhận xét tại buổi học','Present','2026-11-03 14:30');
+INSERT INTO training_results(session_id,member_id,coach_id,content,attendance_status,recorded_at) VALUES(86,3,24,'DEMO thực hiện bài tập và được nhận xét tại buổi học','Present','2026-11-03 14:30');
+INSERT INTO training_results(session_id,member_id,coach_id,content,attendance_status,recorded_at) VALUES(86,5,24,'DEMO thực hiện bài tập và được nhận xét tại buổi học','Present','2026-11-03 14:30');
+INSERT INTO training_results(session_id,member_id,coach_id,content,attendance_status,recorded_at) VALUES(86,6,24,'DEMO thực hiện bài tập và được nhận xét tại buổi học','Present','2026-11-03 14:30');
+INSERT INTO training_results(session_id,member_id,coach_id,content,attendance_status,recorded_at) VALUES(86,7,24,'DEMO thực hiện bài tập và được nhận xét tại buổi học','Present','2026-11-03 14:30');
+INSERT INTO training_results(session_id,member_id,coach_id,content,attendance_status,recorded_at) VALUES(87,2,24,'DEMO thực hiện bài tập và được nhận xét tại buổi học','Present','2026-11-05 14:30');
+INSERT INTO training_results(session_id,member_id,coach_id,content,attendance_status,recorded_at) VALUES(87,3,24,'DEMO thực hiện bài tập và được nhận xét tại buổi học','Present','2026-11-05 14:30');
+INSERT INTO training_results(session_id,member_id,coach_id,content,attendance_status,recorded_at) VALUES(87,4,24,'DEMO thực hiện bài tập và được nhận xét tại buổi học','Present','2026-11-05 14:30');
+INSERT INTO training_results(session_id,member_id,coach_id,content,attendance_status,recorded_at) VALUES(87,5,24,'DEMO thực hiện bài tập và được nhận xét tại buổi học','Present','2026-11-05 14:30');
+INSERT INTO training_results(session_id,member_id,coach_id,content,attendance_status,recorded_at) VALUES(87,6,24,'DEMO thực hiện bài tập và được nhận xét tại buổi học','Present','2026-11-05 14:30');
+INSERT INTO training_results(session_id,member_id,coach_id,content,attendance_status,recorded_at) VALUES(87,7,24,'DEMO thực hiện bài tập và được nhận xét tại buổi học','Present','2026-11-05 14:30');
+INSERT INTO training_results(session_id,member_id,coach_id,content,attendance_status,recorded_at) VALUES(88,2,24,'DEMO thực hiện bài tập và được nhận xét tại buổi học','Present','2026-11-07 14:30');
+INSERT INTO training_results(session_id,member_id,coach_id,content,attendance_status,recorded_at) VALUES(88,3,24,'DEMO thực hiện bài tập và được nhận xét tại buổi học','Present','2026-11-07 14:30');
+INSERT INTO training_results(session_id,member_id,coach_id,content,attendance_status,recorded_at) VALUES(88,5,24,'DEMO thực hiện bài tập và được nhận xét tại buổi học','Present','2026-11-07 14:30');
+INSERT INTO training_results(session_id,member_id,coach_id,content,attendance_status,recorded_at) VALUES(88,6,24,'DEMO thực hiện bài tập và được nhận xét tại buổi học','Present','2026-11-07 14:30');
+INSERT INTO training_results(session_id,member_id,coach_id,content,attendance_status,recorded_at) VALUES(88,7,24,'DEMO thực hiện bài tập và được nhận xét tại buổi học','Present','2026-11-07 14:30');
+INSERT INTO training_results(session_id,member_id,coach_id,content,attendance_status,recorded_at) VALUES(97,2,28,'DEMO thực hiện bài tập và được nhận xét tại buổi học','Present','2026-09-21 16:15');
+INSERT INTO training_results(session_id,member_id,coach_id,content,attendance_status,recorded_at) VALUES(97,3,28,'DEMO thực hiện bài tập và được nhận xét tại buổi học','Present','2026-09-21 16:15');
+INSERT INTO training_results(session_id,member_id,coach_id,content,attendance_status,recorded_at) VALUES(98,2,28,'DEMO thực hiện bài tập và được nhận xét tại buổi học','Present','2026-09-23 16:15');
+INSERT INTO training_results(session_id,member_id,coach_id,content,attendance_status,recorded_at) VALUES(98,3,28,'DEMO thực hiện bài tập và được nhận xét tại buổi học','Present','2026-09-23 16:15');
+INSERT INTO training_results(session_id,member_id,coach_id,content,attendance_status,recorded_at) VALUES(99,2,28,'DEMO thực hiện bài tập và được nhận xét tại buổi học','Present','2026-09-25 16:15');
+INSERT INTO training_results(session_id,member_id,coach_id,content,attendance_status,recorded_at) VALUES(99,3,28,'DEMO thực hiện bài tập và được nhận xét tại buổi học','Present','2026-09-25 16:15');
+INSERT INTO training_results(session_id,member_id,coach_id,content,attendance_status,recorded_at) VALUES(100,2,28,'DEMO thực hiện bài tập và được nhận xét tại buổi học','Present','2026-09-28 16:15');
+INSERT INTO training_results(session_id,member_id,coach_id,content,attendance_status,recorded_at) VALUES(100,3,28,'DEMO thực hiện bài tập và được nhận xét tại buổi học','Present','2026-09-28 16:15');
+INSERT INTO training_results(session_id,member_id,coach_id,content,attendance_status,recorded_at) VALUES(101,2,28,'DEMO thực hiện bài tập và được nhận xét tại buổi học','Present','2026-09-30 16:15');
+INSERT INTO training_results(session_id,member_id,coach_id,content,attendance_status,recorded_at) VALUES(101,3,28,'DEMO thực hiện bài tập và được nhận xét tại buổi học','Present','2026-09-30 16:15');
+INSERT INTO training_results(session_id,member_id,coach_id,content,attendance_status,recorded_at) VALUES(102,2,28,'DEMO thực hiện bài tập và được nhận xét tại buổi học','Present','2026-10-02 16:15');
+INSERT INTO training_results(session_id,member_id,coach_id,content,attendance_status,recorded_at) VALUES(102,3,28,'DEMO thực hiện bài tập và được nhận xét tại buổi học','Present','2026-10-02 16:15');
+INSERT INTO training_results(session_id,member_id,coach_id,content,attendance_status,recorded_at) VALUES(103,2,28,'DEMO thực hiện bài tập và được nhận xét tại buổi học','Present','2026-10-05 16:15');
+INSERT INTO training_results(session_id,member_id,coach_id,content,attendance_status,recorded_at) VALUES(103,3,28,'DEMO thực hiện bài tập và được nhận xét tại buổi học','Present','2026-10-05 16:15');
+INSERT INTO training_results(session_id,member_id,coach_id,content,attendance_status,recorded_at) VALUES(104,2,28,'DEMO thực hiện bài tập và được nhận xét tại buổi học','Present','2026-10-07 16:15');
+INSERT INTO training_results(session_id,member_id,coach_id,content,attendance_status,recorded_at) VALUES(104,3,28,'DEMO thực hiện bài tập và được nhận xét tại buổi học','Present','2026-10-07 16:15');
+INSERT INTO training_results(session_id,member_id,coach_id,content,attendance_status,recorded_at) VALUES(105,2,28,'DEMO thực hiện bài tập và được nhận xét tại buổi học','Present','2026-10-09 16:15');
+INSERT INTO training_results(session_id,member_id,coach_id,content,attendance_status,recorded_at) VALUES(105,3,28,'DEMO thực hiện bài tập và được nhận xét tại buổi học','Present','2026-10-09 16:15');
+INSERT INTO training_results(session_id,member_id,coach_id,content,attendance_status,recorded_at) VALUES(106,2,28,'DEMO thực hiện bài tập và được nhận xét tại buổi học','Present','2026-10-12 16:15');
+INSERT INTO training_results(session_id,member_id,coach_id,content,attendance_status,recorded_at) VALUES(106,3,28,'DEMO thực hiện bài tập và được nhận xét tại buổi học','Present','2026-10-12 16:15');
+INSERT INTO training_results(session_id,member_id,coach_id,content,attendance_status,recorded_at) VALUES(107,2,28,'DEMO thực hiện bài tập và được nhận xét tại buổi học','Present','2026-10-14 16:15');
+INSERT INTO training_results(session_id,member_id,coach_id,content,attendance_status,recorded_at) VALUES(107,3,28,'DEMO thực hiện bài tập và được nhận xét tại buổi học','Present','2026-10-14 16:15');
+INSERT INTO training_results(session_id,member_id,coach_id,content,attendance_status,recorded_at) VALUES(108,2,28,'DEMO thực hiện bài tập và được nhận xét tại buổi học','Present','2026-10-16 16:15');
+INSERT INTO training_results(session_id,member_id,coach_id,content,attendance_status,recorded_at) VALUES(108,3,28,'DEMO thực hiện bài tập và được nhận xét tại buổi học','Present','2026-10-16 16:15');
+INSERT INTO training_results(session_id,member_id,coach_id,content,attendance_status,recorded_at) VALUES(109,2,26,'DEMO thực hiện bài tập và được nhận xét tại buổi học','Present','2026-10-22 16:15');
+INSERT INTO training_results(session_id,member_id,coach_id,content,attendance_status,recorded_at) VALUES(109,3,26,'DEMO thực hiện bài tập và được nhận xét tại buổi học','Present','2026-10-22 16:15');
+INSERT INTO training_results(session_id,member_id,coach_id,content,attendance_status,recorded_at) VALUES(109,4,26,'DEMO thực hiện bài tập và được nhận xét tại buổi học','Present','2026-10-22 16:15');
+INSERT INTO training_results(session_id,member_id,coach_id,content,attendance_status,recorded_at) VALUES(110,2,26,'DEMO thực hiện bài tập và được nhận xét tại buổi học','Present','2026-10-24 16:15');
+INSERT INTO training_results(session_id,member_id,coach_id,content,attendance_status,recorded_at) VALUES(110,3,26,'DEMO thực hiện bài tập và được nhận xét tại buổi học','Present','2026-10-24 16:15');
+INSERT INTO training_results(session_id,member_id,coach_id,content,attendance_status,recorded_at) VALUES(111,2,26,'DEMO thực hiện bài tập và được nhận xét tại buổi học','Present','2026-10-27 16:15');
+INSERT INTO training_results(session_id,member_id,coach_id,content,attendance_status,recorded_at) VALUES(111,3,26,'DEMO thực hiện bài tập và được nhận xét tại buổi học','Present','2026-10-27 16:15');
+INSERT INTO training_results(session_id,member_id,coach_id,content,attendance_status,recorded_at) VALUES(111,4,26,'DEMO thực hiện bài tập và được nhận xét tại buổi học','Present','2026-10-27 16:15');
+INSERT INTO training_results(session_id,member_id,coach_id,content,attendance_status,recorded_at) VALUES(112,2,26,'DEMO thực hiện bài tập và được nhận xét tại buổi học','Present','2026-10-29 16:15');
+INSERT INTO training_results(session_id,member_id,coach_id,content,attendance_status,recorded_at) VALUES(112,3,26,'DEMO thực hiện bài tập và được nhận xét tại buổi học','Present','2026-10-29 16:15');
+INSERT INTO training_results(session_id,member_id,coach_id,content,attendance_status,recorded_at) VALUES(113,2,26,'DEMO thực hiện bài tập và được nhận xét tại buổi học','Present','2026-10-31 16:15');
+INSERT INTO training_results(session_id,member_id,coach_id,content,attendance_status,recorded_at) VALUES(113,3,26,'DEMO thực hiện bài tập và được nhận xét tại buổi học','Present','2026-10-31 16:15');
+INSERT INTO training_results(session_id,member_id,coach_id,content,attendance_status,recorded_at) VALUES(113,4,26,'DEMO thực hiện bài tập và được nhận xét tại buổi học','Present','2026-10-31 16:15');
+INSERT INTO training_results(session_id,member_id,coach_id,content,attendance_status,recorded_at) VALUES(114,2,26,'DEMO thực hiện bài tập và được nhận xét tại buổi học','Present','2026-11-03 16:15');
+INSERT INTO training_results(session_id,member_id,coach_id,content,attendance_status,recorded_at) VALUES(114,3,26,'DEMO thực hiện bài tập và được nhận xét tại buổi học','Present','2026-11-03 16:15');
+INSERT INTO training_results(session_id,member_id,coach_id,content,attendance_status,recorded_at) VALUES(114,4,26,'DEMO thực hiện bài tập và được nhận xét tại buổi học','Present','2026-11-03 16:15');
+INSERT INTO training_results(session_id,member_id,coach_id,content,attendance_status,recorded_at) VALUES(115,2,26,'DEMO thực hiện bài tập và được nhận xét tại buổi học','Present','2026-11-05 16:15');
+INSERT INTO training_results(session_id,member_id,coach_id,content,attendance_status,recorded_at) VALUES(115,3,26,'DEMO thực hiện bài tập và được nhận xét tại buổi học','Present','2026-11-05 16:15');
+INSERT INTO training_results(session_id,member_id,coach_id,content,attendance_status,recorded_at) VALUES(115,4,26,'DEMO thực hiện bài tập và được nhận xét tại buổi học','Present','2026-11-05 16:15');
+INSERT INTO training_plans(coach_id,class_id,member_id,title,content,created_at) VALUES(12,NULL,4,'DEMO giáo án cá nhân Advanced','Thực hành kỹ thuật riêng cho Member M03','2026-10-31 08:00');
+INSERT INTO training_plans(coach_id,class_id,member_id,title,content,created_at) VALUES(24,17,NULL,'DEMO giáo án lớp N08','Khởi động, kỹ thuật cơ bản, thực hành và thả lỏng','2026-10-31 08:00');
+INSERT INTO training_plans(coach_id,class_id,member_id,title,content,created_at) VALUES(28,18,NULL,'DEMO giáo án lớp N09','Khởi động, kỹ thuật cơ bản, thực hành và thả lỏng','2026-10-31 08:00');
+INSERT INTO training_plans(coach_id,class_id,member_id,title,content,created_at) VALUES(26,19,NULL,'DEMO giáo án lớp N10','Khởi động, kỹ thuật cơ bản, thực hành và thả lỏng','2026-10-31 08:00');
+INSERT INTO evaluations(member_id,coach_id,evaluation_date,progress_score,comment) VALUES(2,28,'2026-10-26',8,'DEMO tiến bộ sau khóa Bóng bàn');
+INSERT INTO evaluations(member_id,coach_id,evaluation_date,progress_score,comment) VALUES(3,28,'2026-10-26',8,'DEMO tiến bộ sau khóa Bóng bàn');
+INSERT INTO class_feedbacks(member_id,class_id,coach_id,class_rating,coach_rating,comment,created_at) VALUES(2,18,28,4,4,'DEMO phản hồi khóa đã hoàn tất','2026-11-09 08:00');
+INSERT INTO class_feedbacks(member_id,class_id,coach_id,class_rating,coach_rating,comment,created_at) VALUES(3,18,28,4,4,'DEMO phản hồi khóa đã hoàn tất','2026-11-09 08:00');
+INSERT INTO center_incidents(id,session_id,request_key,started_at,ended_at,reason,evidence,status,created_by,created_at,resolved_by,resolved_at,recovered_credits,session_compensated) VALUES(1,116,'INC-N10','2026-11-07 14:45','2026-11-07 14:45','DEMO buổi không tổ chức do trung tâm','DEMO xác minh buổi không tổ chức','Resolved',32,'2026-11-07 14:45',32,'2026-11-07 14:45',0,TRUE);
+INSERT INTO incident_affected_members(incident_id,member_id) VALUES(1,2);
+INSERT INTO incident_affected_members(incident_id,member_id) VALUES(1,3);
+INSERT INTO incident_affected_members(incident_id,member_id) VALUES(1,4);
+INSERT INTO payment_resolutions(id,invoice_id,resolution_type,status,amount,reason,created_by,created_at,approved_by,approved_at,completed_by,completed_at,performed_at,evidence) VALUES(1,56,'CashCorrection','Approved',3000000,'DEMO COUNTER_MISTAKE',32,'2026-11-08T09:00:00',32,'2026-11-08T09:01:00',NULL,NULL,NULL,NULL);
+INSERT INTO payment_resolutions(id,invoice_id,resolution_type,status,amount,reason,created_by,created_at,approved_by,approved_at,completed_by,completed_at,performed_at,evidence) VALUES(2,15,'Refund','AwaitingReceiver',1800000,'DEMO MEMBER_REQUEST',32,'2026-11-07T00:00:00',NULL,NULL,NULL,NULL,NULL,NULL);
+INSERT INTO normal_refunds(id,class_id,origin,version,due_at,first_due_at,issue_note) VALUES(2,14,'MemberChoice',0,NULL,NULL,NULL);
+UPDATE invoices SET resolution_status='RefundPending' WHERE invoice_id=15;
+INSERT INTO payment_resolutions(id,invoice_id,resolution_type,status,amount,reason,created_by,created_at,approved_by,approved_at,completed_by,completed_at,performed_at,evidence) VALUES(3,17,'Refund','AwaitingReceiver',1200000,'DEMO CENTER_CANCELLATION',32,'2026-11-07T00:00:00',NULL,NULL,NULL,NULL,NULL,NULL);
+INSERT INTO normal_refunds(id,class_id,origin,version,due_at,first_due_at,issue_note) VALUES(3,15,'CenterCancellation',0,NULL,NULL,NULL);
+UPDATE invoices SET resolution_status='RefundPending' WHERE invoice_id=17;
+INSERT INTO payment_resolutions(id,invoice_id,resolution_type,status,amount,reason,created_by,created_at,approved_by,approved_at,completed_by,completed_at,performed_at,evidence) VALUES(4,18,'Refund','AwaitingApproval',1200000,'DEMO CENTER_CANCELLATION',32,'2026-11-07T00:00:00',NULL,NULL,NULL,NULL,NULL,NULL);
+INSERT INTO normal_refunds(id,class_id,origin,version,due_at,first_due_at,issue_note) VALUES(4,15,'CenterCancellation',0,NULL,NULL,NULL);
+UPDATE invoices SET resolution_status='RefundPending' WHERE invoice_id=18;
+INSERT INTO normal_refund_receivers(id,refund_id,bank,account_number,account_name,confirmed_by,confirmed_at,verified_by,verified_at,verification_source) VALUES(4,4,'DEMO BANK','DEMOACCOUNTM05','DEMO M05',6,'2026-11-10T00:00',NULL,NULL,NULL);
+UPDATE normal_refunds SET receiver_id=4,approved_receiver_id=NULL WHERE id=4;
+INSERT INTO payment_resolutions(id,invoice_id,resolution_type,status,amount,reason,created_by,created_at,approved_by,approved_at,completed_by,completed_at,performed_at,evidence) VALUES(5,19,'Refund','Approved',1200000,'DEMO CENTER_CANCELLATION',32,'2026-11-07T00:00:00',32,'2026-11-10T00:00',NULL,NULL,NULL,NULL);
+INSERT INTO normal_refunds(id,class_id,origin,version,due_at,first_due_at,issue_note) VALUES(5,15,'CenterCancellation',0,'2026-11-17T23:59:59.999','2026-11-17T23:59:59.999',NULL);
+UPDATE invoices SET resolution_status='RefundPending' WHERE invoice_id=19;
+INSERT INTO normal_refund_receivers(id,refund_id,bank,account_number,account_name,confirmed_by,confirmed_at,verified_by,verified_at,verification_source) VALUES(5,5,'DEMO BANK','DEMOACCOUNTM06','DEMO M06',7,'2026-11-10T00:00',32,'2026-11-10T00:00','DEMO Member and receiving account ownership verified');
+UPDATE normal_refunds SET receiver_id=5,approved_receiver_id=5 WHERE id=5;
+INSERT INTO payment_resolutions(id,invoice_id,resolution_type,status,amount,reason,created_by,created_at,approved_by,approved_at,completed_by,completed_at,performed_at,evidence) VALUES(6,48,'Refund','AwaitingVerification',900000,'DEMO CENTER_CANCELLATION',32,'2026-10-20T16:30:00',32,'2026-11-07T00:00',NULL,NULL,NULL,NULL);
+INSERT INTO normal_refunds(id,class_id,origin,version,due_at,first_due_at,issue_note) VALUES(6,21,'CenterCancellation',0,'2026-11-14T23:59:59.999','2026-11-14T23:59:59.999',NULL);
+UPDATE invoices SET resolution_status='RefundPending' WHERE invoice_id=48;
+INSERT INTO normal_refund_receivers(id,refund_id,bank,account_number,account_name,confirmed_by,confirmed_at,verified_by,verified_at,verification_source) VALUES(6,6,'DEMO BANK','DEMOACCOUNTM07','DEMO M07',8,'2026-11-07T00:00',32,'2026-11-07T00:00','DEMO Member and receiving account ownership verified');
+UPDATE normal_refunds SET receiver_id=6,approved_receiver_id=6 WHERE id=6;
+INSERT INTO normal_refund_attempts(id,refund_id,receiver_id,claim_key,claimed_by,claimed_at,status,amount,currency,bank_reference,performed_at,verified_by,verified_at,bank_source,outcome_note) VALUES(6,6,6,'852316bf-6922-5326-a044-9f8a12e42a13',30,'2026-11-08 08:00','Submitted',900000,'VND','DEMO-TRANSFER-RF05','2026-11-09T08:00',NULL,NULL,NULL,NULL);
+INSERT INTO normal_refund_documents(attempt_id,uploaded_by,uploaded_at,content_type,sha256,content) VALUES(6,30,'2026-11-09T08:00','application/pdf','0ba3084d2086d4f7a4858adf2ffba38d00f847c14df46c6974b6fa02ad14e94f',decode('255044462d312e330a25938c8b9e205265706f72744c61622047656e6572617465642050444620646f63756d656e7420286f70656e736f75726365290a312030206f626a0a3c3c0a2f4631203220302052202f46322033203020520a3e3e0a656e646f626a0a322030206f626a0a3c3c0a2f42617365466f6e74202f48656c766574696361202f456e636f64696e67202f57696e416e7369456e636f64696e67202f4e616d65202f4631202f53756274797065202f5479706531202f54797065202f466f6e740a3e3e0a656e646f626a0a332030206f626a0a3c3c0a2f42617365466f6e74202f48656c7665746963612d426f6c64202f456e636f64696e67202f57696e416e7369456e636f64696e67202f4e616d65202f4632202f53756274797065202f5479706531202f54797065202f466f6e740a3e3e0a656e646f626a0a342030206f626a0a3c3c0a2f436f6e74656e7473203820302052202f4d65646961426f78205b203020302035393520343230205d202f506172656e74203720302052202f5265736f7572636573203c3c0a2f466f6e74203120302052202f50726f63536574205b202f504446202f54657874202f496d61676542202f496d61676543202f496d61676549205d0a3e3e202f526f746174652030202f5472616e73203c3c0a0a3e3e200a20202f54797065202f506167650a3e3e0a656e646f626a0a352030206f626a0a3c3c0a2f506167654d6f6465202f5573654e6f6e65202f5061676573203720302052202f54797065202f436174616c6f670a3e3e0a656e646f626a0a362030206f626a0a3c3c0a2f417574686f722028616e6f6e796d6f757329202f4372656174696f6e446174652028443a32303030303130313030303030302b30302730302729202f43726561746f722028616e6f6e796d6f757329202f4b6579776f726473202829202f4d6f64446174652028443a32303030303130313030303030302b30302730302729202f50726f647563657220285265706f72744c616220504446204c696272617279202d205c286f70656e736f757263655c2929200a20202f5375626a6563742028756e73706563696669656429202f5469746c65202844454d4f20726566756e642065766964656e6365205246303529202f54726170706564202f46616c73650a3e3e0a656e646f626a0a372030206f626a0a3c3c0a2f436f756e742031202f4b696473205b203420302052205d202f54797065202f50616765730a3e3e0a656e646f626a0a382030206f626a0a3c3c0a2f46696c746572205b202f415343494938354465636f6465202f466c6174654465636f6465205d202f4c656e677468203337320a3e3e0a73747265616d0a4761733244597469316a274c64355b696638505240604d337341682e5e5a32283b2d4c472a42522854515a46573c3969413933212e35363445752a736b4d3275595f382a6b623f595c4c7269614b6d4436635e306e352b3d712d4f6965562d256855464c5c49632b42473c576b602c29316d75383c294140524e32715e35473152214863545a652b2a56463d2350656a547335572e745f574f3c6335214a6827532a55455f39577134343e483f395c514b6d3d2b2367636b394852252e2c45373f6e705c5a2a5a376f4a632a5929286c605e5c5058406e2e21402f313f4226213746666a45545c2d2b3c3f343f56665d4267637024274e43383a6d5254247226555b586b7223612235566b3b265d586a704173235b25754c532d4e6a566665517550503325562c582b457259633d467427413845755b62663b3167415e6935356b653b2b4f394c5952612e506746365f336f2b3c3f5f433559454665553662516b5f665b6a423b255d585b623d3c2c4965607e3e656e6473747265616d0a656e646f626a0a787265660a3020390a303030303030303030302036353533352066200a30303030303030303631203030303030206e200a30303030303030313032203030303030206e200a30303030303030323039203030303030206e200a30303030303030333231203030303030206e200a30303030303030353134203030303030206e200a30303030303030353832203030303030206e200a30303030303030383630203030303030206e200a30303030303030393139203030303030206e200a747261696c65720a3c3c0a2f4944200a5b3c61356261376339363235616661363135666437663731353931393438666239613e3c61356261376339363235616661363135666437663731353931393438666239613e5d0a25205265706f72744c61622067656e6572617465642050444620646f63756d656e74202d2d2064696765737420286f70656e736f75726365290a0a2f496e666f2036203020520a2f526f6f742035203020520a2f53697a6520390a3e3e0a7374617274787265660a313338310a2525454f460a','hex'));
+INSERT INTO payment_resolutions(id,invoice_id,resolution_type,status,amount,reason,created_by,created_at,approved_by,approved_at,completed_by,completed_at,performed_at,evidence) VALUES(7,49,'Refund','Completed',900000,'DEMO CENTER_CANCELLATION',32,'2026-10-20T16:30:00',32,'2026-11-07T00:00',33,'2026-11-10 00:00','2026-11-09 08:00','DEMO private bank evidence retained');
+INSERT INTO normal_refunds(id,class_id,origin,version,due_at,first_due_at,issue_note) VALUES(7,21,'CenterCancellation',0,'2026-11-14T23:59:59.999','2026-11-14T23:59:59.999',NULL);
+UPDATE invoices SET resolution_status='Completed' WHERE invoice_id=49;
+INSERT INTO normal_refund_receivers(id,refund_id,bank,account_number,account_name,confirmed_by,confirmed_at,verified_by,verified_at,verification_source) VALUES(7,7,'DEMO BANK','DEMOACCOUNTM08','DEMO M08',9,'2026-11-07T00:00',32,'2026-11-07T00:00','DEMO Member and receiving account ownership verified');
+UPDATE normal_refunds SET receiver_id=7,approved_receiver_id=7 WHERE id=7;
+INSERT INTO normal_refund_attempts(id,refund_id,receiver_id,claim_key,claimed_by,claimed_at,status,amount,currency,bank_reference,performed_at,verified_by,verified_at,bank_source,outcome_note) VALUES(7,7,7,'0a07aaa4-9db2-58bb-b9bf-06115213545d',30,'2026-11-08 08:00','Verified',900000,'VND','DEMO-TRANSFER-RF06','2026-11-09T08:00',33,'2026-11-10 00:00','DEMO independent center bank statement','DEMO independently matched success');
+INSERT INTO normal_refund_documents(attempt_id,uploaded_by,uploaded_at,content_type,sha256,content) VALUES(7,30,'2026-11-09T08:00','application/pdf','439a8e178bcc8dbbc0c0d5607d4d3917155aa54452d2e1270131db2ddb9f7211',decode('255044462d312e330a25938c8b9e205265706f72744c61622047656e6572617465642050444620646f63756d656e7420286f70656e736f75726365290a312030206f626a0a3c3c0a2f4631203220302052202f46322033203020520a3e3e0a656e646f626a0a322030206f626a0a3c3c0a2f42617365466f6e74202f48656c766574696361202f456e636f64696e67202f57696e416e7369456e636f64696e67202f4e616d65202f4631202f53756274797065202f5479706531202f54797065202f466f6e740a3e3e0a656e646f626a0a332030206f626a0a3c3c0a2f42617365466f6e74202f48656c7665746963612d426f6c64202f456e636f64696e67202f57696e416e7369456e636f64696e67202f4e616d65202f4632202f53756274797065202f5479706531202f54797065202f466f6e740a3e3e0a656e646f626a0a342030206f626a0a3c3c0a2f436f6e74656e7473203820302052202f4d65646961426f78205b203020302035393520343230205d202f506172656e74203720302052202f5265736f7572636573203c3c0a2f466f6e74203120302052202f50726f63536574205b202f504446202f54657874202f496d61676542202f496d61676543202f496d61676549205d0a3e3e202f526f746174652030202f5472616e73203c3c0a0a3e3e200a20202f54797065202f506167650a3e3e0a656e646f626a0a352030206f626a0a3c3c0a2f506167654d6f6465202f5573654e6f6e65202f5061676573203720302052202f54797065202f436174616c6f670a3e3e0a656e646f626a0a362030206f626a0a3c3c0a2f417574686f722028616e6f6e796d6f757329202f4372656174696f6e446174652028443a32303030303130313030303030302b30302730302729202f43726561746f722028616e6f6e796d6f757329202f4b6579776f726473202829202f4d6f64446174652028443a32303030303130313030303030302b30302730302729202f50726f647563657220285265706f72744c616220504446204c696272617279202d205c286f70656e736f757263655c2929200a20202f5375626a6563742028756e73706563696669656429202f5469746c65202844454d4f20726566756e642065766964656e6365205246303629202f54726170706564202f46616c73650a3e3e0a656e646f626a0a372030206f626a0a3c3c0a2f436f756e742031202f4b696473205b203420302052205d202f54797065202f50616765730a3e3e0a656e646f626a0a382030206f626a0a3c3c0a2f46696c746572205b202f415343494938354465636f6465202f466c6174654465636f6465205d202f4c656e677468203337320a3e3e0a73747265616d0a4761733244597469316a274c64355b696638505240604e3e5341682e5e5a32283b2d4c472a42522854515a46573c3969413933212e35363445752a736b4d3275595f382a6b623f595c4c7269614b6d4436635e306e352b3d712d4f6965562d25685a68213e5f6c505434212e6c40264f41656d383c294140524e32715e35473152214863545a652b2a56463d2350656a547335572e745f574e4a4949216b512c32715c644852396c47475b6f544f432f43684735263e36575070493b3b37694d5e676a462653324d6c23352e3c3151375b575c5058406e2e21402f313f3c735a316c3c3a5b31453d235a5e475e2e4e4364746c70272e42225254676c59746d2c505c446170636a69483a487375443e483d5f7126402a747333224f59365a3863392f5033276c6c582b457259633d4674274131583c416b246f2d6f313f742c5546506629385650366a41276344352c692855535930324f283d33336d642b6a6f5c6f446751482f4d3f4a4b6f2f3c706c2d3c7e3e656e6473747265616d0a656e646f626a0a787265660a3020390a303030303030303030302036353533352066200a30303030303030303631203030303030206e200a30303030303030313032203030303030206e200a30303030303030323039203030303030206e200a30303030303030333231203030303030206e200a30303030303030353134203030303030206e200a30303030303030353832203030303030206e200a30303030303030383630203030303030206e200a30303030303030393139203030303030206e200a747261696c65720a3c3c0a2f4944200a5b3c36363963616465663961663030333930343339653133366230303037653466393e3c36363963616465663961663030333930343339653133366230303037653466393e5d0a25205265706f72744c61622067656e6572617465642050444620646f63756d656e74202d2d2064696765737420286f70656e736f75726365290a0a2f496e666f2036203020520a2f526f6f742035203020520a2f53697a6520390a3e3e0a7374617274787265660a313338310a2525454f460a','hex'));
+INSERT INTO payment_resolutions(id,invoice_id,resolution_type,status,amount,reason,created_by,created_at,approved_by,approved_at,completed_by,completed_at,performed_at,evidence) VALUES(8,50,'Refund','NeedsReview',900000,'DEMO CENTER_CANCELLATION',32,'2026-10-20T16:30:00',32,'2026-11-07T00:00',NULL,NULL,NULL,NULL);
+INSERT INTO normal_refunds(id,class_id,origin,version,due_at,first_due_at,issue_note) VALUES(8,21,'CenterCancellation',0,'2026-11-14T23:59:59.999','2026-11-14T23:59:59.999','DEMO unknown bank outcome; do not retry transfer');
+UPDATE invoices SET resolution_status='RefundPending' WHERE invoice_id=50;
+INSERT INTO normal_refund_receivers(id,refund_id,bank,account_number,account_name,confirmed_by,confirmed_at,verified_by,verified_at,verification_source) VALUES(8,8,'DEMO BANK','DEMOACCOUNTM09','DEMO M09',10,'2026-11-07T00:00',32,'2026-11-07T00:00','DEMO Member and receiving account ownership verified');
+UPDATE normal_refunds SET receiver_id=8,approved_receiver_id=8 WHERE id=8;
+INSERT INTO normal_refund_attempts(id,refund_id,receiver_id,claim_key,claimed_by,claimed_at,status,amount,currency,bank_reference,performed_at,verified_by,verified_at,bank_source,outcome_note) VALUES(8,8,8,'f2f24d0c-a592-569f-8353-bf265375f65f',30,'2026-11-08 08:00','Claimed',900000,'VND','DEMO-TRANSFER-RF07','2026-11-09T08:00',NULL,NULL,NULL,NULL);
+INSERT INTO normal_refund_verifications(attempt_id,verified_by,verified_at,outcome,bank_source,note) VALUES(7,33,'2026-11-10 00:00','Success','DEMO independent center bank statement','DEMO receipt and receiver matched independently');
+INSERT INTO normal_proposals(id,class_id,target_class_id,kind,status,shift_days,version,fingerprint,schedule_json,reason,created_by,created_at) VALUES(1,14,20,'Transfer','Pending',NULL,1,'RECOMPUTE_AFTER_FIXTURE','[]','DEMO center cannot provide original class',32,'2026-11-07 00:00');
+INSERT INTO normal_responses(proposal_id,invoice_id,member_id,choice,version,responded_at) VALUES(1,14,2,'Waiting',1,'2026-11-07 00:00');
+INSERT INTO normal_responses(proposal_id,invoice_id,member_id,choice,version,responded_at) VALUES(1,15,3,'Refund',1,'2026-11-07 00:00');
+INSERT INTO normal_responses(proposal_id,invoice_id,member_id,choice,version,responded_at) VALUES(1,16,4,'Waiting',1,'2026-11-07 00:00');
+UPDATE normal_proposals p SET schedule_json=(SELECT json_agg(json_build_object('sessionId',s.session_id,'date',s.session_date,'start',to_char(s.start_time,'HH24:MI'),'end',to_char(s.end_time,'HH24:MI'),'coachId',s.coach_id,'roomId',s.room_id) ORDER BY s.session_date,s.start_time)::text FROM sessions s WHERE s.class_id=coalesce(p.target_class_id,p.class_id) AND s.status<>'Cancelled' AND NOT s.center_invalidated) WHERE p.id=1;
+UPDATE normal_proposals p SET fingerprint=encode(extensions.digest((SELECT string_agg(piece,'' ORDER BY class_id) FROM (SELECT c.class_id,c.class_id||':'||c.status||':'||c.tuition_fee||':'||c.max_capacity||':'||c.min_capacity||':'||c.coach_id||coalesce((SELECT string_agg('|'||s.session_id||':'||s.session_date||':'||to_char(s.start_time,'HH24:MI')||':'||to_char(s.end_time,'HH24:MI')||':'||s.room_id||':'||s.coach_id||':'||s.status,'' ORDER BY s.session_date,s.start_time) FROM sessions s WHERE s.class_id=c.class_id AND s.status<>'Cancelled' AND NOT s.center_invalidated),'') AS piece FROM classes c WHERE c.class_id=p.class_id OR c.class_id=p.target_class_id) x),'sha256'),'hex') WHERE p.id=1;
+INSERT INTO normal_proposals(id,class_id,target_class_id,kind,status,shift_days,version,fingerprint,schedule_json,reason,created_by,created_at) VALUES(2,13,NULL,'Postpone','Applied',7,1,'RECOMPUTE_AFTER_FIXTURE','[]','DEMO insufficient enrollment; one postponement applied',32,'2026-11-07 00:00');
+INSERT INTO normal_responses(proposal_id,invoice_id,member_id,choice,version,responded_at) VALUES(2,11,2,'Accept',1,'2026-11-07 00:00');
+INSERT INTO normal_responses(proposal_id,invoice_id,member_id,choice,version,responded_at) VALUES(2,12,3,'Accept',1,'2026-11-07 00:00');
+INSERT INTO normal_responses(proposal_id,invoice_id,member_id,choice,version,responded_at) VALUES(2,13,4,'Accept',1,'2026-11-07 00:00');
+UPDATE normal_proposals p SET schedule_json=(SELECT json_agg(json_build_object('sessionId',s.session_id,'date',s.session_date,'start',to_char(s.start_time,'HH24:MI'),'end',to_char(s.end_time,'HH24:MI'),'coachId',s.coach_id,'roomId',s.room_id) ORDER BY s.session_date,s.start_time)::text FROM sessions s WHERE s.class_id=coalesce(p.target_class_id,p.class_id) AND s.status<>'Cancelled' AND NOT s.center_invalidated) WHERE p.id=2;
+UPDATE normal_proposals p SET fingerprint=encode(extensions.digest((SELECT string_agg(piece,'' ORDER BY class_id) FROM (SELECT c.class_id,c.class_id||':'||c.status||':'||c.tuition_fee||':'||c.max_capacity||':'||c.min_capacity||':'||c.coach_id||coalesce((SELECT string_agg('|'||s.session_id||':'||s.session_date||':'||to_char(s.start_time,'HH24:MI')||':'||to_char(s.end_time,'HH24:MI')||':'||s.room_id||':'||s.coach_id||':'||s.status,'' ORDER BY s.session_date,s.start_time) FROM sessions s WHERE s.class_id=c.class_id AND s.status<>'Cancelled' AND NOT s.center_invalidated),'') AS piece FROM classes c WHERE c.class_id=p.class_id OR c.class_id=p.target_class_id) x),'sha256'),'hex') WHERE p.id=2;
+INSERT INTO notifications(notification_id,user_id,title,content,type,notification_type,related_type,related_id,dedupe_key,is_read,created_at) VALUES(1,2,'DEMO workflow update','DEMO đề nghị chuyển N05→N11; chờ lựa chọn Member, không tự đồng ý','System','PAYMENT_RECONCILED','CLASS',14,'DEMO:NT01',FALSE,'2026-11-10 00:00');
+INSERT INTO notification_recipients(notification_id,user_id,is_read,created_at) VALUES(1,2,FALSE,'2026-11-10 00:00');
+INSERT INTO notifications(notification_id,user_id,title,content,type,notification_type,related_type,related_id,dedupe_key,is_read,created_at) VALUES(2,5,'DEMO workflow update','DEMO trung tâm hủy lớp; đã có nghĩa vụ hoàn, chờ thông tin nhận','System','PAYMENT_RECONCILED','CLASS',15,'DEMO:NT02',FALSE,'2026-11-10 00:00');
+INSERT INTO notification_recipients(notification_id,user_id,is_read,created_at) VALUES(2,5,FALSE,'2026-11-10 00:00');
+INSERT INTO notifications(notification_id,user_id,title,content,type,notification_type,related_type,related_id,dedupe_key,is_read,created_at) VALUES(3,9,'DEMO workflow update','DEMO đã xác minh hoàn900000đ; tham chiếu DEMO-TRANSFER-RF06','System','PAYMENT_RECONCILED','CLASS',21,'DEMO:NT03',TRUE,'2026-11-10 00:00');
+INSERT INTO notification_recipients(notification_id,user_id,is_read,created_at) VALUES(3,9,TRUE,'2026-11-10 00:00');
+INSERT INTO system_logs(user_id,action,target_entity,target_id,detail,timestamp,audit_category,center_id,scope_source) VALUES(32,'CANCEL_NORMAL_PRESTART','CLASS',15,'DEMO fixture: synthetic history, not observed provider operations','2026-11-10 00:00','BUSINESS',1,'TARGET_AT_EVENT');
+INSERT INTO system_logs(user_id,action,target_entity,target_id,detail,timestamp,audit_category,center_id,scope_source) VALUES(32,'APPROVE_NORMAL_REFUND','CLASS',21,'DEMO fixture: synthetic history, not observed provider operations','2026-11-10 00:00','BUSINESS',1,'TARGET_AT_EVENT');
+INSERT INTO system_logs(user_id,action,target_entity,target_id,detail,timestamp,audit_category,center_id,scope_source) VALUES(30,'SUBMIT_REFUND_PROOF','CLASS',21,'DEMO fixture: synthetic history, not observed provider operations','2026-11-10 00:00','BUSINESS',1,'TARGET_AT_EVENT');
+INSERT INTO system_logs(user_id,action,target_entity,target_id,detail,timestamp,audit_category,center_id,scope_source) VALUES(33,'VERIFY_NORMAL_REFUND','CLASS',21,'DEMO fixture: synthetic history, not observed provider operations','2026-11-10 00:00','BUSINESS',1,'TARGET_AT_EVENT');
+INSERT INTO chat_conversations(id,member_user_id,assigned_staff_user_id,status,handler_type,subject,created_at,updated_at,last_message_at) VALUES(1,9,30,'OPEN','STAFF','DEMO refund inquiry','2026-11-10 00:00','2026-11-10 00:00','2026-11-10 00:00');
+INSERT INTO chat_messages(id,conversation_id,sender_type,sender_user_id,content,content_type,client_message_id,created_at) VALUES(1,1,'MEMBER',9,'DEMO tôi muốn kiểm tra khoản hoàn RF06','TEXT','DEMO-MSG-1','2026-11-10 00:00');
+INSERT INTO chat_messages(id,conversation_id,sender_type,sender_user_id,content,content_type,client_message_id,created_at) VALUES(2,1,'STAFF',30,'DEMO trung tâm đã tiếp nhận để kiểm tra lại giao dịch','TEXT','DEMO-MSG-2','2026-11-10 00:00');
+INSERT INTO chat_read_state(conversation_id,user_id,last_read_message_id,updated_at) VALUES(1,9,1,'2026-11-10 00:00');
+INSERT INTO chat_read_state(conversation_id,user_id,last_read_message_id,updated_at) VALUES(1,30,2,'2026-11-10 00:00');
+ALTER TABLE classes ENABLE TRIGGER trg_classes_validate;
+ALTER TABLE sessions ENABLE TRIGGER trg_sessions_validate;
+
+-- Revoke direct browser/Data API access to SCMS data; backend owner/explicit service grants remain.
+DO $acl$
+DECLARE n TEXT; grantee_name TEXT; seq RECORD;
+BEGIN
+ FOREACH n IN ARRAY ARRAY['normal_refund_verifications','normal_refund_documents','normal_refund_attempts','normal_refund_receivers','normal_refunds','normal_transfers','normal_responses','normal_proposals','scms_data_migration_audit','payment_resolutions','incident_affected_members','center_incidents','session_changes','session_absence_notices','advanced_registrations','coach_days_off','coach_work_slots','coach_work_schedules','subscription_pauses','normal_class_requests','system_logs','ai_consultations','chat_read_state','chat_messages','chat_conversations','notification_recipients','notifications','support_requests','vnpay_payment_attempts','invoices','holidays','class_enrollments','member_packages','membership_packages','class_feedbacks','evaluations','attendances','training_results','sessions','training_plans','classes','rooms','coach_specializations','specializations','subjects','members','coaches','receptionists','center_managers','email_otps','users','centers','role_permissions','permissions','roles','attendances_backup_flow4','class_enrollments_backup_flow4','role_permissions_backup_n06','training_results_backup_flow4'] LOOP
+  IF to_regclass('public.'||n) IS NOT NULL THEN
+   EXECUTE format('REVOKE ALL PRIVILEGES ON TABLE public.%I FROM PUBLIC',n);
+   FOREACH grantee_name IN ARRAY ARRAY['anon','authenticated'] LOOP
+    IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname=grantee_name) THEN
+     EXECUTE format('REVOKE ALL PRIVILEGES ON TABLE public.%I FROM %I',n,grantee_name);
+    END IF;
+   END LOOP;
+  END IF;
+ END LOOP;
+ FOR seq IN SELECT sequencename FROM pg_sequences WHERE schemaname='public' AND
+   (sequencename='invoice_code_seq' OR EXISTS(SELECT 1 FROM pg_class c JOIN pg_depend d ON d.objid=c.oid
+     JOIN pg_class t ON t.oid=d.refobjid WHERE c.oid=to_regclass('public.'||sequencename) AND t.relname=ANY(ARRAY['normal_refund_verifications','normal_refund_documents','normal_refund_attempts','normal_refund_receivers','normal_refunds','normal_transfers','normal_responses','normal_proposals','scms_data_migration_audit','payment_resolutions','incident_affected_members','center_incidents','session_changes','session_absence_notices','advanced_registrations','coach_days_off','coach_work_slots','coach_work_schedules','subscription_pauses','normal_class_requests','system_logs','ai_consultations','chat_read_state','chat_messages','chat_conversations','notification_recipients','notifications','support_requests','vnpay_payment_attempts','invoices','holidays','class_enrollments','member_packages','membership_packages','class_feedbacks','evaluations','attendances','training_results','sessions','training_plans','classes','rooms','coach_specializations','specializations','subjects','members','coaches','receptionists','center_managers','email_otps','users','centers','role_permissions','permissions','roles','attendances_backup_flow4','class_enrollments_backup_flow4','role_permissions_backup_n06','training_results_backup_flow4']) AND d.deptype IN ('a','i'))) LOOP
+  EXECUTE format('REVOKE ALL PRIVILEGES ON SEQUENCE public.%I FROM PUBLIC',seq.sequencename);
+  FOREACH grantee_name IN ARRAY ARRAY['anon','authenticated'] LOOP
+   IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname=grantee_name) THEN EXECUTE format('REVOKE ALL PRIVILEGES ON SEQUENCE public.%I FROM %I',seq.sequencename,grantee_name); END IF;
+  END LOOP;
+ END LOOP;
+END $acl$;
+-- Reset row IDs only where owned by recreated SCMS tables. Payment-reference sequence is separate and monotonic.
+DO $ids$
+DECLARE r RECORD; seq TEXT; last_id BIGINT;
+BEGIN
+ FOR r IN SELECT table_name,column_name FROM information_schema.columns WHERE table_schema='public'
+   AND table_name=ANY(ARRAY['normal_refund_verifications','normal_refund_documents','normal_refund_attempts','normal_refund_receivers','normal_refunds','normal_transfers','normal_responses','normal_proposals','scms_data_migration_audit','payment_resolutions','incident_affected_members','center_incidents','session_changes','session_absence_notices','advanced_registrations','coach_days_off','coach_work_slots','coach_work_schedules','subscription_pauses','normal_class_requests','system_logs','ai_consultations','chat_read_state','chat_messages','chat_conversations','notification_recipients','notifications','support_requests','vnpay_payment_attempts','invoices','holidays','class_enrollments','member_packages','membership_packages','class_feedbacks','evaluations','attendances','training_results','sessions','training_plans','classes','rooms','coach_specializations','specializations','subjects','members','coaches','receptionists','center_managers','email_otps','users','centers','role_permissions','permissions','roles','attendances_backup_flow4','class_enrollments_backup_flow4','role_permissions_backup_n06','training_results_backup_flow4']) AND (column_default LIKE 'nextval(%' OR is_identity='YES') LOOP
+  seq:=pg_get_serial_sequence('public.'||r.table_name,r.column_name);
+  IF seq IS NOT NULL AND seq<>'public.invoice_code_seq' AND seq<>'invoice_code_seq' THEN
+   EXECUTE format('SELECT max(%I) FROM public.%I',r.column_name,r.table_name) INTO last_id;
+   PERFORM setval(seq::regclass,coalesce(last_id,1),last_id IS NOT NULL);
+  END IF;
+ END LOOP;
+ PERFORM setval('public.invoice_code_seq',greatest((SELECT value FROM _scms_code_floor),(SELECT last_value FROM public.invoice_code_seq)),true);
+END $ids$;
+INSERT INTO public.scms_data_migration_audit(migration_key,captured_at,before_data,after_data)
+VALUES('20261110_demo_rebuild_v3',clock_timestamp() AT TIME ZONE 'Asia/Ho_Chi_Minh',
+ (SELECT coalesce(jsonb_object_agg(table_name,row_count),'{}'::jsonb)::text FROM _scms_reset_before),
+ jsonb_build_object('mode','approved-synthetic-demo','accounts',47,'subjects',9,'rooms',20,'advanced_templates',9,
+  'normal_classes',12,'synthetic_fixture',true,'invoice_code_floor',(SELECT value FROM _scms_code_floor))::text);
+INSERT INTO public.scms_data_migration_audit VALUES('20261106_retire_legacy_memberships_v1',clock_timestamp() AT TIME ZONE 'Asia/Ho_Chi_Minh',
+ '{"mode":"fresh-demo"}','{"mode":"fresh-demo","model_retired":true}');
+DO $postflight$
+DECLARE n TEXT; c BIGINT;
+BEGIN
+ IF (SELECT count(*) FROM users)<>47 OR (SELECT count(*) FROM subjects)<>9 OR (SELECT count(*) FROM rooms)<>20
+   OR (SELECT count(*) FROM classes)<>21 OR (SELECT count(*) FROM classes WHERE class_type='Normal')<>12
+   OR (SELECT count(*) FROM normal_refunds)<>7 OR (SELECT count(*) FROM normal_refund_documents)<>2
+   OR EXISTS(SELECT 1 FROM rooms WHERE activity_type IS NULL) THEN
+  RAISE EXCEPTION 'SCMS_DEMO_POSTFLIGHT: approved fixture counts mismatch';
+ END IF;
+ IF EXISTS(SELECT 1 FROM classes c WHERE c.class_type='Normal' AND
+   (c.min_capacity<(2*c.max_capacity+2)/3 OR c.min_capacity>c.max_capacity OR
+    (SELECT count(*) FROM sessions s WHERE s.class_id=c.class_id AND NOT s.center_invalidated)<>12)) THEN
+  RAISE EXCEPTION 'SCMS_DEMO_POSTFLIGHT: Normal minimum or twelve valid sessions mismatch';
+ END IF;
+ IF EXISTS(SELECT 1 FROM invoices i WHERE i.amount<=0 OR i.payment_status<>'Paid')
+ OR EXISTS(SELECT 1 FROM normal_refunds f JOIN payment_resolutions r ON r.id=f.id JOIN invoices i ON i.invoice_id=r.invoice_id WHERE r.amount<>i.amount OR i.payment_status<>'Paid')
+ OR EXISTS(SELECT 1 FROM normal_refunds f JOIN payment_resolutions r ON r.id=f.id JOIN invoices i ON i.invoice_id=r.invoice_id JOIN class_enrollments e ON e.member_id=i.member_id AND e.class_id=f.class_id WHERE e.status<>'Cancelled') THEN
+  RAISE EXCEPTION 'SCMS_DEMO_POSTFLIGHT: receipt/refund/right mismatch';
+ END IF;
+ FOREACH n IN ARRAY ARRAY['email_otps','vnpay_payment_attempts','membership_packages'] LOOP
+  EXECUTE format('SELECT count(*) FROM public.%I',n) INTO c;
+  IF c<>0 THEN RAISE EXCEPTION 'SCMS_DEMO_POSTFLIGHT: dynamic/retired data in %',n; END IF;
+ END LOOP;
+ IF EXISTS(SELECT 1 FROM pg_constraint c JOIN pg_class t ON t.oid=c.conrelid JOIN pg_namespace ns ON ns.oid=t.relnamespace
+   WHERE ns.nspname='public' AND t.relname=ANY(ARRAY['normal_refund_verifications','normal_refund_documents','normal_refund_attempts','normal_refund_receivers','normal_refunds','normal_transfers','normal_responses','normal_proposals','scms_data_migration_audit','payment_resolutions','incident_affected_members','center_incidents','session_changes','session_absence_notices','advanced_registrations','coach_days_off','coach_work_slots','coach_work_schedules','subscription_pauses','normal_class_requests','system_logs','ai_consultations','chat_read_state','chat_messages','chat_conversations','notification_recipients','notifications','support_requests','vnpay_payment_attempts','invoices','holidays','class_enrollments','member_packages','membership_packages','class_feedbacks','evaluations','attendances','training_results','sessions','training_plans','classes','rooms','coach_specializations','specializations','subjects','members','coaches','receptionists','center_managers','email_otps','users','centers','role_permissions','permissions','roles','attendances_backup_flow4','class_enrollments_backup_flow4','role_permissions_backup_n06','training_results_backup_flow4']) AND NOT c.convalidated) THEN
+  RAISE EXCEPTION 'SCMS_DEMO_POSTFLIGHT: unvalidated constraint';
+ END IF;
+END $postflight$;
 COMMIT;
-
-
+SELECT 'PASS' AS result,migration_key,after_data::jsonb AS summary FROM public.scms_data_migration_audit WHERE migration_key='20261110_demo_rebuild_v3';
 

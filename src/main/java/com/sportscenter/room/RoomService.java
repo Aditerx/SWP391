@@ -18,6 +18,7 @@ public class RoomService {
     private final RoomRepository repository;
     private final AuditService auditService;
     private final java.time.Clock clock;
+    private final com.sportscenter.session.ScheduleWriteLock scheduleLock;
 
     @Transactional(readOnly = true)
     public List<RoomResponse> findAll() {
@@ -31,33 +32,35 @@ public class RoomService {
     @Transactional
     public RoomResponse create(RoomRequest request) {
         Room room = new Room();
-        var actor = AccountScope.actor(users);
+        var actor = administrationActor();
         room.setCenterId(actor.getCenterId() == null ? 1 : actor.getCenterId());
         apply(room, request);
         Room saved = repository.save(room);
-        auditService.log(actor.getId(), "CREATE_ROOM", "ROOM", saved.getId(), saved.getName());
+        auditService.log(actor.getId(), "CREATE_ROOM", "ROOM", saved.getId(), configuration(saved));
         return RoomResponse.from(saved);
     }
 
     @Transactional
     public RoomResponse update(Integer id, RoomRequest request) {
-        Room room = getEntity(id);
-        String previousStatus = room.getStatus();
+        Room room = getLockedEntity(id);
+        String before = configuration(room);
         validateRoomCanBecomeUnavailable(room, request.status());
         if ((!java.util.Objects.equals(room.getCapacity(), request.capacity())
-                || request.facilityType() != null && !request.facilityType().equals(room.getFacilityType()))
+                || request.facilityType() != null && !request.facilityType().equals(room.getFacilityType())
+                || request.activityType() != null && !java.util.Objects.equals(RoomActivity.parse(request.activityType()), room.getActivityType()))
                 && !repository.findFutureScheduledSessions(id, java.time.LocalDate.now(clock)).isEmpty()) {
-            throw new BusinessException("ROOM_HAS_SCHEDULE: Resolve future sessions before changing room capacity or facility type");
+            throw new BusinessException("ROOM_HAS_SCHEDULE: Resolve future sessions before changing room capacity, facility or activity type");
         }
         apply(room, request);
         Room saved = repository.save(room);
-        auditStatusChange(previousStatus, saved, "UPDATE_ROOM");
+        if (!before.equals(configuration(saved)))
+            auditService.log(administrationActor().getId(), "UPDATE_ROOM", "ROOM", saved.getId(), before + " -> " + configuration(saved));
         return RoomResponse.from(saved);
     }
 
     @Transactional
     public RoomResponse updateStatus(Integer id, String status) {
-        Room room = getEntity(id);
+        Room room = getLockedEntity(id);
         String previousStatus = room.getStatus();
         validateRoomCanBecomeUnavailable(room, status);
         room.setStatus(normalizeRoomStatus(status));
@@ -69,11 +72,31 @@ public class RoomService {
         return RoomResponse.from(saved);
     }
 
-    private Room getEntity(Integer id) {
-        Room room = repository.findById(id)
+    private Room getLockedEntity(Integer id) {
+        var actor = administrationActor();
+        Integer center = repository.findCenterIdById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Room not found: " + id));
+        AccountScope.require(actor, center);
+        scheduleLock.acquireForResourceAdministration(center);
+        Room room = repository.findByIdForUpdate(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Room not found: " + id));
         AccountScope.require(AccountScope.actor(users), room.getCenterId());
         return room;
+    }
+
+    private com.sportscenter.user.User administrationActor() {
+        var actor = AccountScope.actor(users);
+        com.sportscenter.common.ActorPolicy.manager(actor);
+        var auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        if (auth.getAuthorities().stream().noneMatch(a -> "MANAGE_CLASSES".equals(a.getAuthority())))
+            throw new org.springframework.security.access.AccessDeniedException("MANAGE_CLASSES required");
+        return actor;
+    }
+
+    private String configuration(Room room) {
+        return "code=" + room.getRoomCode() + "; name=" + room.getName() + "; location=" + room.getLocation()
+                + "; capacity=" + room.getCapacity() + "; facility=" + room.getFacilityType()
+                + "; activity=" + room.getActivityType() + "; status=" + room.getStatus();
     }
 
     private void apply(Room room, RoomRequest request) {
@@ -91,6 +114,7 @@ public class RoomService {
         if (request.facilityType() != null && !request.facilityType().isBlank()) {
             room.setFacilityType(request.facilityType());
         }
+        if (request.activityType() != null) room.setActivityType(RoomActivity.parse(request.activityType()));
     }
 
     private String normalizeRoomStatus(String status) {
@@ -120,10 +144,4 @@ public class RoomService {
         }
     }
 
-    private void auditStatusChange(String previousStatus, Room saved, String action) {
-        if (previousStatus != null && !previousStatus.equalsIgnoreCase(saved.getStatus())) {
-            auditService.log(AccountScope.actor(users).getId(), action, "ROOM", saved.getId(),
-                    previousStatus + " -> " + saved.getStatus());
-        }
-    }
 }

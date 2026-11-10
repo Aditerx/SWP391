@@ -37,7 +37,7 @@ public class StaffService {
 
     @Transactional(readOnly = true)
     public List<StaffResponse> findAllStaff() {
-        User actor = AccountScope.actor(userRepository);
+        User actor = AccountScope.staffReadActor(userRepository);
         List<User> users = userRepository.findAll();
         var allClasses = sportsClassRepository.findAll();
         Map<Integer, Coach> coachMap = coachRepository.findAllWithUser().stream()
@@ -163,8 +163,6 @@ public class StaffService {
     }
 
     private String normalizeUserStatus(String status) {
-        if ("suspended".equalsIgnoreCase(status) || "locked".equalsIgnoreCase(status)) return "Locked";
-        if ("inactive".equalsIgnoreCase(status)) return "Inactive";
-        return "Active";
+        return AccountStatus.require(status);
     }
 }

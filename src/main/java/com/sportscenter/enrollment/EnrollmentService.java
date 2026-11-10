@@ -101,7 +101,7 @@ public class EnrollmentService {
 
     @Transactional
     public EnrollmentResponse enroll(Integer classId, Integer targetMemberId, String actorEmail) {
-        return enroll(classId, targetMemberId, actorEmail, "Cash");
+        return enroll(classId, targetMemberId, actorEmail, "VNPay");
     }
 
     @Transactional
@@ -112,6 +112,7 @@ public class EnrollmentService {
     @Transactional
     public EnrollmentResponse enroll(Integer classId, Integer targetMemberId, String actorEmail, String paymentMethod, String clientIp) {
         User actor = requireActor(actorEmail);
+        if (!"Active".equalsIgnoreCase(actor.getStatus())) throw new AccessDeniedException("Active account required");
         final Integer memberId = resolveMemberScope(actor, targetMemberId);
         User member = userRepository.findById(memberId)
                 .orElseThrow(() -> new ResourceNotFoundException("Member user not found: " + memberId));
@@ -142,10 +143,20 @@ public class EnrollmentService {
             if (!"Open".equalsIgnoreCase(sportsClass.getStatus())) throw new BusinessException("CLASS_NOT_READY: Normal registration is closed");
             requirePositiveNormalPrice(sportsClass);
             com.sportscenter.session.NormalSchedulePolicy.requireReady(sportsClass, sessionRepository, clock);
+            com.sportscenter.sportclass.NormalClassPolicy.requireAdmission(sportsClass, sessionRepository, clock);
         }
 
+        String method = paymentMethod == null ? "VNPay" : paymentMethod;
+        boolean cash = "Cash".equalsIgnoreCase(method);
+        if (cash && (!ActorPolicy.role(actor, "Receptionist") || !hasAuthority("MANAGE_INVOICES") || !hasAuthority("REGISTER_MEMBER")))
+            throw new AccessDeniedException("NORMAL_CASH_COUNTER_ONLY: Normal Cash requires Receptionist counter registration and immediate collection");
+        if (!cash && !"VNPay".equalsIgnoreCase(method)) throw new BusinessException("Payment method must be Cash or VNPay");
+        invoiceService.expireClassReservations(sportsClass);
+        rotateExpiredInvitations(sportsClass);
+
         ClassEnrollment enrollment = enrollmentRepository.findByMemberIdAndSportsClassId(memberId, classId).orElse(null);
-        if (enrollment != null && List.of("Registered", "Pending", "Waitlisted").contains(enrollment.getStatus())) {
+        boolean claimingWaitlist = enrollment != null && "Waitlisted".equals(enrollment.getStatus());
+        if (enrollment != null && List.of("Registered", "Pending").contains(enrollment.getStatus())) {
             throw new BusinessException("ALREADY_ENROLLED: member is already enrolled in this class");
         }
 
@@ -159,7 +170,10 @@ public class EnrollmentService {
 
         long queued = enrollmentRepository.countBySportsClassIdAndStatus(classId, "Waitlisted");
         long currentEnrolled = enrollmentRepository.countBySportsClassIdAndStatusIn(classId, List.of("Registered", "Pending"));
-        boolean shouldWaitlist = (sportsClass.getMaxCapacity() != null && currentEnrolled >= sportsClass.getMaxCapacity()) || queued > 0;
+        boolean queueTurn = claimingWaitlist && enrollmentRepository.findBySportsClassIdAndStatusOrderByEnrolledAtAscIdAsc(classId, "Waitlisted")
+                .stream().findFirst().map(e -> e.getMember().getId().equals(memberId)).orElse(false);
+        boolean shouldWaitlist = (sportsClass.getMaxCapacity() != null && currentEnrolled >= sportsClass.getMaxCapacity()) || queued > 0 && !queueTurn;
+        if (claimingWaitlist && shouldWaitlist) throw new BusinessException("WAITLIST_NOT_READY: No available place for this queue entry");
         if (shouldWaitlist && queued >= 10) {
             throw new BusinessException("WAITLIST_FULL: class waitlist is full");
         }
@@ -176,6 +190,7 @@ public class EnrollmentService {
         }
         enrollment.setEnrolledAt(LocalDateTime.now(clock));
         if (shouldWaitlist) {
+            if (cash) throw new BusinessException("NORMAL_CASH_NO_SEAT: Cash cannot be collected for a waitlist place");
             enrollment.setStatus("Waitlisted");
             ClassEnrollment saved = enrollmentRepository.save(enrollment);
             auditService.log(actor.getId(), "ENROLL_CLASS", "CLASS_ENROLLMENT", saved.getId(),
@@ -187,7 +202,11 @@ public class EnrollmentService {
         enrollment.setStatus(statusForNewEnrollment(sportsClass));
         ClassEnrollment saved = enrollmentRepository.save(enrollment);
         if ("Pending".equals(enrollment.getStatus())) {
-            order = invoiceService.createClassOrder(member, sportsClass, paymentMethod == null ? "Cash" : paymentMethod, clientIp);
+            order = invoiceService.createClassOrder(member, sportsClass, method, clientIp);
+            if (cash) {
+                invoiceService.confirmCash(order.invoiceId(), SecurityContextHolder.getContext().getAuthentication());
+                order = new InvoiceOrderResponse(order.invoiceId(), order.invoiceCode(), order.amount(), order.paymentMethod(), "Paid", order.expiresAt(), null);
+            }
         }
         auditService.log(actor.getId(), "ENROLL_CLASS", "CLASS_ENROLLMENT", saved.getId(),
                 "Member " + member.getFullName() + " (ID: " + memberId + ") enrolled in class '" + sportsClass.getName() + "' (ID: " + classId + ")");
@@ -306,33 +325,60 @@ public class EnrollmentService {
 
     @Transactional
     public void promoteWaitlist(Integer classId, Integer actorId) {
+        scheduleWriteLock.acquire(classRepository.findCenterIdById(classId).orElseThrow(() -> new ResourceNotFoundException("Class not found")));
         promote(classId, actorId);
     }
 
     private void promote(Integer classId, Integer actorId) {
         SportsClass sportsClass = classRepository.findByIdForUpdate(classId).orElse(null);
         if (sportsClass == null || !sportsClass.isNormal() || sportsClass.getMaxCapacity() == null) return;
+        // A notification invites a fresh authenticated order; promotion never manufactures a Cash invoice.
+        try { com.sportscenter.sportclass.NormalClassPolicy.requireAdmission(sportsClass, sessionRepository, clock); }
+        catch (BusinessException closed) { return; }
+        invoiceService.expireClassReservations(sportsClass);
+        rotateExpiredInvitations(sportsClass);
+        requirePositiveNormalPrice(sportsClass);
         long occupied = enrollmentRepository.countBySportsClassIdAndStatusIn(classId, List.of("Registered", "Pending"));
         int free = Math.max(0, sportsClass.getMaxCapacity() - (int) occupied);
         for (ClassEnrollment waiting : enrollmentRepository.findBySportsClassIdAndStatusOrderByEnrolledAtAscIdAsc(classId, "Waitlisted")) {
             if (free <= 0) break;
+            if (waiting.getPromotedAt() != null) { free--; continue; }
             User member = waiting.getMember();
             if (member == null || !"Active".equalsIgnoreCase(member.getStatus())) continue;
             Member profile = memberRepository.findById(member.getId()).orElse(null);
             if (profile != null && profile.getBookingBlockedUntil() != null && profile.getBookingBlockedUntil().isAfter(LocalDateTime.now(clock))) continue;
             if (!sessionRepository.findFutureEnrollmentScheduleConflicts(member.getId(), classId,
                     LocalDate.now(clock), LocalTime.now(clock)).isEmpty()) continue;
-            waiting.setStatus(statusForNewEnrollment(sportsClass));
             waiting.setPromotedAt(LocalDateTime.now(clock));
             ClassEnrollment promoted = enrollmentRepository.save(waiting);
-            if ("Pending".equals(waiting.getStatus())) {
-                invoiceService.createClassOrder(member, sportsClass, "Cash", "127.0.0.1");
-            }
             auditService.log(actorId, "PROMOTE_WAITLIST", "CLASS_ENROLLMENT", promoted.getId(),
                     "Promoted member " + member.getId() + " from waitlist for class " + classId);
-            safeNotify(member.getId(), "Waitlist update", "A place opened in " + sportsClass.getName() + ". Your status is " + waiting.getStatus() + ".", "Schedule");
+            if (org.springframework.transaction.support.TransactionSynchronizationManager.isSynchronizationActive()) org.springframework.transaction.support.TransactionSynchronizationManager.registerSynchronization(new org.springframework.transaction.support.TransactionSynchronization() {
+                @Override public void afterCommit() { safeNotify(member.getId(), "Waitlist update", "A place opened in " + sportsClass.getName() + ". Create a VNPay order or register at the counter before the cutoff.", "Schedule"); }
+            });
             free--;
         }
+    }
+
+    private boolean hasAuthority(String name) {
+        var auth = SecurityContextHolder.getContext().getAuthentication();
+        return auth != null && auth.getAuthorities().stream().anyMatch(a -> name.equals(a.getAuthority()));
+    }
+
+    @org.springframework.beans.factory.annotation.Value("${payment.expire-minutes:5}")
+    private int invitationMinutes=5;
+
+    private void rotateExpiredInvitations(SportsClass c) {
+        LocalDateTime now=LocalDateTime.now(clock);
+        for(ClassEnrollment e:enrollmentRepository.findByClassIdWithDetails(c.getId())) {
+            if(e.getPromotedAt()==null)continue;
+            boolean expiredInvite="Waitlisted".equals(e.getStatus())&&!e.getPromotedAt().plusMinutes(invitationMinutes).isAfter(now);
+            boolean expiredOrder="Cancelled".equals(e.getStatus())&&invoiceService.hasExpiredClassOrder(e.getMember().getId(),c.getId());
+            if(expiredInvite||expiredOrder) {
+                e.setStatus("Waitlisted");e.setPromotedAt(null);e.setEnrolledAt(now);e.setCancelledAt(null);e.setCancelledBy(null);e.setCancelReason(null);
+            }
+        }
+        enrollmentRepository.flush();
     }
 
     private void safeNotify(Integer userId, String title, String content, String type) {

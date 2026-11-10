@@ -197,9 +197,12 @@ class AttendanceCorrectionIntegrationTest {
         assertEquals("Present",stored("state")); assertEquals(1,count("attendances")); assertEquals("Completed",jdbc.queryForObject("SELECT status FROM sessions WHERE session_id=?",String.class,session.getId()));
     }
     @Test void finalizerCompletesNormalAtEndAndCorrectionWorksAfterLifecycle() throws Exception {
+        // This fixture models an already running course, not a draft/unconfirmed opening.
+        jdbc.update("UPDATE classes SET status='Ongoing' WHERE class_id=?",course.getId());
         tx(() -> { for(int n=1;n<12;n++) { var s=new Session(); s.setSportsClass(course); s.setCoach(coach); s.setRoom(room); s.setSessionDate(LocalDate.of(2026,10,20).plusDays(n)); s.setStartTime(LocalTime.of(6,0)); s.setEndTime(LocalTime.of(7,30)); s.setAttendanceFinalized(true); s.setStatus("Completed"); em.persist(s); } });
         finalizer.process(session.getId());
         assertEquals("Completed",jdbc.queryForObject("SELECT status FROM class_enrollments WHERE class_id=?",String.class,course.getId())); assertEquals(0,notifications());
+        assertEquals("Closed",jdbc.queryForObject("SELECT status FROM classes WHERE class_id=?",String.class,course.getId()));
         correct(login(coach),target("Present")).andExpect(status().isOk()); clock.at("2026-11-10T00:00:00"); finalizer.review(session.getId()); finalizer.review(session.getId()); assertEquals(0,notifications());
     }
     @ParameterizedTest @ValueSource(strings={"Active","Completed","Expired"})

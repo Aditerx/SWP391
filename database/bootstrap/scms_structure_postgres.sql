@@ -681,7 +681,7 @@ CREATE TABLE IF NOT EXISTS notifications (
         CHECK (type IN ('Schedule', 'Payment', 'System', 'Promotion', 'Other')),
     notification_type VARCHAR(40),
     related_type    VARCHAR(40),
-    related_id      INT,
+    related_id      BIGINT,
     dedupe_key      VARCHAR(180),
     is_read         BOOLEAN NOT NULL DEFAULT FALSE,
     created_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,

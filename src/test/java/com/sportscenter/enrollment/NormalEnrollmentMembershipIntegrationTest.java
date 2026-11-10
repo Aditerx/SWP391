@@ -67,6 +67,7 @@ class NormalEnrollmentMembershipIntegrationTest {
     @MockBean PackageExpirationJob packageExpirationJob;
     @MockBean AttendanceFinalizationJob attendanceFinalizationJob;
     @MockBean NotificationScheduleJob notificationScheduleJob;
+    @MockBean com.sportscenter.sportclass.NormalLifecycleJob lifecycleJob;
 
     private Role memberRole, coachRole, receptionistRole;
     private User member, second, otherCenter, coach, cashier;
@@ -95,15 +96,15 @@ class NormalEnrollmentMembershipIntegrationTest {
             member = actor("member", memberRole, 1); second = actor("second", memberRole, 1);
             otherCenter = actor("other-center", memberRole, 2);
             coach = actor("coach", coachRole, 1); cashier = actor("cashier", receptionistRole, 1);
-            Subject subject = new Subject(); subject.setName("Local badminton " + fixture);
-            subject.setSlug("normal-no-membership-" + fixture); subject.setNormalPrice(new BigDecimal("900000")); em.persist(subject);
-            Room room = new Room(); room.setName("Local room " + fixture); room.setStatus("Available"); room.setCapacity(15); em.persist(room);
+            Subject subject = em.createQuery("select s from Subject s where s.slug='cau-long'", Subject.class).getResultStream().findFirst().orElse(null);
+            if (subject == null) { subject = new Subject(); subject.setName("Local badminton"); subject.setSlug("cau-long"); subject.setOutdoor(false); subject.setNormalPrice(new BigDecimal("900000")); em.persist(subject); }
+            Room room = new Room(); room.setActivityType(com.sportscenter.room.RoomActivity.BADMINTON); room.setName("Local room " + fixture); room.setStatus("Available"); room.setCapacity(15); em.persist(room);
             sportsClass = new SportsClass(); sportsClass.setName("Normal tuition " + fixture);
             sportsClass.setClassType("Normal"); sportsClass.setSubject(subject); sportsClass.setCoach(coach);
             sportsClass.setStatus("Open"); sportsClass.setMaxCapacity(15); sportsClass.setTuitionFee(new BigDecimal("900000")); em.persist(sportsClass);
             for (int i = 1; i <= 12; i++) {
                 Session s = new Session(); s.setSportsClass(sportsClass); s.setRoom(room); s.setCoach(coach);
-                s.setSessionDate(NOW.toLocalDate().plusDays(i)); s.setStartTime(LocalTime.of(7, 45)); s.setEndTime(LocalTime.of(9, 15)); em.persist(s);
+                s.setSessionDate(NOW.toLocalDate().plusDays(i+2)); s.setStartTime(LocalTime.of(7, 45)); s.setEndTime(LocalTime.of(9, 15)); em.persist(s);
             }
         });
     }
@@ -135,20 +136,23 @@ class NormalEnrollmentMembershipIntegrationTest {
         assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM member_packages WHERE member_id IN (?,?)", Integer.class, member.getId(), second.getId()));
     }
 
-    @Test void newMemberCashOrderBecomesRegisteredOnlyAfterPaidAndPriceStaysFrozen() throws Exception {
-        assertNoMemberships(); var session = login(member);
-        JsonNode order = enroll(session, "Cash"); int invoice = order.get("invoiceId").asInt();
-        assertEquals("Pending", order.get("status").asText()); assertEquals("Pending", order.get("paymentStatus").asText());
-        assertEquals(900000, order.get("amount").asInt()); assertEquals("Pending", enrollmentStatus(member));
-        assertNull(jdbc.queryForObject("SELECT eligibility_subscription_id FROM class_enrollments WHERE enrollment_id=?", Integer.class, order.get("id").asInt()));
-        jdbc.update("UPDATE classes SET tuition_fee=950000 WHERE class_id=?", sportsClass.getId());
-        var staff = login(cashier);
-        mvc.perform(post("/api/invoices/" + invoice + "/confirm-cash").session(staff)).andExpect(status().isOk());
-        assertEquals("Registered", enrollmentStatus(member));
-        assertEquals("Paid", jdbc.queryForObject("SELECT payment_status FROM invoices WHERE invoice_id=?", String.class, invoice));
-        assertEquals(900000, jdbc.queryForObject("SELECT amount FROM invoices WHERE invoice_id=?", BigDecimal.class, invoice).intValue());
-        mvc.perform(post("/api/invoices/" + invoice + "/confirm-cash").session(staff)).andExpect(status().isConflict());
-        assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM invoices WHERE class_id=?", Integer.class, sportsClass.getId()));
+    @Test void cashIsCounterOnlyAtomicAndPriceStaysFrozen() throws Exception {
+        var memberSession=login(member); var staff=login(cashier);
+        for(String route:List.of(path(),"/api/enrollments")) {
+            mvc.perform(post(route).session(memberSession).contentType("application/json").content(json.writeValueAsString(Map.of("classId",sportsClass.getId(),"paymentMethod","Cash"))))
+                .andExpect(status().isForbidden());
+        }
+        assertEquals(0,jdbc.queryForObject("SELECT count(*) FROM invoices WHERE class_id=?",Integer.class,sportsClass.getId()));
+        JsonNode order=json.readTree(mvc.perform(post(path()).session(staff).contentType("application/json")
+            .content(json.writeValueAsString(Map.of("memberId",member.getId(),"paymentMethod","Cash"))))
+            .andExpect(status().isCreated()).andExpect(jsonPath("$.status").value("Registered"))
+            .andExpect(jsonPath("$.paymentStatus").value("Paid")).andReturn().getResponse().getContentAsString());
+        int invoice=order.path("invoiceId").asInt();
+        jdbc.update("UPDATE classes SET tuition_fee=950000 WHERE class_id=?",sportsClass.getId());
+        assertEquals("Registered",enrollmentStatus(member));
+        assertEquals(900000,jdbc.queryForObject("SELECT amount FROM invoices WHERE invoice_id=?",BigDecimal.class,invoice).intValue());
+        mvc.perform(post("/api/invoices/"+invoice+"/confirm-cash").session(staff)).andExpect(status().isConflict());
+        assertEquals(1,jdbc.queryForObject("SELECT count(*) FROM invoices WHERE class_id=?",Integer.class,sportsClass.getId()));
         assertNoMemberships();
     }
 
@@ -162,18 +166,20 @@ class NormalEnrollmentMembershipIntegrationTest {
         assertEquals("Pending", enrollmentStatus(member)); assertNoMemberships();
     }
 
-    @Test void waitlistMemberWithoutMembershipIsPromotedToPendingAndDoesNotGetFreeRights() throws Exception {
+    @Test void waitlistInvitationDoesNotCreateCashOrRightsAndMemberMustCheckout() throws Exception {
         jdbc.update("UPDATE classes SET max_capacity=1 WHERE class_id=?", sportsClass.getId());
-        enroll(login(member), "Cash"); JsonNode waiting = enroll(login(second), "Cash");
+        enroll(login(member), "VNPay"); JsonNode waiting = enroll(login(second), "VNPay");
         assertEquals("Waitlisted", waiting.get("status").asText());
         assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM invoices WHERE class_id=?", Integer.class, sportsClass.getId()));
         // Separate local fixture transition simulates a released reservation; it is not cancellation acceptance.
         jdbc.update("UPDATE class_enrollments SET status='Cancelled' WHERE class_id=? AND member_id=?", sportsClass.getId(), member.getId());
         enrollments.promoteWaitlist(sportsClass.getId(), cashier.getId());
-        assertEquals("Pending", enrollmentStatus(second));
-        assertEquals("Pending", jdbc.queryForObject("SELECT payment_status FROM invoices WHERE class_id=? AND member_id=?", String.class, sportsClass.getId(), second.getId()));
+        assertEquals("Waitlisted", enrollmentStatus(second));
+        assertEquals(0,jdbc.queryForObject("SELECT count(*) FROM invoices WHERE class_id=? AND member_id=?",Integer.class,sportsClass.getId(),second.getId()));
         enrollments.promoteWaitlist(sportsClass.getId(), cashier.getId());
-        assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM invoices WHERE class_id=? AND member_id=?", Integer.class, sportsClass.getId(), second.getId()));
+        JsonNode order=enroll(login(second),"VNPay");
+        assertEquals("Pending",order.path("status").asText());
+        assertEquals(1,jdbc.queryForObject("SELECT count(*) FROM invoices WHERE class_id=? AND member_id=?",Integer.class,sportsClass.getId(),second.getId()));
         assertNoMemberships();
     }
 
@@ -208,7 +214,7 @@ class NormalEnrollmentMembershipIntegrationTest {
             SportsClass c = new SportsClass(); c.setName("Conflict"); c.setCoach(em.getReference(User.class, coach.getId())); em.persist(c);
             Session s = new Session(); s.setSportsClass(c);
             s.setRoom(em.getReference(Room.class, jdbc.queryForObject("SELECT MIN(room_id) FROM sessions WHERE class_id=?", Integer.class, sportsClass.getId())));
-            s.setSessionDate(NOW.toLocalDate().plusDays(1)); s.setStartTime(LocalTime.of(7,45)); s.setEndTime(LocalTime.of(9,15)); em.persist(s);
+            s.setSessionDate(NOW.toLocalDate().plusDays(3)); s.setStartTime(LocalTime.of(7,45)); s.setEndTime(LocalTime.of(9,15)); em.persist(s);
             ClassEnrollment e = new ClassEnrollment(); e.setMember(em.getReference(User.class, member.getId())); e.setSportsClass(c); e.setEnrolledAt(NOW); e.setStatus("Registered"); em.persist(e);
         });
         mvc.perform(post(path()).session(session)).andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("SCHEDULE_CONFLICT"));
@@ -225,7 +231,7 @@ class NormalEnrollmentMembershipIntegrationTest {
             List<Future<String>> requests = new ArrayList<>();
             for (var session : List.of(firstSession, secondSession)) requests.add(pool.submit(() -> {
                 ready.countDown(); assertTrue(start.await(10, TimeUnit.SECONDS));
-                return enroll(session, "Cash").get("status").asText();
+                return enroll(session, "VNPay").get("status").asText();
             }));
             assertTrue(ready.await(10, TimeUnit.SECONDS)); start.countDown();
             List<String> statuses = new ArrayList<>();
@@ -250,7 +256,7 @@ class NormalEnrollmentMembershipIntegrationTest {
             old.setEligibilitySubscription(subscription); em.persist(old);
             return subscription.getSubscriptionId();
         });
-        JsonNode order = enroll(login(member), "Cash");
+        JsonNode order = enroll(login(member), "VNPay");
         assertEquals("Pending", order.get("status").asText());
         assertEquals(oldSubscription, jdbc.queryForObject("SELECT eligibility_subscription_id FROM class_enrollments WHERE enrollment_id=?", Integer.class, order.get("id").asInt()));
         assertEquals("Expired", jdbc.queryForObject("SELECT status FROM member_packages WHERE subscription_id=?", String.class, oldSubscription));
@@ -287,10 +293,11 @@ class NormalEnrollmentMembershipIntegrationTest {
 
     @Test void invalidPriceDuringPromotionKeepsWaitlistAndExistingPaidReceiptUnchanged() throws Exception {
         jdbc.update("UPDATE classes SET max_capacity=1 WHERE class_id=?", sportsClass.getId());
-        JsonNode firstOrder = enroll(login(member), "Cash"); int paidInvoice = firstOrder.get("invoiceId").asInt();
-        mvc.perform(post("/api/invoices/" + paidInvoice + "/confirm-cash").session(login(cashier)))
-                .andExpect(status().isOk());
-        JsonNode waiting = enroll(login(second), "Cash");
+        JsonNode firstOrder=json.readTree(mvc.perform(post(path()).session(login(cashier)).contentType("application/json")
+            .content(json.writeValueAsString(Map.of("memberId",member.getId(),"paymentMethod","Cash"))))
+            .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString());
+        int paidInvoice=firstOrder.path("invoiceId").asInt();
+        JsonNode waiting = enroll(login(second), "VNPay");
         assertEquals("Waitlisted", waiting.get("status").asText());
         jdbc.update("UPDATE classes SET max_capacity=2 WHERE class_id=?", sportsClass.getId());
         for (BigDecimal price : List.of(BigDecimal.ZERO, new BigDecimal("-1"))) {
@@ -307,10 +314,10 @@ class NormalEnrollmentMembershipIntegrationTest {
         }
         jdbc.update("UPDATE classes SET tuition_fee=900000 WHERE class_id=?", sportsClass.getId());
         enrollments.promoteWaitlist(sportsClass.getId(), cashier.getId());
-        assertEquals("Pending", enrollmentStatus(second));
-        assertEquals("Pending", jdbc.queryForObject("SELECT payment_status FROM invoices WHERE class_id=? AND member_id=?", String.class, sportsClass.getId(), second.getId()));
+        assertEquals("Waitlisted", enrollmentStatus(second));
+        assertEquals(0,jdbc.queryForObject("SELECT count(*) FROM invoices WHERE class_id=? AND member_id=?",Integer.class,sportsClass.getId(),second.getId()));
         enrollments.promoteWaitlist(sportsClass.getId(), cashier.getId());
-        assertEquals(2, jdbc.queryForObject("SELECT COUNT(*) FROM invoices WHERE class_id=?", Integer.class, sportsClass.getId()));
+        assertEquals(1,jdbc.queryForObject("SELECT count(*) FROM invoices WHERE class_id=?",Integer.class,sportsClass.getId()));
         assertNoMemberships();
     }
 

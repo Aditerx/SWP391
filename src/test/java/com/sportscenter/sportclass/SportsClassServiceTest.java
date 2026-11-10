@@ -49,6 +49,7 @@ class SportsClassServiceTest {
 
     @Mock com.sportscenter.session.SessionRepository sessionRepository;
     @Mock com.sportscenter.session.ScheduleWriteLock scheduleWriteLock;
+    @Mock com.sportscenter.invoice.InvoiceRepository invoiceRepository;
     @InjectMocks
     private SportsClassService sportsClassService;
 
@@ -57,6 +58,12 @@ class SportsClassServiceTest {
 
     @BeforeEach
     void setUp() {
+        User manager = new User(); manager.setId(90); manager.setCenterId(1); manager.setStatus("Active");
+        Role managerRole = new Role(); managerRole.setName("CenterManager"); manager.setRole(managerRole);
+        lenient().when(userRepository.findByEmailIgnoreCase("publication@local.test.invalid")).thenReturn(Optional.of(manager));
+        org.springframework.security.core.context.SecurityContextHolder.getContext().setAuthentication(
+                new org.springframework.security.authentication.UsernamePasswordAuthenticationToken("publication@local.test.invalid", "n/a",
+                        java.util.List.of(new org.springframework.security.core.authority.SimpleGrantedAuthority("MANAGE_CLASSES"))));
         sampleSubject = new Subject();
         sampleSubject.setId(1);
         sampleSubject.setName("Quần vợt (Tennis)");
@@ -71,6 +78,10 @@ class SportsClassServiceTest {
         sampleCoach.setId(10); sampleCoach.setCenterId(1);
         sampleCoach.setFullName("Coach Tuấn");
         sampleCoach.setRole(coachRole);
+    }
+
+    @org.junit.jupiter.api.AfterEach void clearActor() {
+        org.springframework.security.core.context.SecurityContextHolder.clearContext();
     }
 
     @Test

@@ -80,8 +80,12 @@ class EnrollmentServiceTest {
     private User sampleAdmin;
     private SportsClass sampleClass;
 
+    @org.junit.jupiter.api.AfterEach void clearTransactions() { if(org.springframework.transaction.support.TransactionSynchronizationManager.isSynchronizationActive()) org.springframework.transaction.support.TransactionSynchronizationManager.clearSynchronization(); }
+    private void deliverNotifications(){org.springframework.transaction.support.TransactionSynchronizationManager.getSynchronizations().forEach(org.springframework.transaction.support.TransactionSynchronization::afterCommit);}
+
     @BeforeEach
     void setUp() {
+        org.springframework.transaction.support.TransactionSynchronizationManager.initSynchronization();
         lenient().when(clock.instant()).thenReturn(Instant.parse("2026-10-16T03:00:00Z"));
         lenient().when(clock.getZone()).thenReturn(ZoneId.of("Asia/Ho_Chi_Minh"));
         sampleMember = new User();
@@ -95,7 +99,7 @@ class EnrollmentServiceTest {
         lenient().when(userRepository.findByEmailIgnoreCase(sampleMember.getEmail())).thenReturn(Optional.of(sampleMember));
 
         sampleAdmin = new User();
-        sampleAdmin.setId(1);
+        sampleAdmin.setId(1); sampleAdmin.setStatus("Active");
         sampleAdmin.setEmail("admin@scms.com");
         Role adminRole = new Role();
         adminRole.setName("Admin");
@@ -110,13 +114,19 @@ class EnrollmentServiceTest {
         sampleClass.setClassType("Normal");
         sampleClass.setTuitionFee(new BigDecimal("900000"));
 
-        var room = new com.sportscenter.room.Room(); room.setStatus("Available");
+        var subject = new com.sportscenter.subject.Subject(); subject.setSlug("cau-long"); subject.setOutdoor(false);
+        sampleClass.setSubject(subject);
+
+        var room = new com.sportscenter.room.Room(); room.setStatus("Available"); room.setCapacity(15);
+        room.setActivityType(com.sportscenter.room.RoomActivity.BADMINTON);
         var readySessions = new java.util.ArrayList<Session>();
         for (int i = 1; i <= 12; i++) {
-            Session session = new Session(); session.setSessionDate(LocalDate.now(clock).plusDays(i));
+            Session session = new Session(); session.setSessionDate(LocalDate.now(clock).plusDays(i+2));
             session.setStartTime(java.time.LocalTime.of(7,45)); session.setEndTime(java.time.LocalTime.of(9,15));
             session.setRoom(room); session.setStatus("Scheduled"); readySessions.add(session);
         }
+        lenient().when(classRepository.findCenterIdById(1)).thenReturn(Optional.of(1));
+        lenient().when(sessionRepository.findBySportsClassId(1)).thenReturn(readySessions);
         lenient().when(sessionRepository.findFiltered(eq(1), isNull(), isNull(), isNull(), isNull(), isNull())).thenReturn(readySessions);
         var order = new com.sportscenter.invoice.InvoiceOrderResponse(99,"LOCAL-NORMAL",new BigDecimal("900000"),"Cash","Pending",LocalDateTime.now(clock).plusMinutes(5),null);
         lenient().when(invoiceService.createClassOrder(any(), any(), anyString(), anyString())).thenReturn(order);
@@ -401,11 +411,12 @@ class EnrollmentServiceTest {
                 .when(notificationService).send(eq(8), anyString(), anyString(), eq("Schedule"));
 
         assertDoesNotThrow(() -> enrollmentService.promoteWaitlist(1, sampleAdmin.getId()));
+        deliverNotifications();
 
-        assertEquals("Pending", waiting.getStatus());
+        assertEquals("Waitlisted", waiting.getStatus());
         assertEquals(LocalDateTime.now(clock), waiting.getPromotedAt());
         verify(notificationService).send(8, "Waitlist update",
-                "A place opened in " + sampleClass.getName() + ". Your status is Pending.", "Schedule");
+                "A place opened in " + sampleClass.getName() + ". Create a VNPay order or register at the counter before the cutoff.", "Schedule");
         verify(auditService).log(sampleAdmin.getId(), "PROMOTE_WAITLIST", "CLASS_ENROLLMENT", 70,
                 "Promoted member 8 from waitlist for class 1");
     }
@@ -430,9 +441,11 @@ class EnrollmentServiceTest {
         when(enrollmentRepository.save(any(ClassEnrollment.class))).thenAnswer(call -> call.getArgument(0));
 
         enrollmentService.promoteWaitlist(1, sampleAdmin.getId());
+        deliverNotifications();
 
         assertEquals("Waitlisted", expired.getStatus());
-        assertEquals("Pending", firstEligible.getStatus());
+        assertEquals("Waitlisted", firstEligible.getStatus());
+        assertNotNull(firstEligible.getPromotedAt());
         assertEquals("Waitlisted", beyondCapacity.getStatus());
         verify(enrollmentRepository, times(1)).save(any(ClassEnrollment.class));
         verify(notificationService, times(1)).send(eq(19), anyString(), anyString(), eq("Schedule"));
@@ -453,7 +466,7 @@ class EnrollmentServiceTest {
 
         enrollmentService.promoteWaitlist(1, sampleAdmin.getId());
 
-        assertEquals("Pending", waiting.getStatus());
+        assertEquals("Waitlisted", waiting.getStatus());
     }
 
     @Test

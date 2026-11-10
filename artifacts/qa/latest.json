@@ -561,9 +561,12 @@
   },
   "openApi": {
     "path": "artifacts/fe-handoff/openapi.json",
-    "sha256": "99272f2c02cdb3b6a1005a19e6ccd8dc5ac20aa61907aab17e5c156b96e5e1e7",
-    "evidence": "attendanceRelease20261109.openApi; final local integrated application",
-    "generatedLocally": true
+    "sha256": "37a389eb2d28d5a1cc6083e5900c2171ca7174d13e986a8b2c5f038ece142d7f",
+    "evidence": "normalLifecycleFoundation20261110.openApi",
+    "generatedLocally": true,
+    "sourceCommit": "165bb45e8e15f909c66efb5f9e8b15f29282cd0a",
+    "worktreeDirty": true,
+    "verificationRecord": "normalLifecycleFoundation20261110"
   },
   "local": {
     "workflowCases": [
@@ -22915,5 +22918,1882 @@
       "migration16Rerun": false,
       "generalCrudLive": "Owner common acceptance"
     }
+  },
+  "phase1Implementation20261109": {
+    "result": "PASS_LOCAL",
+    "checkedAtUtc": "2026-11-09T00:17:46.895337+00:00",
+    "gitBaseCommit": "165bb45e8e15f909c66efb5f9e8b15f29282cd0a",
+    "workingTreeUncommitted": true,
+    "sourceFingerprints": {
+      "src/main": "c8ebeb6a85e4f6bc1aeb09997150fe655376d56b3eae6e40dd5a4e74f06137e7",
+      "src/test": "b7e9dcd83a86999d9496f349e2c7ee690b52748f571694a750b5100ea5ff0adb",
+      "database": "668d642b77f9ba8c310fcd5903f3f476c0493e2def6969b0e739c49077a9274b",
+      "pom.xml": "050f3393d2ecdc350e8ac52acab26c052ba35a1ea0e509fffe45db122e882bf7",
+      "schema_postgres.sql": "b45ef0a351e2a36f9caba86a8bad52b3cc94049b5e151e54cbbdcc15b57e25c0",
+      "scripts/test-room-absence-postgres.py": "7144adb3689349a949c9ee702958f765fb5743433d8a285dcfc264af2a77c82c",
+      "scripts/test-phases-postgres.py": "1cef42c7b255bc65af88b644d322b9af2836935f44e358f6687d22fdc4ab3e18",
+      "scripts/prepare-phases-release.py": "e6c525b8a70562527d606b0017d72199865c838df31b6bbc995acb1405deb5a5"
+    },
+    "environment": {
+      "os": "Windows",
+      "java": "17.0.12",
+      "businessTimezone": "Asia/Ho_Chi_Minh",
+      "h2": "isolated copy, no .env",
+      "postgres": "17.11, disposable databases, loopback 127.0.0.1:55440",
+      "cloudMutation": false,
+      "externalProviderCalls": "none; gateway/QueryDR/email tests use local fakes or mocks"
+    },
+    "acceptance": {
+      "R3PrivateScopes": "PASS_LOCAL",
+      "explicitAccountStatus": "PASS_LOCAL",
+      "permissionSetAtomicReplacement": "PASS_LOCAL",
+      "auditScopeProvenanceFiltersPagination": "PASS_LOCAL",
+      "reportD13D18Preserved": "PASS_LOCAL",
+      "firstNormalPublicationPriceAndFrozenMoney": "PASS_LOCAL",
+      "roomActivityAndScheduleRace": "PASS_LOCAL",
+      "attendanceBoundariesRaceReadbackAuditNoShow": "PASS_LOCAL"
+    },
+    "cleanTest": {
+      "tests": 516,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 28,
+      "passed": 488,
+      "command": ".\\mvnw.cmd clean test -Duser.timezone=Asia/Ho_Chi_Minh",
+      "sourceFingerprints": {
+        "src/main": "c8ebeb6a85e4f6bc1aeb09997150fe655376d56b3eae6e40dd5a4e74f06137e7",
+        "src/test": "da92f9a9bbb2f1a0cfe6edbbcb1c48e99f7802f5149e86c6e8e33421e092d824",
+        "database": "668d642b77f9ba8c310fcd5903f3f476c0493e2def6969b0e739c49077a9274b",
+        "pom.xml": "050f3393d2ecdc350e8ac52acab26c052ba35a1ea0e509fffe45db122e882bf7",
+        "schema_postgres.sql": "b45ef0a351e2a36f9caba86a8bad52b3cc94049b5e151e54cbbdcc15b57e25c0",
+        "scripts/test-room-absence-postgres.py": "7144adb3689349a949c9ee702958f765fb5743433d8a285dcfc264af2a77c82c",
+        "scripts/test-phases-postgres.py": "1cef42c7b255bc65af88b644d322b9af2836935f44e358f6687d22fdc4ab3e18",
+        "scripts/prepare-phases-release.py": "e6c525b8a70562527d606b0017d72199865c838df31b6bbc995acb1405deb5a5"
+      },
+      "rawXml": "artifacts/runs/phase1-20261109/final-clean-xml",
+      "finalBeAndSchemaMatch": true
+    },
+    "postCleanFixtureFollowUp": {
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "result": "PASS",
+      "suite": "PublicationResourceHttpTest",
+      "reason": "Only PG fixture adjustments after clean: explicit subtype flush before Cash invoice, short synthetic room names within existing DB length50. BE/schema unchanged. Final fixture rechecked on H2 and PostgreSQL.",
+      "sourceFileSha256": "0f5d11662553d4ca98ce0aa41881b9a1d29c64c3213afad8c729085dd840e28c",
+      "rawXml": "artifacts/runs/phase1-20261109/final-fixture-h2.xml"
+    },
+    "postgres": {
+      "aggregate": {
+        "tests": 59,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "suites": {
+        "config.PublicationResourceHttpTest": {
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "config.RbacGuardIntegrationTest": {
+          "tests": 33,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "training.AttendanceCorrectionIntegrationTest": {
+          "tests": 22,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      },
+      "rawXml": "artifacts/runs/phase1-20261109/final-postgres-xml",
+      "scope": "Guard/attendance passed together; publication rerun on a new database after fixture corrections; unchanged BE tree.",
+      "databases": [
+        "scms_phases_p1_final_rbac_20261109",
+        "scms_phases_p1_final_attendance_20261109",
+        "scms_phases_p1_publication_final_20261109"
+      ]
+    },
+    "migrations": {
+      "status": "PASS",
+      "runner": "scripts/test-phase1-migrations-postgres.py",
+      "runnerSha256": "05394c6d73dad72b7e4ea60032ff16743aae1e635d60ff9975d2c6e9a561105b",
+      "rawResult": "artifacts/runs/phase1-20261109/final-migration-guards.log",
+      "database": "scms_phases_p1_migration_guards_final_20261109",
+      "verified": [
+        "legacy audit preserved without center guesses",
+        "schema type/nullability guards roll back",
+        "room snapshot identity survives renaming",
+        "wrong future sport aborts migration",
+        "historical sessions/prices/invoices/purchase amounts unchanged",
+        "replay preserves activity edits and pricing drafts"
+      ],
+      "files": {
+        "18_audit_scope_postgres.sql": "2631b71044d7f6e44e85dac91b001c9d6d8c95445d782b62ba51dfa7bbf42c3c",
+        "19_room_activity_postgres.sql": "6be50bb5cf81d3fe8a31ea56ba3b062ab7e266322dde665e2b38b7375b96f719",
+        "20_class_publication_price_postgres.sql": "146bf5552552d44524598b61b20bb1c67fda1fb8b1a293bbbee9fbde1a6a6628"
+      },
+      "cloudApplied": false
+    },
+    "openApi": {
+      "path": "artifacts/fe-handoff/openapi.json",
+      "sha256": "edc4432e8251151d250fe5f71c461c5659ed6cd3769f05ed67244e08dbebaf6d",
+      "checks": [
+        "audit array/query/header metadata",
+        "SystemLog provenance",
+        "room activityType nine values",
+        "workflow DTO/status assertions in clean suite"
+      ],
+      "deployedToCanonicalServer": false
+    },
+    "fixtureNotes": [
+      "canonical subject/activityType added to fixtures; money/enrollment/Coach/QueryDR expected outcomes retained",
+      "staff totalSpent test now uses a permitted Manager; Paid-only assertion retained",
+      "Normal enroll retry retains 400 ALREADY_ENROLLED with no duplicate invoice; atomic class requestId replay still succeeds"
+    ],
+    "remaining": {
+      "phase1Item5": "STOP_FOR_OWNER_REVIEW; R1/R2 not implemented",
+      "fullRbacCrudMatrix": "OPEN, no broad center re-audit",
+      "historicalReassignmentRevokedRights": "POLICY_REVIEW_IF_NEEDED",
+      "fullMatrixReadAndLastAdministratorGuard": "NOT_ADDED_WITHOUT_POLICY",
+      "postPublicationRepricing": "NOT_GRANTED; changed Normal price explicitly409",
+      "roomInputLengths": "KNOWN_LOCAL_BE_GAP: DB room_name50/location100 not fully declared by request/JPA; oversized input may409; defer item6/CRUD",
+      "FE": "NOT_RUN; F05/F06/F12 Owner-confirmed in reported scope",
+      "Render": "Phase1 not pushed/deployed or FE-accepted; Owner reports18 success,19 blocked164,20 not run. Current deployment tracking: roomActivityDeployment20261109.",
+      "GoogleAvatar": "AFTER_OTHER_PHASE2_HANDOFF",
+      "OTP": "accepted main flow retained; optional boundary QA is not missing feature",
+      "AI": "OPEN",
+      "QueryDR": "reconcile usage/off-state at Phase2 item3; independent of OTP; no environment toggle changed"
+    }
+  },
+  "roomActivityDeployment20261109": {
+    "updatedAtUtc": "2026-11-09T05:55:35.325294+00:00",
+    "gitBaseCommit": "165bb45e8e15f909c66efb5f9e8b15f29282cd0a",
+    "ownerReported": {
+      "migration18": "SUCCESS",
+      "migration19": {
+        "status": "FAIL",
+        "sqlState": "P0001",
+        "message": "ROOM_ACTIVITY_SCHEDULE_CONFLICT: Reconcile existing future sessions before deploy",
+        "sessionIds": [
+          164
+        ]
+      },
+      "migration20": "NOT_RUN"
+    },
+    "cloudIndependentlyVerified": false,
+    "agentCloudQueryOrMutation": false,
+    "readOnlyDiagnostic": {
+      "path": "scripts/check-room-activity-postgres.sql",
+      "sha256": "5fcfc7d565a8fd18b33c2b9a335c1aee96d1cdb4c5a55792d32fa166403e0db2",
+      "localCheck": {
+        "result": "PASS",
+        "environment": "disposable loopback PostgreSQL",
+        "database": "scms_phases_room19_diagnosis_20261109",
+        "cases": [
+          "read-only SELECT works before activity_type exists",
+          "20 immutable snapshot bindings",
+          "session164 mismatch classified",
+          "failed19 rolled back while18 remains",
+          "missing session returns null",
+          "historical Completed is outside guard"
+        ],
+        "cloudQueryExecuted": false
+      },
+      "rawResult": "artifacts/runs/room-activity-diagnosis-20261109/local-check.json",
+      "cloudResult": "OWNER_SUPPLIED_QUERY_RESULT"
+    },
+    "backendOrMigrationImplementationChanged": false,
+    "newBackendTestsExecuted": false,
+    "nextSequence": [
+      "Owner requested full demo audit and clean rebuild instead of reconciling164",
+      "follow demoDbAuditRebuild20261109 and docs02 demo-rebuild-20261109"
+    ],
+    "item5ImplementationAuthorizedNow": false,
+    "ownerSuppliedDiagnostic": {
+      "queryBusinessTime": "2026-11-09T12:51:15.121969",
+      "approvedRoomBindings": 20,
+      "deployment": {
+        "audit18ColumnsPresent": true,
+        "room19ColumnPresent": false,
+        "room19MarkerPresent": false,
+        "pricing20ColumnPresent": false
+      },
+      "session": {
+        "id": 164,
+        "classId": 1,
+        "classType": "Advanced",
+        "classStatus": "Open",
+        "subjectId": 1,
+        "subjectSlug": "quan-vot-tennis",
+        "requiredActivity": "TENNIS",
+        "date": "2026-11-09",
+        "start": "18:15:00",
+        "end": "19:45:00",
+        "status": "Scheduled",
+        "classCenter": 1,
+        "classCapacity": 1,
+        "roomId": 10,
+        "roomCode": "C01-ARC-01",
+        "roomCenter": 1,
+        "roomStatus": "Available",
+        "roomCapacity": 5,
+        "prospectiveActivity": "ARCHERY",
+        "storedActivity": null,
+        "privateMemberLinked": true,
+        "attendanceFinalized": false,
+        "centerInvalidated": false,
+        "guardWouldBlock": true,
+        "diagnosticIssues": [
+          "ROOM_SUBJECT_MISMATCH"
+        ]
+      },
+      "sameSportRoomsAtQuery": [
+        {
+          "roomId": 24,
+          "roomCode": "C01-TEN-01",
+          "status": "Available",
+          "capacity": 4,
+          "capacitySufficient": true,
+          "overlapSessionIds": []
+        },
+        {
+          "roomId": 25,
+          "roomCode": "C01-TEN-02",
+          "status": "Available",
+          "capacity": 4,
+          "capacitySufficient": true,
+          "overlapSessionIds": []
+        }
+      ]
+    },
+    "assessment": "Guard19 correctly rejects Tennis booked on Archery; no implementation change indicated by supplied row.",
+    "proposedReconciliation": {
+      "status": "NOT_EXECUTED_PENDING_CONTEXT_AND_CONSENT",
+      "sessionId": 164,
+      "fromRoom": 10,
+      "proposedRoom": 24,
+      "alternativeRoom": 25,
+      "preserve": [
+        "date",
+        "start/end",
+        "coach",
+        "member",
+        "subscription",
+        "credits",
+        "money",
+        "attendance",
+        "absence notices"
+      ],
+      "needs": [
+        "Owner confirms real vs demo/test",
+        "for real session, actual agreement to exact room-only move and appropriate existing D06/D07 procedure",
+        "recheck unstarted state and all applicable guards at execution"
+      ],
+      "noInventedConsentOrIncident": true
+    },
+    "cloudDataMutationPerformed": false,
+    "currentStatus": "SUPERSEDED_BY_OWNER_DEMO_REBUILD",
+    "supersededBy": "demoDbAuditRebuild20261109",
+    "historicalObservationOnly": true
+  },
+  "demoDbAuditRebuild20261109": {
+    "result": "PASS_LOCAL",
+    "checkedAtUtc": "2026-11-09T07:32:28.183199+00:00",
+    "gitBaseCommit": "165bb45e8e15f909c66efb5f9e8b15f29282cd0a",
+    "workingTreeUncommitted": true,
+    "sourceFingerprints": {
+      "src/main": "c8ebeb6a85e4f6bc1aeb09997150fe655376d56b3eae6e40dd5a4e74f06137e7",
+      "src/test": "0376c3c4b2ce0ccb58123960a454903094118b2fe35c7a58c9c54d54a0aed576",
+      "database": "c303a249d772546cac50626434aa8256a676ad0b8541ff5b67f49b6f92a9e723",
+      "pom.xml": "050f3393d2ecdc350e8ac52acab26c052ba35a1ea0e509fffe45db122e882bf7",
+      "schema_postgres.sql": "b45ef0a351e2a36f9caba86a8bad52b3cc94049b5e151e54cbbdcc15b57e25c0",
+      "scripts/test-room-absence-postgres.py": "7144adb3689349a949c9ee702958f765fb5743433d8a285dcfc264af2a77c82c",
+      "scripts/test-phases-postgres.py": "1cef42c7b255bc65af88b644d322b9af2836935f44e358f6687d22fdc4ab3e18",
+      "scripts/prepare-phases-release.py": "e6c525b8a70562527d606b0017d72199865c838df31b6bbc995acb1405deb5a5"
+    },
+    "unchangedBackendFingerprints": {
+      "src/main": "c8ebeb6a85e4f6bc1aeb09997150fe655376d56b3eae6e40dd5a4e74f06137e7",
+      "pom.xml": "050f3393d2ecdc350e8ac52acab26c052ba35a1ea0e509fffe45db122e882bf7"
+    },
+    "environment": {
+      "postgres": "17.11 loopback127.0.0.1:55440",
+      "java": "17.0.12",
+      "timezone": "Asia/Ho_Chi_Minh",
+      "localTestsNoEnv": true
+    },
+    "cloudAudit": {
+      "mode": "READ_ONLY",
+      "targetFingerprint": "188f67654d48aa11c970703f2cdaefc79290f1173a7dedaf93547e74bc6b1048",
+      "capturedAt": "2026-11-09T13:23:13.169786+07:00",
+      "tables": 51,
+      "rows": 2146,
+      "qualityChecks": 38,
+      "findings": {
+        "futureWrongActivitySessionIds": [
+          164
+        ],
+        "legacyLogsWithoutProvenance": 128,
+        "obsoleteBackupTables": {
+          "attendances_backup_flow4": 9,
+          "class_enrollments_backup_flow4": 14,
+          "role_permissions_backup_n06": 22,
+          "training_results_backup_flow4": 10
+        },
+        "pendingUser40": "VALID_OTP_LIFECYCLE; original audit false-positive corrected",
+        "pricingDraft": "NOT_RUN_MISSING_STRUCTURE; migration20 not applied",
+        "anonSelectWithoutRlsTables": 46,
+        "dataApiExploitVerified": false
+      },
+      "noViewsOrCrossSchemaFk": true,
+      "allConstraintsValidated": true,
+      "limits": "bounded queries/metadata are not proof every business scenario is valid; INFO legacy is not automatically corrupt",
+      "rawIgnored": "artifacts/runs/demo-db-audit-20261109/supabase-audit.json"
+    },
+    "backupClone": {
+      "result": "PASS",
+      "source": "read-only Supabase public-schema dump",
+      "encryptedBackup": "artifacts\\private-backups\\scms-demo-public-20261109_063334.dump.dpapi",
+      "plaintextDumpWrittenToWorkspace": false,
+      "localClone": "scms_phases_demo_rebuild_clone_20261109",
+      "cloudMutation": false,
+      "restore": "strict; only redundant CREATE SCHEMA public TOC item excluded"
+    },
+    "sqlReset": {
+      "database": "scms_schema_demo_reset_bigint_20261109",
+      "localOnly": true,
+      "envLoaded": false,
+      "schemaSha256": "2c302de04adac2eda8e39918177e3e48385c2385cd7cceb1e8d1e958290f1c94",
+      "checks": [
+        {
+          "name": "fresh_install_reference_counts",
+          "status": "PASS"
+        },
+        {
+          "name": "unlisted_objects_and_grants_preserved",
+          "status": "PASS"
+        },
+        {
+          "name": "scms_direct_browser_grants_revoked",
+          "status": "PASS"
+        },
+        {
+          "name": "scms_sequence_browser_grants_revoked",
+          "status": "PASS"
+        },
+        {
+          "name": "all_accounts_active_and_passwords_work",
+          "status": "PASS"
+        },
+        {
+          "name": "no_fabricated_business_history",
+          "status": "PASS"
+        },
+        {
+          "name": "current_guard_columns_and_validated_constraints",
+          "status": "PASS"
+        },
+        {
+          "name": "otp_pending_remains_supported",
+          "status": "PASS"
+        },
+        {
+          "name": "case_insensitive_email_collision_rejected",
+          "status": "PASS"
+        },
+        {
+          "name": "external_fk_blocks_reset_and_preserves_rows",
+          "status": "PASS"
+        },
+        {
+          "name": "external_view_blocks_reset_and_preserves_rows",
+          "status": "PASS"
+        },
+        {
+          "name": "dirty_replay_removes_backups_and_business_rows",
+          "status": "PASS"
+        },
+        {
+          "name": "payment_reference_counter_never_reused",
+          "status": "PASS"
+        },
+        {
+          "name": "unlisted_objects_survive_replay",
+          "status": "PASS"
+        }
+      ],
+      "status": "PASS",
+      "cloneReset": "PASS",
+      "cloneDatabase": "scms_phases_demo_rebuild_clone_20261109",
+      "scope": "47 SCMS tables recreated plus4 known old backup tables removed",
+      "businessHistorySeeded": false,
+      "reference": {
+        "accounts": 33,
+        "subjects": 9,
+        "rooms": 20,
+        "advancedTemplates": 9,
+        "publishedCoachWeeklySlots": 882
+      },
+      "supabaseSecurity": "revoke PUBLIC/anon/authenticated table+sequence grants only within SCMS scope; owner/default service grants retained; old custom grants require reapplication; unrelated object grants preserved",
+      "invoiceCodeCounter": "nondecreasing max of previous sequence, previous invoice suffix and epoch-millisecond floor; never restart at1",
+      "noCloudMutation": true
+    },
+    "postgresHttp": {
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "status": "PASS",
+      "database": "scms_schema_demo_reset_bigint_20261109",
+      "xmlSha256": "0fdbb6295239eecde336a188964e39bb29d9e5feb6ed8ab0e5855fc19c2319b5",
+      "xmlPath": "artifacts/runs/demo-db-audit-20261109/demo-pg-final.xml",
+      "acceptance": [
+        "Hibernate ddl-auto=validate all mappings",
+        "33 approved accounts login/auth-me/role route/logout; no password-change requirement",
+        "Normal create and retry produces exactly12sessions; publication price preserved in Pending invoice then Registered only after Cash",
+        "Advanced request/accept/order Pending0credit/Cash12credit then book/retry11credit and exactly1session",
+        "agreement remains required; wrong room activity rejected without spending credit",
+        "subjectId-only booking resolves Advanced template",
+        "new audit provenance populated; no attendance/training result fabricated"
+      ]
+    },
+    "cleanTest": {
+      "tests": 518,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 30,
+      "passed": 488,
+      "status": "PASS",
+      "workspaceNoEnv": true,
+      "sourceCopyMatches": true,
+      "reports": [
+        {
+          "file": "TEST-com.sportscenter.audit.BusinessGapAuditTest.xml",
+          "sha256": "fdd71b87c4bf1e2ea396083a08fce3a3432289d1eefb27b5a68c86f30dcac413"
+        },
+        {
+          "file": "TEST-com.sportscenter.audit.DemoDataPreparationTest.xml",
+          "sha256": "6e5949140d9f70dccfff5d2ee87d8527a917cee7ed15ffcf6967151d13f1f45f"
+        },
+        {
+          "file": "TEST-com.sportscenter.audit.LiveCashDemoTest.xml",
+          "sha256": "7a48910a7cb83cc6b271111c7ff4a88cbcf86c6a767f0a802089e6ca8d780ba2"
+        },
+        {
+          "file": "TEST-com.sportscenter.audit.LiveReadOnlyAuditTest.xml",
+          "sha256": "78a9aa2c613e9a5ede363f69852632847c3a69e4e7eb696152b71609194605f1"
+        },
+        {
+          "file": "TEST-com.sportscenter.audit.UpgradedSchemaValidationTest.xml",
+          "sha256": "65a446bdf352286663086b153a7c091e4a49fcd6dfd83e1c85cf57a0185afc5d"
+        },
+        {
+          "file": "TEST-com.sportscenter.auth.DemoRebuildPostgresTest.xml",
+          "sha256": "b38d328a9f208f4f74edb50aaba1770160a2a99fbaa1644dc6c6d54de690fdf6"
+        },
+        {
+          "file": "TEST-com.sportscenter.auth.DemoSchemaLoginPostgresTest.xml",
+          "sha256": "fe1a00f2ddcb7ae90b068f7a54745fe20b401b02ff161fac8e314beaeedbf609"
+        },
+        {
+          "file": "TEST-com.sportscenter.auth.EmailServiceConfigurationTest.xml",
+          "sha256": "ac201f1896de1dec986f72653657a21d87f720ca7e2970ef094a5a9138c622b3"
+        },
+        {
+          "file": "TEST-com.sportscenter.auth.GoogleAuthControllerTest.xml",
+          "sha256": "6a613e8ea91c5d61840d8aa9cb1f9935052ef7e89c34d058746c46c4793248d2"
+        },
+        {
+          "file": "TEST-com.sportscenter.auth.GoogleAuthServiceTest.xml",
+          "sha256": "98e7316231aeb6f330167c27c8414ee47b3e560708fe917e021d605ccb3b7754"
+        },
+        {
+          "file": "TEST-com.sportscenter.auth.LoginAttemptServiceTest.xml",
+          "sha256": "efe12e2db5e004a3c0909c9a1dcdfca5169dc34eaaf673a8439a113408b4c443"
+        },
+        {
+          "file": "TEST-com.sportscenter.auth.PasswordResetDemoIsolationTest.xml",
+          "sha256": "ea306dba1b316b88e2f0b9a090651eb59a94d61608aa0f1453077c6d97120728"
+        },
+        {
+          "file": "TEST-com.sportscenter.auth.PendingLoginTest.xml",
+          "sha256": "ad684c97b2a96b8b9ccfc197fd9ef30c0e0310c9f1a28b0f039fa6564b119fde"
+        },
+        {
+          "file": "TEST-com.sportscenter.auth.RegistrationOtpServiceTest.xml",
+          "sha256": "e73ceeb3aeb101c1dc7c61c7fd1e3c49fa592daf37fe1db1088e860349719350"
+        },
+        {
+          "file": "TEST-com.sportscenter.auth.TemporaryPasswordGeneratorTest.xml",
+          "sha256": "00d4831e3c331f43a01403de244115970e3295de7f0a7aab02a541e8e725205b"
+        },
+        {
+          "file": "TEST-com.sportscenter.chat.ai.ChatAiResponderTest.xml",
+          "sha256": "eabf29e40c01c69056cbb5210fbdf13b7a0c451ee71eca6d8f2c8a84beb90094"
+        },
+        {
+          "file": "TEST-com.sportscenter.chat.ai.DeepSeekChatClientTest.xml",
+          "sha256": "4935e5b12b30a489475ed2dcd243b8bee2b6cf5a2cd0d48caec938a8172357ef"
+        },
+        {
+          "file": "TEST-com.sportscenter.chat.ChatControllerTest.xml",
+          "sha256": "17d12f26dff97445ed4f1811e548219d335c4ed6727b923f52eb07c978be5406"
+        },
+        {
+          "file": "TEST-com.sportscenter.chat.ChatMessageEventListenerTest.xml",
+          "sha256": "d1702e4b418fd4d9306b8f79b7b3edb23bcc75c39b8556763501f969d8cfd53e"
+        },
+        {
+          "file": "TEST-com.sportscenter.chat.ChatResponderDispatcherTest.xml",
+          "sha256": "6fb46c30d1b91565d75f9d9b01442ecb521aa85274a33d49f8b78dff2de65a91"
+        },
+        {
+          "file": "TEST-com.sportscenter.chat.ChatServiceTest.xml",
+          "sha256": "cf486b37c0897e7a1fb3d62768b30e215772ffccf84d0deec31287e9f9067aef"
+        },
+        {
+          "file": "TEST-com.sportscenter.common.RuntimeIdentityTest.xml",
+          "sha256": "a8824f9b3842b8ed42e89833d21b7b02bbd8706fea7c95fee1d32155a4d1ed4e"
+        },
+        {
+          "file": "TEST-com.sportscenter.communication.CommunicationFeaturesPostgresTest.xml",
+          "sha256": "2e250bcc41f4154d3fbe33bb498748b63b3e5aee5cae191fd1e18ca16925b320"
+        },
+        {
+          "file": "TEST-com.sportscenter.config.AuthorizationHttpTest.xml",
+          "sha256": "939679a43a73bf873c605df53da5c09c8ab472e6cd0fe1e69e63601c0ecdba1b"
+        },
+        {
+          "file": "TEST-com.sportscenter.config.LegacyPasswordEncoderTest.xml",
+          "sha256": "4ab11f90b28db02f2838de0556773a90b7a6170b8473e9fb3beadfee9aa2e3b1"
+        },
+        {
+          "file": "TEST-com.sportscenter.config.PublicationResourceHttpTest.xml",
+          "sha256": "c9d497749ddb68b8a4183b88f10c5a00395224ffc7fa3c46e3c59e6a5c466bf4"
+        },
+        {
+          "file": "TEST-com.sportscenter.config.RbacGuardIntegrationTest.xml",
+          "sha256": "b9761c6eb0f03b48beb6cf1012842e9cab961fda63d5e05c9896b644f792e5ba"
+        },
+        {
+          "file": "TEST-com.sportscenter.enrollment.EnrollmentServiceTest.xml",
+          "sha256": "94165442023e077ac8eea2c4ac6dcd8c05468bdac34b7a07788c3d93eef991f2"
+        },
+        {
+          "file": "TEST-com.sportscenter.enrollment.NormalEnrollmentMembershipIntegrationTest.xml",
+          "sha256": "a407da5c295f9979fee99dffcbca534b1b4731f7d6c81aa7bb1fc2b146342b5b"
+        },
+        {
+          "file": "TEST-com.sportscenter.feedback.ClassFeedbackAuditTest.xml",
+          "sha256": "ad962e4cb5042e5db3f79a750e7792e5d48ca8e3c7060f70b39fac876dd1d934"
+        },
+        {
+          "file": "TEST-com.sportscenter.invoice.InvoiceServiceTest.xml",
+          "sha256": "c2e30e7f96b7bd2fd5f3c23fba7844030148414febc9365881a79d21cef4161c"
+        },
+        {
+          "file": "TEST-com.sportscenter.invoice.PaymentResolutionAuthorizationHttpTest.xml",
+          "sha256": "0040cc80009867d9176a41bd8ffa818195720b4af36e681df82dc0aca0e4ff03"
+        },
+        {
+          "file": "TEST-com.sportscenter.invoice.PaymentResolutionCashCorrectionHttpTest.xml",
+          "sha256": "ae0f4d30fbfefd2aee689e971500a5c5fd7b7cbb173a343d8d85ad1da03a0e4c"
+        },
+        {
+          "file": "TEST-com.sportscenter.invoice.VnPayGatewayTest.xml",
+          "sha256": "d380b891819c500ed8f34c1573ba24cdbda1b97a8662fd89a56b3c7a54957a12"
+        },
+        {
+          "file": "TEST-com.sportscenter.invoice.VnPayNetworkProbeTest.xml",
+          "sha256": "38f24dd9b67f2228db179839ae95dd2cc8dbafa4a3335310129f59acddc17fd6"
+        },
+        {
+          "file": "TEST-com.sportscenter.invoice.VnPayQueryClientTest.xml",
+          "sha256": "14a1a511ba8ac42b9bcb68b278428516ed6720d04a2e14f4e878e96d1a4102c9"
+        },
+        {
+          "file": "TEST-com.sportscenter.invoice.VnPayQueryIntegrationTest.xml",
+          "sha256": "87ffe4635f6fb07e0dbaf37118067e21d26192e8ee7495b6e25fb799860ed16e"
+        },
+        {
+          "file": "TEST-com.sportscenter.media.AvatarUrlOptimizerTest.xml",
+          "sha256": "47b6520185042aabd0cb623e22430654b9d3334edafd02d3d437ee496656b850"
+        },
+        {
+          "file": "TEST-com.sportscenter.membership.EntitlementTimePolicyTest.xml",
+          "sha256": "9539a17ab1606e2689f9a95cac923afc4d96e03c36cc35547852d67bbcb0a12b"
+        },
+        {
+          "file": "TEST-com.sportscenter.membership.MemberPackageExtensionTest.xml",
+          "sha256": "019338c023cbc85e51a51485a6d4e5987f23ab99629c0246d6546bf9b6741359"
+        },
+        {
+          "file": "TEST-com.sportscenter.membership.MemberPackageServiceTest.xml",
+          "sha256": "ea06302e8aff34f31ff5240bfd9cc9b63daa56f82a2d4d9177773f81c92e5e25"
+        },
+        {
+          "file": "TEST-com.sportscenter.membership.PackageExpirationJobTest.xml",
+          "sha256": "bd72839f854776f4011325f52bbc7764e004ce343a597eca53b671495b236ed0"
+        },
+        {
+          "file": "TEST-com.sportscenter.notification.NotificationControllerTest.xml",
+          "sha256": "a40c2bf063853510260468ad7d9812980442bd355d3de8ec2da0fb2f79f553c3"
+        },
+        {
+          "file": "TEST-com.sportscenter.notification.NotificationEventListenerTest.xml",
+          "sha256": "9a33950b25d4e23e92eaeccea3a99a123c169726bd636342172b40b496c16962"
+        },
+        {
+          "file": "TEST-com.sportscenter.notification.NotificationScheduleJobTest.xml",
+          "sha256": "9e313a334020430b29f781dfd72217a6ff5d7110167149889e59e9150a461554"
+        },
+        {
+          "file": "TEST-com.sportscenter.notification.NotificationServiceTest.xml",
+          "sha256": "a3ade05fcf16eb183b4f584c58c0721f1ac2696fea9acb7425ee9bcde4697701"
+        },
+        {
+          "file": "TEST-com.sportscenter.report.ChurnRiskServiceTest.xml",
+          "sha256": "5e2ae2a8e42d6f9d001e66631406ab26d423d1eb82f9e1d76efdf8e112803e71"
+        },
+        {
+          "file": "TEST-com.sportscenter.report.ReportServiceTest.xml",
+          "sha256": "9deaaed753fa81aece751cca9bf689176e6618fe6c64e7ca5939574ae24fc60d"
+        },
+        {
+          "file": "TEST-com.sportscenter.session.CenterIncidentRecoveryTest.xml",
+          "sha256": "fc8e1380e1e0c225f6b8effa137807cf18e25a7a4130542e68437e6cceb71c60"
+        },
+        {
+          "file": "TEST-com.sportscenter.session.PrivateSessionServiceTest.xml",
+          "sha256": "4b147619ccd0e819c4020c59963d5badb8fbd8719dec327d9b50a8c1bb62204c"
+        },
+        {
+          "file": "TEST-com.sportscenter.session.ScheduleDatabaseTest.xml",
+          "sha256": "a9cc021ffa98be2ec6f8a0bf909bfd74522cd030f504ac43a475640f33002baf"
+        },
+        {
+          "file": "TEST-com.sportscenter.session.SessionIncidentServiceTest.xml",
+          "sha256": "ca002c2943707d9ba41ed82201df6c9bb954f0cd67c6efe3555e1c118ce9a393"
+        },
+        {
+          "file": "TEST-com.sportscenter.session.SessionPrivacyTest.xml",
+          "sha256": "d48b8332470957d14ae7d683a9763a5bcd15e4e4b9e9018bee7dd08c0ed6dfff"
+        },
+        {
+          "file": "TEST-com.sportscenter.session.SessionSchemaPostgresTest.xml",
+          "sha256": "4bd9d7d3acdd575ba365068f66c48f842e213e5e1ddcd0c789bd1413c64a57a7"
+        },
+        {
+          "file": "TEST-com.sportscenter.session.SessionServiceTest.xml",
+          "sha256": "e8656858f74906ddafaace7a7ade42c5d4f1f17deecc1f31748ec1d00b638317"
+        },
+        {
+          "file": "TEST-com.sportscenter.session.SessionSlotValidatorTest.xml",
+          "sha256": "b948608821987f015283f22f42c11941e3e7fc8a8c2ed662f301397618270d09"
+        },
+        {
+          "file": "TEST-com.sportscenter.specialization.CoachDirectoryIntegrationTest.xml",
+          "sha256": "0eba26d6fc8858b0d54bf902ac97076bd74c69684088b3465ae896e6dcca17db"
+        },
+        {
+          "file": "TEST-com.sportscenter.sportclass.SportsClassServiceTest.xml",
+          "sha256": "cd5b4a29942609e10db2f4dbb259e1a31057dc5649a9d049ed34dbd825adf7d0"
+        },
+        {
+          "file": "TEST-com.sportscenter.subject.SubjectSafetyTest.xml",
+          "sha256": "b6597e3d92b535b2025b73b10b2c60b72544ad2274baf132814e1bb5e75fdc1e"
+        },
+        {
+          "file": "TEST-com.sportscenter.training.AttendanceCorrectionIntegrationTest.xml",
+          "sha256": "7938cbbaabc595804af902d5d6cf9b0b1be825e70b7d083925707ab29971e443"
+        },
+        {
+          "file": "TEST-com.sportscenter.training.AttendanceFinalizationJobTest.xml",
+          "sha256": "88a0af68710bafc60b574ae2ec9e4e37a8de1679ecd9f0979bf7931af17ee649"
+        },
+        {
+          "file": "TEST-com.sportscenter.training.AttendanceFinalizationProcessorTest.xml",
+          "sha256": "7c10b45472d2fcdf31c9fd94180a53b63a40732acf1376424d4ff87f9ce92e9c"
+        },
+        {
+          "file": "TEST-com.sportscenter.training.AttendanceServiceScanTest.xml",
+          "sha256": "ba48d902a71f07735b36545ddbefd4b5d359d62f9e89eb074ba7578632a05268"
+        },
+        {
+          "file": "TEST-com.sportscenter.training.AttendanceServiceTest.xml",
+          "sha256": "c237a0e949c7553571117ef146463bf5b87310ebe5d54e6a3f6094ccb8b6448f"
+        },
+        {
+          "file": "TEST-com.sportscenter.training.CheckInRequestTest.xml",
+          "sha256": "49685984e84661774b2cb1f07da76ccce42487e469d058ea407b11dd866f1fe7"
+        },
+        {
+          "file": "TEST-com.sportscenter.training.TotpTest.xml",
+          "sha256": "3ee64f1f5331dc305a0d228dd9e46ca54c9b15c9a4c28c964ffc4441a77d7109"
+        },
+        {
+          "file": "TEST-com.sportscenter.training.TrainingResultAccessIntegrationTest.xml",
+          "sha256": "310a1fe0ed1995d7db96882b6e638b240dc80a06fab71cdda394c32e50aec073"
+        },
+        {
+          "file": "TEST-com.sportscenter.training.TrainingResultServiceTest.xml",
+          "sha256": "07f7c474a3b1caf9a5ef22217d6158da364fd9ef3bcb7530d1a294bcc0d3b5f3"
+        },
+        {
+          "file": "TEST-com.sportscenter.user.BookingBlockServiceTest.xml",
+          "sha256": "ef7e4c3be07d4b71d71f0363d5627a18424f395d514de2bf73964cd433671e9f"
+        },
+        {
+          "file": "TEST-com.sportscenter.user.CoachRoleSpecializationTest.xml",
+          "sha256": "c62e2e7aea6aa59a61b921a906ff8351828b7e1409aee256c0f9330bad4db3cb"
+        },
+        {
+          "file": "TEST-com.sportscenter.user.MemberRegistrationPaymentTest.xml",
+          "sha256": "8eafd28f5f2436b50475df67c68009dc215a7f5194327ec3adb25b1c08aa5700"
+        },
+        {
+          "file": "TEST-com.sportscenter.user.MemberSelfProfileControllerTest.xml",
+          "sha256": "66a808a9af76b54992005c06b95324b7b22dc736f5879aaa4fc9482503785fe8"
+        },
+        {
+          "file": "TEST-com.sportscenter.user.RoleServiceTest.xml",
+          "sha256": "ed092afba52fa8c6e291de05a99b665b3f285993c22172a7f568f1b2c12fe423"
+        },
+        {
+          "file": "TEST-com.sportscenter.workflow.PhaseWorkflowHttpTest.xml",
+          "sha256": "334c950cc4cdfdf7ce6c39a93f412b86e3fb8944d6144bab59a737a8192acec4"
+        }
+      ]
+    },
+    "postResetDataQuality": {
+      "checks": 38,
+      "nonzeroOrNotRun": 0
+    },
+    "openApiSha256": "edc4432e8251151d250fe5f71c461c5659ed6cd3769f05ed67244e08dbebaf6d",
+    "correctionsDuringVerification": [
+      "audit initially misclassified OTP Pending; source and read-only live status confirmed valid and query corrected",
+      "migration15 SET LOCAL search_path excluded extensions; reset restores it before BCrypt reference seed",
+      "new JPA validation found notifications.related_id INT mismatch; bootstrap/reset now BIGINT",
+      "PostgreSQL test subclass needed explicit opt-in condition; verified off=2skip and on=2pass before clean"
+    ],
+    "remaining": [
+      "Owner execute one whole database/schema_postgres.sql on intended demo Supabase and report PASS summary",
+      "then push/merge/deploy Phase1 as authorized and simple FE confirmation",
+      "FE/Render/CRUD/live acceptance remains deferred to common round",
+      "item5/R1/R2 and room name/location length/pending policies need proposal/review; not implemented",
+      "Google/avatar later; OTP main accepted, AI unfinished, QueryDR revisit phase2; no cloud feature toggle changed"
+    ],
+    "contractOffline": {
+      "result": "PASS",
+      "mode": "OFFLINE_RETAINED_EVIDENCE_CHECK",
+      "checkedAtUtc": "2026-11-09T07:34:04.681282+00:00",
+      "backendTestsExecuted": false,
+      "liveProbePerformed": false,
+      "evidenceSourceCommit": "ec2325df07df053257df09698857b27e36489820",
+      "sourceVerification": "Demo schema rebuild validated on local clone/fresh/replay/JPA/authenticated workflows and clean tests; BE unchanged from Phase1; FE/Render not accepted",
+      "retainedBackendTreeMatchesSource": true,
+      "openApiHashMatchesRecord": true,
+      "operations": 190,
+      "sourceRoutesMatched": 190,
+      "missingSourceRoutes": [],
+      "extraSourceRoutes": [],
+      "positiveRecordedExchanges": 52,
+      "bodyTypePropertyChecks": 82,
+      "wireIssues": [],
+      "limits": [
+        "Static route parser, not a complete Java or authorization analysis",
+        "Compatibility covers recorded positive status/basic types/properties; nullability/required/format/range/negative errors need separate tests",
+        "This does not rerun business tests or certify the current production state"
+      ]
+    },
+    "generatorDeterministic": true,
+    "reviewedFilesSha256": {
+      "scripts/build-demo-schema.py": "7a75840a641d440d8a32a5d0f2150bc2d40f0ec716495c60f440a6f1486b46eb",
+      "scripts/test-demo-schema-postgres.py": "7c49949a6a2a663cbb0145498c9f403b2edf9227e241c62797a7148f6ebf7569",
+      "scripts/audit-supabase-demo.sql": "ce0b739d682a9565cf0434cfe215dc8a09bdd5455d8feb386ed4170ebed50f04",
+      "scripts/audit-fe-contract.py": "179f0c9b464f446d99033620bafdb648eff45342807aeca56acb7f5000519325",
+      "database/schema_postgres.sql": "2c302de04adac2eda8e39918177e3e48385c2385cd7cceb1e8d1e958290f1c94"
+    },
+    "postTestDocumentationOnly": "database/README.md clarified custom role grants after DROP/recreate; SQL, BE and tests unchanged; syntax/link/diff verification only"
+  },
+  "roleCatalogReadAccess20261110": {
+    "result": "PASS_LOCAL",
+    "checkedAtUtc": "2026-11-09T19:50:36.391055+00:00",
+    "gitBaseCommit": "165bb45e8e15f909c66efb5f9e8b15f29282cd0a",
+    "workingTreeUncommitted": true,
+    "sourceFingerprints": {
+      "src/main": "e4065ac8beaa5f64f4b85215d15194ebc9d8832853b33aa84d51bc0dfb1dcf3b",
+      "src/test": "bebd0bbb45a270f6dc7901c81d93060766926c70219f76384a6efa02ff9b291f",
+      "database": "c303a249d772546cac50626434aa8256a676ad0b8541ff5b67f49b6f92a9e723",
+      "pom.xml": "050f3393d2ecdc350e8ac52acab26c052ba35a1ea0e509fffe45db122e882bf7",
+      "schema_postgres.sql": "b45ef0a351e2a36f9caba86a8bad52b3cc94049b5e151e54cbbdcc15b57e25c0",
+      "scripts/test-room-absence-postgres.py": "7144adb3689349a949c9ee702958f765fb5743433d8a285dcfc264af2a77c82c",
+      "scripts/test-phases-postgres.py": "1cef42c7b255bc65af88b644d322b9af2836935f44e358f6687d22fdc4ab3e18",
+      "scripts/prepare-phases-release.py": "e6c525b8a70562527d606b0017d72199865c838df31b6bbc995acb1405deb5a5"
+    },
+    "environment": {
+      "workspaceNoEnv": true,
+      "database": "isolated H2 PostgreSQL mode",
+      "timezone": "Asia/Ho_Chi_Minh",
+      "externalProvider": "local fake only in existing regression",
+      "cloudMutation": false
+    },
+    "decision": "Owner10/11 Admin-only GET roles and permissions; role detail guarded against equivalent disclosure",
+    "backendChangedFromDemoRebuild": [
+      "src/main/java/com/sportscenter/user/RoleController.java: 3 GET method-authorization annotations"
+    ],
+    "acceptance": [
+      "Active Admin reads roles,role detail,permissions even without MANAGE_PERMISSIONS",
+      "CenterManager/Receptionist/Coach/Member denied all3GET routes even with MANAGE_PERMISSIONS",
+      "anonymous401 separately checked; authenticated role checks use real login and auth/me",
+      "existing Admin sessions after Inactive/Locked denied ACCOUNT_NOT_ACTIVE",
+      "read/reject operations leave audit unchanged; temporary permission/status fixtures restored",
+      "existing PUT permission mutation gate and guards unchanged"
+    ],
+    "targeted": {
+      "tests": 35,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "status": "PASS",
+      "xml": "artifacts/runs/role-catalog-20261110/targeted.xml",
+      "sha256": "827c2d8444880e61d66765024f7497064593c654474bfc126525ec9c022b21e4"
+    },
+    "cleanTest": {
+      "tests": 520,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 30,
+      "passed": 490,
+      "status": "PASS",
+      "exitCode": 0,
+      "sourceCopyMatches": true,
+      "reports": [
+        {
+          "file": "TEST-com.sportscenter.audit.BusinessGapAuditTest.xml",
+          "sha256": "9b77256a84c015434e7545bbd1d248ed54ccb84bb63864e986609b21cbf4ab31"
+        },
+        {
+          "file": "TEST-com.sportscenter.audit.DemoDataPreparationTest.xml",
+          "sha256": "6b8949cd0eeca85c3e0d99566de799e7bb8d5a2208000cbf12bfc35d32fd5940"
+        },
+        {
+          "file": "TEST-com.sportscenter.audit.LiveCashDemoTest.xml",
+          "sha256": "4e68ec4f595a9fe5280fd0ec82c9cb12f7bd75cb945de0e8b34ddf3fbcd9b7ed"
+        },
+        {
+          "file": "TEST-com.sportscenter.audit.LiveReadOnlyAuditTest.xml",
+          "sha256": "64016f4578b1128c635fb9056378c4e55e139a841e65a1edbde53ee1e0f2c4fc"
+        },
+        {
+          "file": "TEST-com.sportscenter.audit.UpgradedSchemaValidationTest.xml",
+          "sha256": "28d724fd2391508bbe02858c881a9bc4dc47713a8cfb0b98e587fc851816c681"
+        },
+        {
+          "file": "TEST-com.sportscenter.auth.DemoRebuildPostgresTest.xml",
+          "sha256": "daa476af8df97f56a677ab2e2b8833169b65d3af916c625f602192060140242d"
+        },
+        {
+          "file": "TEST-com.sportscenter.auth.DemoSchemaLoginPostgresTest.xml",
+          "sha256": "52b75297c3a8038fa90cfa736b0b5f94380cdd52dcba6bcd0ddd7c0eb460c6fe"
+        },
+        {
+          "file": "TEST-com.sportscenter.auth.EmailServiceConfigurationTest.xml",
+          "sha256": "1a7f3912e2ccd7cbb692596d8846aa624c3bd56631c82c592f732c73265230ff"
+        },
+        {
+          "file": "TEST-com.sportscenter.auth.GoogleAuthControllerTest.xml",
+          "sha256": "3fc9275c03ed6283ab00556da040771bbcd665fc42d27fcb2091b2255f8b1452"
+        },
+        {
+          "file": "TEST-com.sportscenter.auth.GoogleAuthServiceTest.xml",
+          "sha256": "4b797b1fb3220d718dd75cd1ea695862d4f613b0a04fe0030c9f20d976cc1b7e"
+        },
+        {
+          "file": "TEST-com.sportscenter.auth.LoginAttemptServiceTest.xml",
+          "sha256": "a96334884a96c1b8dcddbadcfbed47e2434d95af438619b481f103a61713bb98"
+        },
+        {
+          "file": "TEST-com.sportscenter.auth.PasswordResetDemoIsolationTest.xml",
+          "sha256": "ffbff2c27450f19fc4ef7126cc665ae479b5e6a9d506791534728e4b215ba38e"
+        },
+        {
+          "file": "TEST-com.sportscenter.auth.PendingLoginTest.xml",
+          "sha256": "b92417d6a68f4b69bd0a000a663f5aa4760c330bdac84f828494e4e51e20048e"
+        },
+        {
+          "file": "TEST-com.sportscenter.auth.RegistrationOtpServiceTest.xml",
+          "sha256": "49468c31f961122037222f8946d877d67aca573839f1b1595eec5a5151075986"
+        },
+        {
+          "file": "TEST-com.sportscenter.auth.TemporaryPasswordGeneratorTest.xml",
+          "sha256": "3fd4367336d2baeb0ec4a246c66dac728a983419502e081e33d4ed3379530de4"
+        },
+        {
+          "file": "TEST-com.sportscenter.chat.ai.ChatAiResponderTest.xml",
+          "sha256": "745d8d53e005e094ac7febe2588fb33e815611627fd585c73dae79a97206c7a0"
+        },
+        {
+          "file": "TEST-com.sportscenter.chat.ai.DeepSeekChatClientTest.xml",
+          "sha256": "f463e5888abc7e49172dbfe1aa54dedf1388094812d17859705a4048efb5ee9a"
+        },
+        {
+          "file": "TEST-com.sportscenter.chat.ChatControllerTest.xml",
+          "sha256": "120acc0ef8c38df191f59f43af9fe7a1a2634c4877007cbc980376e9f899d2e6"
+        },
+        {
+          "file": "TEST-com.sportscenter.chat.ChatMessageEventListenerTest.xml",
+          "sha256": "9650a31e9590c8eafabdf3b32a115c55c46baea3457eb674e69926a00f1affdf"
+        },
+        {
+          "file": "TEST-com.sportscenter.chat.ChatResponderDispatcherTest.xml",
+          "sha256": "8e5d41be5ee6578a2065f0467a27a9cc6b458c08b6e07c6b66032b7ca58924cb"
+        },
+        {
+          "file": "TEST-com.sportscenter.chat.ChatServiceTest.xml",
+          "sha256": "766b3661f270e629a11e878383f6a1fc37a8c71f22eea01d3f4102f658b1a0e6"
+        },
+        {
+          "file": "TEST-com.sportscenter.common.RuntimeIdentityTest.xml",
+          "sha256": "97826d268140b8f4ccabb96588735e4ab8e715c47a88ece40ebb596480db786f"
+        },
+        {
+          "file": "TEST-com.sportscenter.communication.CommunicationFeaturesPostgresTest.xml",
+          "sha256": "4a8e565106c6cdb834c0a15228fd6a45a3455bfc6d8b6156b9e59a5fdcf85555"
+        },
+        {
+          "file": "TEST-com.sportscenter.config.AuthorizationHttpTest.xml",
+          "sha256": "fe4fb50dbc47acefb06b81d5cb0bdf8fd543c6c634d7aca30bb8d61960ae3ca6"
+        },
+        {
+          "file": "TEST-com.sportscenter.config.LegacyPasswordEncoderTest.xml",
+          "sha256": "f9b837f03d94b4e27868034e2f13830d7ec6f5ef90cef33e45ac6f7d67b31f4c"
+        },
+        {
+          "file": "TEST-com.sportscenter.config.PublicationResourceHttpTest.xml",
+          "sha256": "6a275e85b4c512e9916d2452170631633be453ced7e2a421a807798b4b37b46c"
+        },
+        {
+          "file": "TEST-com.sportscenter.config.RbacGuardIntegrationTest.xml",
+          "sha256": "9f9764c4f79f4e970a2f34bfeea72839b3731dfb3ba432dfe16acc303c986d6c"
+        },
+        {
+          "file": "TEST-com.sportscenter.enrollment.EnrollmentServiceTest.xml",
+          "sha256": "dad79066feedd5df9146811c5da56f9b7b2667a56f238eaf145e5be27d67915a"
+        },
+        {
+          "file": "TEST-com.sportscenter.enrollment.NormalEnrollmentMembershipIntegrationTest.xml",
+          "sha256": "885d4f4ddade9daef5cc8be62105109227ecaab0d52542b0a5f1b155f967dc99"
+        },
+        {
+          "file": "TEST-com.sportscenter.feedback.ClassFeedbackAuditTest.xml",
+          "sha256": "b3fb097ecb9c3b93849dee952efc6647c7c1ffbd9c424f486c7b77be2c22d8c0"
+        },
+        {
+          "file": "TEST-com.sportscenter.invoice.InvoiceServiceTest.xml",
+          "sha256": "7da8d79878ae81ddec1d53888846f1743c708bdbd680ae8da24523dd592e1724"
+        },
+        {
+          "file": "TEST-com.sportscenter.invoice.PaymentResolutionAuthorizationHttpTest.xml",
+          "sha256": "a44b874d7bb38ab1f1bd6d10a7734bc941413dae3c27d5c823eada4a01c33b53"
+        },
+        {
+          "file": "TEST-com.sportscenter.invoice.PaymentResolutionCashCorrectionHttpTest.xml",
+          "sha256": "1e8d405c296b0c66c867cc83d7d765352d08cbc257902ee2f494b982a3567682"
+        },
+        {
+          "file": "TEST-com.sportscenter.invoice.VnPayGatewayTest.xml",
+          "sha256": "80e0ea868df1f9726902d55c3d4010c6e61f4c049e2a88541d99323318849d38"
+        },
+        {
+          "file": "TEST-com.sportscenter.invoice.VnPayNetworkProbeTest.xml",
+          "sha256": "61f002bfc9644eef41e4ef7852573f2735c3b4997797076e7cf20662c0ae1d05"
+        },
+        {
+          "file": "TEST-com.sportscenter.invoice.VnPayQueryClientTest.xml",
+          "sha256": "641b7ab7c4c5cbd6c0509506d4c0515788c6dfd1fff78108470347c6eba74006"
+        },
+        {
+          "file": "TEST-com.sportscenter.invoice.VnPayQueryIntegrationTest.xml",
+          "sha256": "c0a02b1aaa184d3f16af71471dcdd5f6e2b3728e26aabfe5646a65f2de1f61dd"
+        },
+        {
+          "file": "TEST-com.sportscenter.media.AvatarUrlOptimizerTest.xml",
+          "sha256": "92d0f48c3f5930ecd93ca5032421dff0af7f322c81f71adc780224553d04cf04"
+        },
+        {
+          "file": "TEST-com.sportscenter.membership.EntitlementTimePolicyTest.xml",
+          "sha256": "6e318d37d895cf7cdb7b51347e66217121d55c575e072b3fd2f529e426ab696c"
+        },
+        {
+          "file": "TEST-com.sportscenter.membership.MemberPackageExtensionTest.xml",
+          "sha256": "1e67c4335d69a27dbb16fe2e3188ce79b9c5bdac102ce52bed78028d31bb04dd"
+        },
+        {
+          "file": "TEST-com.sportscenter.membership.MemberPackageServiceTest.xml",
+          "sha256": "344df1562c4a0dfbbacb12b62842ef9aa9ccdc337a0da5db4b7b56018d5b4a42"
+        },
+        {
+          "file": "TEST-com.sportscenter.membership.PackageExpirationJobTest.xml",
+          "sha256": "ec2871e34812b56fbe7c92400788ed5c1d250091abc7c6dd623713faa07c9709"
+        },
+        {
+          "file": "TEST-com.sportscenter.notification.NotificationControllerTest.xml",
+          "sha256": "82f5fe94584cc6e52374a2457cc062bf6746e933b22b60c25d4cb6a94373c982"
+        },
+        {
+          "file": "TEST-com.sportscenter.notification.NotificationEventListenerTest.xml",
+          "sha256": "8de785b83580d77ab832b048f018ff4daac493b2f15e8aec7e032685fd11c9da"
+        },
+        {
+          "file": "TEST-com.sportscenter.notification.NotificationScheduleJobTest.xml",
+          "sha256": "e1ab89edd9883e20efabc1bfd4fe6a88d74c337a2c38167ec77269e04d98753a"
+        },
+        {
+          "file": "TEST-com.sportscenter.notification.NotificationServiceTest.xml",
+          "sha256": "543c31aea67cf9543deb221690e858d68c6787036eb76233f1e7fec7e95ad0e5"
+        },
+        {
+          "file": "TEST-com.sportscenter.report.ChurnRiskServiceTest.xml",
+          "sha256": "cdbe6eef065c3cfc4f1e176b63742cb959fd4d9e830ebfa49a3e588e37cd013e"
+        },
+        {
+          "file": "TEST-com.sportscenter.report.ReportServiceTest.xml",
+          "sha256": "9579d7220bf4377515e60fe00419a8f64c1ea69c75eed917e11062bc0d77c2b1"
+        },
+        {
+          "file": "TEST-com.sportscenter.session.CenterIncidentRecoveryTest.xml",
+          "sha256": "7c9531d9e210ee95063eb5ee68ce0717ab09b5234ec6d36043b0e9fb5775cf87"
+        },
+        {
+          "file": "TEST-com.sportscenter.session.PrivateSessionServiceTest.xml",
+          "sha256": "d5ff0674d936a3bed19074580fdcf6bbc85ce9820aab75cc5db05c68217c28c2"
+        },
+        {
+          "file": "TEST-com.sportscenter.session.ScheduleDatabaseTest.xml",
+          "sha256": "8149fb4a1bc70b49118e7acbfb37cb9970708b5ef9ac59f53db61a5bc5cf31cd"
+        },
+        {
+          "file": "TEST-com.sportscenter.session.SessionIncidentServiceTest.xml",
+          "sha256": "c7a39b3d47541c254da10e39f0ec314f2b74931ef3ac87ce1f21be8561bc8778"
+        },
+        {
+          "file": "TEST-com.sportscenter.session.SessionPrivacyTest.xml",
+          "sha256": "8439afefd099c6595e52956ef6dadca62ebbff266354701946e12968204d2892"
+        },
+        {
+          "file": "TEST-com.sportscenter.session.SessionSchemaPostgresTest.xml",
+          "sha256": "553fceddb7618404dd576762aaea4dcdf6bff6cf5ef51832a2dcab32948fbd58"
+        },
+        {
+          "file": "TEST-com.sportscenter.session.SessionServiceTest.xml",
+          "sha256": "b1e633aa10e3d596fc98d4f6a901198bb90a9761036fa3b2ce5deb4cdd3dfc6a"
+        },
+        {
+          "file": "TEST-com.sportscenter.session.SessionSlotValidatorTest.xml",
+          "sha256": "0cdeae5adc68085096a791ea3c2309c16f45ba4ae2783f192de6e3962f234e77"
+        },
+        {
+          "file": "TEST-com.sportscenter.specialization.CoachDirectoryIntegrationTest.xml",
+          "sha256": "596f076dcf62a7e911840e5b82c7220bc0169839741d8f005adc8637a2a90b16"
+        },
+        {
+          "file": "TEST-com.sportscenter.sportclass.SportsClassServiceTest.xml",
+          "sha256": "607360b8d884d2548436f13b48ecc9168f73a8d5b240bd8b0a31a8cfc387c01c"
+        },
+        {
+          "file": "TEST-com.sportscenter.subject.SubjectSafetyTest.xml",
+          "sha256": "580daa1fc556d6f13807d8f52b32c9c0f655db055748f3ad9d81fa8e0213ff33"
+        },
+        {
+          "file": "TEST-com.sportscenter.training.AttendanceCorrectionIntegrationTest.xml",
+          "sha256": "9875dc36be3f83f3a3298b4786b97561b31b1f98a5472b6b97bf305dff6d3a8f"
+        },
+        {
+          "file": "TEST-com.sportscenter.training.AttendanceFinalizationJobTest.xml",
+          "sha256": "48bfd5492a1fd97abb7f2cdb6270dcafd57fadcfb8db1e88a015c252a79ced7f"
+        },
+        {
+          "file": "TEST-com.sportscenter.training.AttendanceFinalizationProcessorTest.xml",
+          "sha256": "94a526695730a431a9e5f78691fc5d346548650ba0721d000b0635c8c89574f8"
+        },
+        {
+          "file": "TEST-com.sportscenter.training.AttendanceServiceScanTest.xml",
+          "sha256": "658e4a02e3de72c83cb34e7aadd158cc1460b33e304cfeaf879fd4100f26d94e"
+        },
+        {
+          "file": "TEST-com.sportscenter.training.AttendanceServiceTest.xml",
+          "sha256": "bb47b0d2c930123279b63262014d7c65251e45a6b107fac613e58abf88bb2dd8"
+        },
+        {
+          "file": "TEST-com.sportscenter.training.CheckInRequestTest.xml",
+          "sha256": "684cc100ef983cddd9f83d4f26830329903e52ab1199d7db444486b5c24617df"
+        },
+        {
+          "file": "TEST-com.sportscenter.training.TotpTest.xml",
+          "sha256": "2504de83c1ffec11e34a37d20941cc2970cd31fd758f84fc941d7e071fe38304"
+        },
+        {
+          "file": "TEST-com.sportscenter.training.TrainingResultAccessIntegrationTest.xml",
+          "sha256": "31fff953b895e6d47dbbcc08b40ae9096cc94a9a791c4aeb7c54ca2be5f61d0a"
+        },
+        {
+          "file": "TEST-com.sportscenter.training.TrainingResultServiceTest.xml",
+          "sha256": "f862dcf95e5be8a801e90b0a61901e308d8a7747b7dabd890539676ee4c187af"
+        },
+        {
+          "file": "TEST-com.sportscenter.user.BookingBlockServiceTest.xml",
+          "sha256": "d640aa0bb4160c9eb569c21d4e8b01a9adf57e8224fec97dc82c9eb88b8e47cf"
+        },
+        {
+          "file": "TEST-com.sportscenter.user.CoachRoleSpecializationTest.xml",
+          "sha256": "890ef18f72932cab3994feaf0f75d558fee3b88dbd840b88a35139609c2c770e"
+        },
+        {
+          "file": "TEST-com.sportscenter.user.MemberRegistrationPaymentTest.xml",
+          "sha256": "84fea47eb331b023f39e3baae15bfc7246cd8725f52399ed1f5c795e01374838"
+        },
+        {
+          "file": "TEST-com.sportscenter.user.MemberSelfProfileControllerTest.xml",
+          "sha256": "e03cd1e2ed79eb315ebc9efd72c4efc282eb8aa6eff8b470c562de58eb395dd0"
+        },
+        {
+          "file": "TEST-com.sportscenter.user.RoleServiceTest.xml",
+          "sha256": "f3b9fa15a44f3cb426d8e91c4f41b4109c18f52c71a4c33f22ecf00f94aefcfc"
+        },
+        {
+          "file": "TEST-com.sportscenter.workflow.PhaseWorkflowHttpTest.xml",
+          "sha256": "073a07ce454679961cd962b48ee793fb40b3562b9946ceb310f7fb77385cd490"
+        }
+      ]
+    },
+    "openApi": {
+      "generatedFromTestedApp": true,
+      "generatedBy": "PhaseWorkflowHttpTest real HTTP /v3/api-docs during clean regression",
+      "semanticMatch": true,
+      "canonicalSnapshotRetained": true,
+      "sha256": "edc4432e8251151d250fe5f71c461c5659ed6cd3769f05ed67244e08dbebaf6d",
+      "generatedSha256": "d70edc88e92fbcafe67ad0c349701037fde29ac384513edec745003df8973f22",
+      "generatedPath": "artifacts/runs/role-catalog-20261110/openapi-generated.json",
+      "reason": "Only read authorization changed; paths/DTO/schema unchanged; access policy in docs01"
+    },
+    "remaining": [
+      "not pushed/deployed; FE/Render/CRUD/live not accepted",
+      "Normal/refund source implementation not changed; only approved policy/doc clarifications",
+      "class compatibility/phone clarification and proposed7calendar-days policy still under review",
+      "SYSTEM-DATA/approved demo fixtures not generated or executed"
+    ],
+    "contractOffline": {
+      "result": "PASS",
+      "mode": "OFFLINE_RETAINED_EVIDENCE_CHECK",
+      "checkedAtUtc": "2026-11-09T19:50:37.409516+00:00",
+      "backendTestsExecuted": false,
+      "liveProbePerformed": false,
+      "evidenceSourceCommit": "ec2325df07df053257df09698857b27e36489820",
+      "sourceVerification": "Admin-only role/permission GET catalogs and role-detail bypass guarded; current login/authority/status tests and clean regression local; FE/Render not accepted",
+      "retainedBackendTreeMatchesSource": true,
+      "openApiHashMatchesRecord": true,
+      "operations": 190,
+      "sourceRoutesMatched": 190,
+      "missingSourceRoutes": [],
+      "extraSourceRoutes": [],
+      "positiveRecordedExchanges": 52,
+      "bodyTypePropertyChecks": 82,
+      "wireIssues": [],
+      "limits": [
+        "Static route parser, not a complete Java or authorization analysis",
+        "Compatibility covers recorded positive status/basic types/properties; nullability/required/format/range/negative errors need separate tests",
+        "This does not rerun business tests or certify the current production state"
+      ]
+    }
+  },
+  "normalDemoReadiness20261110": {
+    "status": "READ_ONLY_OBSERVATION",
+    "checkedAtUtc": "2026-11-09T20:17:03.665060+00:00",
+    "gitBaseCommit": "165bb45e8e15f909c66efb5f9e8b15f29282cd0a",
+    "sourceFingerprints": {
+      "src/main": "e4065ac8beaa5f64f4b85215d15194ebc9d8832853b33aa84d51bc0dfb1dcf3b",
+      "src/test": "bebd0bbb45a270f6dc7901c81d93060766926c70219f76384a6efa02ff9b291f",
+      "database": "c303a249d772546cac50626434aa8256a676ad0b8541ff5b67f49b6f92a9e723",
+      "pom.xml": "050f3393d2ecdc350e8ac52acab26c052ba35a1ea0e509fffe45db122e882bf7",
+      "schema_postgres.sql": "b45ef0a351e2a36f9caba86a8bad52b3cc94049b5e151e54cbbdcc15b57e25c0",
+      "scripts/test-room-absence-postgres.py": "7144adb3689349a949c9ee702958f765fb5743433d8a285dcfc264af2a77c82c",
+      "scripts/test-phases-postgres.py": "1cef42c7b255bc65af88b644d322b9af2836935f44e358f6687d22fdc4ab3e18",
+      "scripts/prepare-phases-release.py": "e6c525b8a70562527d606b0017d72199865c838df31b6bbc995acb1405deb5a5"
+    },
+    "environment": "current Supabase; BEGIN READ ONLY via validated TLS datasource; no mutation",
+    "capturedAt": "2026-11-10T03:11:49.9537",
+    "classes": {
+      "normal": 13,
+      "classes": 22,
+      "advanced": 9
+    },
+    "pair19To21": {
+      "limit": "Read-only screening; proposed new lifecycle/refund/transfer workflow is not implemented, no consent collected, no rows changed; cannot transfer all4 into2free seats",
+      "read_only": "on",
+      "captured_at": "2026-11-10T03:14:52.436917",
+      "source_class": 19,
+      "target_class": 21,
+      "target_session_rows": 12,
+      "target_room_problems": 0,
+      "target_coach_problems": 0,
+      "source_paid_registered": 4,
+      "target_holiday_sessions": 0,
+      "target_resource_overlaps": 0,
+      "members_already_in_target": 2,
+      "members_with_observed_conflict": 0,
+      "target_room_binding_unverified": 0,
+      "runtime_activity_column_present": false,
+      "members_with_no_other_observed_conflict": 2
+    },
+    "screeningLimits": "Basic class-level screening; not a complete check of member conflicts, consent, room activity or transfer workflow readiness",
+    "workingCalendar": {
+      "centerColumns": [
+        "center_id",
+        "center_name"
+      ],
+      "explicitWorkingDayColumns": [],
+      "holidayRows": 18,
+      "scheduledIsoWeekdays": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ],
+      "coachSlotWeekdays": [
+        "FRIDAY",
+        "MONDAY",
+        "SATURDAY",
+        "SUNDAY",
+        "THURSDAY",
+        "TUESDAY",
+        "WEDNESDAY"
+      ],
+      "conclusion": "No standalone center weekly/admin-working calendar or Refund SLA definition; booking model accepts1..7 and uses configured closures; Mon-Fri is not an existing rule"
+    },
+    "rawReports": {
+      "artifacts/runs/normal-design-review-20261110/current-db-readonly.json": {
+        "sha256": "bf092a846b8fb0863d5bae1d1cf29ba6c51e72039321229689c9b3c52b5e140a"
+      },
+      "artifacts/runs/normal-design-review-20261110/pair19-21-readonly.json": {
+        "sha256": "7400d3a96b29eff0f3aa92b1ed87c05aa66238c417672b0fead8fe8a32e4da35"
+      }
+    },
+    "newBackendTestsExecuted": false,
+    "cloudMutation": false,
+    "liveBusinessFlowAccepted": false,
+    "newDemoFixtureSeeded": false,
+    "pending": [
+      "N11 proposed Pickleball target for N05; no extra Class count, not seeded",
+      "define Refund working day as center-open day and count origin; no policy change applied",
+      "phone is proposed case contact, not attachment or bank verification evidence"
+    ]
+  },
+  "approvedDemoDataDesign20261110": {
+    "status": "PASS_DATA_DESIGN_ONLY",
+    "checkedAtUtc": "2026-11-09T20:42:41.319069+00:00",
+    "decision": "Owner approved remaining3/4/5; N11 Pickleball target, optional FE contact phone,7center-open days including weekends except configured closures",
+    "document": "SYSTEM-DATA.md",
+    "documentSha256": "eaa00e755354deb4869b39cd325622c35df8d7e7652c097e8c708b86c73f3c61",
+    "generator": "scripts/build-system-data.py",
+    "generatorSha256": "0e9226f42eea7ffe130bc4ae5b928690b83c8f64ea97c1da96e00acf85dc6324",
+    "scope": {
+      "currentTableSections": 47,
+      "proposedNewTableSections": 6,
+      "accountDesignRows": 47,
+      "originalPdfAccountsPreserved": 33,
+      "classDesignRows": 21,
+      "referenceDate": "2026-11-10",
+      "timezone": "Asia/Ho_Chi_Minh"
+    },
+    "validation": [
+      "deterministic render --check",
+      "unique business keys, account roles, role-permission references and coach-slot pairs",
+      "enrollment Member/Class references and no duplicate Member/Class",
+      "exact12non-invalidated Normal planned rows; N10 retains13physical rows with1invalidated",
+      "minCapacity ceil(2*max/3), maximum seats and N05/N11 same subject/price",
+      "planned Coach/room/Member session overlaps checked",
+      "Completed sessions before anchor and Scheduled on/after anchor",
+      "Advanced booked session end within original45day expiry",
+      "resolution amount/member equals originalPaid invoice",
+      "training results only on completed noninvalidated sessions",
+      "UUID request IDs valid and stable",
+      "local Markdown links and git diff --check"
+    ],
+    "runtimeFingerprintsUnchanged": true,
+    "newBackendTestsExecuted": false,
+    "cloudMutation": false,
+    "seedExecuted": false,
+    "implementationAccepted": false,
+    "limits": [
+      "DATA DESIGN is not finalSQL-ready export or evidence allbusiness flows implemented",
+      "dynamicPending/QR/OTP/waitlist/provider attempts created atdemotime; not frozen seededvalidity",
+      "private refund documents described but actualDEMO assets notgenerated/uploaded",
+      "newNormal lifecycle/refund schema/API and fixtureexecution stillrequired; field/state namesnotpublishedAPI",
+      "FE/Render/CRUD/live notaccepted"
+    ]
+  },
+  "normalLifecycleFoundation20261110": {
+    "result": "PASS_LOCAL_FOUNDATION_PHASE1_INCOMPLETE",
+    "checkedAtUtc": "2026-11-09T21:46:32.421668+00:00",
+    "baseCommit": "165bb45e8e15f909c66efb5f9e8b15f29282cd0a",
+    "worktreeDirty": true,
+    "preexistingDiffAndUntrackedPreserved": true,
+    "phase1Complete": false,
+    "environment": "Isolated source copies without .env; H2 and NEW PostgreSQL 17 DBs in pinned Docker 127.0.0.1:55440",
+    "sourceFingerprints": {
+      "src/main": "75529f3783b93070fc8dfe21dffdb290c1997ba218ab1c8bd38fa0ddc4923769",
+      "src/test": "75f55789693e76fa9fef4c8e87df697c6213c5003c0975a62042961430e9af77",
+      "database": "1ead692c69f74e7efa0a21aa0171c174015c7bf9b437f281debf5fd5c8a6d47a",
+      "pom.xml": "050f3393d2ecdc350e8ac52acab26c052ba35a1ea0e509fffe45db122e882bf7",
+      "schema_postgres.sql": "b45ef0a351e2a36f9caba86a8bad52b3cc94049b5e151e54cbbdcc15b57e25c0",
+      "scripts/test-room-absence-postgres.py": "7144adb3689349a949c9ee702958f765fb5743433d8a285dcfc264af2a77c82c",
+      "scripts/test-phases-postgres.py": "28c4f1388f719c207a96cdd8980c891f45bfd447f3c212fe79d258840682f28e",
+      "scripts/prepare-phases-release.py": "e6c525b8a70562527d606b0017d72199865c838df31b6bbc995acb1405deb5a5"
+    },
+    "isolatedBackendAndTestsMatch": true,
+    "isolatedSqlFilesMatch": true,
+    "maintenanceOnlyAfterTestCopy": [
+      "database/README.md and documentation/generator notes"
+    ],
+    "cloudMutation": false,
+    "providerCalls": false,
+    "decisions": [
+      "D02",
+      "D10",
+      "D11",
+      "D12",
+      "D15",
+      "D16",
+      "D19",
+      "approved Normal requirements 2026-11-10"
+    ],
+    "implementedScope": [
+      "Minimum formula/default/increase validation and locking after publication or any registration",
+      "48h persisted-schedule cutoff, bounded TTL, inline release of expired holds, atomic receptionist Cash, invitation-only waitlist",
+      "Manager standard/late confirmation with actor/time/reason, rechecking start job, no unconfirmed automatic opening/cancellation",
+      "Close after twelve valid finalized sessions; D15 correction preserved; late unheld incident/makeup reopens real obligation",
+      "PUT/type/date/session aliases guarded; signed late money retained Paid/reconciliation without reviving seats"
+    ],
+    "cleanTest": {
+      "tests": 527,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 30,
+      "passed": 497
+    },
+    "regressionTargeted": {
+      "tests": 66,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "passed": 66
+    },
+    "postgresNormal": {
+      "tests": 7,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "passed": 7
+    },
+    "postgresCriteria": [
+      "Real login/auth-me and committed readback; wrong role/center; creation rollback and minimum immutable after Pending",
+      "Exact 48h and bounded TTL; Pending excluded from minimum; no automatic unconfirmed opening",
+      "Late reason, confirmation/start retry, forbidden reverse/cancel/close PUT aliases",
+      "Twelve-session closure and same-day Coach correction after Closed",
+      "Signed Return read-only; cutoff callback Paid/reconciliation and duplicate callback safety",
+      "Exact five-minute hold release in next transaction; synchronized last seat commits one Pending and one invoice-free Waitlisted"
+    ],
+    "migration": {
+      "status": "PASS",
+      "database": "scms_phases_normal_migration_20261110a",
+      "localOnly": true,
+      "envLoaded": false,
+      "cloudMutation": false,
+      "migrationSha256": "fc85176397fdceeb72324278a07835bcb914ac14001ef6dfa7f6df1e67686ab1",
+      "checks": [
+        "legacy minimum/confirmation remain unknown; no fabricated opening",
+        "replay preserves class decisions, Paid receipts and sessions",
+        "postponement and actor constraints reject invalid data without changing history",
+        "incompatible column/default/nullability preflight rolls back all preceding DDL"
+      ]
+    },
+    "schemaReference": {
+      "database": "scms_schema_demo_normal_20261110b",
+      "localOnly": true,
+      "envLoaded": false,
+      "schemaSha256": "2b5ce5199964f76085d8032557d6cb614b5b548a4d74fa5c8cd1671132667a71",
+      "checks": [
+        {
+          "name": "fresh_install_reference_counts",
+          "status": "PASS"
+        },
+        {
+          "name": "unlisted_objects_and_grants_preserved",
+          "status": "PASS"
+        },
+        {
+          "name": "scms_direct_browser_grants_revoked",
+          "status": "PASS"
+        },
+        {
+          "name": "scms_sequence_browser_grants_revoked",
+          "status": "PASS"
+        },
+        {
+          "name": "all_accounts_active_and_passwords_work",
+          "status": "PASS"
+        },
+        {
+          "name": "no_fabricated_business_history",
+          "status": "PASS"
+        },
+        {
+          "name": "current_guard_columns_and_validated_constraints",
+          "status": "PASS"
+        },
+        {
+          "name": "otp_pending_remains_supported",
+          "status": "PASS"
+        },
+        {
+          "name": "case_insensitive_email_collision_rejected",
+          "status": "PASS"
+        },
+        {
+          "name": "external_fk_blocks_reset_and_preserves_rows",
+          "status": "PASS"
+        },
+        {
+          "name": "external_view_blocks_reset_and_preserves_rows",
+          "status": "PASS"
+        },
+        {
+          "name": "dirty_replay_removes_backups_and_business_rows",
+          "status": "PASS"
+        },
+        {
+          "name": "payment_reference_counter_never_reused",
+          "status": "PASS"
+        },
+        {
+          "name": "unlisted_objects_survive_replay",
+          "status": "PASS"
+        }
+      ],
+      "status": "PASS"
+    },
+    "openApi": {
+      "sha256": "37a389eb2d28d5a1cc6083e5900c2171ca7174d13e986a8b2c5f038ece142d7f",
+      "generatedFromTestedApp": true,
+      "source": "NormalLifecycleHttpTest /v3/api-docs after disposable PostgreSQL suite",
+      "newPath": "POST /api/classes/{id}/confirm-opening"
+    },
+    "dataDesign": {
+      "status": "PASS_REPRODUCTION_DATA_DESIGN_ONLY",
+      "seeded": false,
+      "sha256": "8338840c46b670bb45369748e47e99fefea607db84bf2c1e7d81095ae03fc81e",
+      "generatorSha256": "f2d713218d53e3ac160f64b071e35667a7e564d744fc2134b32a7372f3a5beff",
+      "approvedCountsUnchanged": {
+        "accounts": 47,
+        "classes": 21
+      },
+      "actualReferenceSqlCounts": {
+        "accounts": 33,
+        "classes": 9
+      }
+    },
+    "maintenanceValidation": {
+      "schemaGeneratorByteMatch": true,
+      "pythonSyntax": "PASS",
+      "localLinkFiles": "PASS",
+      "checkpointAnchors": "PASS",
+      "gitDiffCheck": "PASS"
+    },
+    "files": {
+      "database/migrations/21_normal_lifecycle_postgres.sql": "fc85176397fdceeb72324278a07835bcb914ac14001ef6dfa7f6df1e67686ab1",
+      "database/schema_postgres.sql": "2b5ce5199964f76085d8032557d6cb614b5b548a4d74fa5c8cd1671132667a71",
+      "scripts/build-demo-schema.py": "da4e3bd1e602edffc0778da6a6c50ab174db26cb30e24173e58c02879eba1ecd",
+      "scripts/test-normal-lifecycle-migration.py": "3b5654874e0a896a11317054d92c03c0fcc9953351df27a6488fa22f46451e44",
+      "scripts/audit-fe-contract.py": "7461640f9b724d51609fa9691c41ae108cb827dba8fbaa4b5a655b5b6a0572f7",
+      "src/test/java/com/sportscenter/sportclass/NormalLifecycleHttpTest.java": "e9fdb33e366e02cac379f0efebb3bdf73a299bb986ac56bd434f8b0601dabdc2"
+    },
+    "remainingPhase1": [
+      "P1.1 proposal/transfer/refund technical mapping and compatibility",
+      "P1.2 one postponement with consent/version, choices, compatible transfer preserving invoice/all entitlement queries, cancellation with refund obligations",
+      "P1.3 repeated waitlist invitations and expiry/proposal/transfer/cancellation/late-money combined races",
+      "P1.4 receiver/version/reapproval/claim/attempt/private proof/independent verification/SLA open-center days/contact/report/audit/notifications",
+      "P1.5 executable approved fixture with anchor/TTL/private DEMO assets and verified-manifest exports",
+      "P1.6 integrated full-Phase1 PostgreSQL rollback/race/commit/readback and separate Refund handoff"
+    ],
+    "notRun": [
+      "Supabase reset/seed",
+      "SQL16 cleanup",
+      "Render deployment",
+      "real provider/money transfer",
+      "current FE browser and full CRUD/live"
+    ],
+    "nextCheckpoint": "docs/03-TODO.md#normal-phase1-foundation-20261110",
+    "limits": [
+      "Foundation acceptance only; Phase1 exit criteria not met",
+      "DATA DESIGN and old payment-resolution APIs do not imply new transfer/refund implementation",
+      "Historical QA entries retain their original source/scope; retained wire compatibility is structural only"
+    ],
+    "offlineAudit": {
+      "result": "PASS",
+      "operations": 191,
+      "sourceRoutesMatched": 191,
+      "missingSourceRoutes": [],
+      "extraSourceRoutes": [],
+      "wireIssues": [],
+      "retainedBackendTreeMatchesSource": true,
+      "openApiHashMatchesRecord": true,
+      "sourceVerification": "Normal lifecycle/admission foundation tested locally; Phase1 remains incomplete; retained wire exchanges are historical structural compatibility evidence only; no FE/Render acceptance"
+    }
+  },
+  "normalPhase1Implementation20261110": {
+    "result": "PASS_LOCAL",
+    "checkedAtUtc": "2026-11-09T22:58:12.315069+00:00",
+    "baseCommit": "d3394d61151644d88e637fd4d0ad31e2337ee36f",
+    "worktreeDirty": true,
+    "phase1Complete": true,
+    "preexistingDiffAndUntrackedPreserved": true,
+    "environment": {
+      "system": "Windows / Java17",
+      "businessZone": "Asia/Ho_Chi_Minh",
+      "database": "PostgreSQL loopback 127.0.0.1:55440; H2 clean regression",
+      "sourceCopyWithoutEnv": "D:\\Projects\\scms-local-phase1-20261110",
+      "envLoaded": false,
+      "postgresVersion": "17.11",
+      "secondIsolatedPostgresTarget": "D:\\Projects\\scms-local-phase1-pg-final-20261110"
+    },
+    "sourceFingerprints": {
+      "src/main": "f0ecf7dbbb5e989b1abfaba486782fb5bbb2a7224c9f8e2532b0c79b70600736",
+      "src/test": "926c1923ea4a41b861a5e5b8a1242a6e05c675ea078b6203454ec8bb4bee3e4b",
+      "database": "c83c754aec08e4e0c47cb3e7955fdcbcc192965bb66c5ff9dc685a32b136b641",
+      "pom.xml": "050f3393d2ecdc350e8ac52acab26c052ba35a1ea0e509fffe45db122e882bf7",
+      "schema_postgres.sql": "b45ef0a351e2a36f9caba86a8bad52b3cc94049b5e151e54cbbdcc15b57e25c0",
+      "scripts/test-room-absence-postgres.py": "7144adb3689349a949c9ee702958f765fb5743433d8a285dcfc264af2a77c82c",
+      "scripts/test-phases-postgres.py": "7b5cb63ef1d5385baab6dcb9c4daaa4074d56129841dc77e53f520ddf89efd3e",
+      "scripts/prepare-phases-release.py": "e6c525b8a70562527d606b0017d72199865c838df31b6bbc995acb1405deb5a5"
+    },
+    "isolatedBackendAndTestsMatch": {
+      "src/main": true,
+      "src/test": true,
+      "secondPostgresTarget": true
+    },
+    "cleanTest": {
+      "tests": 539,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 31,
+      "passed": 508,
+      "reportsSha256": "94402a4b924b6b1eee4049be95d9fd3256dc007a5ad207571ef077e2156efbb1",
+      "logSha256": "ad0d6bf3738408d4c2e24672a574e4488e1a68848949ee2f245fd1d8831f2ae6"
+    },
+    "postgresHttp": {
+      "tests": 21,
+      "passed": 21,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "normalDatabase": "scms_phases_normal_full_20261110d",
+      "demoDatabase": "scms_schema_demo_phase1_20261110i",
+      "suites": {
+        "com.sportscenter.sportclass.NormalLifecycleHttpTest": {
+          "tests": 18,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "xmlSha256": "62babb782b2987a1ee835fe73f910df1079eabd6194d0943fd6c68ee82587c18"
+        },
+        "com.sportscenter.auth.DemoRebuildPostgresTest": {
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "xmlSha256": "1d5a3fa92e0a624ee7a38900b7398771f37bf99718396c2c3a17067d300a051c"
+        }
+      },
+      "acceptanceLogSha256": "1422012b3f7e43c91c1d7aef9eeb210a39974f8d076d487fd579d9b134f144e7",
+      "criteria": [
+        "real login/auth-me and committed readback",
+        "minimum/cutoff/late confirmation/start/close and D15 correction",
+        "Member consent/version/stale target preserves refund choice",
+        "transfer retains invoice and updates entitlement/plan access; last-seat recheck",
+        "counter Cash/waitlist rotation and callback after cancellation obligation",
+        "receiver reapproval/claim race/idempotency/private document scope",
+        "independent bank match, pending/failure/reversal/complaint history",
+        "separate collection/refund periods without double deduction",
+        "43 Active demo accounts login; N05 to N11 from actual seeded fixture"
+      ],
+      "finalDemoFixture": {
+        "tests": 3,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "xmlSha256": "1d5a3fa92e0a624ee7a38900b7398771f37bf99718396c2c3a17067d300a051c",
+        "logSha256": "8c770b3824c6a067e39da136c57971e25b81303d24cf034026e515c8978841d9"
+      }
+    },
+    "schema": {
+      "database": "scms_schema_demo_phase1_20261110i",
+      "localOnly": true,
+      "envLoaded": false,
+      "schemaSha256": "2dc50bce0ae032d7a9e534dcb7b72b70e8429551270f61fe7cf6f8bca0d2d366",
+      "checks": [
+        {
+          "name": "fresh_install_reference_counts",
+          "status": "PASS"
+        },
+        {
+          "name": "unlisted_objects_and_grants_preserved",
+          "status": "PASS"
+        },
+        {
+          "name": "scms_direct_browser_grants_revoked",
+          "status": "PASS"
+        },
+        {
+          "name": "scms_sequence_browser_grants_revoked",
+          "status": "PASS"
+        },
+        {
+          "name": "approved_accounts_passwords_and_first_login",
+          "status": "PASS"
+        },
+        {
+          "name": "approved_synthetic_history_and_dynamic_secrets_empty",
+          "status": "PASS"
+        },
+        {
+          "name": "current_guard_columns_and_validated_constraints",
+          "status": "PASS"
+        },
+        {
+          "name": "otp_pending_remains_supported",
+          "status": "PASS"
+        },
+        {
+          "name": "case_insensitive_email_collision_rejected",
+          "status": "PASS"
+        },
+        {
+          "name": "external_fk_blocks_reset_and_preserves_rows",
+          "status": "PASS"
+        },
+        {
+          "name": "external_view_blocks_reset_and_preserves_rows",
+          "status": "PASS"
+        },
+        {
+          "name": "dirty_replay_rebuilds_only_approved_synthetic_rows",
+          "status": "PASS"
+        },
+        {
+          "name": "payment_reference_counter_never_reused",
+          "status": "PASS"
+        },
+        {
+          "name": "normal22_replay_preserves_receipts_refunds_private_assets",
+          "status": "PASS"
+        },
+        {
+          "name": "normal22_incompatible_type_rolls_back",
+          "status": "PASS"
+        },
+        {
+          "name": "receiver_fk_and_active_bank_claim_constraints_reject_cross_case_or_duplicate",
+          "status": "PASS"
+        },
+        {
+          "name": "synthetic_schedule_has_no_resource_or_member_overlap",
+          "status": "PASS"
+        },
+        {
+          "name": "expired_credit_and_reserved_advanced_balances",
+          "status": "PASS"
+        },
+        {
+          "name": "synthetic_financial_history_order_and_no_future_completion",
+          "status": "PASS"
+        },
+        {
+          "name": "unlisted_objects_survive_replay",
+          "status": "PASS"
+        }
+      ],
+      "status": "PASS",
+      "anchor": "2026-11-10",
+      "scmsTables": 55,
+      "obsoleteBackupTables": 4,
+      "users": 47,
+      "classes": 21,
+      "subjects": 9,
+      "rooms": 20,
+      "normalRefunds": 7,
+      "privateDemoPdfs": 2,
+      "migration22Sha256": "5bdcbbcb1ef1c165607667b84c8d67a08372b5149a041342993c79469585ad86",
+      "fixtureSqlSha256": "04f73a8ef0aef12150605a00594e4727a89fc02e79d82917a534f952926545c6"
+    },
+    "openApi": {
+      "sha256": "38e45f0fd122683fb13d0b6412c17b100cf8ed84163489fc0b5545dba9f8ddac",
+      "generatedFromTestedApp": true,
+      "source": "NormalLifecycleHttpTest /v3/api-docs from final post-main source on PostgreSQL",
+      "operations": 209,
+      "semanticallySameAsPrePullSnapshot": true
+    },
+    "dataDesign": {
+      "state": "DATA_DESIGN_LOCAL_FIXTURE_EXECUTED_NOT_CLOUD",
+      "sourceDatabase": "scms_schema_demo_phase1_20261110g",
+      "sha256": "902331b753aec7fc8185d9dafb43f69006c53aff8189cf2933766753c5b8b9d7",
+      "tables": 55,
+      "users": 47,
+      "classes": 21,
+      "privateAssetStorage": "BYTEA authenticated download; no public URL",
+      "dynamicFixtures": "Pending/expired/waitlist/callback/OTP/QR created only at scenario time; no secret seed"
+    },
+    "criteria": {
+      "P1.1": "PASS_LOCAL",
+      "P1.2": "PASS_LOCAL",
+      "P1.3": "PASS_LOCAL",
+      "P1.4": "PASS_LOCAL",
+      "P1.5": "PASS_LOCAL",
+      "P1.6": "PASS_LOCAL"
+    },
+    "correctedFindings": [
+      "Holiday CUSTOM is not a supported tag; use CENTER_EVENT",
+      "Accepted label without committed transfer replaced by Waiting until actual action",
+      "Expired Advanced retains revoked credit provenance",
+      "Decision OpenAPI collision fixed with unique schema names",
+      "proof download audit requires writable transaction on PostgreSQL",
+      "stale schedule cannot revoke refund choice",
+      "proposal schedule and each bank verification retain history",
+      "synthetic financial times ordered after receipt and before now",
+      "explicit receipt Paid/reconciliation/effective-class recheck at transfer commit"
+    ],
+    "cloudMutation": false,
+    "providerCalls": false,
+    "remainingPhase1": [],
+    "notRun": [
+      "Supabase reset/seed/migration/cloud mutation",
+      "Render deploy",
+      "live bank/VNPay/mail/AI/Google/storage",
+      "current FE/browser/full Phase2 matrix/CRUD",
+      "SQLServer runtime"
+    ],
+    "nextCheckpoint": "docs/03-TODO.md#normal-phase1-complete-20261110",
+    "limits": [
+      "539 clean executions include 31 skipped opt-in cases; skip is not PASS",
+      "Local callback/bank verification evidence is synthetic and does not certify a bank transfer",
+      "DATA DESIGN/export is from an untouched local fixture, not Supabase",
+      "Phase2 requires Owner review and explicit release approval",
+      "Default HTTP multipart file limit is 1 MiB (verified installed Spring Boot constructor); service/DB upper guard is 5 MiB. Contract uses the effective 1 MiB default and no avatar/global upload configuration was changed."
+    ],
+    "maintenanceValidation": {
+      "pythonSyntax": "PASS",
+      "changedDocumentLinks": "PASS",
+      "sqlGeneratorByteReproducible": "PASS",
+      "systemDataByteReproducibleOnUntouchedLocalFixture": "PASS",
+      "pdfTextAndVisualReview": "PASS",
+      "diffWhitespace": "PASS",
+      "privateSqlPdfsMatchVisuallyReviewedFiles": "PASS",
+      "finalLinksAndWhitespace": "PASS"
+    },
+    "gitIntegration": {
+      "result": "PASS",
+      "command": "git pull --no-rebase origin main on tai",
+      "previousHead": "165bb45e8e15f909c66efb5f9e8b15f29282cd0a",
+      "head": "d3394d61151644d88e637fd4d0ad31e2337ee36f",
+      "fastForward": true,
+      "oldTree": "a8c270180889f84cd75ed6dc8d24c518b932e17e",
+      "newTree": "a8c270180889f84cd75ed6dc8d24c518b932e17e",
+      "contentConflicts": [],
+      "unmergedFiles": [],
+      "phase1DiffAndOriginalUntrackedRestored": true,
+      "lineEndingsRestoredToExactSavedBytes": true,
+      "recoveryCopyOutsideGit": "D:\\Projects\\scms-phase1-pre-main-20261110",
+      "recoveryStashRetained": true,
+      "phase1CommitCreated": false,
+      "pushed": false,
+      "postPullBackendTestsRerun": true,
+      "postPullVerification": "Main tree equals the old base. After restoring every original diff/untracked file, added an explicit Paid/not-reconciliation/original-link guard at transfer commit. Final clean regression and PostgreSQL Normal plus real seeded-demo HTTP all passed on the final source.",
+      "unchangedSavedFilesVerifiedExactly": true
+    },
+    "remainingApproval": "Review Phase1 diff and main integration; approve P2.1 release/anchor/reset plan separately. No cloud authorization inferred.",
+    "offlineAudit": {
+      "result": "PASS",
+      "mode": "OFFLINE_RETAINED_EVIDENCE_CHECK",
+      "checkedAtUtc": "2026-11-09T23:00:41.115752+00:00",
+      "backendTestsExecuted": false,
+      "liveProbePerformed": false,
+      "evidenceSourceCommit": "d3394d61151644d88e637fd4d0ad31e2337ee36f",
+      "retainedWireEvidenceSourceCommit": "ec2325df07df053257df09698857b27e36489820",
+      "sourceVerification": "Normal Phase1 behavior/schema/approved synthetic fixture verified locally; historical wire rows remain structural compatibility evidence; FE/cloud/provider not accepted",
+      "retainedBackendTreeMatchesSource": true,
+      "openApiHashMatchesRecord": true,
+      "operations": 209,
+      "sourceRoutesMatched": 209,
+      "missingSourceRoutes": [],
+      "extraSourceRoutes": [],
+      "positiveRecordedExchanges": 52,
+      "bodyTypePropertyChecks": 82,
+      "wireIssues": [],
+      "limits": [
+        "Static route parser, not a complete Java or authorization analysis",
+        "Compatibility covers recorded positive status/basic types/properties; nullability/required/format/range/negative errors need separate tests",
+        "This does not rerun business tests or certify the current production state"
+      ]
+    }
+  },
+  "normalDemoOwnerAcceptance20261110": {
+    "result": "PASS_OWNER_REPORTED",
+    "reportedDate": "2026-11-10",
+    "evidenceSource": "Owner pasted Supabase SQL result in chat after running database/schema_postgres.sql",
+    "migrationKey": "20261110_demo_rebuild_v3",
+    "summary": {
+      "mode": "approved-synthetic-demo",
+      "rooms": 20,
+      "accounts": 47,
+      "subjects": 9,
+      "normal_classes": 12,
+      "synthetic_fixture": true,
+      "advanced_templates": 9,
+      "invoice_code_floor": 1794283370356
+    },
+    "intendedBundleSha256": "2dc50bce0ae032d7a9e534dcb7b72b70e8429551270f61fe7cf6f8bca0d2d366",
+    "executedBundleBytesIndependentlyMeasured": false,
+    "agentCloudMutation": false,
+    "renderAcceptance": "NOT_RUN",
+    "authenticatedBusinessSmoke": "NOT_RUN",
+    "feBrowserAcceptance": "NOT_RUN"
+  },
+  "normalPhase1Release20261110": {
+    "state": "PREPARED_FOR_AUTHORIZED_MERGE",
+    "date": "2026-11-10",
+    "authorization": "Owner requested merging tai into main after reporting Supabase demo rebuild PASS",
+    "testedSource": "normalPhase1Implementation20261110",
+    "sourceMatchesRecordedFingerprints": true,
+    "localTestReuse": "No BE/pom/schema diff from the final verified source; tests were not rerun merely for Git publication",
+    "package": {
+      "status": "PASS",
+      "testsExecuted": false,
+      "command": "mvnw -q -DargLine=-Duser.timezone=Asia/Ho_Chi_Minh -DskipTests package",
+      "javaClassMajorVersion": 61,
+      "jarSha256": "f10c8b64d805932b15f68e434bc16eb4ca32b8437f3baf6c8511f244518b86ba",
+      "newNormalAndRefundClassesPresent": true
+    },
+    "providerCalls": false,
+    "agentCloudMutation": false,
+    "renderDeployment": "NOT_VERIFIED",
+    "smokeStatus": "NOT_RUN",
+    "smokePlan": "docs/02-DEPLOYMENT-GUIDE.md#normal-release-smoke-20261110"
   }
 }

@@ -7,6 +7,12 @@ import org.springframework.data.repository.query.Param;
 import java.util.List;
 
 public interface RoomRepository extends JpaRepository<Room, Integer> {
+    @Query("select r.centerId from Room r where r.id=:id")
+    java.util.Optional<Integer> findCenterIdById(@Param("id") Integer id);
+
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("select r from Room r where r.id=:id")
+    java.util.Optional<Room> findByIdForUpdate(@Param("id") Integer id);
     @Query(value = """
             SELECT s.session_id AS sessionId,
                    s.session_date AS sessionDate,

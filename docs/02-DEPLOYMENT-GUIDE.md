@@ -52,6 +52,12 @@ Nhóm có phiên phải login và kiểm `/api/auth/me`, sau đó đúng ngườ
 
 ### Local workflow
 
+**Snapshot kiểm foundation10/11:** phần lõi trước nhóm hoàn thiện; checkpoint hiện hành [docs03](03-TODO.md#normal-phase1-complete-20261110), bundle đầy đủ ở mục demo-rebuild bên dưới. Chỉ làm trong bản sao source hiện hành không.env; test đích `NormalLifecycleHttpTest,NormalEnrollmentMembershipIntegrationTest,EnrollmentServiceTest,PublicationResourceHttpTest`, rồi clean test. Không dùng runner lấy committed checkout cũ để chứng minh working tree mới.
+
+Suite `NormalLifecycleHttpTest` mặc định H2; opt-in `-Dscms.normal.pg-url=jdbc:postgresql://127.0.0.1:55440/scms_phases_normal_<fixture_moi>` chỉ nhận DB local đúng regex, ddl-auto=none. Tạo DB mới bằng `python scripts/test-phases-postgres.py --database scms_phases_normal_<fixture_moi> --minimal-fixture`; bao gồm replay21. Actor/Member/Coach/chuyên môn/lịch làm/12buổi và phiên login+auth/me do test tạo rồi kiểm trạng thái qua connection khác sau commit. Clock VN cố định/tiến có kiểm soát; callback ký test key, không gọi VNPay/ngân hàng/SMTP thật. Có thể xuất một OpenAPI từ cùng app bằng `-Dscms.normal.openapi=<duong_dan_json_trong_ban_sao>`.
+
+Kiểm migration21 độc lập: `python scripts/test-normal-lifecycle-migration.py --database scms_phases_normal_migration_<fixture_moi> --output artifacts/runs/normal-phase1/migration-validation.json`. Runner chỉ CREATE DATABASE mới trong container đã ghim; kiểm legacy NULL, giữ receipt/session, replay giữ quyết định, FK/giới hạn dời và rollback DDL khi kiểu/default/nullability sai. Schema tham chiếu kiểm riêng bằng test-demo-schema-postgres; không lấy PASS cấu trúc làm PASS fixture mới. Migration21 đã nhúng generator reset nhưng chưa nằm trong schema root; chỉ chuẩn bị/kiểm local, không tự chạy cloud hoặc SQL16.
+
 ```powershell
 docker start scms-phases-20261027
 .\scripts\run-phases-demo.ps1
@@ -126,6 +132,72 @@ python scripts/test-phases-postgres.py --database scms_phases_attendance_<ma_moi
 
 Chạy Maven từ bản sao source hiện hành không.env; DB mới loopback55440 đúng runner. Integration test mặc định H2, opt-in PG chỉ nhận URL local đã ghim, ddl-auto=none; fixture login/auth-me thật rồi kiểm response/DB sau commit và race. Có thể xuất schema từ cùng app bằng `-Dscms.attendance.openapi=<duong_dan_raw_openapi.json>`; chỉ cập nhật snapshot sau khi kiểm đạt. Test đích rồi clean test theo mục2. Bằng chứng/SHA/count hiện hành chỉ ghi ở docs00/QA; FE/Render/CRUD nghiệm thu đợt chung, lượt này không mutation cloud.
 
+<a id="demo-rebuild-20261109"></a>
+### Bundle demo Normal/Refund10/11 — kiểm local, chưa chạy cloud
+
+File đích duy nhất [database/schema_postgres.sql](../database/schema_postgres.sql): tạo lại55bảng SCMS, xóa4backup SCMS cũ; giữ hạ tầng auth/storage/realtime/extensions và bảng ngoài danh sách. FK/view ngoài phạm vi gây RESTRICT rollback. Bundle nhúng baseline/migration17–22, chỉ trích guard runtime16; không chạy cleanup16 hoặc18–22 nối tiếp. Schema root là baseline bảo toàn cũ.
+
+Bộ47account giữ33PDF/thêm14,9môn/20sân/21Class và lịch/quyền/thu/hoàn/attendance/incident/chat/thông báo tổng hợp.2PDF DEMO nằm BYTEA riêng tư, không cần provider/bucket công khai. Seed chỉ tắt hai trigger thời gian classes/sessions để nạp lịch sử tổng hợp rồi bật lại cùng transaction; FK/CHECK/unique vẫn chạy, postflight kiểm dữ liệu. Không coi seed history là nghiệp vụ thật đã quan sát.
+
+Anchor là ngày VN truyền vào compiler; SQL từ chối CURRENT_DATE khác anchor. Khi chạy ngày mới phải tái sinh/kiểm lịch; không đổi Clock Render/TTL để giữ demo. Chưa cấp quyền cloud. Sau Owner duyệt phát hành: ngừng BE/job ghi, kiểm đúng DB/recovery riêng tư rồi chạy nguyên một file; restart BE để hủy phiên/ID cũ, đăng nhập mới/auth-me trước smoke. Không tái dùng pay URL trước reset.
+
+**Kết quả mong đợi sau thực thi được duyệt:** result=PASS, migration_key=20261110_demo_rebuild_v3; summary mode=approved-synthetic-demo/accounts47/subjects9/rooms20/advanced_templates9/normal_classes12/synthetic_fixture:true. Chưa quan sát kết quả này trên Supabase. Invoice sequence giữ floor cũ và các số fixture vừa dùng, không giảm/tái dùng; rollback có thể có khoảng trống. Thu hồi quyền PUBLIC/anon/authenticated của bảng/sequence SCMS, giữ bảng/grant ngoài phạm vi; role datasource riêng cần đúng quyền sau tạo lại.
+
+Kiểm trong source copy không.env, DB mới riêng do runner tạo; không reset DB tùy ý:
+
+```powershell
+python scripts/build-demo-schema.py --anchor 2026-11-10
+python scripts/test-demo-schema-postgres.py --database scms_schema_demo_phase1_<ma_moi> --output artifacts/runs/normal-demo/sql-proof.json
+python scripts/test-phases-postgres.py --database scms_phases_normal_<ma_moi> --minimal-fixture
+.\mvnw.cmd "-DargLine=-Duser.timezone=Asia/Ho_Chi_Minh" "-Dtest=NormalLifecycleHttpTest,DemoRebuildPostgresTest" "-Dscms.normal.pg-url=jdbc:postgresql://127.0.0.1:55440/scms_phases_normal_<ma_moi>" "-Dscms.demo.pg-url=jdbc:postgresql://127.0.0.1:55440/scms_schema_demo_phase1_<ma_moi>" test
+.\mvnw.cmd clean test
+# Export từ DB fixture nguyên trạng riêng trước test HTTP làm thay đổi kịch bản:
+python scripts/build-system-data.py --anchor 2026-11-10 --from-local-pg scms_schema_demo_phase1_<db_nguyen_trang>
+```
+
+Ví dụ dùng ngày10/11; thay bằng ngày VN dự kiến và kiểm lại. `--check` cùng `--from-local-pg` kiểm SYSTEM-DATA tái sinh. Compiler dùng reportlab tạo2PDF invariant; không là dependency BE. QR/OTP/Pending/waitlist/provider attempt tạo lúc demo bằng HTTP; không seed secret/hold hết hạn. JVM timezone canonical cần argLine như ví dụ; không load.env hoặc SMTP/gateway thật.
+
+Nhánh giữ dữ liệu chọn baseline theo README,21 rồi22 additive riêng; không reset để vá.22 thêm proposal/response/transfer, entitlement_class_id/change_pending, Refund receiver/attempt/document/verification; guard kiểu/nullability/FK/unique/replay, không backfill consent/ngân hàng hay sửa receipt. Upload HTTP giữ multipart mặc định1MiB; service/DB có trần bảo vệ5MiB, không coi trần lưu trữ là cấu hình nhận HTTP. FE gửi file≤1MiB, tăng trần HTTP cần cấu hình/test riêng; download có phiên/role/center; không dùng MediaService/public URL. PostgreSQL đã kiểm, SQLServer chưa suy tương đương.
+
+Trạng thái chuẩn/điều phối ở Active/QA. audit-supabase-demo.sql vẫn chỉ đọc; không gọi cloud audit/mutation mới chỉ vì bundle được cập nhật.
+
+<a id="normal-release-smoke-20261110"></a>
+### Smoke sau phát hành Normal/Refund — đề xuất10/11, chưa thực thi
+
+Owner đã cung cấp PASS cho bundle demo và yêu cầu merge tai→main; bằng chứng/trạng thái Git/CI chuẩn ở Active/QA. Không chạy lại bundle, SQL16, seed hay migration nối tiếp để làm smoke. Không tự gọi VNPay/QueryDR/mail/AI/Google/storage provider hoặc chuyển khoản ngân hàng thật. Mỗi nhóm ghi rõ build/actor/fixture/response và trạng thái sau commit, PASS/FAIL/BLOCKED/NOT_RUN; anonymous401 và health200 chưa là nghiệm thu nghiệp vụ.
+
+| Thứ tự / lớp kiểm | Cách kiểm và kết quả cần có |
+|---|---|
+| 1. Đúng build và DB — chỉ đọc | Lấy SHA phát hành thực tế từ Git main/CI rồi GET /api/health trên BE FE thật sự gọi: buildCommit phải khớp, status UP; đối chiếu databaseTargetFingerprint với target đã xác nhận. GET /actuator/health phải UP cho DB. Nếu build cũ/DB chưa xác định thì dừng nhóm nghiệp vụ, không đổi credential/env để ép pass |
+| 2. Phiên mới và dữ liệu — chỉ đọc | Login lại năm role bằng account demo mới, xác minh GET /api/auth/me cùng cookie đúng user/role/authorities; không dùng session/ID trước reset. Admin/Manager đọc danh mục phù hợp:47account/21Class gồm9template Advanced và12Normal,9môn/20room nếu state chưa bị thao tác. Không coi account Inactive/Locked/Pending đăng nhập thất bại là lỗi role hoặc sửa status để thử |
+| 3. Scope và DTO — chỉ đọc | Member chỉ thấy enrollment/lịch/plan/attendance/result và Refund của mình; thử ID Member khác phải bị chặn. Coach đọc roster lớp được giao, lớp không được giao bị chặn. GET roles/permissions chỉ Admin; đọc Refund/proof/history theo role tài chính, Member/Coach không được tải proof. Manager kiểm các state Refund hiện có, receiver che đúng phạm vi/contact không lộ ra thông báo; response giữ field/shape của contract |
+| 4. Cash/admission/lifecycle — nhóm ghi demo được xác định | Chọn rõ fixture SMOKE trước khi chạy; thu Cash qua Receptionist có đủ quyền phải Paid+Registered cùng transaction, Invoice.amount theo BE; Member Cash online bị chặn và retry không nhân đơn/suất. Kiểm cutoff/minimum/confirm và chặn hủy Ongoing bằng response+readback. Không đổi Clock, ngày cũ hoặc state DB để vượt cửa thời gian; phần không đúng thời điểm ghi NOT_RUN |
+| 5. Chuyển lớp/Refund — nhóm ghi demo được xác định | Nếu dùng N05→N11 phải ghi rõ Member/chỗ sẽ tiêu thụ; preview không giữ chỗ, Accept phải chuyển quyền giữ Invoice.classId/amount, retry không nhân liên kết. Refund dùng workflow Member receiver→Manager verify/approve→Receptionist claim/proof→Manager bank verification; upload chưa Completed. Có thể dừng ở đọc/claim/proof thay vì tạo xác nhận ngân hàng giả trên hồ sơ chưa thống nhất. Retry cùng UUID không tạo attempt khác; mọi evidence mô phỏng phải ghi DEMO; không chuyển tiền thật |
+| 6. Kiểm sau ghi và FE browser | Đọc lại Invoice/enrollment/quyền/lịch/Refund, report tiền thu–hoàn–ròng và audit/thông báo đúng scope; đối chiếu DB chỉ trong quyền đọc đã có. Không xóa/sửa lịch sử để làm đẹp kết quả. Trên đúng repo/build FE, kiểm cookie/CORS, chọn lớp/buổi, lưu rồi tải lại; UI mới chưa tích hợp thì ghi NOT_RUN và dùng API có phiên để kiểm BE, không gọi đó là browser PASS |
+
+Smoke ban đầu ưu tiên1–3. Nhóm4–5 cần fixture/thao tác ghi cụ thể được xác định trước; kế hoạch này chưa tự mở quyền sửa dữ liệu cloud. Bộ demo đã seed còn có thể được FE dùng trình diễn, nên không tự tiêu thụ N05→N11/hoàn tất Refund hoặc đổi role/password hàng loạt. Không đếm request làm quota; full race/matrix/CRUD/FE/live thuộc đợt riêng. Sau smoke mới trình R1/R2, validation sân và policy còn mở để Owner duyệt.
+
+<a id="phase1-migrations-20261109"></a>
+### Nhánh nâng cấp giữ dữ liệu — migration18–20
+
+### Phase1 09/11 — audit, loại sân và giá công bố
+
+Bản BE Phase1 local cần baseline hiện hành, Google13/attendance14/17 như trước và ba migration riêng theo thứ tự: [18_audit_scope_postgres.sql](../database/migrations/18_audit_scope_postgres.sql), [19_room_activity_postgres.sql](../database/migrations/19_room_activity_postgres.sql), [20_class_publication_price_postgres.sql](../database/migrations/20_class_publication_price_postgres.sql). Không chạy schema dựng lại hoặc SQL16 để thêm cột. Hai schema gộp chưa nhúng18–20; dựng mới xong baseline cũng phải áp migration riêng. **Chưa có quyền thực thi cloud trong lượt này; chưa deploy BE Phase1 lên Render.** Không phát hành BE mới khi schema còn thiếu cột.
+
+18 thêm category/center/provenance nullable vào system_logs; không backfill hoặc xóa lịch sử. 19 thêm rooms.activity_type và map20room bằng **ID trong snapshot bất biến** `20261102_room_catalog_v1`, không suy từ mã/tên hiện tại. Nếu thiếu snapshot/ID không còn đúng center1/có loại mâu thuẫn hoặc lịch Scheduled tương lai dùng sân không rõ/sai môn, script rollback và báo lỗi/ID buổi cần đối chiếu; không tự dời lịch, đổi môn, đóng sân hoặc sửa dữ liệu để vượt guard. Dữ liệu phòng lịch sử ngoài20room giữ nguyên; chưa cấu hình không được xếp lịch mới. 20 thêm pricing_draft mặc định false cho dữ liệu cũ, không đoán Closed là chưa công bố. BE mới tự quản lý marker draft mới; replay giữ marker/loại sân đã được sửa hợp lệ về sau, giữ nguyên giá/chứng từ.
+
+Kiểm tại bản sao source không.env, PostgreSQL loopback55440 đã ghim trong runner; mỗi tên DB phải mới, không reset DB có sẵn:
+
+Khi19 báo `ROOM_ACTIVITY_SCHEDULE_CONFLICT` kèm ID buổi, chạy riêng SELECT trong [check-room-activity-postgres.sql](../scripts/check-room-activity-postgres.sql) trên đúng DB đó. Script mặc định buổi164; chỉ đổi target_session_id khi cần. Query không mutation và dùng được khi activity_type chưa tồn tại sau rollback: nó tính mapping dự kiến từ snapshot bất biến, trả trạng thái cột/marker18–20, môn/room/center của buổi và các room cùng môn kèm sức chứa/trùng giờ để đối chiếu. Kết quả room chỉ là dữ liệu xem xét, chưa xác nhận toàn bộ điều kiện đổi lịch/consent/quyền học. `guard_would_block:false` có thể do trạng thái/thời gian đã đổi; không tự suy lỗi trước đó đã được sửa. Giữ guard và dữ liệu, xác định nguyên nhân trước khi đề xuất xử lý cụ thể; không đổi môn/loại sân, hủy/hoàn tất buổi hoặc bỏ guard để ép migration qua.
+
+```powershell
+python scripts/test-phase1-migrations-postgres.py --database scms_phases_p1_migrations_<ma_moi>
+python scripts/test-phases-postgres.py --database scms_phases_p1_publication_<ma_moi> --minimal-fixture
+.\mvnw.cmd '-Duser.timezone=Asia/Ho_Chi_Minh' '-Dtest=PublicationResourceHttpTest' '-Dscms.publication.pg-url=jdbc:postgresql://127.0.0.1:55440/scms_phases_p1_publication_<ma_moi>' test
+```
+
+`RbacGuardIntegrationTest` dùng property riêng `scms.rbac.pg-url`, `AttendanceCorrectionIntegrationTest` dùng `scms.attendance.pg-url`; chuẩn bị **DB mới riêng cho mỗi fixture suite** bằng runner baseline như trên. Không chạy hai Maven clean cùng target. Test đích rồi clean test theo AGENTS; schema xuất từ app đã kiểm, QA/hash/count tại docs00/QA. Các test không nạp.env, gọi provider/gateway hoặc nghiệm thu browser/Render. Bước phát hành/SQL cloud chỉ làm khi được duyệt riêng với source đã kiểm và migration tương ứng; không tự bật QueryDR hoặc chế tài booking.
+
 <a id="retire-legacy-memberships"></a>
 ### Bỏ dữ liệu gói hội viên chung — migration16
 
@@ -139,7 +211,7 @@ File tự làm preflight→khóa/phân loại→xóa subgraph gói chung cũ ch�
 
 Kiểm local: `python scripts/test-retire-legacy-memberships.py` chỉ dùng Docker PostgreSQL loopback55440/DB mới, không .env/cloud; có kiểm empty/old+modern/replay/retirement guards/unknown FK/partial Advanced/rollback sau mutation. BE có test đích và clean; workflow có phiên cũng kiểm trên PG sau migration. Khi chạy Maven PG dùng JVM `-DargLine=-Duser.timezone=Asia/Ho_Chi_Minh`, không dùng alias Asia/Saigon cho JDBC của container này. Kết quả/hash/XML tại docs00/QA, không suy local thành Supabase đã chạy.
 
-Chọn script DB theo [database/README](../database/README.md#2-chọn-đúng-script): schema root bảo toàn ID/lịch sử, còn `database/schema_postgres.sql` dựng lại dữ liệu SCMS mỗi lần chạy. Khi chỉ cần sửa thiết kế trên DB cần giữ dữ liệu, chuẩn bị migration riêng thay vì chạy bản dựng lại. Schema gộp đã bao gồm migration01–14; không chạy nối tiếp hai schema hoặc chạy lại toàn thư mục migration sau đó.
+Chọn script DB theo [database/README](../database/README.md#2-chọn-đúng-script): bản root là baseline bảo toàn cũ, `database/schema_postgres.sql` hiện là bản dựng lại sạch09/11 gồm cấu trúc mới. Khi cần giữ dữ liệu, dùng đúng migration thiếu thay vì reset; không chạy nối tiếp hai schema hoặc toàn thư mục migration. Các bundle02/11 dưới đây là lịch sử nâng cấp, không áp tiếp sau reset mới.
 
 **Bundle room/báo vắng02/11:** baseline29/10 dùng `13_room_catalog_postgres.sql`→`14_absence_attendance_postgres.sql` trước BE mới. Dừng ghi lịch trong cửa sổ migration, backup/restore proof và kiểm DB đích; không dùng bản dựng lại. Preflight đọc rooms, classes.max_capacity, số ghi danh, sessions Scheduled từ hôm nay và môn liên quan. Đối soát lớp vượt sức chứa mới theo danh mục README, ca đang diễn ra, phòng tùy chỉnh, code/tên trùng và sân01 trùng lịch trước khi chạy. Guard lỗi thì transaction rollback; không sửa lớp ngoài7giới hạn được duyệt hoặc tắt trigger để vượt. Bản trước/sau chuyển room và marker lưu trong scms_data_migration_audit; lịch đã diễn ra/chứng từ/attendance không chuyển/xóa. Postflight:20phòng mới Available,8phòng chuẩn cũ Closed nếu nâng cấp từ fixture8phòng; lịch tương lai dùng room Available/đủ sức chứa/không trùng; kiểm marker và unique current attendance. Replay giữ metadata phòng đã chỉnh về sau. BE mới cần đủ hai migration; code cũ chưa hiểu attendance superseded nên không rollback riêng BE sau khi đã phát sinh luồng mới.
 

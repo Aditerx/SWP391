@@ -162,7 +162,7 @@ class VnPayQueryIntegrationTest {
         em.persist(new com.sportscenter.specialization.CoachSpecialization(profile,spec));
         var schedule=new CoachWorkSchedule();schedule.setCoach(coach);schedule.setAcceptingNew(true);
         for(DayOfWeek day:DayOfWeek.values())for(int slot=1;slot<=7;slot++)schedule.getWeeklySlots().add(day.name()+":"+slot);em.persist(schedule);
-        var room=new com.sportscenter.room.Room();room.setName("Query room "+UUID.randomUUID());room.setCapacity(15);room.setCenterId(1);room.setStatus("Available");room.setFacilityType("Indoor");em.persist(room);
+        var room=new com.sportscenter.room.Room();room.setActivityType(com.sportscenter.room.RoomActivity.BADMINTON);room.setName("Query room "+UUID.randomUUID());room.setCapacity(15);room.setCenterId(1);room.setStatus("Available");room.setFacilityType("Indoor");em.persist(room);
         var s=new MemberPackage();s.setMember(users.findById(memberId).orElseThrow());s.setSubject(subject);s.setPrimaryCoach(coach);s.setPurchaseAmount(new BigDecimal("900000"));s.setStatus("Pending");subscriptions.save(s);
         var o=service.createAdvancedOrder(s,"VNPay","127.0.0.1");return new Order(o.invoiceId(),s.getSubscriptionId(),o.invoiceCode());
     });}

@@ -47,6 +47,8 @@ public class AttendanceFinalizationProcessor {
         scheduleWriteLock.acquire(center.get());
         Session session = sessionRepository.findByIdForUpdate(sessionId).orElse(null);
         if (session == null || session.isAttendanceFinalized() || session.isCenterInvalidated() || "Cancelled".equalsIgnoreCase(session.getStatus())) return;
+        if (session.getSportsClass().isNormal() && session.getSportsClass().getMinCapacity()!=null
+                && !"Ongoing".equals(session.getSportsClass().getStatus())) return;
         LocalDateTime now = SessionAttendancePolicy.now(clock);
         LocalDateTime endsAt = LocalDateTime.of(session.getSessionDate(), session.getEndTime());
         if (endsAt.isAfter(now)) return;
@@ -88,12 +90,15 @@ public class AttendanceFinalizationProcessor {
             }
         }
         if (session.getBookedMember() == null && session.getSportsClass().isNormal()
+                && "Ongoing".equals(session.getSportsClass().getStatus())
                 && sessionRepository.countBySportsClassIdAndCenterInvalidatedFalseAndStatusNot(session.getSportsClass().getId(), "Cancelled") == 12
                 && sessionRepository.countBySportsClassIdAndStatusAndAttendanceFinalizedFalse(session.getSportsClass().getId(), "Scheduled") == 0) {
             enrollmentRepository.findByClassIdWithDetails(session.getSportsClass().getId()).stream()
                     .filter(e -> "Registered".equals(e.getStatus())).forEach(e -> {
                         e.setStatus("Completed"); enrollmentRepository.save(e);
                     });
+            session.getSportsClass().setStatus("Closed");
+            auditService.log(null,"CLOSE_NORMAL_CLASS","CLASS",session.getSportsClass().getId(),"Twelve valid sessions finalized; Coach correction cutoff is unchanged");
         }
     }
 

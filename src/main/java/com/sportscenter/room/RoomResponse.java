@@ -8,10 +8,11 @@ public record RoomResponse(
         String status,
         String facilityType,
         Boolean outdoor,
-        String roomCode) {
+        String roomCode,
+        RoomActivity activityType) {
 
     public RoomResponse(Integer id, String name, String location, Integer capacity, String status) {
-        this(id, name, location, capacity, status, "Indoor", false, null);
+        this(id, name, location, capacity, status, "Indoor", false, null, null);
     }
 
     public static RoomResponse from(Room room) {
@@ -24,6 +25,6 @@ public record RoomResponse(
                 room.getStatus(),
                 room.getFacilityType() == null ? "Indoor" : room.getFacilityType(),
                 room.isOutdoor(),
-                room.getRoomCode());
+                room.getRoomCode(), room.getActivityType());
     }
 }

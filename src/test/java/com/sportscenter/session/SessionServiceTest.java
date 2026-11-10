@@ -96,7 +96,7 @@ class SessionServiceTest {
         lenient().when(coachSpecializationRepository.findByCoachUserId(anyInt())).thenAnswer(call -> {
             var a = new com.sportscenter.specialization.CoachSpecialization();
             var spec = new com.sportscenter.specialization.Specialization();
-            var subject = new Subject(); subject.setId(1); subject.setOutdoor(false); subject.setOutdoor(false); spec.setSubject(subject); spec.setStatus("Active"); a.setSpecialization(spec);
+            var subject = new Subject(); subject.setId(1); subject.setSlug("cau-long"); subject.setOutdoor(false); subject.setOutdoor(false); spec.setSubject(subject); spec.setStatus("Active"); a.setSpecialization(spec);
             var b = new com.sportscenter.specialization.CoachSpecialization();
             var spec2 = new com.sportscenter.specialization.Specialization();
             var subject2 = new Subject(); subject2.setId(2); subject2.setOutdoor(false); spec2.setSubject(subject2); spec2.setStatus("Active"); b.setSpecialization(spec2);
@@ -112,14 +112,14 @@ class SessionServiceTest {
         sampleCoach.setFullName("Trần Thị Hương");
 
         sampleClass = new SportsClass();
-        sampleClass.setId(1); var subject = new Subject(); subject.setId(1); subject.setOutdoor(false); subject.setOutdoor(false); sampleClass.setSubject(subject);
+        sampleClass.setId(1); var subject = new Subject(); subject.setId(1); subject.setSlug("cau-long"); subject.setOutdoor(false); subject.setOutdoor(false); sampleClass.setSubject(subject);
         sampleClass.setName("Cầu lông Buổi Sáng");
         sampleClass.setCoach(sampleCoach);
         sampleClass.setMaxCapacity(20);
         sampleClass.setStatus("Open");
         sampleClass.setTotalSessions(12);
 
-        sampleRoom = new Room();
+        sampleRoom = new Room(); sampleRoom.setActivityType(com.sportscenter.room.RoomActivity.BADMINTON);
         sampleRoom.setId(1);
         sampleRoom.setName("Sân Cầu lông 01");
         sampleRoom.setCapacity(25);

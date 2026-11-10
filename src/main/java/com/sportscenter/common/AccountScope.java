@@ -29,6 +29,14 @@ public final class AccountScope {
                 || centerId != null && Objects.equals(actor.getCenterId(), centerId);
     }
 
+    /** Staff DTOs contain private account/financial fields; learners/coaches use me/assigned workflows. */
+    public static User staffReadActor(UserRepository users) {
+        User actor = actor(users);
+        if (ActorPolicy.role(actor, "Coach") || ActorPolicy.role(actor, "Member"))
+            throw new AccessDeniedException("Use your own profile or assigned roster; staff account records are restricted");
+        return actor;
+    }
+
     public static void require(User actor, Integer centerId) {
         if (!visible(actor, centerId)) throw new AccessDeniedException("Resource belongs to another center");
     }

@@ -2,6 +2,8 @@
 
 PostgreSQL/Supabase là môi trường đang dùng. README hướng dẫn chọn script và đọc mô hình dữ liệu trong repo; không chứng nhận DB đang chạy đã đồng bộ với script.
 
+**Phase1 Normal/Refund10/11:** bundle có47account/21Class và fixture nghiệp vụ tổng hợp/private PDF DEMO. SYSTEM-DATA giữ DATA DESIGN, xuất từ fixture local; không là reset Supabase/deploy. Trạng thái kiểm/checkpoint ở [Active](../docs/00-MASTER-CHECKLIST.md#active) và [docs03](../docs/03-TODO.md#normal-phase1-complete-20261110).
+
 ## 1. Context cho session debug hoặc thay đổi thiết kế
 
 Đọc [AGENTS.md](../AGENTS.md) → Active của [docs00](../docs/00-MASTER-CHECKLIST.md) → bảng quyết định và đúng Dxx trong [docs04](../docs/04-DEBUG-NOTE.md). Sau đó mở phần schema, source BE và test liên quan.
@@ -21,13 +23,17 @@ Hai schema có mục đích khác nhau, không phải hai bản sao đồng bộ
 
 | Script | Mục đích và hành vi chạy lại |
 |---|---|
-| [schema_postgres.sql ở root](../schema_postgres.sql) | Nâng cấp DB mới/đang có; bảo toàn ID, chứng từ, attendance và lịch sử nghiệp vụ được bảo vệ. Chuẩn hóa danh mục/account theo marker; bước sửa mật khẩu demo cũ chỉ chạy một lần cho 33 email PDF, replay giữ thay đổi về sau. Không tạo bộ lịch sử demo như bản `database/`. |
-| [database/schema_postgres.sql](schema_postgres.sql) | **Dựng lại 47 bảng SCMS và dữ liệu tham chiếu mỗi lần chạy**, kể cả DB đang có. ID số độc lập tạo lại từ 1; PK subtype giữ cùng `users.user_id`, UUID/khóa ghép giữ kiểu khóa. Giữ định nghĩa hai bảng tương lai `ai_consultations`, `support_requests`, nhưng dữ liệu cũ trong phạm vi dựng lại bị thay. |
+| [schema_postgres.sql ở root](../schema_postgres.sql) | Biến thể nâng cấp/bảo toàn của baseline cũ, không đồng bộ với bundle demo10/11 và chưa gồm toàn bộ thay đổi16–20. Không dùng file này cho lượt làm sạch hiện tại. DB cần giữ dữ liệu phải chọn migration theo hiện trạng thay vì reset. |
+| [database/schema_postgres.sql](schema_postgres.sql) | **File duy nhất cho lượt dựng lại demo Owner09/11.** Xóa/tạo lại55bảng SCMS, xóa thêm4bảng backup cũ đã thấy trên Supabase. Tạo47account giữ33PDF,9môn/20sân/21Class, chuyên môn/lịch Coach và kịch bản giao dịch/quyền/lịch/attendance/Refund có nhãn DEMO; không seed OTP/QR secret/Pending hết hạn/provider attempts. ID bản ghi tạo lại; PK subtype bằng `users.user_id`, UUID/khóa ghép giữ kiểu. Riêng bộ đếm mã hóa đơn không giảm/tái dùng. |
 | [bootstrap/scms_structure_postgres.sql](bootstrap/scms_structure_postgres.sql) | Cấu trúc phục vụ runner kiểm PostgreSQL riêng, không có account/giao dịch demo; không thay schema bàn giao Supabase. |
 
-Copy **toàn bộ đúng một file schema gộp** vào SQL Editor trong một lần thực thi. Không chạy nối tiếp hai biến thể; không cần chạy thêm migration01–15 sau schema gộp. “Chạy lại được” của bản `database/` nghĩa là dựng lại thành công, **không có nghĩa giữ dữ liệu đã phát sinh**. DB đã ở baseline29/10 chỉ cần migration13→14 sau preflight; không dùng bản dựng lại để cập nhật phòng. DB đã cập nhật13/14 chỉ cần [15_QueryDR.sql](migrations/15_QueryDR.sql) để thêm QueryDR; không chạy lại schema gộp.
+Sau khi Owner duyệt cloud, chạy **toàn bộ đúng một file `database/schema_postgres.sql`** cho lượt làm sạch hiện tại theo [docs02](../docs/02-DEPLOYMENT-GUIDE.md#demo-rebuild-20261109). Đã gồm cấu trúc Google, attendance17, audit18, activity19, pricing20 và guard mô hình đã retire; không chạy thêm18/19/20 hoặc chạy lại cleanup SQL16. “Chạy lại được” nghĩa là reset lại thành công, **không giữ dữ liệu demo phát sinh**. Generator [build-demo-schema.py](../scripts/build-demo-schema.py) ghép từ nguồn hiện hành và chỉ trích guard runtime của16, không chạy DML dọn dữ liệu16.
 
-**Bổ sung06/11 — bỏ gói chung:** schema gộp hiện gồm tới15, chưa nhúng bước retire16. Để loại dữ liệu gói chung và khóa ghi trở lại, chạy **toàn bộ một file** [16_retire_legacy_memberships_postgres.sql](migrations/16_retire_legacy_memberships_postgres.sql) trên DB đã có cấu trúc hiện hành, gồm QueryDR15. Không chạy schema dựng lại để thay migration16. Hướng dẫn và kết quả cần đối chiếu tại [docs02](../docs/02-DEPLOYMENT-GUIDE.md#retire-legacy-memberships).
+Bundle nhúng [21 lifecycle](migrations/21_normal_lifecycle_postgres.sql) và [22 consent/Refund](migrations/22_normal_changes_refunds_postgres.sql).21 giữ metadata legacy NULL, không bịa khai giảng.22 thêm8bảng normal_proposals/normal_responses/normal_transfers/normal_refunds/normal_refund_receivers/normal_refund_attempts/normal_refund_documents/normal_refund_verifications; tái dùng payment_resolutions cho Refund/report. Invoice.class_id/amount giữ gốc, entitlement_class_id là quyền đích. Snapshot/version/fingerprint giữ consent; receiver/verification giữ lịch sử; unique chặn hai claim active. Upload chưa cấp quyền Completed.
+
+[Compiler fixture](../scripts/build-demo-fixture.py) dùng nguồn build-system-data, nhận anchor VN, tạo2PDF DEMO invariant vào BYTEA riêng tư. Seed tắt đúng hai trigger thời gian classes/sessions trong transaction để nạp lịch sử tổng hợp rồi bật lại; FK/CHECK/unique giữ nguyên. SQL từ chối anchor cũ. SYSTEM-DATA xuất `build-system-data.py --anchor <ngay-VN> --from-local-pg <DB-fixture-nguyen-trang>`; không xuất password/secret/binary. Cách kiểm/phạm vi phát hành tại [docs02](../docs/02-DEPLOYMENT-GUIDE.md#demo-rebuild-20261109).
+
+**DB cần giữ dữ liệu:** migration16 là cleanup có guard riêng; migration17–22 là các bước nâng cấp riêng. Chỉ chạy bước còn thiếu sau đối chiếu baseline; hướng dẫn cũ vẫn giữ trong docs02 để phục vụ nhánh nâng cấp, không phải thứ tự phải chạy sau bản dựng lại09/11.
 
 **Dependency Google trước deploy:** BE ghép Google cần cột `users.google_sub` kể cả khi chưa bật đăng nhập Google. Hai schema gộp đã chứa cấu trúc này; DB cũ cần xác minh riêng [13_google_login_postgres.sql](migrations/13_google_login_postgres.sql) theo [docs02](../docs/02-DEPLOYMENT-GUIDE.md#google-login). Prefix13 không chứng minh các migration room/capacity/Google thay thế nhau. SQL16 đã PASS trên Supabase không chứng minh Google đã chạy; không chạy lại SQL16 hoặc schema reset để bổ sung cột này.
 
@@ -35,20 +41,20 @@ Ngoại lệ có phê duyệt riêng: `13_owner_class_capacity_20261102_postgres
 
 Mỗi file dùng transaction. Bản dựng lại chỉ drop danh sách bảng SCMS đã nêu, không drop bảng Supabase `auth`/`storage`/`realtime` hoặc bảng ứng dụng ngoài danh sách. Dependency FK/view từ ngoài phạm vi khiến thao tác dừng và rollback thay vì cascade. Sau lỗi, xử lý nguyên nhân trước khi chạy lại; không thêm `CASCADE` để vượt guard.
 
-Phê duyệt Owner29/10 cho phép chuẩn bị script dựng lại để Owner tự chạy; không mở quyền tự reset cloud cho session debug tiếp theo. Khi sửa thiết kế trên DB có dữ liệu cần giữ, dùng migration riêng có guard/replay và kiểm tương thích theo [docs02](../docs/02-DEPLOYMENT-GUIDE.md).
+Owner09/11 yêu cầu rà toàn DB demo và chuẩn bị script dựng lại sạch, thay xử lý riêng buổi164. Lượt audit cloud chỉ đọc; backup trong phạm vi schema `public` được mã hóa riêng và kiểm trên clone local, không đưa dump/credential vào Git. Chưa reset Supabase; tình trạng kiểm chuẩn tại Active/QA. Quyền đọc này không cho phép mutation cloud ngoài phạm vi đã giao.
 
-**Attendance09/11:** BE mới cần chạy riêng [17_attendance_review_postgres.sql](migrations/17_attendance_review_postgres.sql) sau baseline attendance14 (cột note TEXT đã có). Script thêm `sessions.attendance_review_pending` mặc định false và index; không sửa state/note/chứng từ, không đưa buổi đã hoàn tất cũ vào hàng chờ thông báo. Finalizer mới bật marker tại end; review sau cutoff tắt marker cùng transaction. Replay giữ marker đang pending. Không chạy lại schema dựng lại hoặc SQL16 để thêm cột này; vận hành theo [docs02](../docs/02-DEPLOYMENT-GUIDE.md#attendance-review-20261109).
+**Attendance09/11, nhánh giữ dữ liệu:** BE mới cần chạy riêng [17_attendance_review_postgres.sql](migrations/17_attendance_review_postgres.sql) sau baseline attendance14 (cột note TEXT đã có). Bản reset09/11 đã nhúng17. Script thêm `sessions.attendance_review_pending` mặc định false và index; không sửa state/note/chứng từ, không đưa buổi đã hoàn tất cũ vào hàng chờ thông báo. Finalizer mới bật marker tại end; review sau cutoff tắt marker cùng transaction. Replay giữ marker đang pending. Không chạy lại schema dựng lại hoặc SQL16 chỉ để thêm cột; vận hành theo [docs02](../docs/02-DEPLOYMENT-GUIDE.md#attendance-review-20261109).
 
 ## 3. Các bảng dễ nhầm và dữ liệu tham chiếu
 
 | Bảng | Ý nghĩa hiện hành |
 |---|---|
 | `subjects` | 9 môn chuẩn và 18 mức giá theo D02. Danh mục room02/11 có20tài nguyên; Bóng rổ/Bóng chuyền tách sân. Không thêm subject_id vào rooms. |
-| `classes` | Chứa khóa Normal (`class_type='Normal'`) và template Advanced (`class_type='Advanced'`). Bản dựng lại có 9 Normal ID10–18 và 9 template Advanced ID1–9. ID này chỉ thuộc fixture dựng lại, không hardcode vào FE. |
+| `classes` | Bản dựng lại có9template Advanced và12Normal theo SYSTEM-DATA; template không là quyền đã mua. `SessionService` cần template để đặt theo subjectId; không tự sinh12buổi. Normal do Manager tạo/công bố cùng12buổi qua API. Không hardcode ID vào FE. |
 | `sessions` | Mỗi dòng là một buổi cụ thể, liên kết `classes` bằng `class_id`. Normal có 12 buổi hợp lệ; Advanced đặt ca linh hoạt theo quyền học, không sinh sẵn 12 ca cho mỗi Member chỉ vì template có `total_sessions=12`. |
-| `class_enrollments` | Ghi danh/waitlist Normal và trạng thái liên quan thanh toán. Bản dựng lại có 9 ghi danh. |
+| `class_enrollments` | Ghi danh/waitlist Normal và trạng thái liên quan thanh toán; bản dựng lại để trống. |
 | `membership_packages` | Danh mục gói chung đã ngừng sử dụng; sau SQL16 bảng trống và cấm ghi lại, giữ cấu trúc cho ORM. Bản dựng lại không seed gói tháng/VIP; 18 giá môn hiện hành nằm ở `subjects`. |
-| `member_packages` | Quyền Advanced từng đăng ký: môn, Primary Coach, giá mua đóng băng, credit và hạn. Bản dựng lại có 4 dòng; `package_id` có thể NULL vì đăng ký gắn trực tiếp với môn/Coach. Default `remaining_credit=0`; Paid hợp lệ mới cấp 12 credit qua workflow D03. |
+| `member_packages` | Quyền Advanced từng đăng ký: môn, Primary Coach, giá mua đóng băng, credit và hạn; bản dựng lại để trống. `package_id` có thể NULL vì đăng ký gắn trực tiếp với môn/Coach. Default credit0; Paid hợp lệ mới cấp12credit qua workflow D03. |
 | `vnpay_payment_attempts` | Metadata từng link pay: `attempt_id` bigint, FK `invoice_id` RESTRICT, `tmn_code`, `txn_ref`, `transaction_date` (đúng vnp_CreateDate gốc), `amount_minor` (VND×100), `created_at`, `last_query_at`. Unique invoice/merchant/ref/date. BE nội bộ; FE không đọc/ghi bảng. Không lưu secret/fullURL hoặc tự backfill invoice cũ. RLS không có policy cho anon/authenticated. |
 | `users` | Danh tính đăng nhập của 33 account theo `System Account.pdf`; Active, người dùng thường center1, Admin center NULL. `_scms_accounts` là bảng tạm tự xóa khi commit, không có bảng account thường trực mới. |
 
@@ -56,15 +62,26 @@ Phê duyệt Owner29/10 cho phép chuẩn bị script dựng lại để Owner t
 
 **Dọn dữ liệu mô hình cũ theo Owner06/11:** file16 tự kiểm/phân loại trong transaction. Chỉ xóa subscription có package_id nhưng cả subject_id/primary_coach_id đều NULL, cùng hóa đơn gói chung cũ và payment attempt/resolution trực tiếp của hóa đơn đó khi không lẫn owner/khóa hiện hành. Gặp link sang session, enrollment, advanced-registration, pause hoặc hình dạng thiếu một phần thông tin thì dừng toàn bộ. Quyền Advanced đã có môn/Coach chỉ được tháo package_id cũ; giá, credit, trạng thái và hóa đơn hiện hành không đổi. Postflight kiểm dữ liệu được bảo vệ; lỗi thì rollback cả phần xóa. Sau khi dọn, trigger chặn tạo lại catalog/subscription/invoice kiểu cũ; không giữ bản sao dòng dữ liệu nghiệp vụ cũ, chỉ lưu số lượng ở marker migration. Bảng danh mục để trống nhằm không phá ORM hiện có, không giữ sản phẩm cũ hoạt động. Không xóa cả member_packages. Script đã kiểm PostgreSQL local; Owner gửi kết quả Supabase PASS, model_retired=true và mọi bộ đếm xóa/tháo liên kết0. Agent không trực tiếp truy vấn cloud; trạng thái BE/A và bằng chứng chuẩn xem docs00/QA.
 
-`classes.total_sessions=12` là cấu hình, không bắt buộc số dòng `sessions` bằng 12. Fixture Tennis Normal có 13 dòng: giữ buổi gốc bị hủy do trung tâm (`center_invalidated=true`) và thêm buổi bù liên kết `makeup_for_session_id`; còn 12 buổi hợp lệ khi lọc `NOT center_invalidated AND status <> 'Cancelled'`. Nghiệp vụ bù/attendance theo D15.
+`classes.total_sessions=12` là cấu hình, không bắt buộc số dòng `sessions` bằng12 sau các nghiệp vụ hủy/bù. Đếm buổi hợp lệ theo D15, không ép mọi truy vấn trả đúng12dòng.
 
-Bản dựng lại seed 13 invoice và 114 session. Ngày tham chiếu tính từ ngày chạy tại `Asia/Ho_Chi_Minh`; số attendance/kết quả phụ thuộc các buổi đã hoàn thành tại thời điểm dựng. Số quan sát của lần kiểm trước nằm ở docs00/QA, không phải quota cố định cho mọi ngày chạy.
+Bản dựng lại09/11 không seed lịch sử giao dịch/buổi học. Join date dùng ngày chạy tại `Asia/Ho_Chi_Minh`; bộ lịch sử tổng hợp của schema29/10 chỉ còn trong Git/bằng chứng lịch sử. Bốn bảng backup cũ trong phạm vi xóa: `attendances_backup_flow4`, `class_enrollments_backup_flow4`, `role_permissions_backup_n06`, `training_results_backup_flow4`.
 
 `attendances.absence_notice_id` liên kết nguồn Member báo vắng; `superseded_at` giữ bản tự động hết hiệu lực do đổi giờ. Unique index chỉ áp dụng bản hiện hành `(session_id,member_id) WHERE superseded_at IS NULL`; không xóa attendance cũ hoặc backfill notice quá khứ. Luồng và quyền theo D05/D15 và docs01.
 
-Nguồn: danh tính account theo `System Account.pdf`; danh mục/quy tắc theo D02/D03/D05/D12/D15 trong [docs04](../docs/04-DEBUG-NOTE.md). Chứng từ Cash, lịch sử hủy/hoàn credit, báo vắng, hết hạn, bảo trì/bù và attendance là **fixture tổng hợp để minh họa nghiệp vụ**, không phải giao dịch thật hoặc yêu cầu số lượng từ PDF. Chức năng từng bảng có trong `COMMENT ON TABLE` của hai schema.
+Nguồn: account theo danh sách Owner đã duyệt; danh mục/quy tắc theo D02/D03/D05/D12/D15 trong [docs04](../docs/04-DEBUG-NOTE.md). Giữ bảng legacy rỗng cần cho ORM và bảng tương lai để không phá BE; giữ bảng pay attempt không đồng nghĩa bật QueryDR. Role/permission dùng baseline hiện hành, chưa mở policy mục5.
+
+SCMS sử dụng BE/JDBC, nên schema thu hồi quyền bảng/sequence SCMS của `PUBLIC`, `anon`, `authenticated`. Owner vẫn sở hữu bảng mới; grant service từ default privileges không bị thu hồi. Grant tùy chỉnh trên bảng cũ không tự được sao chép khi DROP/tạo lại, nên datasource dùng role riêng cần cấp lại đúng quyền. Đây là kiểm catalog privilege, không khẳng định đã khai thác được Data API. Không thay quyền bảng ngoài danh sách. `notifications.related_id` dùng BIGINT đúng entity; unique email không phân biệt hoa thường. Các guard giá dương,12buổi cấu hình và7khung giờ chuẩn theo rule hiện hành, không tạo policy quyền mới.
 
 Mật khẩu demo đã được Owner chốt, lưu salted BCrypt tương thích login BE; chỉ bộ account demo bỏ yêu cầu đổi mật khẩu lần đầu. Luồng tạo/cấp lại mật khẩu qua BE vẫn giữ first-login policy. Kết quả cuối script không xuất mật khẩu/hash. Coach mới chưa chọn `specializationIds` để chuyên môn trống và chưa đủ điều kiện nhận đăng ký/dạy môn đó.
+
+<a id="phase1-20261109"></a>
+### Bổ sung Phase1 09/11 — cấu trúc và migration riêng
+
+- [18 audit scope](migrations/18_audit_scope_postgres.sql): `system_logs.audit_category,center_id,scope_source` lưu provenance sự kiện mới; legacy giữ NULL, không suy từ center hiện tại của actor. API chỉ trả loại/phạm vi có chứng cứ theo RP-43; lịch sử chưa rõ vẫn giữ DB.
+- [19 room activity](migrations/19_room_activity_postgres.sql): thêm `rooms.activity_type` là loại sân/phòng phục vụ một môn, không thêm subject_id hoặc quan hệ đa môn. Runtime so loại với slug môn chuẩn; tên/mã hiển thị không tham gia quyết định. Map20room lần đầu lấy room_id từ snapshot đã duyệt của migration13, nên đổi tên/mã hiện tại không làm đổi liên kết. Guard rollback khi thiếu nguồn hoặc lịch tương lai sai môn; không sửa lịch cũ. Room chưa rõ loại giữ NULL, chặn xếp lịch mới cho đến khi Admin/Manager cấu hình theo quyền hiện hành.
+- [20 publication price](migrations/20_class_publication_price_postgres.sql): `classes.pricing_draft` mặc định false bảo toàn giá lớp legacy; BE chỉ bật cho draft Normal mới, tắt khi công bố. Không đổi Invoice.amount/purchaseAmount, không tạo bằng chứng công bố giả cho lớp cũ. Giá Normal theo Class đã công bố, Advanced order theo Subject như D02/D03/RP-13.
+
+Ba script có guard kiểu cột/replay; đã nhúng vào bản dựng lại09/11, chưa nhúng vào schema root bảo toàn. DB cần giữ dữ liệu chọn migration riêng theo [docs02](../docs/02-DEPLOYMENT-GUIDE.md#phase1-migrations-20261109). Không dùng reset chỉ để thêm cột vào dữ liệu cần giữ; không chạy migration nối tiếp bản reset mới.
 
 <a id="room-catalog"></a>
 ### Danh mục room — Owner02/11
@@ -122,6 +139,8 @@ Migration13 giữ nguyên ID và dữ liệu phòng cũ bằng mã `C01-LEGACY-<
 | `14_absence_attendance_postgres.sql` | Nguồn notice, attendance superseded và unique cho bản hiện hành; không backfill lịch sử |
 | [16_retire_legacy_memberships_postgres.sql](migrations/16_retire_legacy_memberships_postgres.sql) | Loại mô hình gói chung theo guard/phân loại; Owner đã xác nhận Supabase PASS, không yêu cầu chạy lại |
 | [17_attendance_review_postgres.sql](migrations/17_attendance_review_postgres.sql) | Hàng chờ đối soát attendance sau cutoff, không backfill lịch sử; cần trước BE attendance09/11 |
+| [21 Normal lifecycle](migrations/21_normal_lifecycle_postgres.sql) | Metadata minimum/confirmation/postponement/version; giữ legacy NULL, guard/replay |
+| [22 Normal changes/Refund](migrations/22_normal_changes_refunds_postgres.sql) | Consent/snapshot/chuyển quyền và workflow Receiver/Claim/private proof/đối soát; không seed hoặc sửa receipt |
 
 `05_reseed_demo_users_and_coaches.sql` là script reset demo cũ, không thuộc chuỗi nâng cấp an toàn cho DB dùng chung/live. File `*_mssql.sql` dành cho SQL Server, không chạy trên PostgreSQL; runtime SQL Server chưa được nghiệm thu.
 

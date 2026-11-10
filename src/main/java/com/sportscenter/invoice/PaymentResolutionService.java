@@ -31,6 +31,7 @@ public class PaymentResolutionService {
     private final ApplicationEventPublisher events;
     private final Clock clock;
     private final com.sportscenter.enrollment.ClassEnrollmentRepository enrollments;
+    private final com.sportscenter.normal.NormalRefundRepository normalRefunds;
     @io.swagger.v3.oas.annotations.media.Schema(name="PaymentResolutionResponse")
     public record Response(Integer id,Integer invoiceId,String type,String status,BigDecimal amount,String reason,String evidence,
             String outcomeNote,LocalDateTime createdAt,LocalDateTime approvedAt,LocalDateTime performedAt,LocalDateTime completedAt) {
@@ -42,6 +43,7 @@ public class PaymentResolutionService {
         Invoice invoice=lock(invoiceId);ActorPolicy.center(actor,invoice.getMember().getCenterId());
         if(!Set.of("Refund","CashCorrection").contains(type))throw new BusinessException("RESOLUTION_TYPE_INVALID: Use Refund or CashCorrection");
         if(!"Paid".equals(invoice.getPaymentStatus()))throw new BusinessException("PAID_INVOICE_REQUIRED: Resolve a recorded Paid invoice");
+        if("Refund".equals(type) && invoice.getSportsClass()!=null && invoice.getSportsClass().isNormal() && !invoice.isReconciliationRequired())throw new BusinessException("USE_NORMAL_REFUND_WORKFLOW: Use the Normal obligation and bank verification workflow");
         var existing=resolutions.findByInvoiceInvoiceIdAndType(invoiceId,type);
         if(existing.isPresent())return Response.from(existing.get());
         PaymentResolution r=new PaymentResolution();r.setInvoice(invoice);r.setType(type);r.setAmount(invoice.getAmount());r.setReason(reason);r.setCreatedBy(actor.getId());r.setCreatedAt(LocalDateTime.now(clock));resolutions.save(r);
@@ -52,6 +54,7 @@ public class PaymentResolutionService {
     public Response approve(Integer id,Authentication auth){
         User actor=actors.actor(auth);ActorPolicy.manager(actor);mutex.acquire(actor.getCenterId());
         PaymentResolution r=entity(id);Invoice invoice=lock(r.getInvoice().getInvoiceId());ActorPolicy.center(actor,invoice.getMember().getCenterId());
+        if(normalRefunds.existsById(id))throw new BusinessException("USE_NORMAL_REFUND_WORKFLOW");
         if("Completed".equals(r.getStatus())||"Approved".equals(r.getStatus()))return Response.from(r);
         String blocked=eligibility(r,invoice);
         if(blocked!=null){r.setStatus("Blocked");r.setOutcomeNote(blocked);audit.log(actor.getId(),"BLOCK_PAYMENT_RESOLUTION","INVOICE",invoice.getInvoiceId(),"case="+id+"; "+blocked);return Response.from(r);}
@@ -63,6 +66,7 @@ public class PaymentResolutionService {
     public Response complete(Integer id,String evidence,LocalDateTime performedAt,boolean moneyNotReceived,Authentication auth){
         User actor=actors.actor(auth);ActorPolicy.manager(actor);ActorPolicy.reason(evidence);mutex.acquire(actor.getCenterId());
         PaymentResolution r=entity(id);Invoice invoice=lock(r.getInvoice().getInvoiceId());ActorPolicy.center(actor,invoice.getMember().getCenterId());
+        if(normalRefunds.existsById(id))throw new BusinessException("USE_NORMAL_REFUND_WORKFLOW");
         if("Completed".equals(r.getStatus()))return Response.from(r);
         if(!"Approved".equals(r.getStatus()))throw new BusinessException("RESOLUTION_APPROVAL_REQUIRED: Manager must approve the case first");
         String blocked=eligibility(r,invoice);
@@ -84,7 +88,7 @@ public class PaymentResolutionService {
         events.publishEvent(NotificationTemplates.event(NotificationType.PAYMENT_RECONCILED,List.of(invoice.getMember().getId()),r.getOutcomeNote(),"INVOICE",invoice.getInvoiceId(),"PAYMENT_RESOLUTION:"+id));
         return Response.from(r);
     }
-    @Transactional(readOnly=true) public List<Response> list(Authentication auth){User actor=actors.actor(auth);requireStaff(actor);return resolutions.findByInvoiceMemberCenterId(actor.getCenterId()).stream().map(Response::from).toList();}
+    @Transactional(readOnly=true) public List<Response> list(Authentication auth){User actor=actors.actor(auth);requireStaff(actor);return resolutions.findByInvoiceMemberCenterId(actor.getCenterId()).stream().filter(r -> !normalRefunds.existsById(r.getId())).map(Response::from).toList();}
     private String eligibility(PaymentResolution r,Invoice invoice){
         if(!"Paid".equals(invoice.getPaymentStatus())||invoice.isCashConfirmationReversed())return "Original receipt is no longer eligible";
         if(resolutions.findByInvoiceInvoiceId(invoice.getInvoiceId()).stream().anyMatch(x->!x.getId().equals(r.getId())&&"Completed".equals(x.getStatus())))return "Another financial resolution was already completed";

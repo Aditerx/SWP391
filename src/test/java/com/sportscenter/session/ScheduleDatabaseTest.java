@@ -40,6 +40,7 @@ import static org.junit.jupiter.api.Assertions.*;
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class ScheduleDatabaseTest {
+    @MockBean com.sportscenter.normal.NormalRefundService normalRefunds;
     @org.springframework.boot.test.context.TestConfiguration
     static class Config {
         @Bean Clock clock() { return Clock.fixed(Instant.parse("2026-10-23T01:00:00Z"), ZoneId.of("Asia/Ho_Chi_Minh")); }
@@ -95,7 +96,7 @@ class ScheduleDatabaseTest {
         subject.setNormalPrice(new java.math.BigDecimal("2500000")); subject = subjects.save(subject);
         var spec = new Specialization(); spec.setName("Tennis"); spec.setSubject(subject); spec = specializations.save(spec);
         assignments.save(new CoachSpecialization(profile, spec));
-        room = new Room(); room.setName("Test court"); room.setStatus("Available"); room.setCapacity(15); room.setFacilityType("Outdoor"); room = rooms.save(room);
+        room = new Room(); room.setActivityType(com.sportscenter.room.RoomActivity.TENNIS); room.setName("Test court"); room.setStatus("Available"); room.setCapacity(15); room.setFacilityType("Outdoor"); room = rooms.save(room);
         template = new SportsClass(); template.setName("Tennis private"); template.setSubject(subject); template.setClassType("Advanced"); template.setMaxCapacity(1); template.setStatus("Open"); template = classes.save(template);
         var pkg = new MembershipPackage(); pkg.setName("Test package"); pkg.setPackageType("Advanced"); pkg.setDurationDays(45); pkg.setPrice(java.math.BigDecimal.TEN); pkg.setStatus("Active"); pkg = packages.save(pkg);
         packageA = subscription(memberA, pkg); packageB = subscription(memberB, pkg);
@@ -217,14 +218,19 @@ class ScheduleDatabaseTest {
     }
 
     @Test void twoMembersCompetingForLastNormalSeatCreateOnlyOnePendingInvoice() throws Exception {
+        org.mockito.Mockito.when(paymentProperties.getExpireMinutes()).thenReturn(5);
+        org.mockito.Mockito.when(gateway.createPaymentLink(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.anyString())).thenAnswer(call -> {
+            com.sportscenter.invoice.Invoice invoice=call.getArgument(0);
+            return new com.sportscenter.invoice.VnPayGateway.PaymentLink("http://127.0.0.1:9/no-provider","LOCALTEST",invoice.getInvoiceCode(),"20261023080000",invoice.getAmount().movePointRight(2).longValueExact());
+        });
         SecurityContextHolder.getContext().setAuthentication(auth(manager,"MANAGE_CLASSES"));
         var request = new NormalClassCreationRequest(UUID.randomUUID(), new SportsClassRequest("Last seat",subject.getId(),coach.getId(),1,date,date.plusDays(40),"Open"),room.getId(),List.of(1,3,5),LocalTime.of(14,45),LocalTime.of(16,15));
         Integer classId = normalClasses.create(request).id();
         SecurityContextHolder.clearContext();
         var pool = Executors.newFixedThreadPool(2); var start = new CountDownLatch(1);
         try {
-            var a = pool.submit(() -> { start.await(); return enrollments.enroll(classId,memberA.getId(),manager.getEmail(),"Cash"); });
-            var b = pool.submit(() -> { start.await(); return enrollments.enroll(classId,memberB.getId(),manager.getEmail(),"Cash"); });
+            var a = pool.submit(() -> { SecurityContextHolder.getContext().setAuthentication(auth(manager,"MANAGE_CLASSES"));try{start.await(); return enrollments.enroll(classId,memberA.getId(),manager.getEmail(),"VNPay");}finally{SecurityContextHolder.clearContext();} });
+            var b = pool.submit(() -> { SecurityContextHolder.getContext().setAuthentication(auth(manager,"MANAGE_CLASSES"));try{start.await(); return enrollments.enroll(classId,memberB.getId(),manager.getEmail(),"VNPay");}finally{SecurityContextHolder.clearContext();} });
             start.countDown();
             var statuses = List.of(a.get(20,TimeUnit.SECONDS).status(),b.get(20,TimeUnit.SECONDS).status());
             assertEquals(1,statuses.stream().filter("Pending"::equals).count());

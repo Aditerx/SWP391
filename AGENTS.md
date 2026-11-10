@@ -1,5 +1,12 @@
 # AGENTS.md — Nguyên tắc làm việc SCMS
 
+## 0. Bối cảnh project và cách trao đổi
+
+- Đây là **project học tập**; mọi dữ liệu, kế hoạch và thiết kế của SCMS được xem là **demo**. Nhóm phát triển còn ít kinh nghiệm, nên tài liệu, source, schema và dữ liệu thực tế đều cần double-check; không xem bất kỳ nguồn nào là mặc nhiên đúng.
+- Chủ động chỉ ra sai sót/mâu thuẫn, phản biện và đề xuất lại bằng ví dụ cụ thể. Hỏi Owner khi cần chọn hướng nghiệp vụ hoặc khi căn cứ đã chốt có mâu thuẫn thực chất; không dùng nhãn “đã chốt” để bỏ qua lỗi, cũng không hỏi lại chỉ vì nguồn lịch sử chưa cập nhật.
+- Xưng hô **Tôi–Bạn** trong trao đổi với người dùng.
+- Yêu cầu dựng lại/làm sạch DB demo được xử lý theo đúng phạm vi Owner giao; không tự áp quy trình dữ liệu production cho dữ liệu demo. Phân biệt chuẩn bị/kiểm script với thực thi trên Supabase, và bảo vệ credential cùng các thành phần hạ tầng không thuộc phạm vi SCMS.
+
 ## 1. Bắt đầu session
 
 1. Đọc file này và **phần Active** của [docs/00-MASTER-CHECKLIST.md](docs/00-MASTER-CHECKLIST.md).
@@ -26,7 +33,7 @@ Mỗi nguồn có vai trò riêng: quyết định Owner mô tả điều phải
 - Ghi tranh chấp tài nguyên dùng transaction và DB lock, ví dụ findByIdForUpdate; giữ thứ tự khóa nhất quán. Retry không nhân hóa đơn, buổi, credit hoặc thông báo.
 - Rule Normal/Advanced,12h,45 ngày sử dụng, attendance và ngoại lệ TT theo Dxx hiện hành trong docs04. Không khôi phục rule lịch sử24h/1080 giờ.
 - Giữ code/tests chế tài khóa7ngày; default toggle tắt. Giữ lịch sử attendance và chứng từ; không sửa dữ liệu để làm kết quả đẹp.
-- Migration riêng, có guard/tương thích/replay phù hợp. Không DROP TABLE/TRUNCATE/reset dữ liệu thật. Quyền mutation cloud phải đúng phạm vi đã được duyệt; phê duyệt một bundle không mở quyền seed hoặc live tests.
+- Migration nâng cấp có guard/tương thích/replay phù hợp; script dựng lại demo phải ghi rõ phạm vi xóa/tạo và được kiểm riêng. Không DROP TABLE/TRUNCATE/reset ngoài phạm vi Owner yêu cầu. Quyền mutation cloud phải đúng phạm vi được giao; chuẩn bị bundle không tự mở quyền chạy seed hoặc live tests ngoài bundle.
 - .env, credential, cookie, OTP/QR secret và backup riêng tư không đưa lên Git hoặc báo cáo. Không dùng tài khoản seed lịch sử để thử production.
 
 ## 4. Kiểm thử và kết luận

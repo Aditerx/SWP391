@@ -258,6 +258,7 @@ class AttendanceFinalizationProcessorTest {
     }
 
     @Test void normalEnrollmentCompletesAfterTwelveFinalizedSessions() {
+        session.getSportsClass().setStatus("Ongoing");
         var registered = enrollment("Registered");
         when(sessionRepository.findByIdForUpdate(90)).thenReturn(Optional.of(session));
         when(enrollmentRepository.findByClassIdWithDetails(12)).thenReturn(List.of(registered));
@@ -266,5 +267,6 @@ class AttendanceFinalizationProcessorTest {
         when(sessionRepository.countBySportsClassIdAndCenterInvalidatedFalseAndStatusNot(12,"Cancelled")).thenReturn(12L);
         processor.process(90);
         assertEquals("Completed",registered.getStatus());
+        assertEquals("Closed",session.getSportsClass().getStatus());
     }
 }

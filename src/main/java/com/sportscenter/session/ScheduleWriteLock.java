@@ -14,6 +14,14 @@ public class ScheduleWriteLock {
     private final EntityManager entityManager;
     private final com.sportscenter.user.UserRepository users;
 
+    /** Baseline room administration also supports the existing Admin-without-center scope. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void acquireForResourceAdministration(Integer centerId) {
+        com.sportscenter.common.AccountScope.require(com.sportscenter.common.AccountScope.actor(users), centerId);
+        if (centerId == null || entityManager.find(ScheduleMutex.class, centerId, LockModeType.PESSIMISTIC_WRITE) == null)
+            throw new BusinessException("CENTER_REQUIRED: Resource changes require a valid center");
+    }
+
     @Transactional(propagation = Propagation.MANDATORY)
     public void acquire(Integer centerId) {
         var authentication = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();

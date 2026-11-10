@@ -36,4 +36,14 @@ public class SystemLog {
     @Column(name = "timestamp")
     private LocalDateTime createdAt;
 
+    /** Immutable event-time provenance. Null means legacy/unknown, never inferred at read time. */
+    @Column(name = "audit_category", length = 24)
+    private String category;
+
+    @Column(name = "center_id")
+    private Integer centerId;
+
+    @Column(name = "scope_source", length = 40)
+    private String scopeSource;
+
 }

@@ -60,7 +60,7 @@ public class NormalMakeupService {
         for(Integer member:incident.getAffectedMembers())if(!sessions.findMemberConflicts(member,r.date(),r.startTime(),r.endTime(),null).isEmpty())throw new BusinessConflictException("MEMBER_CONFLICT: An affected Member has another session");
         Session makeup=new Session();makeup.setSportsClass(old.getSportsClass());makeup.setRoom(room);makeup.setCoach(coach);makeup.setSessionDate(r.date());makeup.setStartTime(r.startTime());makeup.setEndTime(r.endTime());makeup.setMakeupFor(old);makeup.setCreatedBy(actor.getId());makeup.setSupportReason(r.reason());sessions.save(makeup);
         var c=old.getSportsClass();if(c.getEndDate()==null||r.date().isAfter(c.getEndDate()))c.setEndDate(r.date());
-        if("Completed".equals(c.getStatus()))c.setStatus("Ongoing");
+        if("Closed".equals(c.getStatus()) && !c.isPricingDraft())c.setStatus("Ongoing");
         enrollments.findByClassIdWithDetails(c.getId()).stream().filter(e->incident.getAffectedMembers().contains(e.getMember().getId())&&"Completed".equals(e.getStatus())).forEach(e->e.setStatus("Registered"));
         audit.log(actor.getId(),"CREATE_LINKED_NORMAL_MAKEUP","SESSION",makeup.getId(),"original="+old.getId()+"; incident="+incidentId+"; reason="+r.reason());
         events.publishEvent(NotificationTemplates.event(NotificationType.SESSION_RESCHEDULED,List.copyOf(incident.getAffectedMembers()),"Buổi bù của lớp "+c.getName()+" đã được xếp: "+r.date()+" "+r.startTime(),"SESSION",makeup.getId(),"NORMAL_MAKEUP:"+old.getId()));

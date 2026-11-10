@@ -17,11 +17,13 @@ public class RoleController {
     private final RoleService roleService;
 
     @GetMapping("/roles")
+    @PreAuthorize("hasRole('ADMIN')")
     public List<RoleResponse> getAllRoles() {
         return roleService.findAllRoles();
     }
 
     @GetMapping("/roles/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public RoleResponse getRoleById(@PathVariable Integer id) {
         return roleService.findRoleById(id);
     }
@@ -33,6 +35,7 @@ public class RoleController {
     }
 
     @GetMapping("/permissions")
+    @PreAuthorize("hasRole('ADMIN')")
     public List<PermissionResponse> getAllPermissions() {
         return roleService.findAllPermissions();
     }

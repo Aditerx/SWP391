@@ -51,7 +51,7 @@ public class EnrollmentController {
         String userEmail = authentication != null ? authentication.getName() : null;
         Integer memberId = request != null ? request.memberId() : null;
         EnrollmentResponse response = enrollmentService.enroll(classId, memberId, userEmail,
-                request != null ? request.paymentMethod() : "Cash", clientIp(httpRequest));
+                request != null ? request.paymentMethod() : "VNPay", clientIp(httpRequest));
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 

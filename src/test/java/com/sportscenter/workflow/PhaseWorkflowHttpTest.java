@@ -68,6 +68,8 @@ public class PhaseWorkflowHttpTest {
     @MockBean PackageExpirationJob packageJob;
     @MockBean com.sportscenter.training.AttendanceFinalizationJob attendanceJob;
     @MockBean com.sportscenter.notification.NotificationScheduleJob notificationJob;
+    @MockBean com.sportscenter.sportclass.NormalLifecycleJob normalLifecycleJob;
+    @Autowired com.sportscenter.sportclass.NormalLifecycleService normalLifecycle;
     @Autowired JdbcTemplate jdbc;
     @Autowired TransactionTemplate tx;
     @Autowired UserRepository users;
@@ -123,7 +125,7 @@ public class PhaseWorkflowHttpTest {
         tx.executeWithoutResult(t->{
             jdbc.execute("CREATE SEQUENCE IF NOT EXISTS invoice_code_seq START WITH 10000");
             if(jdbc.queryForObject("SELECT count(*) FROM centers WHERE center_id=1",Integer.class)==0) jdbc.update("INSERT INTO centers(center_id) VALUES(1)");
-            Role mr=role("Member"), cr=role("Coach","RECORD_RESULT"), mgr=role("CenterManager","MANAGE_CLASSES","VIEW_REPORTS","MANAGE_INVOICES","MANAGE_SUBSCRIPTIONS"), rr=role("Receptionist","MANAGE_INVOICES");
+            Role mr=role("Member"), cr=role("Coach","RECORD_RESULT"), mgr=role("CenterManager","MANAGE_CLASSES","VIEW_REPORTS","MANAGE_INVOICES","MANAGE_SUBSCRIPTIONS"), rr=role("Receptionist","MANAGE_INVOICES","REGISTER_MEMBER");
             User m=user("phase.member",mr),c=user("phase.coach",cr); memberId=m.getId(); coachId=c.getId();
             otherId=user("phase.other",mr).getId(); user("phase.manager",mgr);
             User desk=user("phase.cashier",rr); Receptionist deskProfile=new Receptionist();deskProfile.setUser(desk);receptionists.save(deskProfile);
@@ -132,7 +134,7 @@ public class PhaseWorkflowHttpTest {
             Subject s=subjects.findBySlug("cau-long").orElseGet(Subject::new);s.setName("Cầu lông");s.setSlug("cau-long");s.setOutdoor(false);s.setStatus("Active");s.setNormalPrice(new BigDecimal("900000"));s.setAdvancedPrice(new BigDecimal("3000000"));subjects.save(s);subjectId=s.getId();
             Specialization spec=new Specialization();spec.setName("phase-badminton");spec.setSubject(s);spec.setStatus("Active");specs.save(spec);assignments.save(new CoachSpecialization(profile,spec));
             var template=new com.sportscenter.sportclass.SportsClass();template.setName("Phase Advanced template");template.setSubject(s);template.setCoach(c);template.setClassType("Advanced");template.setMaxCapacity(1);template.setTuitionFee(s.getAdvancedPrice());template.setStatus("Open");template.setCenterId(1);classes.save(template);
-            Room r=new Room();r.setName("Phase test room");r.setCapacity(15);r.setStatus("Available");r.setCenterId(1);r.setFacilityType("Indoor");rooms.save(r);roomId=r.getId();
+            Room r=new Room();r.setActivityType(com.sportscenter.room.RoomActivity.BADMINTON);r.setName("Phase test room");r.setCapacity(15);r.setStatus("Available");r.setCenterId(1);r.setFacilityType("Indoor");rooms.save(r);roomId=r.getId();
             if(holidays.findByHolidayDate(LocalDate.of(2026,10,30)).isEmpty()) holidays.save(new Holiday(LocalDate.of(2026,10,30),"Phase closure","CENTER_EVENT",true));
         });
         member=login("phase.member");coach=login("phase.coach");manager=login("phase.manager");cashier=login("phase.cashier");other=login("phase.other");
@@ -307,7 +309,7 @@ public class PhaseWorkflowHttpTest {
         call(other,"POST","/api/sessions/"+scheduledId+"/absence",Map.of("reason","Not mine"),403);
         call(member,"POST","/api/sessions/"+scheduledId+"/cancel-private",null,400);
         proof("ABSENCE-UNDER-12H","D05,D15","Owner31/10 replaces notice-only; Member A reports 7h45 before session","Notice + one linked Absent committed; retry same notice/credit; wrong owner403; Scheduled, no refund",rightsSql(),subscriptionId);
-        int secondRoom=tx.execute(t->{Room r=new Room();r.setName("Phase alternate room");r.setCapacity(15);r.setStatus("Available");r.setCenterId(1);r.setFacilityType("Indoor");return rooms.save(r).getId();});
+        int secondRoom=tx.execute(t->{Room r=new Room();r.setActivityType(com.sportscenter.room.RoomActivity.BADMINTON);r.setName("Phase alternate room");r.setCapacity(15);r.setStatus("Available");r.setCenterId(1);r.setFacilityType("Indoor");return rooms.save(r).getId();});
         var incident=call(manager,"POST","/api/center-incidents",Map.of("sessionId",scheduledId,"startedAt","2026-10-28T00:00:00","reason","Room issue","evidence","Verified maintenance record","requestKey","room-incident"),200);
         var move=new HashMap<String,Object>();move.put("newDate","2026-10-28");move.put("newStartTime","07:45");move.put("newEndTime","09:15");move.put("newRoomId",secondRoom);move.put("cause","CENTER_INCIDENT");move.put("reason","Agreed room replacement");move.put("memberAgreed",true);move.put("requestKey","room-change");move.put("incidentId",incident.get("id").asInt());
         call(manager,"POST","/api/sessions/"+scheduledId+"/reschedule",move,200);
@@ -440,11 +442,12 @@ public class PhaseWorkflowHttpTest {
     @Test @Order(9) void normalPaidCourseLateIncidentCreatesOneLinkedMakeupAndCompletesTwelveValidSessions() throws Exception {
         var holiday=Map.of("holidayDate","2027-01-01","holidayName","Phase New Year closure","tag","NATIONAL_FIXED","active",true);
         var preview=call(manager,"POST","/api/holidays/preview",holiday,200);call(manager,"POST","/api/holidays",holiday,201,previewHeader(preview));
-        var details=new HashMap<String,Object>();details.put("name","Phase Normal twelve sessions");details.put("subjectId",subjectId);details.put("coachId",coachId);details.put("maxCapacity",15);details.put("classType","Normal");details.put("totalSessions",12);details.put("startDate","2026-12-17");details.put("endDate","2027-02-01");details.put("status","Open");
+        var details=new HashMap<String,Object>();details.put("name","Phase Normal twelve sessions");details.put("subjectId",subjectId);details.put("coachId",coachId);details.put("maxCapacity",1);details.put("classType","Normal");details.put("totalSessions",12);details.put("startDate","2026-12-17");details.put("endDate","2027-02-01");details.put("status","Open");
         var created=call(manager,"POST","/api/classes/normal-with-sessions",Map.of("requestId",UUID.randomUUID().toString(),"sportsClass",details,"roomId",roomId,"daysOfWeek",List.of(2,4),"startTime","07:45","endTime","09:15"),201);int cid=created.get("id").asInt();
         assertEquals(12,jdbc.queryForObject("SELECT count(*) FROM sessions WHERE class_id=?",Integer.class,cid));assertEquals(0,jdbc.queryForObject("SELECT count(*) FROM sessions WHERE class_id=? AND session_date='2027-01-01'",Integer.class,cid));
-        var enrollment=call(member,"POST","/api/classes/"+cid+"/enroll",Map.of("paymentMethod","Cash"),201);int iid=enrollment.get("invoiceId").asInt();
-        assertEquals("Pending",enrollment.get("status").asText());call(cashier,"POST","/api/invoices/"+iid+"/confirm-cash",Map.of("note","LOCAL TEST Normal tuition received"),200);
+        var enrollment=call(cashier,"POST","/api/classes/"+cid+"/enroll",Map.of("memberId",memberId,"paymentMethod","Cash"),201);int iid=enrollment.get("invoiceId").asInt();
+        assertEquals("Registered",enrollment.get("status").asText());assertEquals("Paid",enrollment.get("paymentStatus").asText());
+        call(manager,"POST","/api/classes/"+cid+"/confirm-opening",Map.of("reason","Opening review completed"),200);
         assertEquals(900000,jdbc.queryForObject("SELECT amount FROM invoices WHERE invoice_id=?",BigDecimal.class,iid).intValue());
         call(member,"POST","/api/classes/"+cid+"/cancel-enrollment",null,400);
         int original=jdbc.queryForObject("SELECT session_id FROM sessions WHERE class_id=? ORDER BY session_date,start_time LIMIT 1",Integer.class,cid);
@@ -452,6 +455,7 @@ public class PhaseWorkflowHttpTest {
         var cashCase=call(cashier,"POST","/api/payment-resolutions",Map.of("invoiceId",iid,"type","CashCorrection","reason","Normal must not get a cancellation exception"),200);
         assertEquals("Blocked",call(manager,"POST","/api/payment-resolutions/"+cashCase.get("id").asInt()+"/approve",null,200).get("status").asText());
         proof("NORMAL-PAID-NO-CANCEL","D02,D05,D12,D15,D16","12-session Normal course, 900000 Cash; Member personal cancellation/notice","Paid enrollment Registered; 12 sessions skip Holiday; personal cancel/absence 400; Normal CashCorrection Blocked","SELECT status FROM class_enrollments WHERE class_id=? AND member_id=?",cid,memberId);
+        at("2026-12-17T07:45:00");normalLifecycle.reconcile(cid);
         at("2026-12-17T09:15:00");finalizer.process(original);
         var incident=call(manager,"POST","/api/center-incidents",Map.of("sessionId",original,"startedAt","2026-12-17T07:45:00","reason","Late verified center incident; session was not held","evidence","LOCAL TEST incident evidence for original session","requestKey","late-normal-incident"),200);int incidentId=incident.get("id").asInt();
         call(manager,"POST","/api/center-incidents/"+incidentId+"/resolve",Map.of("endedAt","2026-12-17T09:15:00"),200);
@@ -604,14 +608,14 @@ public class PhaseWorkflowHttpTest {
         call(cashier,"POST","/api/invoices/"+eligibility.path("invoiceId").asInt()+"/confirm-cash",null,200);
         var details=new HashMap<String,Object>();details.put("name","Acceptance Normal last seat");details.put("subjectId",subjectId);details.put("coachId",coachId);details.put("maxCapacity",1);details.put("classType","Normal");details.put("totalSessions",12);details.put("startDate","2027-04-01");details.put("endDate","2027-06-01");details.put("status","Open");
         var course=call(manager,"POST","/api/classes/normal-with-sessions",Map.of("requestId",UUID.randomUUID().toString(),"sportsClass",details,"roomId",roomId,"daysOfWeek",List.of(2,4),"startTime","14:45","endTime","16:15"),201);int cid=course.path("id").asInt();
-        race(new HttpClient[]{member,other},"/api/classes/"+cid+"/enroll",new Object[]{Map.of("paymentMethod","Cash"),Map.of("paymentMethod","Cash")},List.of(201,201));
+        race(new HttpClient[]{member,other},"/api/classes/"+cid+"/enroll",new Object[]{Map.of("paymentMethod","VNPay"),Map.of("paymentMethod","VNPay")},List.of(201,201));
         assertEquals(1,jdbc.queryForObject("SELECT count(*) FROM class_enrollments WHERE class_id=? AND status='Pending'",Integer.class,cid));
         assertEquals(1,jdbc.queryForObject("SELECT count(*) FROM class_enrollments WHERE class_id=? AND status='Waitlisted'",Integer.class,cid));
         assertEquals(1,jdbc.queryForObject("SELECT count(*) FROM invoices WHERE class_id=?",Integer.class,cid));
         int iid=jdbc.queryForObject("SELECT invoice_id FROM invoices WHERE class_id=?",Integer.class,cid);
-        call(cashier,"POST","/api/invoices/"+iid+"/confirm-cash",null,200);
+        var tuitionOrder=call(cashier,"GET","/api/invoices/"+iid,null,200);call(member,"GET","/api/payments/vnpay/ipn?"+callback(tuitionOrder),null,200);
         assertEquals(1,jdbc.queryForObject("SELECT count(*) FROM class_enrollments WHERE class_id=? AND status='Registered'",Integer.class,cid));
-        proof("NORMAL-LAST-SEAT-RACE","D10,D15","Two verified Members concurrently enroll in capacity 1 Normal; cashier pays winner","Both 201: one Pending invoice, one Waitlisted without invoice; after Paid exactly one Registered, one Waitlisted","SELECT member_id,status FROM class_enrollments WHERE class_id=? ORDER BY member_id",cid);
+        proof("NORMAL-LAST-SEAT-RACE","D10,D15","Two verified Members concurrently enroll in capacity 1 Normal; signed local IPN pays winner","Both 201: one Pending invoice, one Waitlisted without invoice; after Paid exactly one Registered, one Waitlisted","SELECT member_id,status FROM class_enrollments WHERE class_id=? ORDER BY member_id",cid);
     }
 
     @Test @Order(15) void incidentSubstituteRequiresExactConsentAndKeepsPrimaryCoach() throws Exception {
@@ -645,7 +649,7 @@ public class PhaseWorkflowHttpTest {
             User m=user("phase.member2",roles.findAll().stream().filter(r->"Member".equals(r.getName())).findFirst().orElseThrow());m.setCenterId(2);Member mp=new Member();mp.setUser(m);mp.setJoinDate(LocalDate.now(clock));members.save(mp);
             User c=user("phase.coach2",roles.findAll().stream().filter(r->"Coach".equals(r.getName())).findFirst().orElseThrow());c.setCenterId(2);Coach cp=new Coach();cp.setUser(c);coaches.save(cp);
             var spec=specs.findAll().stream().filter(s->s.getSubject()!=null&&s.getSubject().getId().equals(subjectId)).findFirst().orElseThrow();assignments.save(new CoachSpecialization(cp,spec));
-            Room r=new Room();r.setName("Acceptance center 2 room");r.setCapacity(15);r.setStatus("Available");r.setFacilityType("Indoor");r.setCenterId(2);rooms.save(r);return new int[]{m.getId(),c.getId()};
+            Room r=new Room();r.setActivityType(com.sportscenter.room.RoomActivity.BADMINTON);r.setName("Acceptance center 2 room");r.setCapacity(15);r.setStatus("Available");r.setFacilityType("Indoor");r.setCenterId(2);rooms.save(r);return new int[]{m.getId(),c.getId()};
         });
         var m2=login("phase.member2");var c2=login("phase.coach2");var manager2=login("phase.manager2");var cashier2=login("phase.cashier2");
         call(manager2,"PUT","/api/coaches/"+fixture[1]+"/work-schedule",Map.of("weeklySlots",allSlots(),"daysOff",List.of(),"acceptingNew",true),200);
@@ -667,7 +671,7 @@ public class PhaseWorkflowHttpTest {
             Subject outdoor=subjects.findBySlug("quan-vot-tennis").orElseGet(Subject::new);outdoor.setSlug("quan-vot-tennis");outdoor.setName("Tennis");outdoor.setStatus("Active");outdoor.setOutdoor(true);outdoor.setNormalPrice(new BigDecimal("2500000"));outdoor.setAdvancedPrice(new BigDecimal("8000000"));subjects.save(outdoor);
             var indoor=specs.findAll().stream().filter(s->s.getSubject()!=null&&s.getSubject().getId().equals(subjectId)).findFirst().orElseThrow();assignments.save(new CoachSpecialization(cp,indoor));
             Specialization tennis=new Specialization();tennis.setName("Acceptance Tennis");tennis.setSubject(outdoor);tennis.setStatus("Active");specs.save(tennis);assignments.save(new CoachSpecialization(cp,tennis));
-            Room r=new Room();r.setName("Acceptance outdoor court");r.setCapacity(1);r.setStatus("Available");r.setFacilityType("Outdoor");r.setCenterId(1);rooms.save(r);
+            Room r=new Room();r.setActivityType(com.sportscenter.room.RoomActivity.BADMINTON);r.setName("Acceptance outdoor court");r.setActivityType(com.sportscenter.room.RoomActivity.TENNIS);r.setCapacity(1);r.setStatus("Available");r.setFacilityType("Outdoor");r.setCenterId(1);rooms.save(r);
             var template=new com.sportscenter.sportclass.SportsClass();template.setName("Acceptance Tennis template");template.setSubject(outdoor);template.setCoach(c);template.setClassType("Advanced");template.setMaxCapacity(1);template.setTuitionFee(outdoor.getAdvancedPrice());template.setStatus("Open");template.setCenterId(1);classes.save(template);
             return new int[]{c.getId(),outdoor.getId(),r.getId(),template.getId()};
         });
@@ -833,7 +837,7 @@ public class PhaseWorkflowHttpTest {
         body.remove("roomCode");body.put("name","QA coded room renamed");
         assertEquals("C01-QA-01",call(manager,"PUT","/api/rooms/"+id,body,200).path("roomCode").asText());
         body.put("name","QA compatible omitted code");assertTrue(call(manager,"POST","/api/rooms",body,201).path("roomCode").asText().startsWith("C01-RM-"));
-        int legacy=tx.execute(t->{Room r=new Room();r.setName("Retired QA resource");r.setRoomCode("C01-LEGACY-QA");r.setCapacity(4);r.setStatus("Closed");return rooms.save(r).getId();});
+        int legacy=tx.execute(t->{Room r=new Room();r.setActivityType(com.sportscenter.room.RoomActivity.BADMINTON);r.setName("Retired QA resource");r.setRoomCode("C01-LEGACY-QA");r.setCapacity(4);r.setStatus("Closed");return rooms.save(r).getId();});
         assertFalse(java.util.stream.StreamSupport.stream(call(manager,"GET","/api/rooms",null,200).spliterator(),false).anyMatch(r->r.path("id").asInt()==legacy));
         call(member,"POST","/api/rooms",body,403);
         proof("ROOM-CODE-API","D02","Manager CRUD; Member denied; explicit code, omitted code, duplicate and wrong-center code","Numeric id/path retained; roomCode persisted; omitted PUT retains; omitted POST generates; duplicate409, invalid/center400, Member403", "SELECT room_id,room_code,room_name,capacity,status FROM rooms WHERE room_id=?",id);

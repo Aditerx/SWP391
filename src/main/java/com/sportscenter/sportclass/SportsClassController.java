@@ -16,10 +16,18 @@ import java.util.List;
 public class SportsClassController {
     private final SportsClassService service;
     private final NormalClassCreationService normalClassCreationService;
+    private final NormalLifecycleService lifecycle;
+
+    public record OpeningConfirmation(String reason) {}
+    @PostMapping("/{id}/confirm-opening")
+    @PreAuthorize("hasRole('CENTERMANAGER') and hasAuthority('MANAGE_CLASSES')")
+    public SportsClassResponse confirmOpening(@PathVariable Integer id, @RequestBody(required=false) OpeningConfirmation body, Authentication auth) {
+        return lifecycle.confirm(id,body==null?null:body.reason(),auth);
+    }
 
     @org.springframework.web.bind.annotation.ResponseStatus(org.springframework.http.HttpStatus.CREATED)
     @PostMapping("/normal-with-sessions")
-    @PreAuthorize("hasAuthority('MANAGE_CLASSES')")
+    @PreAuthorize("hasAnyRole('ADMIN','CENTERMANAGER') and hasAuthority('MANAGE_CLASSES')")
     public ResponseEntity<SportsClassResponse> createNormal(@Valid @RequestBody NormalClassCreationRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(normalClassCreationService.create(request));
     }
@@ -36,13 +44,13 @@ public class SportsClassController {
 
     @org.springframework.web.bind.annotation.ResponseStatus(org.springframework.http.HttpStatus.CREATED)
     @PostMapping
-    @PreAuthorize("hasAuthority('MANAGE_CLASSES')")
+    @PreAuthorize("hasAnyRole('ADMIN','CENTERMANAGER') and hasAuthority('MANAGE_CLASSES')")
     public ResponseEntity<SportsClassResponse> create(@Valid @RequestBody SportsClassRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(service.create(request));
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAuthority('MANAGE_CLASSES')")
+    @PreAuthorize("hasAnyRole('ADMIN','CENTERMANAGER') and hasAuthority('MANAGE_CLASSES')")
     public ResponseEntity<SportsClassResponse> update(@PathVariable Integer id,
                                                        @Valid @RequestBody SportsClassRequest request,
                                                        Authentication authentication) {

@@ -13,12 +13,20 @@ public record SportsClassRequest(
         @NotNull Integer subjectId,
         Integer coachId,
         @NotNull @Positive Integer maxCapacity,
+        @io.swagger.v3.oas.annotations.media.Schema(description = "Normal: optional positive first-publication price, default Subject.normalPrice; published/legacy repricing is not approved. Advanced always uses Subject.advancedPrice.", example = "950000")
         @DecimalMin(value = "0.00", message = "tuitionFee must not be negative") BigDecimal tuitionFee,
         LocalDate startDate,
         LocalDate endDate,
         String status,
         String classType,
-        Integer totalSessions) {
+        Integer totalSessions,
+        Integer minCapacity) {
+
+    public SportsClassRequest(String name, Integer subjectId, Integer coachId, Integer maxCapacity,
+                              BigDecimal tuitionFee, LocalDate startDate, LocalDate endDate, String status,
+                              String classType, Integer totalSessions) {
+        this(name, subjectId, coachId, maxCapacity, tuitionFee, startDate, endDate, status, classType, totalSessions, null);
+    }
 
     public SportsClassRequest(String name, Integer subjectId, Integer coachId, Integer maxCapacity,
                               BigDecimal tuitionFee, LocalDate startDate, LocalDate endDate, String status) {

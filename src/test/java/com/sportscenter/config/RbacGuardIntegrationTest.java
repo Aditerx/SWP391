@@ -61,6 +61,7 @@ class RbacGuardIntegrationTest {
     @Autowired SessionRegistry sessions;
     @Autowired TrainingPlanService trainingPlans;
     @Autowired EvaluationService evaluations;
+    @Autowired com.sportscenter.audit.AuditService audit;
     @MockBean PaymentExpirationJob paymentJob;
     @MockBean PackageExpirationJob packageJob;
     @MockBean AttendanceFinalizationJob attendanceJob;
@@ -79,6 +80,7 @@ class RbacGuardIntegrationTest {
         new TransactionTemplate(transactions).executeWithoutResult(t -> {
             if (!System.getProperty("scms.rbac.pg-url", "").isBlank())
                 jdbc.update("INSERT INTO centers(center_id,center_name) VALUES(1,'Guard center 1'),(2,'Guard center 2') ON CONFLICT(center_id) DO NOTHING");
+            else jdbc.update("INSERT INTO centers(center_id) VALUES(1),(2)");
             var subjects = em.createQuery("select s from Subject s where s.slug='cau-long'", com.sportscenter.subject.Subject.class).getResultList();
             if (subjects.isEmpty()) {
                 subject = new com.sportscenter.subject.Subject(); subject.setName("Cầu lông"); subject.setSlug("cau-long");
@@ -139,7 +141,7 @@ class RbacGuardIntegrationTest {
         return u;
     }
     private Room room(int center) {
-        Room r = new Room(); r.setName("Guard room " + center); r.setCenterId(center);
+        Room r = new Room(); r.setActivityType(com.sportscenter.room.RoomActivity.BADMINTON); r.setName("Guard room " + center); r.setCenterId(center);
         r.setCapacity(4); r.setStatus("Available"); em.persist(r); return r;
     }
     private SportsClass course(User coach, int center) {
@@ -164,6 +166,52 @@ class RbacGuardIntegrationTest {
         return session;
     }
     private int logs() { return jdbc.queryForObject("SELECT count(*) FROM system_logs", Integer.class); }
+
+    @Test void onlyAdminCanReadRoleAndPermissionCatalogsIncludingRoleDetails() throws Exception {
+        List<String> paths = List.of("/api/roles", "/api/roles/" + admin.getRole().getId(), "/api/permissions");
+        int authority = jdbc.queryForObject("SELECT permission_id FROM permissions WHERE permission_name='MANAGE_PERMISSIONS'", Integer.class);
+        int before = logs();
+        for (String path : paths) mvc.perform(get(path)).andExpect(status().isUnauthorized());
+        var adminSession = login(admin);
+        // Read access is based on the Admin role, not the authority used to mutate permissions.
+        jdbc.update("DELETE FROM role_permissions WHERE role_id=? AND permission_id=?", admin.getRole().getId(), authority);
+        try {
+            mvc.perform(get("/api/roles").session(adminSession)).andExpect(status().isOk())
+                    .andExpect(jsonPath("$[*].id", hasItem(admin.getRole().getId())));
+            mvc.perform(get("/api/roles/" + admin.getRole().getId()).session(adminSession)).andExpect(status().isOk())
+                    .andExpect(jsonPath("$.id").value(admin.getRole().getId()));
+            mvc.perform(get("/api/permissions").session(adminSession)).andExpect(status().isOk())
+                    .andExpect(jsonPath("$[*].name", hasItem("MANAGE_PERMISSIONS")));
+            for (User user : List.of(manager, receptionist, coach, member)) {
+                jdbc.update("INSERT INTO role_permissions(role_id,permission_id) VALUES (?,?)", user.getRole().getId(), authority);
+                try {
+                    var session = login(user);
+                    for (String path : paths) mvc.perform(get(path).session(session)).andExpect(status().isForbidden());
+                } finally {
+                    jdbc.update("DELETE FROM role_permissions WHERE role_id=? AND permission_id=?", user.getRole().getId(), authority);
+                }
+            }
+        } finally {
+            jdbc.update("INSERT INTO role_permissions(role_id,permission_id) VALUES (?,?)", admin.getRole().getId(), authority);
+        }
+        assertEquals(before, logs(), "Catalog reads and rejected requests must not write audit records");
+    }
+
+    @Test void existingAdminSessionCannotReadCatalogsAfterAccountBecomesInactiveOrLocked() throws Exception {
+        int before = logs();
+        for (String state : List.of("Inactive", "Locked")) {
+            var session = login(admin);
+            jdbc.update("UPDATE users SET status=? WHERE user_id=?", state, admin.getId());
+            try {
+                for (String path : List.of("/api/roles", "/api/roles/" + admin.getRole().getId(), "/api/permissions"))
+                    mvc.perform(get(path).session(session)).andExpect(status().isForbidden())
+                            .andExpect(jsonPath("$.code").value("ACCOUNT_NOT_ACTIVE"));
+            } finally {
+                jdbc.update("UPDATE users SET status='Active' WHERE user_id=?", admin.getId());
+            }
+        }
+        assertEquals(before, logs());
+    }
 
     @Test void memberAndStaffAliasesCannotMutateAdminOrWrongSubtype() throws Exception {
         var session = login(manager); int before = logs();
@@ -554,6 +602,248 @@ class RbacGuardIntegrationTest {
                     new EvaluationRequest(member.getId(), coach.getId(), null, "Denied direct call", null)));
         } finally { org.springframework.security.core.context.SecurityContextHolder.clearContext(); }
         assertEquals(before, logs());
+    }
+
+    @Test void coachFeedbackStaysAnonymousEvenWithManagementAuthority() throws Exception {
+        new TransactionTemplate(transactions).executeWithoutResult(t -> {
+            for (var target : List.of(ownClass, otherClass)) {
+                var f = new com.sportscenter.feedback.ClassFeedback(); f.setSportsClass(target);
+                f.setCoach(target.getCoach()); f.setMember(target == ownClass ? member : otherMember);
+                f.setClassRating((short)5); f.setCoachRating((short)4); f.setComment("Private member review"); em.persist(f);
+            }
+        });
+        int permission = jdbc.queryForObject("SELECT permission_id FROM permissions WHERE permission_name='MANAGE_CLASSES'", Integer.class);
+        jdbc.update("INSERT INTO role_permissions(role_id,permission_id) VALUES (?,?)", coach.getRole().getId(), permission);
+        try {
+            var a = login(coach); int before = logs();
+            for (var target : List.of(ownClass, otherClass))
+                mvc.perform(get("/api/classes/" + target.getId() + "/feedback").session(a)).andExpect(status().isForbidden());
+            mvc.perform(get("/api/coaches/me/feedback").session(a)).andExpect(status().isOk())
+                    .andExpect(jsonPath("$.feedback.length()").value(1))
+                    .andExpect(jsonPath("$.feedback[0].memberId").doesNotExist())
+                    .andExpect(jsonPath("$.feedback[0].memberName").doesNotExist());
+            mvc.perform(get("/api/coaches/me/feedback").param("classId",otherClass.getId().toString()).session(a))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.feedback.length()").value(0));
+            assertEquals(before, logs());
+        } finally { jdbc.update("DELETE FROM role_permissions WHERE role_id=? AND permission_id=?",coach.getRole().getId(),permission); }
+    }
+
+    @Test void sameCenterCoachAndMemberReadMatrixCannotExpandThroughIdsFiltersOrExtraAuthority() throws Exception {
+        int[] ids = new int[2];
+        new TransactionTemplate(transactions).executeWithoutResult(t -> {
+            int index=0;
+            for (var target : List.of(ownClass,otherClass)) {
+                var learner=target==ownClass?member:otherMember;
+                var s=new Session(); s.setSportsClass(target); s.setCoach(target.getCoach()); s.setRoom(ownRoom);
+                s.setSessionDate(LocalDate.of(2026,11,7)); s.setStartTime(LocalTime.of(6,0)); s.setEndTime(LocalTime.of(7,30));
+                s.setStatus("Completed"); s.setAttendanceFinalized(true); em.persist(s); ids[index++]=s.getId();
+                var a=new Attendance(); a.setSession(s); a.setMember(learner); a.setState("Absent"); em.persist(a);
+                var r=new TrainingResult(); r.setSession(s); r.setCoach(target.getCoach()); r.setMember(learner);
+                r.setContent("Protected session content"); r.setAttendanceStatus("Absent"); r.setRecordedAt(LocalDateTime.of(2026,11,7,7,0)); em.persist(r);
+            }
+        });
+        int permission=jdbc.queryForObject("SELECT permission_id FROM permissions WHERE permission_name='MANAGE_CLASSES'",Integer.class);
+        jdbc.update("INSERT INTO role_permissions(role_id,permission_id) VALUES (?,?)",coach.getRole().getId(),permission);
+        try {
+            var a=login(coach); var m=login(member); int before=logs();
+            mvc.perform(get("/api/sessions/"+ids[0]).session(a)).andExpect(status().isOk());
+            mvc.perform(get("/api/sessions/"+ids[1]).session(a)).andExpect(status().isForbidden());
+            mvc.perform(get("/api/sessions").param("classId",otherClass.getId().toString()).session(a)).andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(0));
+            mvc.perform(get("/api/sessions").param("coachId",otherCoach.getId().toString()).session(a)).andExpect(status().isForbidden());
+            for(String route:List.of("/api/attendances","/api/training-results")) {
+                mvc.perform(get(route).param("sessionId",Integer.toString(ids[0])).session(a)).andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(1));
+                mvc.perform(get(route).param("sessionId",Integer.toString(ids[1])).session(a)).andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(0));
+                mvc.perform(get(route).param("memberId",otherMember.getId().toString()).session(m)).andExpect(status().isForbidden());
+                mvc.perform(get(route).param("sessionId",Integer.toString(ids[1])).session(m)).andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(0));
+            }
+            for(String route:List.of("/api/training-plans","/api/evaluations","/api/training-results"))
+                mvc.perform(get(route).param("coachId",otherCoach.getId().toString()).session(a)).andExpect(status().isForbidden());
+            mvc.perform(get("/api/training-plans/"+otherPlan).session(a)).andExpect(status().isForbidden());
+            mvc.perform(get("/api/evaluations/"+otherEvaluation).session(a)).andExpect(status().isForbidden());
+            mvc.perform(get("/api/sessions/"+ids[1]).session(m)).andExpect(status().isForbidden());
+            assertEquals(before,logs());
+            assertEquals("Protected session content",jdbc.queryForObject("SELECT content FROM training_results WHERE session_id=?",String.class,ids[1]));
+        } finally { jdbc.update("DELETE FROM role_permissions WHERE role_id=? AND permission_id=?",coach.getRole().getId(),permission); }
+    }
+
+    @Test void invalidAccountStatusNeverReactivatesOrAuditsAnAccountThroughAnyAlias() throws Exception {
+        var session = login(manager);
+        for (String route : List.of("members/" + member.getId(), "users/" + member.getId(), "staff/" + otherCoach.getId())) {
+            int target = route.startsWith("staff/") ? otherCoach.getId() : member.getId();
+            jdbc.update("UPDATE users SET status='Locked' WHERE user_id=?", target);
+            try {
+                int before = logs();
+                for (String body : List.of("{}", "{\"status\":null}", "{\"status\":\"\"}", "{\"status\":\"Inactve\"}")) {
+                    mvc.perform(patch("/api/" + route + "/status").session(session)
+                                    .contentType("application/json").content(body))
+                            .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("INVALID_ACCOUNT_STATUS"));
+                    assertEquals("Locked", jdbc.queryForObject("SELECT status FROM users WHERE user_id=?", String.class, target));
+                    assertEquals(before, logs());
+                }
+                mvc.perform(patch("/api/" + route + "/status").session(session)
+                                .contentType("application/json").content("{\"status\":\" inactive \"}"))
+                        .andExpect(status().isOk());
+                assertEquals("Inactive", jdbc.queryForObject("SELECT status FROM users WHERE user_id=?", String.class, target));
+                assertEquals(before + 1, logs());
+            } finally { jdbc.update("UPDATE users SET status='Active' WHERE user_id=?", target); }
+        }
+    }
+
+    @Test void permissionReplacementValidatesTheWholeSetBeforeCommitAndAuditsBeforeAfter() throws Exception {
+        int target = new TransactionTemplate(transactions).execute(t -> {
+            Role r = new Role(); r.setName("Local validation role");
+            r.getPermissions().add(em.find(Permission.class, jdbc.queryForObject(
+                    "SELECT permission_id FROM permissions WHERE permission_name='MANAGE_CLASSES'", Integer.class)));
+            em.persist(r); em.flush(); return r.getId();
+        });
+        int users = jdbc.queryForObject("SELECT permission_id FROM permissions WHERE permission_name='MANAGE_USERS'", Integer.class);
+        var session = login(admin); int before = logs();
+        var original = jdbc.queryForList("SELECT permission_id FROM role_permissions WHERE role_id=?", Integer.class, target);
+        for (String ids : List.of("[" + users + ",2147483000]", "[null]", "[-1]")) {
+            mvc.perform(put("/api/roles/" + target + "/permissions").session(session).contentType("application/json")
+                            .content("{\"permissionIds\":" + ids + "}"))
+                    .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("INVALID_PERMISSION_IDS"));
+            assertEquals(original, jdbc.queryForList("SELECT permission_id FROM role_permissions WHERE role_id=?", Integer.class, target));
+            assertEquals(before, logs());
+        }
+        mvc.perform(put("/api/roles/" + target + "/permissions").session(session).contentType("application/json")
+                        .content("{\"permissionIds\":[" + users + "," + users + "]}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.permissions.length()").value(1));
+        assertEquals(List.of(users), jdbc.queryForList("SELECT permission_id FROM role_permissions WHERE role_id=?", Integer.class, target));
+        assertEquals(admin.getId(), jdbc.queryForObject("SELECT user_id FROM system_logs WHERE action='UPDATE_ROLE_PERMISSIONS' AND target_id=? ORDER BY log_id DESC LIMIT 1", Integer.class, target));
+        assertEquals("Updated permissions for role Local validation role from: [MANAGE_CLASSES] to: [MANAGE_USERS]",
+                jdbc.queryForObject("SELECT detail FROM system_logs WHERE action='UPDATE_ROLE_PERMISSIONS' AND target_id=? ORDER BY log_id DESC LIMIT 1", String.class, target));
+        mvc.perform(put("/api/roles/" + target + "/permissions").session(session).contentType("application/json")
+                        .content("{\"permissionIds\":[]}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.permissions.length()").value(0));
+        assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM role_permissions WHERE role_id=?", Integer.class, target));
+    }
+
+    @Test void auditScopeIsCapturedAtEventTimeAndFiltersAndPagesCannotWidenIt() throws Exception {
+        int authority = new TransactionTemplate(transactions).execute(t -> {
+            Permission p = new Permission(); p.setName("VIEW_AUDIT_LOG"); em.persist(p); em.flush(); return p.getId();
+        });
+        for (var u : List.of(manager, admin, coach))
+            jdbc.update("INSERT INTO role_permissions(role_id,permission_id) VALUES (?,?)", u.getRole().getId(), authority);
+        try {
+            new TransactionTemplate(transactions).executeWithoutResult(t -> {
+                audit.log(otherCoach.getId(), "PHASE1_AUDIT_TEST", "ROOM", ownRoom.getId(), "First", LocalDateTime.of(2026,11,9,0,0));
+                audit.log(otherCoach.getId(), "PHASE1_AUDIT_TEST", "ROOM", ownRoom.getId(), "Last", LocalDateTime.of(2026,11,9,23,59,59,999000000));
+                audit.log(otherCoach.getId(), "PHASE1_AUDIT_TEST", "ROOM", ownRoom.getId(), "Next day", LocalDateTime.of(2026,11,10,0,0));
+                audit.log(otherCoach.getId(), "PHASE1_AUDIT_TEST", "ROOM", foreignRoom.getId(), "Other center", LocalDateTime.of(2026,11,9,12,0));
+                audit.log(admin.getId(), "CHANGE_PASSWORD", "USER", member.getId(), "Security", LocalDateTime.of(2026,11,9,12,0));
+                audit.log(otherCoach.getId(), "PHASE1_AUDIT_TEST", "ROOM", Integer.MAX_VALUE, "Unproven target", LocalDateTime.of(2026,11,9,12,0));
+            });
+            jdbc.update("INSERT INTO system_logs(user_id,action,target_entity,target_id,detail,timestamp) VALUES (?,?,?,?,?,?)",
+                    otherCoach.getId(), "PHASE1_AUDIT_TEST", "ROOM", ownRoom.getId(), "Legacy", LocalDateTime.of(2026,11,9,12,0));
+            jdbc.update("UPDATE users SET center_id=2 WHERE user_id=?", otherCoach.getId());
+            var m = login(manager); var a = login(admin); var c = login(coach); int before = logs();
+            String filter = "/api/audit-logs?startDate=2026-11-09&endDate=2026-11-09&action=PHASE1_AUDIT_TEST&actorId=" + otherCoach.getId();
+            mvc.perform(get(filter + "&page=0&size=1").session(m)).andExpect(status().isOk())
+                    .andExpect(header().string("X-Total-Count", "2")).andExpect(jsonPath("$.length()").value(1))
+                    .andExpect(jsonPath("$[0].detail").value("Last"))
+                    .andExpect(jsonPath("$[0].centerId").value(1)).andExpect(jsonPath("$[0].scopeSource").value("TARGET_AT_EVENT"));
+            mvc.perform(get(filter + "&page=1&size=1").session(m)).andExpect(status().isOk()).andExpect(jsonPath("$[0].detail").value("First"));
+            mvc.perform(get(filter).session(a)).andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(0));
+            mvc.perform(get("/api/audit-logs?action=CHANGE_PASSWORD&startDate=2026-11-09&endDate=2026-11-09").session(a))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$[0].category").value("SYSTEM_SECURITY"));
+            mvc.perform(get("/api/audit-logs?action=CHANGE_PASSWORD").session(m)).andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(0));
+            mvc.perform(get(filter).session(c)).andExpect(status().isForbidden());
+            for (String bad : List.of("?page=-1", "?page=2147483647&size=100", "?size=101", "?size=0", "?startDate=2026-11-10&endDate=2026-11-09"))
+                mvc.perform(get("/api/audit-logs" + bad).session(m)).andExpect(status().isBadRequest())
+                        .andExpect(jsonPath("$.code").value("INVALID_AUDIT_FILTER"));
+            assertEquals(before, logs());
+            assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM system_logs WHERE detail='Legacy' AND audit_category IS NULL AND center_id IS NULL", Integer.class));
+        } finally {
+            jdbc.update("UPDATE users SET center_id=1 WHERE user_id=?", otherCoach.getId());
+            for (var u : List.of(manager, admin, coach))
+                jdbc.update("DELETE FROM role_permissions WHERE role_id=? AND permission_id=?", u.getRole().getId(), authority);
+        }
+    }
+
+    @Test void coachSpecificAtRiskAndAdvancedQueuesUseTheSessionActorEvenWithExtraReportAuthority() throws Exception {
+        int authority = new TransactionTemplate(transactions).execute(t -> {
+            var p = em.createQuery("select p from Permission p where p.name='VIEW_REPORTS'", Permission.class).getResultStream().findFirst().orElse(null);
+            if (p == null) { p = new Permission(); p.setName("VIEW_REPORTS"); em.persist(p); em.flush(); }
+            return p.getId();
+        });
+        int[] registrations = new TransactionTemplate(transactions).execute(t -> {
+            int[] ids = new int[2]; int n = 0;
+            for (User owner : List.of(member, otherMember)) {
+                var r = new com.sportscenter.membership.AdvancedRegistration(); r.setMember(owner); r.setSubject(subject);
+                r.setCoach(owner == member ? coach : otherCoach); r.setRequestKey("local-r3-" + owner.getId());
+                r.setCreatedAt(LocalDateTime.of(2026,11,9,8,0)); em.persist(r); em.flush(); ids[n++] = r.getId();
+            }
+            return ids;
+        });
+        jdbc.update("UPDATE classes SET status='Ongoing' WHERE class_id IN (?,?)", ownClass.getId(), otherClass.getId());
+        jdbc.update("INSERT INTO role_permissions(role_id,permission_id) VALUES (?,?)", coach.getRole().getId(), authority);
+        try {
+            var a = login(coach); var b = login(otherCoach); var m = login(member); int before = logs();
+            for (var row : List.of(new Object[]{a, member, registrations[0], registrations[1]}, new Object[]{b, otherMember, registrations[1], registrations[0]})) {
+                var session = (org.springframework.mock.web.MockHttpSession)row[0]; var owner = (User)row[1];
+                mvc.perform(get("/api/coaches/me/at-risk-members").param("coachId", otherCoach.getId().toString()).session(session))
+                        .andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(1)).andExpect(jsonPath("$[0].memberId").value(owner.getId()));
+                mvc.perform(get("/api/members/at-risk").session(session)).andExpect(status().isForbidden());
+                mvc.perform(get("/api/advanced-registrations").param("coachId", otherCoach.getId().toString()).session(session))
+                        .andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(1)).andExpect(jsonPath("$[0].id").value(row[2]));
+                mvc.perform(post("/api/advanced-registrations/" + row[3] + "/decision").session(session)
+                                .contentType("application/json").content("{\"accepted\":false,\"reason\":\"Not assigned\"}"))
+                        .andExpect(status().isForbidden());
+            }
+            mvc.perform(post("/api/advanced-registrations/" + registrations[1] + "/order").session(m)
+                    .contentType("application/json").content("{\"paymentMethod\":\"Cash\"}")).andExpect(status().isForbidden());
+            assertEquals(before, logs());
+            assertEquals("Requested", jdbc.queryForObject("SELECT status FROM advanced_registrations WHERE id=?", String.class, registrations[1]));
+            for (int i = 0; i < 2; i++) mvc.perform(post("/api/advanced-registrations/" + registrations[0] + "/decision").session(a)
+                    .contentType("application/json").content("{\"accepted\":false,\"reason\":\"Not accepting\"}"))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("Rejected"));
+            assertEquals(before + 1, logs());
+            assertEquals("Rejected", jdbc.queryForObject("SELECT status FROM advanced_registrations WHERE id=?", String.class, registrations[0]));
+            // Shared catalog metadata remains available; it is not a protected roster.
+            mvc.perform(get("/api/classes/" + otherClass.getId()).session(a)).andExpect(status().isOk());
+            mvc.perform(get("/api/classes/" + otherClass.getId()).session(m)).andExpect(status().isOk());
+        } finally {
+            jdbc.update("UPDATE classes SET status='Closed' WHERE class_id IN (?,?)", ownClass.getId(), otherClass.getId());
+            jdbc.update("DELETE FROM role_permissions WHERE role_id=? AND permission_id=?", coach.getRole().getId(), authority);
+        }
+    }
+
+    @Test void reportsStillRequireManagerRoleAndPermissionAndRetainTheirCenterSemantics() throws Exception {
+        int authority = new TransactionTemplate(transactions).execute(t -> {
+            var p = em.createQuery("select p from Permission p where p.name='VIEW_REPORTS'", Permission.class).getResultStream().findFirst().orElse(null);
+            if (p == null) { p = new Permission(); p.setName("VIEW_REPORTS"); em.persist(p); em.flush(); }
+            return p.getId();
+        });
+        for (User u : List.of(manager, admin, coach, member)) jdbc.update("INSERT INTO role_permissions(role_id,permission_id) VALUES (?,?)",u.getRole().getId(),authority);
+        try {
+            var m = login(manager); var a = login(admin); var c = login(coach); var me = login(member); int before = logs();
+            mvc.perform(get("/api/reports/dashboard").session(m)).andExpect(status().isOk())
+                    .andExpect(jsonPath("$.totalUsers").value(jdbc.queryForObject("SELECT count(*) FROM users WHERE center_id=1", Integer.class)));
+            mvc.perform(get("/api/reports/dashboard").session(a)).andExpect(status().isOk()).andExpect(jsonPath("$.totalUsers").value(0));
+            for (String path : List.of("dashboard", "members", "revenue")) for (var s : List.of(c, me))
+                mvc.perform(get("/api/reports/" + path).session(s)).andExpect(status().isForbidden());
+            mvc.perform(get("/api/reports/revenue?startDate=2026-11-10&endDate=2026-11-09").session(m))
+                    .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("INVALID_REPORT_RANGE"));
+            assertEquals(before, logs());
+            jdbc.update("DELETE FROM role_permissions WHERE role_id=? AND permission_id=?",manager.getRole().getId(),authority);
+            mvc.perform(get("/api/reports/dashboard").session(login(manager))).andExpect(status().isForbidden());
+        } finally { for (User u : List.of(manager, admin, coach, member)) jdbc.update("DELETE FROM role_permissions WHERE role_id=? AND permission_id=?",u.getRole().getId(),authority); }
+    }
+
+    @Test void extraUserAuthorityCannotTurnCoachOrMemberIntoAStaffProfileReader() throws Exception {
+        int permission = jdbc.queryForObject("SELECT permission_id FROM permissions WHERE permission_name='MANAGE_USERS'", Integer.class);
+        for (User u : List.of(coach, member)) jdbc.update("INSERT INTO role_permissions(role_id,permission_id) VALUES (?,?)",u.getRole().getId(),permission);
+        try {
+            for (User u : List.of(coach, member)) {
+                var s = login(u); int before = logs();
+                for (String path : List.of("/api/members", "/api/members/"+otherMember.getId(), "/api/users", "/api/users/"+otherMember.getId(), "/api/staff"))
+                    mvc.perform(get(path).session(s)).andExpect(status().isForbidden());
+                mvc.perform(get("/api/classes").session(s)).andExpect(status().isOk());
+                mvc.perform(get("/api/rooms").session(s)).andExpect(status().isOk());
+                assertEquals(before, logs());
+            }
+        } finally { for (User u : List.of(coach, member)) jdbc.update("DELETE FROM role_permissions WHERE role_id=? AND permission_id=?",u.getRole().getId(),permission); }
     }
 
     @Test void coachNeedsTheSpecificTrainingAuthorityInsteadOfManageClasses() throws Exception {

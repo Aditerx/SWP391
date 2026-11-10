@@ -147,14 +147,14 @@ class SessionIncidentServiceTest {
         indoorSubject.setName("Cầu Lông");
         indoorSubject.setSlug("cau-long");
 
-        room1 = new Room();
+        room1 = new Room(); room1.setActivityType(com.sportscenter.room.RoomActivity.BADMINTON);
         room1.setId(101);
         room1.setName("Sân Cầu Lông 1");
         room1.setStatus("Available");
         room1.setCapacity(20);
         room1.setFacilityType("Indoor");
 
-        room2 = new Room();
+        room2 = new Room(); room2.setActivityType(com.sportscenter.room.RoomActivity.BADMINTON);
         room2.setId(102);
         room2.setName("Sân Cầu Lông 2");
         room2.setStatus("Available");
@@ -443,6 +443,23 @@ class SessionIncidentServiceTest {
         assertThrows(BusinessException.class, () ->
                 sessionService.substituteCoach(normalSession.getId(), request, managerAuth));
     }
+    @Test void incidentCannotMoveToAnotherIndoorSportOrSubstituteIntoAnIneligibleRoom() {
+        when(userRepository.findByEmailIgnoreCase(managerUser.getEmail())).thenReturn(Optional.of(managerUser));
+        when(sessionRepository.findByIdWithDetails(normalSession.getId())).thenReturn(Optional.of(normalSession));
+        room2.setActivityType(com.sportscenter.room.RoomActivity.BASKETBALL);
+        when(roomRepository.findById(room2.getId())).thenReturn(Optional.of(room2));
+        var move = move(LocalDate.of(2026,10,24),LocalTime.of(7,45),LocalTime.of(9,15),room2.getId(),"Approved center incident",null);
+        assertTrue(assertThrows(BusinessException.class, () -> sessionService.rescheduleSession(normalSession.getId(),move,managerAuth))
+                .getMessage().startsWith("ROOM_SUBJECT_MISMATCH:"));
+        room1.setActivityType(com.sportscenter.room.RoomActivity.BASKETBALL);
+        when(userRepository.findById(coach2.getId())).thenReturn(Optional.of(coach2));
+        assertTrue(assertThrows(BusinessException.class, () -> sessionService.substituteCoach(normalSession.getId(),substitute(coach2.getId(),"Approved substitute"),managerAuth))
+                .getMessage().startsWith("ROOM_SUBJECT_MISMATCH:"));
+        assertEquals(coach1.getId(), normalSession.getCoach().getId());
+        verify(sessionRepository, never()).save(any());
+        verifyNoInteractions(auditService, eventPublisher);
+    }
+
     private SessionRescheduleRequest move(LocalDate date,LocalTime start,LocalTime end,Integer room,String reason,Integer days) {
         return new SessionRescheduleRequest(date,start,end,room,reason,days,"CENTER_INCIDENT",true,java.util.UUID.randomUUID().toString(),1,"Minimum extension for the agreed makeup slot");
     }

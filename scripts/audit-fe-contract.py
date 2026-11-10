@@ -153,9 +153,75 @@ if attendance_release.get('result')=='PASS_LOCAL':
             and attendance_release.get('migrationFileSha256')==attendance_review.get('migrationFile',{}).get('sha256')):
         backend_match=source_fingerprints(ROOT)==attendance_release.get('sourceFingerprints')
         source_verification='Attendance release integrated with main and tested locally; retained wire exchanges remain historical structural evidence'
+phase1=qa.get('phase1Implementation20261109',{})
+if phase1.get('result')=='PASS_LOCAL':
+    clean=phase1.get('cleanTest',{})
+    pg=phase1.get('postgres',{}).get('aggregate',{})
+    fixture=phase1.get('postCleanFixtureFollowUp',{})
+    if (clean.get('failures')==0 and clean.get('errors')==0
+            and clean.get('finalBeAndSchemaMatch') is True
+            and fixture.get('result')=='PASS' and fixture.get('failures')==0 and fixture.get('errors')==0
+            and pg.get('failures')==0 and pg.get('errors')==0 and pg.get('skipped')==0
+            and phase1.get('migrations',{}).get('status')=='PASS'
+            and schema_hash==phase1.get('openApi',{}).get('sha256')):
+        backend_match=source_fingerprints(ROOT)==phase1.get('sourceFingerprints')
+        source_verification='Phase1 R3/validation/audit/publication-price/room local verification; retained wire exchanges remain historical structural evidence; FE/Render not accepted'
+rebuild=qa.get('demoDbAuditRebuild20261109',{})
+if rebuild.get('result')=='PASS_LOCAL':
+    clean=rebuild.get('cleanTest',{})
+    pg=rebuild.get('postgresHttp',{})
+    sql_proof=rebuild.get('sqlReset',{})
+    if (rebuild.get('unchangedBackendFingerprints')=={key:phase1.get('sourceFingerprints',{}).get(key) for key in ('src/main','pom.xml')}
+            and clean.get('failures')==0 and clean.get('errors')==0 and clean.get('tests',0)>0
+            and pg.get('tests',0)>0 and pg.get('failures')==0 and pg.get('errors')==0 and pg.get('skipped')==0
+            and sql_proof.get('status')=='PASS' and sql_proof.get('cloneReset')=='PASS'
+            and rebuild.get('postResetDataQuality')=={'checks':38,'nonzeroOrNotRun':0}
+            and schema_hash==rebuild.get('openApiSha256')):
+        current=source_fingerprints(ROOT)
+        backend_match=(current==rebuild.get('sourceFingerprints')
+                       and all(current[key]==value for key,value in rebuild['unchangedBackendFingerprints'].items()))
+        source_verification='Demo schema rebuild validated on local clone/fresh/replay/JPA/authenticated workflows and clean tests; BE unchanged from Phase1; FE/Render not accepted'
+catalog=qa.get('roleCatalogReadAccess20261110',{})
+if catalog.get('result')=='PASS_LOCAL':
+    clean=catalog.get('cleanTest',{})
+    targeted=catalog.get('targeted',{})
+    if (clean.get('tests',0)>0 and clean.get('failures')==0 and clean.get('errors')==0
+            and targeted.get('tests',0)>0 and targeted.get('failures')==0 and targeted.get('errors')==0 and targeted.get('skipped')==0
+            and catalog.get('openApi',{}).get('generatedFromTestedApp') is True
+            and schema_hash==catalog.get('openApi',{}).get('sha256')):
+        backend_match=source_fingerprints(ROOT)==catalog.get('sourceFingerprints')
+        source_verification='Admin-only role/permission GET catalogs and role-detail bypass guarded; current login/authority/status tests and clean regression local; FE/Render not accepted'
+normal=qa.get('normalLifecycleFoundation20261110',{})
+if normal.get('result')=='PASS_LOCAL_FOUNDATION_PHASE1_INCOMPLETE':
+    clean=normal.get('cleanTest',{})
+    pg=normal.get('postgresNormal',{})
+    if (normal.get('phase1Complete') is False
+            and clean.get('tests',0)>0 and clean.get('failures')==0 and clean.get('errors')==0
+            and pg.get('tests',0)>0 and pg.get('failures')==0 and pg.get('errors')==0 and pg.get('skipped')==0
+            and normal.get('migration',{}).get('status')=='PASS'
+            and normal.get('schemaReference',{}).get('status')=='PASS'
+            and normal.get('openApi',{}).get('generatedFromTestedApp') is True
+            and schema_hash==normal.get('openApi',{}).get('sha256')):
+        backend_match=source_fingerprints(ROOT)==normal.get('sourceFingerprints')
+        source_verification='Normal lifecycle/admission foundation tested locally; Phase1 remains incomplete; retained wire exchanges are historical structural compatibility evidence only; no FE/Render acceptance'
+wire_reference=reference
+complete=qa.get('normalPhase1Implementation20261110',{})
+if complete.get('result')=='PASS_LOCAL' and complete.get('phase1Complete') is True:
+    clean=complete.get('cleanTest',{})
+    pg=complete.get('postgresHttp',{})
+    if (clean.get('tests',0)>0 and clean.get('failures')==0 and clean.get('errors')==0
+            and pg.get('tests',0)>0 and pg.get('failures')==0 and pg.get('errors')==0 and pg.get('skipped')==0
+            and complete.get('schema',{}).get('status')=='PASS'
+            and complete.get('openApi',{}).get('generatedFromTestedApp') is True
+            and schema_hash==complete.get('openApi',{}).get('sha256')):
+        backend_match=source_fingerprints(ROOT)==complete.get('sourceFingerprints')
+        hash_match=True
+        reference=complete.get('gitIntegration',{}).get('head',complete.get('baseCommit',reference))
+        source_verification='Normal Phase1 behavior/schema/approved synthetic fixture verified locally; historical wire rows remain structural compatibility evidence; FE/cloud/provider not accepted'
 result={'result':'PASS' if not issues and not missing and not extra and hash_match and backend_match else 'REVIEW_REQUIRED',
         'mode':'OFFLINE_RETAINED_EVIDENCE_CHECK','checkedAtUtc':dt.datetime.now(dt.timezone.utc).isoformat(),
         'backendTestsExecuted':False,'liveProbePerformed':False,'evidenceSourceCommit':reference,
+        'retainedWireEvidenceSourceCommit':wire_reference,
         'sourceVerification':source_verification,
         'retainedBackendTreeMatchesSource':backend_match,'openApiHashMatchesRecord':hash_match,
         'operations':len(operations),'sourceRoutesMatched':len(operations)-len(missing),'missingSourceRoutes':missing,'extraSourceRoutes':extra,

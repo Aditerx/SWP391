@@ -41,7 +41,7 @@ public class MemberService {
 
     @Transactional(readOnly = true)
     public List<MemberResponse> findAllMembers() {
-        User actor = AccountScope.actor(userRepository);
+        User actor = AccountScope.staffReadActor(userRepository);
         List<User> users = userRepository.findAll().stream()
                 .filter(u -> AccountScope.visible(actor, u.getCenterId()))
                 .filter(u -> u.getRole() != null && "Member".equalsIgnoreCase(u.getRole().getName()))
@@ -71,7 +71,7 @@ public class MemberService {
     public MemberResponse findById(Integer id) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Member user not found: " + id));
-        AccountScope.target(AccountScope.actor(userRepository), user, "Member");
+        AccountScope.target(AccountScope.staffReadActor(userRepository), user, "Member");
         Member member = memberRepository.findById(id).orElse(null);
         List<MemberPackage> packages = memberPackageRepository.findByMemberId(id);
         MemberPackage activePkg = packages.stream()
@@ -179,9 +179,7 @@ public class MemberService {
     }
 
     private String normalizeUserStatus(String status) {
-        if ("suspended".equalsIgnoreCase(status) || "locked".equalsIgnoreCase(status)) return "Locked";
-        if ("inactive".equalsIgnoreCase(status)) return "Inactive";
-        return "Active";
+        return AccountStatus.require(status);
     }
     private BigDecimal paidTotal(Integer memberId) {
         return invoiceRepository.findByMemberId(memberId).stream()

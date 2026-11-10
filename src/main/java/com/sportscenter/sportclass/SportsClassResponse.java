@@ -17,12 +17,19 @@ public record SportsClassResponse(
         String status,
         Integer enrolledCount,
         String classType,
-        Integer totalSessions) {
+        Integer totalSessions,
+        Integer minCapacity,
+        java.time.LocalDateTime openingConfirmedAt,
+        Integer openingConfirmedBy,
+        int postponementCount,
+        long lifecycleVersion,
+        boolean pricingDraft,
+        boolean changePending) {
 
     public SportsClassResponse(Integer id, String name, Integer subjectId, Integer coachId,
                                Integer maxCapacity, BigDecimal tuitionFee, LocalDate startDate,
                                LocalDate endDate, String status, Integer enrolledCount) {
-        this(id, name, subjectId, null, coachId, null, maxCapacity, tuitionFee, startDate, endDate, status, enrolledCount, "Normal", 12);
+        this(id, name, subjectId, null, coachId, null, maxCapacity, tuitionFee, startDate, endDate, status, enrolledCount, "Normal", 12, null, null, null, 0, 0, false, false);
     }
 
     public static SportsClassResponse from(SportsClass sportsClass) {
@@ -47,6 +54,7 @@ public record SportsClassResponse(
                 sportsClass.getStatus(),
                 enrolledCount,
                 sportsClass.getClassType(),
-                sportsClass.getTotalSessions());
+                sportsClass.getTotalSessions(), sportsClass.getMinCapacity(), sportsClass.getOpeningConfirmedAt(), sportsClass.getOpeningConfirmedBy(),
+                sportsClass.getPostponementCount(), sportsClass.getLifecycleVersion(), sportsClass.isPricingDraft(),sportsClass.isChangePending());
     }
 }

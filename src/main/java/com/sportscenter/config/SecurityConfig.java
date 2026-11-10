@@ -102,6 +102,7 @@ public class SecurityConfig {
         java.util.Arrays.stream(frontendOrigins.split(",")).map(String::trim).filter(s -> !s.isBlank()).forEach(configuration::addAllowedOrigin);
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("*"));
+        configuration.setExposedHeaders(List.of("X-Total-Count", "X-Page", "X-Page-Size"));
         configuration.setAllowCredentials(true);
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);

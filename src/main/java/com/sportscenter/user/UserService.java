@@ -49,7 +49,7 @@ public class UserService {
 
     @Transactional(readOnly = true)
     public List<UserResponse> findAllUsers(String roleFilter, String search) {
-        User actor = AccountScope.actor(userRepository);
+        User actor = AccountScope.staffReadActor(userRepository);
         List<User> users = userRepository.findAll();
 
         return users.stream()
@@ -79,7 +79,7 @@ public class UserService {
     public UserResponse findById(Integer id) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + id));
-        AccountScope.require(AccountScope.actor(userRepository), user.getCenterId());
+        AccountScope.require(AccountScope.staffReadActor(userRepository), user.getCenterId());
         return UserResponse.from(user);
     }
 
@@ -349,8 +349,6 @@ public class UserService {
     }
 
     private String normalizeUserStatus(String status) {
-        if ("suspended".equalsIgnoreCase(status) || "locked".equalsIgnoreCase(status)) return "Locked";
-        if ("inactive".equalsIgnoreCase(status)) return "Inactive";
-        return "Active";
+        return AccountStatus.require(status);
     }
 }

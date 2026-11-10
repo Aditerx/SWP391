@@ -41,7 +41,7 @@ class RoleServiceTest {
         User admin = new User();
         admin.setId(99);
 
-        when(roleRepository.findByIdWithPermissions(4)).thenReturn(Optional.of(role));
+        when(roleRepository.findByIdForUpdate(4)).thenReturn(Optional.of(role));
         when(permissionRepository.findAllById(List.of(1))).thenReturn(List.of(permission));
         when(roleRepository.save(role)).thenReturn(role);
         when(userRepository.findByEmailIgnoreCase("admin@example.com")).thenReturn(Optional.of(admin));
@@ -51,6 +51,6 @@ class RoleServiceTest {
         roleService.updateRolePermissions(4, List.of(1));
 
         verify(auditService).log(eq(99), eq("UPDATE_ROLE_PERMISSIONS"), eq("ROLE"), eq(4),
-                eq("Updated permissions for role CenterManager to: [MANAGE_USERS]"));
+                eq("Updated permissions for role CenterManager from: [None] to: [MANAGE_USERS]"));
     }
 }
