@@ -24776,7 +24776,7 @@
     "feBrowserAcceptance": "NOT_RUN"
   },
   "normalPhase1Release20261110": {
-    "state": "MERGED_LOCALLY_READY_FOR_PUSH",
+    "state": "MERGED_AND_PUSHED",
     "date": "2026-11-10",
     "authorization": "Owner requested merging tai into main after reporting Supabase demo rebuild PASS",
     "testedSource": "normalPhase1Implementation20261110",
@@ -24806,10 +24806,38 @@
       "otherWorktreesUntouched": true
     },
     "publication": {
+      "status": "PASS",
       "method": "atomic push of tai and main",
-      "expectedSourceCommit": "9fc3acaa3ba8f35f872f62a95c55ad4a39cfd6d1",
-      "releaseHeadLookup": "Use origin/main HEAD for the publication metadata commit containing this source.",
-      "renderDeployment": "NOT_VERIFIED"
-    }
+      "publishedDeployCommit": "f4d6866daadb0c54f74bb2e90c6648e2de1d11b2",
+      "mainAndTaiConfirmedEqual": true,
+      "confirmedAtUtc": "2026-11-10T04:27:05.232032+00:00",
+      "remoteSourceCommit": "9fc3acaa3ba8f35f872f62a95c55ad4a39cfd6d1",
+      "metadataFollowup": "Active/QA evidence only; skip CI/Render flags avoid restarting publication checks or deploying documentation-only updates."
+    },
+    "ci": {
+      "status": "SUCCESS",
+      "sourceCommit": "f4d6866daadb0c54f74bb2e90c6648e2de1d11b2",
+      "runs": [
+        {
+          "id": 42755542205,
+          "branch": "main",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/Aditerx/SWP391/actions/runs/42755542205"
+        },
+        {
+          "id": 42755542031,
+          "branch": "tai",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/Aditerx/SWP391/actions/runs/42755542031"
+        }
+      ]
+    },
+    "deployTargetCommit": "f4d6866daadb0c54f74bb2e90c6648e2de1d11b2",
+    "followupCommitPolicySources": [
+      "https://render.com/docs/deploys#skipping-an-auto-deploy",
+      "https://docs.github.com/en/actions/managing-workflow-runs/skipping-workflow-runs"
+    ]
   }
 }
