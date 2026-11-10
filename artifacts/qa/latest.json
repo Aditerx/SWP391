@@ -24776,7 +24776,7 @@
     "feBrowserAcceptance": "NOT_RUN"
   },
   "normalPhase1Release20261110": {
-    "state": "PREPARED_FOR_AUTHORIZED_MERGE",
+    "state": "MERGED_LOCALLY_READY_FOR_PUSH",
     "date": "2026-11-10",
     "authorization": "Owner requested merging tai into main after reporting Supabase demo rebuild PASS",
     "testedSource": "normalPhase1Implementation20261110",
@@ -24794,6 +24794,22 @@
     "agentCloudMutation": false,
     "renderDeployment": "NOT_VERIFIED",
     "smokeStatus": "NOT_RUN",
-    "smokePlan": "docs/02-DEPLOYMENT-GUIDE.md#normal-release-smoke-20261110"
+    "smokePlan": "docs/02-DEPLOYMENT-GUIDE.md#normal-release-smoke-20261110",
+    "sourceCommit": "9fc3acaa3ba8f35f872f62a95c55ad4a39cfd6d1",
+    "merge": {
+      "target": "main",
+      "source": "tai",
+      "method": "fast-forward",
+      "conflicts": [],
+      "allReviewedChangesCommitted": true,
+      "exactTestedFingerprintsAfterCheckout": true,
+      "otherWorktreesUntouched": true
+    },
+    "publication": {
+      "method": "atomic push of tai and main",
+      "expectedSourceCommit": "9fc3acaa3ba8f35f872f62a95c55ad4a39cfd6d1",
+      "releaseHeadLookup": "Use origin/main HEAD for the publication metadata commit containing this source.",
+      "renderDeployment": "NOT_VERIFIED"
+    }
   }
 }
