@@ -89,6 +89,48 @@ class ChatServiceTest {
         verify(messages,never()).saveAndFlush(any());
     }
 
+    @Test void memberClosePersistsOneVietnameseSystemMessageAndPreservesAssignmentAndHandler() {
+        Role staffRole=new Role(); staffRole.setName("Receptionist"); User assigned=new User(); assigned.setId(22); assigned.setFullName("Assigned staff"); assigned.setRole(staffRole);
+        ChatConversation c=conversation(18,member); c.setHandlerType(ChatHandlerType.AI); c.setAssignedStaff(assigned);
+        when(conversations.findByIdForUpdate(18)).thenReturn(Optional.of(c));
+        when(messages.saveAndFlush(any())).thenAnswer(inv->{ChatMessage m=inv.getArgument(0);m.setId(81);return m;});
+        when(messages.findByConversation_IdOrderByIdDesc(eq(18),any())).thenReturn(List.of());
+
+        ChatConversationResponse response=service.closeAsMember(18,auth);
+
+        assertEquals(ChatConversationStatus.CLOSED,response.status());
+        assertEquals(ChatHandlerType.AI,response.handlerType());
+        assertEquals(22,response.assignedStaffUserId());
+        assertEquals("2026-10-24T12:00+07:00",response.closedAt().toString());
+        verify(messages).saveAndFlush(argThat(m->m.getSenderType()==ChatSenderType.SYSTEM&&m.getSender()==null
+                &&m.getContent().equals("B\u1ea1n \u0111\u00e3 k\u1ebft th\u00fac cu\u1ed9c tr\u00f2 chuy\u1ec7n.")
+                &&m.getMetadata().equals("{\"closedBy\":\"MEMBER\"}")&&m.getCreatedAt().equals(LocalDateTime.of(2026,10,24,12,0))));
+        verifyNoInteractions(events);
+    }
+
+    @Test void memberCloseIsIdempotentAndDoesNotChangeClosedAtOrAddSystemMessage() {
+        ChatConversation c=conversation(19,member); c.setStatus(ChatConversationStatus.CLOSED);
+        LocalDateTime priorClosedAt=LocalDateTime.of(2026,10,23,18,30); c.setClosedAt(priorClosedAt);
+        when(conversations.findByIdForUpdate(19)).thenReturn(Optional.of(c));
+        when(messages.findByConversation_IdOrderByIdDesc(eq(19),any())).thenReturn(List.of());
+
+        ChatConversationResponse response=service.closeAsMember(19,auth);
+
+        assertEquals(ChatConversationStatus.CLOSED,response.status());
+        assertEquals(priorClosedAt,response.closedAt().toLocalDateTime());
+        verify(messages,never()).saveAndFlush(any());
+        verifyNoInteractions(events);
+    }
+
+    @Test void memberCannotCloseAnotherMembersConversationOrUnknownId() {
+        User other=new User(); other.setId(8);
+        when(conversations.findByIdForUpdate(20)).thenReturn(Optional.of(conversation(20,other)));
+        when(conversations.findByIdForUpdate(21)).thenReturn(Optional.empty());
+        assertEquals("CHAT_CONVERSATION_NOT_FOUND",assertThrows(ChatException.class,()->service.closeAsMember(20,auth)).getCode());
+        assertEquals("CHAT_CONVERSATION_NOT_FOUND",assertThrows(ChatException.class,()->service.closeAsMember(21,auth)).getCode());
+        verify(messages,never()).saveAndFlush(any());
+    }
+
     @Test void absentConversationAndForeignConversationShareNotFoundCode() {
         when(conversations.findById(999)).thenReturn(Optional.empty());
         assertEquals("CHAT_CONVERSATION_NOT_FOUND",assertThrows(ChatException.class,()->service.listMessages(999,0,30,auth)).getCode());
@@ -162,6 +204,17 @@ class ChatServiceTest {
                 &&m.getContent().equals("M\u00ecnh \u0111\u00e3 chuy\u1ec3n cu\u1ed9c tr\u00f2 chuy\u1ec7n cho nh\u00e2n vi\u00ean h\u1ed7 tr\u1ee3. Nh\u00e2n vi\u00ean s\u1ebd ph\u1ea3n h\u1ed3i b\u1ea1n s\u1edbm nh\u1ea5t c\u00f3 th\u1ec3.")
                 &&m.getMetadata().contains("SENSITIVE_TOPIC")&&!m.getContent().contains("Transferred to staff:")));
         verify(events).publishEvent(argThat((Object e)->e instanceof ChatMessageCreatedEvent event&&event.senderType()==ChatSenderType.SYSTEM));
+    }
+
+    @Test void lateAiReplyAndEscalationDoNotWriteIntoClosedConversation() {
+        ChatConversation c=conversation(23,member); c.setStatus(ChatConversationStatus.CLOSED); c.setHandlerType(ChatHandlerType.AI);
+        c.setClosedAt(LocalDateTime.of(2026,10,24,12,0)); when(conversations.findByIdForUpdate(23)).thenReturn(Optional.of(c));
+        service.saveResponderReply(23,new ChatResponderReply("Late reply","{\"model\":\"test\"}"));
+        service.escalateToStaff(23,"AI_RUNTIME_FAILURE");
+        assertEquals(ChatConversationStatus.CLOSED,c.getStatus());
+        assertEquals(ChatHandlerType.AI,c.getHandlerType());
+        verify(messages,never()).saveAndFlush(any());
+        verifyNoInteractions(events);
     }
 
     @Test void staffMustHaveChatPermissionAndCoachIsRejected() {

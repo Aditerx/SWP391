@@ -545,6 +545,7 @@ Toàn bộ API dùng session đăng nhập hiện tại. Member chỉ đọc/ghi
 | `GET` | `/api/chat/conversations/{id}/messages?afterId=0&limit=30` | Poll theo ID tăng dần; mặc định 30, giới hạn tối đa 50. |
 | `POST` | `/api/chat/conversations/{id}/messages` | Gửi `{ "content":"Hello", "clientMessageId":"uuid" }`; ID client tùy chọn để retry an toàn. |
 | `POST` | `/api/chat/conversations/{id}/escalate` | Member có `CHAT_AS_MEMBER` chuyển cuộc hội thoại của chính mình sang STAFF; không nhận memberId từ body, trả conversation hiện tại. Retry không tạo thêm SYSTEM message nếu đã chuyển. |
+| `POST` | `/api/chat/conversations/{id}/close` | Member có `CHAT_AS_MEMBER` tự kết thúc hội thoại của mình; không body, danh tính lấy từ session. Trả `ChatConversationResponse`; đóng lặp idempotent. |
 | `POST` | `/api/chat/conversations/{id}/read` | Đánh dấu đã đọc tới message mới nhất cho user hiện tại. |
 | `GET` | `/api/chat/conversations?status=OPEN&assigned=true&unreadOnly=false&page=0&size=30` | Hộp thư staff, mới hoạt động gần nhất trước; `assigned=true` lọc hội thoại của người đang xem, `false` lọc hội thoại chưa được nhận; mỗi hàng kèm last message và unread của staff đang xem. |
 | `POST` | `/api/chat/conversations/{id}/claim` / `/release` | Nhận hội thoại hoặc tự nhả hội thoại đã nhận. |
@@ -553,6 +554,10 @@ Toàn bộ API dùng session đăng nhập hiện tại. Member chỉ đọc/ghi
 Message response gồm `id`, `conversationId`, `senderType`, `senderName`, `isMine`, `content`, `contentType`, `metadata`, `clientMessageId`, `createdAt`. Thời gian trả ISO-8601 cùng offset `+07:00`. Ví dụ: `{ "id":4021,"conversationId":88,"senderType":"STAFF","senderName":"Tran Thi Huong","isMine":false,"content":"Hello","createdAt":"2026-10-24T09:15:00+07:00" }`.
 
 Các mã lỗi chính: `CHAT_CONVERSATION_NOT_FOUND` (404), `CHAT_ACTIVE_CONVERSATION_NOT_FOUND` (404), `CHAT_CONVERSATION_CLOSED` (409), `CHAT_RATE_LIMITED` (429, tối đa 20 tin/phút/người; response có `retryAfterSeconds` và header `Retry-After`), `CHAT_MESSAGE_EMPTY`, `CHAT_MESSAGE_TOO_LONG`, `CHAT_ALREADY_CLAIMED`, `CHAT_NOT_ASSIGNED_TO_ACTOR`, `CHAT_OPEN_CONVERSATION_EXISTS`. FE nên poll message mỗi 3–5 giây khi cửa sổ chat mở, unread count mỗi 30–60 giây, và gửi `clientMessageId` cho mỗi tin.
+
+Member gọi `POST /api/chat/conversations/{id}/close` khi bấm kết thúc. Conversation không tồn tại hoặc thuộc Member khác cùng trả `404 CHAT_CONVERSATION_NOT_FOUND`. Với `OPEN`, BE khóa hội thoại, đặt `status=CLOSED`, `closedAt` theo `Clock`/`Asia/Ho_Chi_Minh`, giữ nguyên `handlerType` và `assignedStaffUserId`, rồi lưu đúng một tin SYSTEM `Bạn đã kết thúc cuộc trò chuyện.` với metadata `{"closedBy":"MEMBER"}`. Trả cùng `ChatConversationResponse` như các route hội thoại. Nếu đã `CLOSED`, trả `200` trạng thái hiện tại, giữ `closedAt` và không thêm SYSTEM message. Endpoint không nhận body/memberId/actor. Member vẫn đọc được lịch sử; gửi tin vào hội thoại đóng tiếp tục trả `409 CHAT_CONVERSATION_CLOSED`.
+
+Tin SYSTEM do Member tự đóng không phát notification cho Member hoặc staff và không tăng unreadCount của Member. Tin này không đánh dấu các tin trước là đã đọc. Worker AI bỏ qua hội thoại đóng; reply AI đến muộn không được lưu, auto-escalate/quota/handoff không mở lại hội thoại hoặc thêm SYSTEM message. Sau khi đóng, Member có thể gọi `POST /api/chat/conversations` để lấy/tạo hội thoại OPEN mới theo `SCMS_AI_CHAT_ENABLED` và `SCMS_AI_CHAT_NEW_CONVERSATION_HANDLER` hiện hành; quy tắc mỗi Member tối đa một hội thoại OPEN giữ nguyên.
 
 ### Mở rộng chat AI
 

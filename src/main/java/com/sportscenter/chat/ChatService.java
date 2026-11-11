@@ -158,7 +158,8 @@ public class ChatService {
             ChatConversation open = conversations.findFirstByMember_IdAndStatusOrderByIdDesc(c.getMember().getId(),ChatConversationStatus.OPEN).orElse(null);
             if (open != null && !open.getId().equals(c.getId())) throw new ChatException(409,"CHAT_OPEN_CONVERSATION_EXISTS","B\u1ea1n \u0111ang c\u00f3 m\u1ed9t cu\u1ed9c tr\u00f2 chuy\u1ec7n kh\u00e1c ch\u01b0a \u0111\u00f3ng");
         }
-        c.setStatus(close?ChatConversationStatus.CLOSED:ChatConversationStatus.OPEN); c.setClosedAt(close?now():null); c.setUpdatedAt(now());
+        if (close) closeConversation(c, now());
+        else { c.setStatus(ChatConversationStatus.OPEN); c.setClosedAt(null); c.setUpdatedAt(now()); }
         audit.log(actor.getId(),close?"CHAT_CLOSE":"CHAT_REOPEN","CHAT_CONVERSATION",id,"conversationId="+id,now());
         return response(c,actor.getId());
     }
@@ -166,6 +167,7 @@ public class ChatService {
     @Transactional
     public void escalateToStaff(Integer id, String reason) {
         ChatConversation c=conversations.findByIdForUpdate(id).orElseThrow(ChatService::notFound);
+        if (c.getStatus() != ChatConversationStatus.OPEN) return;
          if (c.getHandlerType() == ChatHandlerType.STAFF) return;
         List<Integer> targets=staffRecipients(c).stream().filter(target->unread(c,target,true)==0).toList();
         audit.log(null,"CHAT_ESCALATE","CHAT_CONVERSATION",id,"conversationId="+id,now());
@@ -191,10 +193,35 @@ public class ChatService {
     }
 
     @Transactional
+    public ChatConversationResponse closeAsMember(Integer id, Authentication auth) {
+        User member = requireMember(auth);
+        ChatConversation conversation = conversations.findByIdForUpdate(id).orElseThrow(ChatService::notFound);
+        if (!Objects.equals(conversation.getMember().getId(), member.getId())) throw notFound();
+        if (conversation.getStatus() == ChatConversationStatus.OPEN) {
+            LocalDateTime closedAt = now();
+            closeConversation(conversation, closedAt);
+            conversation.setLastMessageAt(closedAt);
+            ChatMessage systemMessage = new ChatMessage();
+            systemMessage.setConversation(conversation);
+            systemMessage.setSenderType(ChatSenderType.SYSTEM);
+            systemMessage.setContent("B\u1ea1n \u0111\u00e3 k\u1ebft th\u00fac cu\u1ed9c tr\u00f2 chuy\u1ec7n.");
+            systemMessage.setMetadata("{\"closedBy\":\"MEMBER\"}");
+            systemMessage.setContentType("TEXT");
+            systemMessage.setCreatedAt(closedAt);
+            messages.saveAndFlush(systemMessage);
+        }
+        return response(conversation, member.getId());
+    }
+
+    @Transactional
     public void saveResponderReply(Integer conversationId, ChatResponderReply reply) {
         if (reply==null || reply.content()==null || reply.content().isBlank()) return;
         ChatConversation c=conversations.findByIdForUpdate(conversationId).orElseThrow(ChatService::notFound);
-        if (c.getHandlerType()!=ChatHandlerType.AI || c.getStatus()!=ChatConversationStatus.OPEN) return;
+        if (c.getStatus()!=ChatConversationStatus.OPEN) {
+            log.debug("Skipping AI reply for closed chat conversationId={}", conversationId);
+            return;
+        }
+        if (c.getHandlerType()!=ChatHandlerType.AI) return;
         boolean transition=unread(c,c.getMember().getId(),false)==0;
         LocalDateTime now=now(); ChatMessage m=new ChatMessage(); m.setConversation(c); m.setSenderType(ChatSenderType.AI); m.setContent(reply.content().trim());
         m.setMetadata(reply.metadata()); m.setContentType("TEXT"); m.setCreatedAt(now); messages.saveAndFlush(m); c.setLastMessageAt(now); c.setUpdatedAt(now);
@@ -217,6 +244,11 @@ public class ChatService {
         List<ChatMessage> last=messages.findByConversation_IdOrderByIdDesc(c.getId(),PageRequest.of(0,1));
         boolean staff=viewerId!=null && !c.getMember().getId().equals(viewerId);
         return ChatConversationResponse.from(c,last.isEmpty()?null:last.get(0),viewerId,unread(c,viewerId,staff));
+    }
+    private void closeConversation(ChatConversation conversation, LocalDateTime closedAt) {
+        conversation.setStatus(ChatConversationStatus.CLOSED);
+        conversation.setClosedAt(closedAt);
+        conversation.setUpdatedAt(closedAt);
     }
     private long unread(ChatConversation c,Integer userId,boolean staff) {
         int after=readStates.findByConversation_IdAndUser_Id(c.getId(),userId).map(s->s.getLastReadMessageId()==null?0:s.getLastReadMessageId()).orElse(0);

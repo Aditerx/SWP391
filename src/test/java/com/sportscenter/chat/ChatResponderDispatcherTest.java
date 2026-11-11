@@ -43,6 +43,14 @@ class ChatResponderDispatcherTest {
         verifyNoInteractions(responder);
     }
 
+    @Test void closedConversationDoesNotInvokeResponderOrEscalate() {
+        conversation.setStatus(ChatConversationStatus.CLOSED); ChatResponder responder=mock(ChatResponder.class);
+        when(service.loadForResponder(4)).thenReturn(conversation); dispatcher=new ChatResponderDispatcher(List.of(responder),service);
+        dispatcher.onMemberMessage(new ChatMessageCreatedEvent(4,5,ChatSenderType.MEMBER,false,7,List.of()));
+        verifyNoInteractions(responder);
+        verify(service,never()).escalateToStaff(anyInt(),anyString());
+    }
+
     @Test void handoffUsesReasonCodeFromAiMetadata() {
         ChatResponder responder=mock(ChatResponder.class);
         when(service.loadForResponder(4)).thenReturn(conversation);

@@ -22,7 +22,7 @@ public class ChatResponderDispatcher {
         ChatConversation conversation = null;
         try {
             conversation=chatService.loadForResponder(event.conversationId());
-            if(conversation.getHandlerType()!=ChatHandlerType.AI) return;
+            if(conversation.getStatus()!=ChatConversationStatus.OPEN || conversation.getHandlerType()!=ChatHandlerType.AI) return;
             if (chatService.aiDailyLimitReached(event.memberUserId())) {
                 chatService.escalateToStaff(event.conversationId(), "AI_DAILY_LIMIT_REACHED");
                 return;
