@@ -28,9 +28,23 @@ Base Render: `https://scms-app-p1gy.onrender.com`; local thông thường `http:
 | POST `/api/auth/reset-password` | email,otp,newPassword →204 |
 | POST `/api/auth/google` | credential là Google ID token →200 LoginResponse và cookie JSESSIONID; không gửi access token |
 
-Đăng nhập Google GIS xác minh chữ ký, hạn và audience theo GOOGLE_CLIENT_ID. Token sai, email chưa xác minh, tài khoản không Active hoặc Google sub không khớp →401 chung. GOOGLE_AUTO_REGISTER=false: email chưa đăng ký →400; mặc định tự tạo Member Active theo implementation Google đã nhập từ main. Luồng Google tạo phiên giống login thường; các request tiếp theo vẫn gửi credentials/cookie.
+Đăng nhập Google GIS xác minh chữ ký, `aud`, `iss`, hạn và `email_verified` theo `GOOGLE_CLIENT_ID`. Endpoint tìm user theo Google `sub`, sau đó theo email đã xác minh. Email chưa có tài khoản và `GOOGLE_AUTO_REGISTER=true` thì tạo Member Active cùng hồ sơ Member; `isFirstLogin=false`. Nếu cờ tự đăng ký tắt, email chưa có tài khoản trả `404 GOOGLE_ACCOUNT_NOT_FOUND`. Tài khoản Pending không được kích hoạt hoặc liên kết Google; cần hoàn tất OTP đã gửi. Tài khoản staff hiện có giữ nguyên role khi đăng nhập Google. Luồng Google tạo phiên giống login thường; các request tiếp theo vẫn gửi credentials/cookie.
 
-LoginResponse của login thường/Google và auth/me có userId,email,fullName,role,authorities,isFirstLogin,memberId,avatarUrl. Avatar Cloudinary được tối ưu động bằng f_auto,q_auto; URL Google giữ nguyên, không ghi đè URL trong DB chỉ để tối ưu. Cấu hình/migration trước triển khai theo [docs02](02-DEPLOYMENT-GUIDE.md#google-login).
+Lỗi của `/api/auth/google` dùng body `{ "code": "...", "message": "..." }`:
+
+| HTTP | code | Ý nghĩa |
+|---|---|---|
+| 400 | `GOOGLE_CREDENTIAL_MISSING` | Thiếu credential hoặc credential rỗng |
+| 401 | `GOOGLE_TOKEN_INVALID` | Token sai chữ ký/audience/issuer/hạn/định dạng, thiếu cấu hình client ID hoặc thiếu `sub`/email |
+| 401 | `GOOGLE_EMAIL_NOT_VERIFIED` | Google chưa xác minh email |
+| 403 | `ACCOUNT_LOCKED` | Tài khoản bị khóa, vô hiệu hoặc có trạng thái không hỗ trợ đăng nhập |
+| 409 | `ACCOUNT_PENDING_VERIFICATION` | Tài khoản đang chờ OTP đăng ký thường |
+| 409 | `GOOGLE_ACCOUNT_CONFLICT` | Email đã liên kết với Google `sub` khác |
+| 404 | `GOOGLE_ACCOUNT_NOT_FOUND` | Email chưa có tài khoản và tự đăng ký đang tắt |
+
+Ví dụ: `{ "code": "ACCOUNT_PENDING_VERIFICATION", "message": "Tài khoản đang chờ xác minh email." }`.
+
+`LoginResponse` của `/api/auth/login`, `/api/auth/google` và `/api/auth/me` gồm `userId,email,fullName,role,authorities,isFirstLogin,memberId,avatarUrl,isNewAccount`. `isNewAccount=true` chỉ trong đúng response Google đã tạo tài khoản tại lần đăng nhập đó; cờ được tính trong response, không lưu DB. FE tự lưu trạng thái onboarding; client cũ có thể bỏ qua field mới. `isFirstLogin` vẫn false cho tài khoản Google mới. Avatar Cloudinary được tối ưu động bằng f_auto,q_auto; URL Google giữ nguyên, không ghi đè URL trong DB chỉ để tối ưu. Cấu hình/migration trước triển khai theo [docs02](02-DEPLOYMENT-GUIDE.md#google-login).
 
 OTP đăng ký10phút, tối đa5lần sai, dùng một lần. REGISTRATION_PENDING/EMAIL_ALREADY_REGISTERED/OTP_INVALID/OTP_EXPIRED/OTP_ATTEMPTS_EXCEEDED/OTP_RESEND_TOO_SOON/OTP_RESEND_LIMIT cần UI riêng. `OtpMessageResponse.code` là mã trạng thái tùy chọn, có thể null; không chứa mã OTP. HTTP200/thông báo gửi chung không chứng minh thư đã được nhận vì mail gửi bất đồng bộ sau commit. Trạng thái email cloud xem [docs00](00-MASTER-CHECKLIST.md#active). Tài khoản demo lịch sử không phải credential production.
 

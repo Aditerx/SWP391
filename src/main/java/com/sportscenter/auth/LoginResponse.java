@@ -10,5 +10,6 @@ public record LoginResponse(
         Set<String> authorities,
         boolean isFirstLogin,
         Integer memberId,
-        String avatarUrl) {
+        String avatarUrl,
+        boolean isNewAccount) {
 }

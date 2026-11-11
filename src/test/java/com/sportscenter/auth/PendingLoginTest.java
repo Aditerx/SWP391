@@ -12,6 +12,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -22,6 +24,7 @@ import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 
 import java.util.Optional;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -67,6 +70,28 @@ class PendingLoginTest {
         assertThrows(BadCredentialsException.class, () -> controller.login(
                 new LoginRequest("pending@example.com", "Wrong123"), new MockHttpServletRequest(), new MockHttpServletResponse()));
         verify(attempts).recordFailure("pending@example.com");
+    }
+
+    @Test
+    void regularLoginAndMeAlwaysReturnNewAccountFalse() {
+        var auth = mock(AuthenticationManager.class);
+        var users = mock(UserRepository.class);
+        var encoder = mock(PasswordEncoder.class);
+        var principal = new UsernamePasswordAuthenticationToken("member@example.com", null,
+                List.of(new SimpleGrantedAuthority("ROLE_MEMBER")));
+        when(auth.authenticate(any())).thenReturn(principal);
+        User member = new User(); member.setId(21); member.setEmail("member@example.com");
+        member.setFullName("Member"); member.setStatus("Active"); member.setFirstLogin(false);
+        when(users.findForAuthentication("member@example.com")).thenReturn(Optional.of(member));
+        AuthController controller = controller(auth, users, encoder);
+
+        var login = controller.login(new LoginRequest("member@example.com", "Password123"),
+                new MockHttpServletRequest(), new MockHttpServletResponse());
+        assertFalse(login.getBody().isNewAccount());
+        assertFalse(login.getBody().isFirstLogin());
+
+        var me = controller.me(principal);
+        assertFalse(me.getBody().isNewAccount());
     }
 
     private AuthController controller(AuthenticationManager auth, UserRepository users, PasswordEncoder encoder) {
