@@ -36,6 +36,23 @@ class ChatControllerTest {
     @Test void unauthenticatedRequestReturns401() throws Exception {
         mvc.perform(get("/api/chat/conversations/1/messages")).andExpect(status().isUnauthorized());
     }
+    @Test void memberCanCloseConversationWithoutRequestBody() throws Exception {
+        when(service.closeAsMember(eq(1),any())).thenReturn(new ChatConversationResponse(1,4,"Member",ChatConversationStatus.CLOSED,null,null,ChatHandlerType.AI,"Help",null,null,null,OffsetDateTime.now(),null,0));
+        mvc.perform(post("/api/chat/conversations/1/close").session(session("m@example.com","MEMBER","CHAT_AS_MEMBER")))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("CLOSED")).andExpect(jsonPath("$.handlerType").value("AI"));
+        verify(service).closeAsMember(eq(1),any());
+    }
+    @Test void memberCloseRequiresMemberRoleAndChatAuthority() throws Exception {
+        mvc.perform(post("/api/chat/conversations/1/close").session(session("m@example.com","MEMBER")))
+                .andExpect(status().isForbidden());
+        mvc.perform(post("/api/chat/conversations/1/close").session(session("staff@example.com","RECEPTIONIST","HANDLE_CHAT")))
+                .andExpect(status().isForbidden());
+        verifyNoInteractions(service);
+    }
+    @Test void unauthenticatedMemberCloseReturns401() throws Exception {
+        mvc.perform(post("/api/chat/conversations/1/close")).andExpect(status().isUnauthorized());
+        verifyNoInteractions(service);
+    }
     @Test void memberCanOpenChatEndpoint() throws Exception {
         when(service.getOrCreate(any(),any())).thenReturn(new ChatConversationResponse(1,4,"Member",ChatConversationStatus.OPEN,null,null,ChatHandlerType.STAFF,"Help",null,null,null,null,null,0));
         mvc.perform(post("/api/chat/conversations").session(session("m@example.com","MEMBER","CHAT_AS_MEMBER")))

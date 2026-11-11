@@ -25,6 +25,11 @@ public class ChatController {
     public ChatConversationResponse requestStaff(@PathVariable Integer id, Authentication auth) {
         return service.requestStaff(id, auth);
     }
+    @PostMapping("/conversations/{id}/close")
+    @PreAuthorize("hasRole('MEMBER') and hasAuthority('CHAT_AS_MEMBER')")
+    public ChatConversationResponse closeAsMember(@PathVariable Integer id, Authentication auth) {
+        return service.closeAsMember(id, auth);
+    }
     @GetMapping("/conversations/me/active") @PreAuthorize("hasRole('MEMBER') and hasAuthority('CHAT_AS_MEMBER')")
     public ChatConversationResponse active(Authentication auth) { return service.active(auth); }
     @GetMapping("/me/unread-count") @PreAuthorize("hasRole('MEMBER') and hasAuthority('CHAT_AS_MEMBER')")

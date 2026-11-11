@@ -19,7 +19,8 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Intege
     @Query("select coalesce(max(m.id),0) from ChatMessage m where m.conversation.id=:conversationId")
     Integer latestId(@Param("conversationId") Integer conversationId);
     @Query("select count(m) from ChatMessage m where m.conversation.id=:conversationId and m.id>:afterId and " +
-            "((:forStaff=true and m.senderType='MEMBER') or (:forStaff=false and m.senderType in ('STAFF','AI','SYSTEM')))")
+            "((:forStaff=true and m.senderType='MEMBER') or (:forStaff=false and m.senderType in ('STAFF','AI')) or " +
+            "(:forStaff=false and m.senderType='SYSTEM' and (m.metadata is null or m.metadata not like '%\"closedBy\":\"MEMBER\"%')))")
     long countUnread(@Param("conversationId") Integer conversationId, @Param("afterId") Integer afterId,
                      @Param("forStaff") boolean forStaff);
     @Query("select m from ChatMessage m where m.conversation.id=:conversationId order by m.id desc")

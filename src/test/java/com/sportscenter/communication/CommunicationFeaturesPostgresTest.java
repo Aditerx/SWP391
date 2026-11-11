@@ -212,6 +212,43 @@ class CommunicationFeaturesPostgresTest {
         databaseProof("chat AFTER_COMMIT notification recipient and read timestamp persisted", true);
     }
 
+    @Test void memberCanCloseOwnChatWithoutNotificationAndStartANewOne() throws Exception {
+        Actor member = member("self-close"), outsider = member("self-close-other"), receptionist = staff("Receptionist");
+        int conversation = request(member.http, "POST", "/api/chat/conversations", Map.of(), 200).body.path("id").asInt();
+        request(receptionist.http, "POST", "/api/chat/conversations/" + conversation + "/claim", null, 200);
+        db.update("UPDATE chat_conversations SET handler_type='AI' WHERE id=?", conversation);
+        assertEquals("AI", db.queryForObject("SELECT handler_type FROM chat_conversations WHERE id=?", String.class, conversation));
+        request(outsider.http, "POST", "/api/chat/conversations/" + conversation + "/close", null, 404);
+
+        var closed = request(member.http, "POST", "/api/chat/conversations/" + conversation + "/close", null, 200).body;
+        assertEquals("CLOSED", closed.path("status").asText());
+        assertEquals("AI", closed.path("handlerType").asText());
+        assertEquals(receptionist.id, closed.path("assignedStaffUserId").asInt());
+        assertFalse(closed.path("closedAt").isMissingNode() || closed.path("closedAt").isNull());
+        assertEquals(1, count("SELECT count(*) FROM chat_messages WHERE conversation_id=? AND sender_type='SYSTEM' AND content='Bạn đã kết thúc cuộc trò chuyện.' AND metadata='{\"closedBy\":\"MEMBER\"}'", conversation));
+        assertEquals("CLOSED", db.queryForObject("SELECT status FROM chat_conversations WHERE id=?", String.class, conversation));
+        assertNotNull(db.queryForObject("SELECT closed_at FROM chat_conversations WHERE id=?", java.time.LocalDateTime.class, conversation));
+        String closedAt = closed.path("closedAt").asText();
+
+        var repeated = request(member.http, "POST", "/api/chat/conversations/" + conversation + "/close", null, 200).body;
+        assertEquals(closedAt, repeated.path("closedAt").asText());
+        assertEquals(1, count("SELECT count(*) FROM chat_messages WHERE conversation_id=? AND sender_type='SYSTEM' AND metadata='{\"closedBy\":\"MEMBER\"}'", conversation));
+        assertEquals(0, request(member.http, "GET", "/api/chat/me/unread-count", null, 200).body.path("unreadCount").asInt());
+        assertEquals(0, count("SELECT count(*) FROM notification_recipients r JOIN notifications n USING(notification_id) WHERE n.related_id=? AND n.notification_type='CHAT_MEMBER_MESSAGE'", conversation));
+        assertEquals(0, count("SELECT count(*) FROM notification_recipients r JOIN notifications n USING(notification_id) WHERE r.user_id=? AND n.related_id=? AND n.notification_type IN ('CHAT_MEMBER_MESSAGE','CHAT_STAFF_REPLY')", member.id, conversation));
+        JsonNode history = request(member.http, "GET", "/api/chat/conversations/" + conversation + "/messages", null, 200).body;
+        assertEquals(1, history.size());
+        assertEquals("SYSTEM", history.get(0).path("senderType").asText());
+        request(outsider.http, "GET", "/api/chat/conversations/" + conversation + "/messages", null, 404);
+        var rejected = request(member.http, "POST", "/api/chat/conversations/" + conversation + "/messages", Map.of("content", "After close"), 409);
+        assertEquals("CHAT_CONVERSATION_CLOSED", rejected.body.path("code").asText());
+
+        int next = request(member.http, "POST", "/api/chat/conversations", Map.of(), 200).body.path("id").asInt();
+        assertNotEquals(conversation, next);
+        assertEquals("STAFF", db.queryForObject("SELECT handler_type FROM chat_conversations WHERE id=?", String.class, next));
+        databaseProof("Member close locks/persists once; response and database show CLOSED; old messages stay readable; new OPEN chat is independent", true);
+    }
+
     @Test void commitRollbackAndDedupeExerciseRealTransactionListeners() throws Exception {
         Actor member = member("transaction");
         String key = "proof-" + UUID.randomUUID();
