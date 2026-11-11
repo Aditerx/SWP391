@@ -6,7 +6,9 @@ import com.google.api.client.googleapis.javanet.GoogleNetHttpTransport;
 import com.google.api.client.http.HttpTransport;
 import com.google.api.client.json.gson.GsonFactory;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.http.HttpStatus;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
@@ -15,6 +17,7 @@ import java.util.List;
 
 @Component
 public class GoogleTokenVerifierImpl implements GoogleTokenVerifier {
+    private static final Logger log = LoggerFactory.getLogger(GoogleTokenVerifierImpl.class);
     private final String clientId;
     private volatile GoogleIdTokenVerifier verifier;
     private volatile HttpTransport transport;
@@ -25,9 +28,12 @@ public class GoogleTokenVerifierImpl implements GoogleTokenVerifier {
 
     @Override
     public GoogleIdentity verify(String credential) {
-        if (clientId == null || clientId.isBlank() || credential == null || credential.isBlank()) {
+        if (clientId == null || clientId.isBlank()) {
+            log.warn("Google sign-in unavailable: google.client-id is not configured");
             throw invalidToken();
         }
+        if (credential == null || credential.isBlank()) throw new GoogleAuthException(HttpStatus.BAD_REQUEST,
+                "GOOGLE_CREDENTIAL_MISSING", "Vui lòng cung cấp thông tin đăng nhập Google.");
         try {
             GoogleIdToken token = getVerifier().verify(credential);
             if (token == null) throw invalidToken();
@@ -36,7 +42,7 @@ public class GoogleTokenVerifierImpl implements GoogleTokenVerifier {
                     Boolean.TRUE.equals(payload.getEmailVerified()), (String) payload.get("name"),
                     (String) payload.get("picture"));
         } catch (GeneralSecurityException | IOException | RuntimeException exception) {
-            if (exception instanceof BadCredentialsException badCredentials) throw badCredentials;
+            if (exception instanceof GoogleAuthException googleAuthException) throw googleAuthException;
             throw invalidToken();
         }
     }
@@ -59,7 +65,8 @@ public class GoogleTokenVerifierImpl implements GoogleTokenVerifier {
         return current;
     }
 
-    private BadCredentialsException invalidToken() {
-        return new BadCredentialsException("Login failed");
+    private GoogleAuthException invalidToken() {
+        return new GoogleAuthException(HttpStatus.UNAUTHORIZED, "GOOGLE_TOKEN_INVALID",
+                "Không thể xác minh thông tin Google.");
     }
 }

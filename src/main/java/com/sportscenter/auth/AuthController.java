@@ -90,7 +90,8 @@ public class AuthController {
     public ResponseEntity<LoginResponse> google(@Valid @RequestBody GoogleLoginRequest request,
                                                 HttpServletRequest httpRequest,
                                                 HttpServletResponse httpResponse) {
-        User user = googleAuthService.authenticate(request.credential());
+        GoogleAuthResult result = googleAuthService.authenticate(request.credential());
+        User user = result.user();
         UserDetails principal = userDetailsService.loadUserByUsername(user.getEmail());
         Authentication authentication = new UsernamePasswordAuthenticationToken(
                 principal, null, principal.getAuthorities());
@@ -101,7 +102,7 @@ public class AuthController {
         HttpSession session = httpRequest.getSession(false);
         if (session != null) sessionRegistry.registerNewSession(session.getId(), authentication.getPrincipal());
         User responseUser = userRepository.findForAuthentication(user.getEmail()).orElseThrow();
-        return ResponseEntity.ok(toResponse(responseUser, authentication));
+        return ResponseEntity.ok(toResponse(responseUser, authentication, result.newAccount()));
     }
 
     @GetMapping("/me")
@@ -178,6 +179,10 @@ public class AuthController {
     }
 
     private LoginResponse toResponse(User user, Authentication authentication) {
+        return toResponse(user, authentication, false);
+    }
+
+    private LoginResponse toResponse(User user, Authentication authentication, boolean newAccount) {
         String role = user.getRole() == null ? null : user.getRole().getName();
         return new LoginResponse(
                 user.getId(),
@@ -189,6 +194,7 @@ public class AuthController {
                         .toList()),
                 user.isFirstLogin(),
                 memberRepository.existsById(user.getId()) ? user.getId() : null,
-                com.sportscenter.media.AvatarUrlOptimizer.optimize(user.getAvatarUrl()));
+                com.sportscenter.media.AvatarUrlOptimizer.optimize(user.getAvatarUrl()),
+                newAccount);
     }
 }
