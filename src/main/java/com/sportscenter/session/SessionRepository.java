@@ -10,6 +10,7 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.LocalDateTime;
 import java.util.List;
+import org.springframework.data.domain.Pageable;
 
 public interface SessionRepository extends JpaRepository<Session, Integer> {
     boolean existsBySportsClassId(Integer id);
@@ -130,6 +131,31 @@ public interface SessionRepository extends JpaRepository<Session, Integer> {
                                        @Param("startDate") LocalDate startDate,
                                        @Param("endDate") LocalDate endDate,
                                        @Param("status") String status);
+
+    @Query("SELECT s FROM Session s JOIN FETCH s.sportsClass c LEFT JOIN FETCH c.subject " +
+            "JOIN FETCH s.room r WHERE (s.bookedMember.id = :memberId OR " +
+            "c.id IN (SELECT e.sportsClass.id FROM ClassEnrollment e WHERE e.member.id = :memberId " +
+            "AND e.status IN ('Registered', 'Completed'))) " +
+            "AND (s.sessionDate > :today OR (s.sessionDate = :today AND s.startTime >= :nowTime)) " +
+            "AND s.status = 'Scheduled' ORDER BY s.sessionDate, s.startTime")
+    List<Session> findUpcomingForMember(@Param("memberId") Integer memberId,
+            @Param("today") LocalDate today, @Param("nowTime") LocalTime nowTime, Pageable pageable);
+
+    @Query("SELECT s FROM Session s JOIN FETCH s.sportsClass c LEFT JOIN FETCH c.subject JOIN FETCH s.room r " +
+            "WHERE (s.bookedMember.id = :memberId OR c.id IN " +
+            "(SELECT e.sportsClass.id FROM ClassEnrollment e WHERE e.member.id = :memberId AND e.status IN ('Registered', 'Completed'))) " +
+            "AND s.sessionDate >= :fromDate AND s.sessionDate <= :toDate " +
+            "AND (s.sessionDate > :today OR (s.sessionDate = :today AND s.startTime >= :nowTime)) " +
+            "AND s.status = 'Scheduled' ORDER BY s.sessionDate, s.startTime")
+    List<Session> findUpcomingForMember(@Param("memberId") Integer memberId, @Param("fromDate") LocalDate fromDate,
+            @Param("toDate") LocalDate toDate, @Param("today") LocalDate today, @Param("nowTime") LocalTime nowTime, Pageable pageable);
+
+    @Query("SELECT COUNT(s) FROM Session s JOIN s.sportsClass c WHERE (s.bookedMember.id = :memberId OR c.id IN " +
+            "(SELECT e.sportsClass.id FROM ClassEnrollment e WHERE e.member.id = :memberId AND e.status IN ('Registered', 'Completed'))) " +
+            "AND s.sessionDate >= :fromDate AND s.sessionDate <= :toDate " +
+            "AND (s.sessionDate > :today OR (s.sessionDate = :today AND s.startTime >= :nowTime)) AND s.status = 'Scheduled'")
+    long countUpcomingForMember(@Param("memberId") Integer memberId, @Param("fromDate") LocalDate fromDate,
+            @Param("toDate") LocalDate toDate, @Param("today") LocalDate today, @Param("nowTime") LocalTime nowTime);
 
     List<Session> findBySessionDateBetween(LocalDate startDate, LocalDate endDate);
 

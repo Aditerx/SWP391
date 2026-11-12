@@ -9,6 +9,7 @@ import jakarta.persistence.LockModeType;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
+import org.springframework.data.domain.Pageable;
 
 public interface MemberPackageRepository extends JpaRepository<MemberPackage, Integer> {
     List<MemberPackage> findByPrimaryCoachId(Integer coachId);
@@ -29,6 +30,10 @@ public interface MemberPackageRepository extends JpaRepository<MemberPackage, In
            "LEFT JOIN FETCH mp.membershipPackage p " +
            "WHERE u.id = :memberId")
     List<MemberPackage> findByMemberId(@Param("memberId") Integer memberId);
+
+    @Query("SELECT mp FROM MemberPackage mp LEFT JOIN FETCH mp.membershipPackage p " +
+           "WHERE mp.member.id = :memberId ORDER BY mp.subscriptionId DESC")
+    List<MemberPackage> findRecentByMemberId(@Param("memberId") Integer memberId, Pageable pageable);
 
     @Query("SELECT mp FROM MemberPackage mp " +
            "JOIN FETCH mp.member u " +

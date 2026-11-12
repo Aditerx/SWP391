@@ -2,6 +2,8 @@
 
 ## Active
 
+**DeepSeek AI Chat DB tools — PASS local; real provider/PostgreSQL/live NOT_RUN:** Giữ 6 tool JSON read-only, `SCMS_AI_CHAT_DB_TOOLS_ENABLED=false`, member scope chỉ từ `respond(..., memberUserId)`, 3 vòng/10 hàng mặc định, DTO whitelist và giới hạn 2.000 ký tự/tool. `get_my_upcoming_sessions` nhận `fromDate`/`toDate` yyyy-MM-dd; mặc định fromDate là hôm nay, khoảng inclusive tối đa 31 ngày; nếu bỏ toDate thì lấy fromDate+30 ngày, trả `truncated` và `total`. Prompt có ngày/giờ/thứ Asia/Ho_Chi_Minh, quy tắc tuần/ngày tự nhiên, gọi tool cho dữ liệu của chính Member, không mời handoff sau câu trả lời đủ dữ liệu; mặc định danh sách gạch đầu dòng, không bảng Markdown (`SCMS_AI_CHAT_MARKDOWN_ENABLED=false`). Hóa đơn sắp theo `COALESCE(paymentDate, createdAt)` giảm dần, tối đa 5. Khi DB tools bật và provider/runtime lỗi, fallback ngắn kèm `AI_UNAVAILABLE`/`AI_RUNTIME_FAILURE`, không chạy FAQ keyword; khi cờ tắt giữ FAQ fallback. `clean test` PASS Java17, 572 run=540 pass/32 skip/0 failure/0 error; test đích tool 7/7 PASS. QA: `deepseekChatDbTools20261112`. Provider thật, PostgreSQL fixtures, FE/browser và Render chưa chạy; bước tiếp là smoke provider và kiểm query trên DB fixture cô lập.
+
 **Member chọn gặp nhân viên trong AI Chat — PASS local; FE/PostgreSQL/live NOT_RUN:** Trên branch `feature/chat-member-choose-handoff`, base mới nhất `origin/main` `a4cb2db` (đã gồm merge close Member), thêm `SCMS_AI_CHAT_HANDOFF_MODE` mặc định `SUGGEST`, giữ `AUTO`; explicit request vẫn chuyển. Gợi ý token/FAQ, quota, responder rỗng/không có/lỗi được lưu với metadata `handoffSuggested`/`reasonCode`; SYSTEM fallback không phát notification hoặc unread Member và chống lặp cùng nguyên nhân. Response API trích metadata an toàn; cập nhật docs01 mục16, OpenAPI và [bàn giao FE AI Chat](../SCMS-BAN-GIAO-FE-AI-CHAT-2026-11-12.md). Không migration, endpoint, quyền, quota/rate limit hoặc gọi mạng provider. `clean test` local Java17: 560run=528pass/32skip/0failure/0error; các test chat liên quan55/55 và `DeepSeekChatClientTest`7/7 PASS trong lượt clean. SHA-256 manifest BE/tests `74E85D2B08CC010F008127A5101567E18761F94A20F99729A6858CCF4CAF530D` (14 changed files). So với base mới nhất ước tính 551 test (548 ghi nhận ở checkpoint close trước merge Google Auth +3 test từ merge đó), scope này thêm9 test; base chưa được chạy độc lập trong lượt này. Diff check/OpenAPI JSON PASS. PostgreSQL after-commit, FE/browser, provider thật và Render NOT_RUN; bước tiếp: FE hiển thị lựa chọn và gọi `/escalate` chỉ khi Member chọn, sau đó chạy PG proof cô lập.
 
 **Member tự kết thúc AI Chat — unit/controller PASS local; HTTP+DB after-commit proof BLOCKED:** Chat không có Dxx riêng; áp dụng tiêu chuẩn evidence D19. Trên branch `feature/chat-member-close`, base `origin/main` `88ef854`, thêm `POST /api/chat/conversations/{id}/close` cho Member; kiểm ownership dưới lock, đóng theo Clock, giữ handler/assignedStaff, SYSTEM message idempotent, không notification/unread cho Member; member gửi sau đóng vẫn409, đọc lịch sử và mở conversation mới theo cờ hiện hành. Reply AI muộn không được lưu; worker bỏ qua CLOSED và escalation không sửa hội thoại đóng. Không migration, không sửa luồng close staff/DeepSeek/FAQ/quota/rate limit. Test đích chat36/36; full `clean test` cuối548run=516pass/32skip/0failure/0error, so baseline cùng base +9run (+8pass,+1 opt-in skip). Fingerprint SHA-256 BE/tests `79A8DC53C7A9B9281210CFD8D5FE6ED616F3EFA735280C7E0C52A09AC832FCD9`. HTTP+DB proof đã thêm trong `CommunicationFeaturesPostgresTest` nhưng BLOCKED vì `127.0.0.1:55440` không mở; không tính skip là pass. FE/browser, PostgreSQL proof, provider thật và Render chưa nghiệm thu. Bước tiếp: FE gọi close khi Member bấm “Kết thúc”, rồi POST `/api/chat/conversations` khi họ chọn bắt đầu chat mới; chạy PG proof trên DB loopback cô lập khi môi trường sẵn sàng.
@@ -111,6 +113,14 @@ Bằng chứng chuẩn: `phase1Implementation20261109` trong [QA](../artifacts/q
 ---
 
 ## 📜 PHẦN II: LỊCH SỬ HOÀN THÀNH (HISTORY)
+
+### [12/11/2026] DeepSeek AI Chat đọc dữ liệu SCMS bằng tool cố định
+
+- Thêm 6 hàm chỉ đọc cho gói đang bán, bộ môn active, lớp Normal đang Open, subscriptions riêng, sessions sắp tới và tối đa5 invoice gần đây. Member ID chỉ lấy từ context backend; DTO chỉ có field phục vụ câu trả lời, truy vấn phân trang, output giới hạn2.000 ký tự và transaction read-only.
+- DeepSeek chạy riêng vòng function calling/role tool, giữ thinking disabled, non-stream và retry; cộng token usage, giới hạn số vòng/deadline và map lỗi về FAQ. Không đổi nhánh FAQ/mock/Anthropic, handoff hoặc quota. Cấu hình opt-in mặc định false, thêm giới hạn rows/rounds và system instruction chống prompt injection từ DB.
+- Cập nhật docs01 mục16 và env mẫu/Render. Unit test xác nhận hai Member không trộn data, không có memberId trong schema/args, tool loop, giới hạn vòng, fallback và cờ opt-in.
+- `clean test` local Java17: 566 tests,534 pass,32 skipped,0 failure/error; test chat/tool24/24 PASS. SHA-256 manifest 19 source/test files `4334bc5d018e640e269007fd6606d19c5c5fefcd7f8ee43a1af4ec6b4885e4e5`; chi tiết trong [QA](../artifacts/qa/latest.json).
+- Chưa chạy truy vấn trên PostgreSQL fixture, chưa gọi DeepSeek thật hoặc kiểm FE/browser/Render. Bước tiếp: kiểm cả sáu truy vấn trên PostgreSQL cô lập với Member A+B, sau đó mới thử provider thật.
 
 ### [07/11/2026] Chuẩn bị khung môi trường Chat AI local
 
@@ -907,6 +917,14 @@ Bằng chứng khi cần: [QA duy nhất](../artifacts/qa/latest.json). Bộ FE 
 27skip của lần clean gồm19baseline live/data/PG,6communication và2clone opt-in. Communication12case và clone2case đã chạy riêng ở source trước; xem QA theo SHA, không gọi đó là lần chạy mới của source hiện tại.
 
 ## HISTORY
+
+### [12/11/2026] DeepSeek tool follow-up theo kết quả kiểm thử
+
+- Mở rộng truy vấn lịch theo khoảng ngày, đánh dấu kết quả bị cắt và tổng số; yêu cầu model gọi tool cho dữ liệu cá nhân, sắp xếp hóa đơn theo ngày FE hiển thị và chuẩn hóa handoff/fallback.
+- Thêm cờ Markdown mặc định tắt cùng test mô tả tool, prompt thời gian hiện tại, date validation, truncated, hóa đơn ngày/mã lệch thứ tự và fallback.
+- `clean test` Java17: 572 run, 540 pass, 32 skipped, 0 failure/error; provider/PostgreSQL/FE/live NOT_RUN. QA chuẩn: `deepseekChatDbTools20261112`.
+
+
 
 - 12/11/2026 — Member có quyền chọn tiếp tục AI hoặc `/escalate`; thêm mode `SUGGEST`/`AUTO`, metadata handoff an toàn, fallback quota/lỗi không notify/unread hoặc lưu lặp. `clean test` 560run=528pass/32skip/0failure/0error trên base `a4cb2db` + working tree; fingerprint BE/tests tại Active; thêm9 test so với base (551 case tính theo checkpoint close + merge Google Auth), không chạy lại baseline riêng. OpenAPI JSON và diff check PASS. Không migration; FE/PG/provider thật/Render NOT_RUN. Bàn giao: `SCMS-BAN-GIAO-FE-AI-CHAT-2026-11-12.md`.
 

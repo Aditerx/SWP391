@@ -4,4 +4,5 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface SubjectRepository extends JpaRepository<Subject, Integer> {
     java.util.Optional<Subject> findBySlug(String slug);
+    java.util.List<Subject> findByStatusIgnoreCase(String status, org.springframework.data.domain.Pageable pageable);
 }
