@@ -101,7 +101,10 @@ public class ChatAiResponder implements ChatResponder {
             return new FaqDecision("M\u00ecnh s\u1ebd chuy\u1ec3n cu\u1ed9c tr\u00f2 chuy\u1ec7n cho nh\u00e2n vi\u00ean h\u1ed7 tr\u1ee3 ngay. [HANDOFF]", false, "MEMBER_REQUESTED_STAFF");
         }
         if (containsConfiguredKeyword(normalized, properties.getFaqSensitiveKeywords())) {
-            return new FaqDecision("Y\u00eau c\u1ea7u n\u00e0y c\u1ea7n nh\u00e2n vi\u00ean h\u1ed7 tr\u1ee3 tr\u1ef1c ti\u1ebfp. M\u00ecnh s\u1ebd chuy\u1ec3n cu\u1ed9c tr\u00f2 chuy\u1ec7n ngay. [HANDOFF]", false, "SENSITIVE_TOPIC");
+            String text = properties.isSuggestHandoff()
+                    ? "Y\u00eau c\u1ea7u n\u00e0y th\u01b0\u1eddng c\u1ea7n nh\u00e2n vi\u00ean h\u1ed7 tr\u1ee3 tr\u1ef1c ti\u1ebfp. B\u1ea1n c\u00f3 mu\u1ed1n chuy\u1ec3n sang nh\u00e2n vi\u00ean kh\u00f4ng? B\u1ea1n c\u00f3 th\u1ec3 b\u1ea5m 'G\u1eb7p nh\u00e2n vi\u00ean' b\u1ea5t c\u1ee9 l\u00fac n\u00e0o, ho\u1eb7c ti\u1ebfp t\u1ee5c h\u1ecfi m\u00ecnh."
+                    : "Y\u00eau c\u1ea7u n\u00e0y c\u1ea7n nh\u00e2n vi\u00ean h\u1ed7 tr\u1ee3 tr\u1ef1c ti\u1ebfp. M\u00ecnh s\u1ebd chuy\u1ec3n cu\u1ed9c tr\u00f2 chuy\u1ec7n ngay.";
+            return new FaqDecision(text + " [HANDOFF]", false, "SENSITIVE_TOPIC");
         }
         if (isGreetingOrThanksOrGoodbye(normalized)) {
             String greeting = normalized.equals("tam biet") || normalized.equals("bye") || normalized.equals("goodbye")
@@ -143,7 +146,8 @@ public class ChatAiResponder implements ChatResponder {
                 .anyMatch(value -> (" " + normalized + " ").contains(" " + value + " "));
     }
 
-    private boolean isExplicitStaffRequest(String normalized) {
+    public static boolean isExplicitStaffRequest(String text) {
+        String normalized = FaqKnowledgeBase.normalize(text);
         return List.of("gap nhan vien", "gap nguoi that", "muon gap nhan vien", "cho toi gap nhan vien",
                 "noi chuyen voi nhan vien", "can nhan vien").stream()
                 .anyMatch(phrase -> (" " + normalized + " ").contains(" " + phrase + " "));
