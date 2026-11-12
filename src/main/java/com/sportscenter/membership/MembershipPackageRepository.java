@@ -4,4 +4,5 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface MembershipPackageRepository extends JpaRepository<MembershipPackage, Integer> {
     java.util.List<MembershipPackage> findByCenterIdAndStatusIgnoreCase(Integer centerId, String status);
+    java.util.List<MembershipPackage> findByCenterIdAndStatusIgnoreCase(Integer centerId, String status, org.springframework.data.domain.Pageable pageable);
 }

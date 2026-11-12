@@ -46,6 +46,14 @@ services:
         value: "12"
       - key: SCMS_AI_CHAT_DEEPSEEK_MAX_TOKENS
         value: "400"
+      - key: SCMS_AI_CHAT_DB_TOOLS_ENABLED
+        value: "false"
+      - key: SCMS_AI_CHAT_MARKDOWN_ENABLED
+        value: "false"
+      - key: SCMS_AI_CHAT_TOOL_MAX_ROUNDS
+        value: "3"
+      - key: SCMS_AI_CHAT_TOOL_MAX_ROWS
+        value: "10"
       - key: SCMS_AI_CHAT_MAX_KNOWLEDGE_BASE_CHARACTERS
         value: "12000"
       - key: SCMS_AI_CHAT_TEMPERATURE

@@ -24839,5 +24839,47 @@
       "https://render.com/docs/deploys#skipping-an-auto-deploy",
       "https://docs.github.com/en/actions/managing-workflow-runs/skipping-workflow-runs"
     ]
+  },
+  "deepseekChatDbTools20261112": {
+    "result": "PASS_LOCAL",
+    "checkedDate": "2026-11-12",
+    "baseCommit": "37dcf0baef914f9823e57c9fb219ee8c1b0e5cf7",
+    "workingTreeUncommitted": true,
+    "sourceTestManifest": {
+      "algorithm": "SHA-256",
+      "files": 18,
+      "digest": "16bb8f3bfed8dcba2dfc6635aaede1049105e0be9b34f899c9dcfcff2fc134eb"
+    },
+    "cleanTest": {
+      "command": ".\\mvnw.cmd -q clean test",
+      "status": "PASS",
+      "tests": 572,
+      "passed": 540,
+      "skipped": 32,
+      "failures": 0,
+      "errors": 0,
+      "java": "17.0.20.1"
+    },
+    "targetedChatToolTests": {
+      "status": "PASS",
+      "tests": 7,
+      "skipped": 0
+    },
+    "scope": [
+      "Fixed read-only DB tools, default disabled",
+      "Member scope sourced from responder context and excluded from tool schemas",
+      "DTO whitelist, bounded rows/result characters, read-only transaction",
+      "DeepSeek tool call loop, aggregate token use, fallback and round limit",
+      "Date range validation, implicit 31-day window, truncated and total",
+      "Invoice ordering by paymentDate/createdAt and newest-5 note",
+      "HCM prompt calendar, personal-tool guidance, Markdown gate and runtime fallback"
+    ],
+    "notRun": [
+      "Isolated PostgreSQL fixtures/query validation for all six tools",
+      "Real DeepSeek provider call",
+      "FE/browser and Render"
+    ],
+    "providerCalls": false,
+    "databaseMutation": false
   }
 }

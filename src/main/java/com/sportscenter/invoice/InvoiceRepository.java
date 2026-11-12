@@ -10,6 +10,7 @@ import org.springframework.stereotype.Repository;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
+import org.springframework.data.domain.Pageable;
 
 @Repository
 public interface InvoiceRepository extends JpaRepository<Invoice, Integer>, org.springframework.data.jpa.repository.JpaSpecificationExecutor<Invoice>, InvoiceSequence {
@@ -47,6 +48,12 @@ public interface InvoiceRepository extends JpaRepository<Invoice, Integer>, org.
     java.util.Optional<Invoice> findByInvoiceCodeForUpdate(@Param("code") String code);
 
     List<Invoice> findByMemberIdOrderByInvoiceIdDesc(Integer memberId);
+
+    List<Invoice> findByMemberIdOrderByInvoiceIdDesc(Integer memberId, Pageable pageable);
+
+    @Query("SELECT i FROM Invoice i WHERE i.member.id = :memberId " +
+           "ORDER BY COALESCE(i.paymentDate, i.createdAt) DESC, i.invoiceId DESC")
+    List<Invoice> findLatestByMemberForAi(@Param("memberId") Integer memberId, Pageable pageable);
 
     List<Invoice> findByPaymentStatusAndExpiresAtBefore(String status, LocalDateTime now);
 

@@ -15,8 +15,96 @@ import org.springframework.core.io.support.PropertiesLoaderUtils;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
+import com.sportscenter.chat.ai.tool.ToolAiCompletion;
+import com.sportscenter.chat.ai.tool.ToolCapableAiCompletionClient;
+import com.sportscenter.chat.ai.tool.ToolContext;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneId;
 
 class ChatAiResponderTest {
+    @Test void toolPathIsOptInAndUsesAuthenticatedMemberContext() {
+        ChatAiProperties properties = new ChatAiProperties();
+        properties.setEnabled(true);
+        ToolClientStub client = new ToolClientStub();
+        ChatAiResponder responder = new ChatAiResponder(client, properties, new ObjectMapper());
+        var memberMessage = message(ChatSenderType.MEMBER, "What packages do I have?");
+
+        ChatResponderReply regular = responder.respond(new ChatConversation(), List.of(memberMessage), 42).orElseThrow();
+        assertEquals("regular", regular.content());
+        assertFalse(regular.metadata().contains("tools"));
+        assertEquals(1, client.regularCalls);
+
+        properties.setDbToolsEnabled(true);
+        ChatResponderReply toolReply = responder.respond(new ChatConversation(), List.of(memberMessage), 42).orElseThrow();
+        assertEquals("tool answer", toolReply.content());
+        assertEquals(new ToolContext(42, "What packages do I have?"), client.context);
+        assertTrue(toolReply.metadata().contains("\"tools\":[\"get_my_subscriptions\"]"));
+        assertTrue(toolReply.metadata().contains("\"toolRounds\":1"));
+        assertEquals(1, client.toolCalls);
+
+        client.failTools = true;
+        ChatResponderReply fallback = responder.respond(new ChatConversation(), List.of(memberMessage), 42).orElseThrow();
+        assertTrue(fallback.content().contains("tạm thời chưa tra cứu được"));
+        assertTrue(fallback.content().contains("[HANDOFF]"));
+        assertTrue(fallback.metadata().contains("\"fallback\":true"));
+        assertTrue(fallback.metadata().contains("AI_UNAVAILABLE"));
+    }
+
+    private static final class ToolClientStub implements AiCompletionClient, ToolCapableAiCompletionClient {
+        int regularCalls;
+        int toolCalls;
+        ToolContext context;
+        boolean failTools;
+        boolean runtimeFailTools;
+        String toolPrompt;
+        @Override public AiCompletion complete(String system, List<AiChatMessage> messages, int maxTokens) {
+            regularCalls++;
+            return new AiCompletion("regular", "deepseek", 1, 1);
+        }
+        @Override public ToolAiCompletion completeWithTools(String system, List<AiChatMessage> messages,
+                int maxTokens, ToolContext context, int maxRounds) {
+            toolCalls++;
+            toolPrompt = system;
+            this.context = context;
+            if (failTools) throw new AiProviderException("tool_failed");
+            if (runtimeFailTools) throw new IllegalStateException("tool runtime failed");
+            return new ToolAiCompletion(new AiCompletion("tool answer", "deepseek", 3, 2), List.of("get_my_subscriptions"), 1);
+        }
+    }
+
+    @Test void toolRuntimeFailureDoesNotUseKeywordFaqAndSuggestsUnavailableHandoff() {
+        ChatAiProperties properties = new ChatAiProperties();
+        properties.setEnabled(true);
+        properties.setDbToolsEnabled(true);
+        ToolClientStub client = new ToolClientStub();
+        client.runtimeFailTools = true;
+        ChatAiResponder responder = new ChatAiResponder(client, properties, new ObjectMapper());
+        ChatResponderReply reply = responder.respond(new ChatConversation(),
+                List.of(message(ChatSenderType.MEMBER, "OTP của tôi là gì?")), 7).orElseThrow();
+        assertTrue(reply.content().contains("tạm thời chưa tra cứu được"));
+        assertFalse(reply.content().contains("07:00"));
+        assertTrue(reply.metadata().contains("AI_RUNTIME_FAILURE"));
+        assertTrue(reply.content().contains("[HANDOFF]"));
+    }
+
+    @Test void toolPromptHasCurrentHcmDateAndRequiredLookupGuidanceAndSuccessHasNoHandoff() {
+        ChatAiProperties properties = new ChatAiProperties();
+        properties.setEnabled(true);
+        properties.setDbToolsEnabled(true);
+        ToolClientStub client = new ToolClientStub();
+        Clock fixed = Clock.fixed(Instant.parse("2026-11-12T04:00:00Z"), ZoneId.of("Asia/Ho_Chi_Minh"));
+        ChatAiResponder responder = new ChatAiResponder(client, properties, new ObjectMapper(), fixed);
+        ChatResponderReply reply = responder.respond(new ChatConversation(),
+                List.of(message(ChatSenderType.MEMBER, "Gói tập của tôi hết hạn ngày nào?")), 42).orElseThrow();
+        assertTrue(client.toolPrompt.contains("2026-11-12T11:00"));
+        assertTrue(client.toolPrompt.contains("thứ Năm"));
+        assertTrue(client.toolPrompt.contains("PHẢI gọi tool tương ứng"));
+        assertTrue(client.toolPrompt.contains("Không dùng bảng Markdown"));
+        assertFalse(reply.metadata().contains("handoffSuggested"));
+        assertFalse(reply.content().contains("Gặp nhân viên"));
+    }
+
     @Test void sendsOnlyBoundedSanitizedTranscriptAndReturnsMetadata() throws Exception {
         ChatAiProperties properties = new ChatAiProperties();
         properties.setEnabled(true);
