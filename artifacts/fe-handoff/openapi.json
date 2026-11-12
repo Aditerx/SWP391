@@ -10045,6 +10045,14 @@
           "createdAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "handoffSuggested": {
+            "type": "boolean",
+            "default": false
+          },
+          "reasonCode": {
+            "type": "string",
+            "nullable": true
           }
         }
       },

@@ -228,6 +228,20 @@ public class ChatService {
         events.publishEvent(new ChatMessageCreatedEvent(c.getId(),m.getId(),ChatSenderType.AI,transition,c.getMember().getId(),List.of(c.getMember().getId())));
     }
 
+    @Transactional
+    public void saveHandoffSuggestion(Integer conversationId, String content, String reasonCode) {
+        ChatConversation c=conversations.findByIdForUpdate(conversationId).orElseThrow(ChatService::notFound);
+        if (c.getStatus()!=ChatConversationStatus.OPEN || c.getHandlerType()!=ChatHandlerType.AI) return;
+        ChatMessage lastSystem = messages.findFirstByConversation_IdAndSenderTypeOrderByIdDesc(conversationId, ChatSenderType.SYSTEM).orElse(null);
+        if (lastSystem != null && ChatHandoffMetadata.suggested(lastSystem.getMetadata())
+                && Objects.equals(reasonCode, ChatHandoffMetadata.reasonCode(lastSystem.getMetadata()))) return;
+        LocalDateTime timestamp=now();
+        ChatMessage message=new ChatMessage(); message.setConversation(c); message.setSenderType(ChatSenderType.SYSTEM);
+        message.setContent(content); message.setContentType("TEXT");
+        message.setMetadata(ChatHandoffMetadata.withSuggestion("{}", reasonCode)); message.setCreatedAt(timestamp);
+        messages.saveAndFlush(message); c.setLastMessageAt(timestamp); c.setUpdatedAt(timestamp);
+    }
+
     @Transactional(readOnly=true)
     public ChatConversation loadForResponder(Integer id) { return conversations.findById(id).orElseThrow(ChatService::notFound); }
     @Transactional(readOnly=true)

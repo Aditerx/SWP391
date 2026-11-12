@@ -19,6 +19,7 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
+import org.mockito.ArgumentCaptor;
 import org.springframework.test.util.ReflectionTestUtils;
 
 class ChatServiceTest {
@@ -204,6 +205,23 @@ class ChatServiceTest {
                 &&m.getContent().equals("M\u00ecnh \u0111\u00e3 chuy\u1ec3n cu\u1ed9c tr\u00f2 chuy\u1ec7n cho nh\u00e2n vi\u00ean h\u1ed7 tr\u1ee3. Nh\u00e2n vi\u00ean s\u1ebd ph\u1ea3n h\u1ed3i b\u1ea1n s\u1edbm nh\u1ea5t c\u00f3 th\u1ec3.")
                 &&m.getMetadata().contains("SENSITIVE_TOPIC")&&!m.getContent().contains("Transferred to staff:")));
         verify(events).publishEvent(argThat((Object e)->e instanceof ChatMessageCreatedEvent event&&event.senderType()==ChatSenderType.SYSTEM));
+    }
+
+    @Test void repeatedSystemHandoffSuggestionIsNotStoredTwiceOrNotified() {
+        ChatConversation c=conversation(31,member); c.setHandlerType(ChatHandlerType.AI);
+        when(conversations.findByIdForUpdate(31)).thenReturn(Optional.of(c));
+        when(messages.findFirstByConversation_IdAndSenderTypeOrderByIdDesc(31,ChatSenderType.SYSTEM)).thenReturn(Optional.empty());
+        when(messages.saveAndFlush(any())).thenAnswer(inv->{ChatMessage m=inv.getArgument(0);m.setId(91);return m;});
+        service.saveHandoffSuggestion(31,"Bạn có thể gặp nhân viên.","AI_UNAVAILABLE");
+        ChatMessage saved=new ChatMessage(); saved.setId(91); saved.setMetadata("{\"handoffSuggested\":true,\"reasonCode\":\"AI_UNAVAILABLE\"}");
+        when(messages.findFirstByConversation_IdAndSenderTypeOrderByIdDesc(31,ChatSenderType.SYSTEM)).thenReturn(Optional.of(saved));
+        service.saveHandoffSuggestion(31,"Bạn có thể gặp nhân viên.","AI_UNAVAILABLE");
+        ArgumentCaptor<ChatMessage> captor=ArgumentCaptor.forClass(ChatMessage.class);
+        verify(messages,times(1)).saveAndFlush(captor.capture());
+        assertEquals(ChatSenderType.SYSTEM,captor.getValue().getSenderType());
+        assertTrue(ChatHandoffMetadata.suggested(captor.getValue().getMetadata()));
+        assertEquals("AI_UNAVAILABLE",ChatHandoffMetadata.reasonCode(captor.getValue().getMetadata()));
+        verifyNoInteractions(events);
     }
 
     @Test void lateAiReplyAndEscalationDoNotWriteIntoClosedConversation() {

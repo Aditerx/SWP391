@@ -2,12 +2,17 @@ package com.sportscenter.chat.ai;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
+import jakarta.annotation.PostConstruct;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Component
 @ConfigurationProperties(prefix = "scms.ai.chat")
 public class ChatAiProperties {
+    private static final Logger log = LoggerFactory.getLogger(ChatAiProperties.class);
     private boolean enabled;
     private String newConversationHandler = "STAFF";
+    private String handoffMode = "SUGGEST";
     private String provider = "mock";
     private String model = "";
     private String apiKey = "";
@@ -34,6 +39,18 @@ public class ChatAiProperties {
     public void setEnabled(boolean enabled) { this.enabled = enabled; }
     public String getNewConversationHandler() { return newConversationHandler; }
     public void setNewConversationHandler(String value) { this.newConversationHandler = value; }
+    public String getHandoffMode() { return handoffMode; }
+    public void setHandoffMode(String value) { this.handoffMode = value; normalizeHandoffMode(); }
+    public boolean isSuggestHandoff() { return !"AUTO".equalsIgnoreCase(handoffMode); }
+    @PostConstruct
+    void normalizeHandoffMode() {
+        if ("AUTO".equalsIgnoreCase(handoffMode)) handoffMode = "AUTO";
+        else if (handoffMode == null || handoffMode.isBlank() || "SUGGEST".equalsIgnoreCase(handoffMode)) handoffMode = "SUGGEST";
+        else {
+            log.warn("Invalid scms.ai.chat.handoff-mode='{}'; using SUGGEST", handoffMode);
+            handoffMode = "SUGGEST";
+        }
+    }
     public String getProvider() { return provider; }
     public void setProvider(String provider) { this.provider = provider; }
     public String getModel() { return model; }

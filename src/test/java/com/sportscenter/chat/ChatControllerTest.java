@@ -61,7 +61,7 @@ class ChatControllerTest {
     @Test void messagesApiPreservesUtf8VietnameseAiReply() throws Exception {
         String reply = "Xin ch" + (char) 0x00e0 + "o! Tr" + (char) 0x1ea3 + " l" + (char) 0x1edd + "i";
         when(service.listMessages(eq(1), any(), any(), any())).thenReturn(List.of(
-                new ChatMessageResponse(7, 1, ChatSenderType.AI, null, false, reply, "TEXT", "{}", null, OffsetDateTime.now())));
+                new ChatMessageResponse(7, 1, ChatSenderType.AI, null, false, reply, "TEXT", "{}", null, OffsetDateTime.now(), false, null)));
         var response = mvc.perform(get("/api/chat/conversations/1/messages")
                         .session(session("m@example.com", "MEMBER", "CHAT_AS_MEMBER")))
                 .andExpect(status().isOk()).andExpect(content().contentTypeCompatibleWith("application/json"))

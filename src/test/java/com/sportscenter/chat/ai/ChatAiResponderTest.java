@@ -114,10 +114,20 @@ class ChatAiResponderTest {
 
     @Test void faqSensitiveAndExplicitStaffRequestsEscalate() {
         ChatAiResponder responder = faqResponder(new ChatAiProperties());
-        assertTrue(respond(responder, "t\u00f4i mu\u1ed1n ho\u00e0n ti\u1ec1n").content().contains("[HANDOFF]"));
+        ChatResponderReply sensitive = respond(responder, "t\u00f4i mu\u1ed1n ho\u00e0n ti\u1ec1n");
+        assertTrue(sensitive.content().contains("B\u1ea1n c\u00f3 mu\u1ed1n chuy\u1ec3n sang nh\u00e2n vi\u00ean kh\u00f4ng?"));
+        assertFalse(sensitive.content().contains("M\u00ecnh s\u1ebd chuy\u1ec3n"));
+        assertTrue(sensitive.content().contains("[HANDOFF]"));
         assertTrue(respond(responder, "cho t\u00f4i g\u1eb7p nh\u00e2n vi\u00ean").content().contains("[HANDOFF]"));
         assertFalse(respond(responder, "c\u1ea3m \u01a1n").content().contains("[HANDOFF]"));
         assertFalse(respond(responder, "t\u1ea1m bi\u1ec7t").content().contains("[HANDOFF]"));
+    }
+
+    @Test void autoModeRetainsOldSensitiveAnswer() {
+        ChatAiProperties properties = new ChatAiProperties();
+        properties.setHandoffMode("AUTO");
+        ChatResponderReply sensitive = respond(faqResponder(properties), "t\u00f4i mu\u1ed1n ho\u00e0n ti\u1ec1n");
+        assertTrue(sensitive.content().contains("M\u00ecnh s\u1ebd chuy\u1ec3n"));
     }
 
     @Test void deepseekProviderFailureUsesFaqFallback() {
