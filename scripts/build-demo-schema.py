@@ -4,19 +4,12 @@ import argparse
 import hashlib
 import json
 import re
-from demo_anchor import anchor_date, sql_anchor_guard, TIMEZONE, FIXTURE_VERSION
 
 ROOT = Path(__file__).resolve().parents[1]
 p = argparse.ArgumentParser(description=__doc__)
 p.add_argument('--output', default='database/schema_postgres.sql')
-p.add_argument('--anchor',required=True,type=anchor_date,help='Explicit YYYY-MM-DD installation date in Asia/Ho_Chi_Minh')
-p.add_argument('--fixture-output',default='database/bootstrap/scms_demo_scenarios.sql',help='Generated fixture path; use a staging path when --output is staged')
+p.add_argument('--anchor',default='2026-11-10',help='VN business date of the approved demo fixture')
 args = p.parse_args()
-for value in [args.output, args.fixture_output]:
-    if not (ROOT/value).resolve().is_relative_to(ROOT) or (ROOT/value).suffix.lower()!='.sql':
-        p.error('Generated SQL output must remain in the workspace')
-if (ROOT/args.output).resolve() == (ROOT/args.fixture_output).resolve():
-    p.error('Bundle and fixture must use different files')
 
 TABLES = '''normal_refund_verifications normal_refund_documents normal_refund_attempts normal_refund_receivers normal_refunds normal_transfers normal_responses normal_proposals scms_data_migration_audit payment_resolutions incident_affected_members center_incidents session_changes
 session_absence_notices advanced_registrations coach_days_off coach_work_slots coach_work_schedules subscription_pauses
@@ -53,7 +46,7 @@ SET LOCAL search_path=public,extensions,pg_catalog;
 SET LOCAL TIME ZONE 'Asia/Ho_Chi_Minh';
 SET LOCAL lock_timeout='10s';
 SET LOCAL statement_timeout='180s';
-''', sql_anchor_guard(args.anchor), '''SELECT pg_advisory_xact_lock(391,20261109);
+SELECT pg_advisory_xact_lock(391,20261109);
 CREATE SCHEMA IF NOT EXISTS extensions;
 CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA extensions;
 CREATE TEMP TABLE _scms_reset_before(table_name TEXT PRIMARY KEY,row_count BIGINT) ON COMMIT DROP;
@@ -93,8 +86,8 @@ END $preflight$;
 manifest = []
 
 
-def append_source(name, body=None, source_path=None):
-    path = source_path or ROOT / name
+def append_source(name, body=None):
+    path = ROOT / name
     data = path.read_bytes()
     if body is None:
         body = data.decode('utf-8-sig')
@@ -128,9 +121,8 @@ ALTER TABLE public.sessions ADD CONSTRAINT ck_demo_standard_session_slot CHECK((
 ''')
 append_source('database/bootstrap/scms_demo_reference.sql')
 import subprocess
-subprocess.run([__import__('sys').executable,str(ROOT/'scripts/build-demo-fixture.py'),'--anchor',args.anchor.isoformat(),
-                '--output',args.fixture_output],check=True,capture_output=True)
-append_source('database/bootstrap/scms_demo_scenarios.sql',source_path=(ROOT/args.fixture_output).resolve())
+subprocess.run([__import__('sys').executable,str(ROOT/'scripts/build-demo-fixture.py'),'--anchor',args.anchor],check=True,capture_output=True)
+append_source('database/bootstrap/scms_demo_scenarios.sql')
 chunks.append(f'''-- Revoke direct browser/Data API access to SCMS data; backend owner/explicit service grants remain.
 DO $acl$
 DECLARE n TEXT; grantee_name TEXT; seq RECORD;
@@ -172,9 +164,7 @@ INSERT INTO public.scms_data_migration_audit(migration_key,captured_at,before_da
 VALUES('20261110_demo_rebuild_v3',clock_timestamp() AT TIME ZONE 'Asia/Ho_Chi_Minh',
  (SELECT coalesce(jsonb_object_agg(table_name,row_count),'{{}}'::jsonb)::text FROM _scms_reset_before),
  jsonb_build_object('mode','approved-synthetic-demo','accounts',47,'subjects',9,'rooms',20,'advanced_templates',9,
-  'normal_classes',12,'synthetic_fixture',true,'anchor_date','{args.anchor.isoformat()}',
-  'business_timezone','{TIMEZONE}','fixture_version','{FIXTURE_VERSION}',
-  'invoice_code_floor',(SELECT value FROM _scms_code_floor))::text);
+  'normal_classes',12,'synthetic_fixture',true,'invoice_code_floor',(SELECT value FROM _scms_code_floor))::text);
 INSERT INTO public.scms_data_migration_audit VALUES('20261106_retire_legacy_memberships_v1',clock_timestamp() AT TIME ZONE 'Asia/Ho_Chi_Minh',
  '{{"mode":"fresh-demo"}}','{{"mode":"fresh-demo","model_retired":true}}');
 DO $postflight$
@@ -215,5 +205,4 @@ output.parent.mkdir(parents=True, exist_ok=True)
 data=('\n'.join(chunks)+'\n').encode('utf-8')
 output.write_bytes(data)
 print(json.dumps({'output':str(output.relative_to(ROOT)), 'sha256':hashlib.sha256(data).hexdigest(),
-                  'anchorDate':args.anchor.isoformat(),'timeZone':TIMEZONE,'fixtureVersion':FIXTURE_VERSION,
                   'dropTables':len(TABLES), 'sources':len(manifest), 'databaseAccess':False}))

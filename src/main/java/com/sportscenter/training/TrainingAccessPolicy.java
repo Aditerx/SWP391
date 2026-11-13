@@ -71,7 +71,7 @@ public class TrainingAccessPolicy {
     public boolean memberCanReadClassPlan(User actor, SportsClass sportsClass) {
         return ActorPolicy.role(actor, "Member") && sportsClass != null && sportsClass.isNormal()
                 && AccountScope.visible(actor, sportsClass.getCenterId())
-                && enrollments.existsByMemberIdAndSportsClassIdAndStatusIn(actor.getId(), sportsClass.getId(), java.util.List.of("Registered", "Completed"))
+                && enrollments.existsByMemberIdAndSportsClassIdAndStatus(actor.getId(), sportsClass.getId(), "Registered")
                 && invoices.existsByMemberIdAndSportsClassIdAndPaymentStatusAndReconciliationRequiredFalseAndCashConfirmationReversedFalse(
                         actor.getId(), sportsClass.getId(), "Paid");
     }

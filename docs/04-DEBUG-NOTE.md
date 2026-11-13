@@ -39,8 +39,6 @@ Ranh giới quản trị theo RP-04/RP-05 của thiết kế gốc, đã đối 
 
 Owner10/11 chốt GET `/api/roles` và GET `/api/permissions` chỉ dành Admin; các role khác bị chặn kể cả được gán thêm authority quản trị. GET `/api/roles/{id}` trả cùng dữ liệu permissions nên phải cùng gate để không lách qua ID. Đây là quyền đọc danh mục/quyền, không tự thay gate PUT phân quyền hoặc chốt guard quản trị cuối cùng; trạng thái triển khai ở docs00.
 
-Owner11/11 đồng ý hướng P2.2/P2.3: PUT `/api/roles/{id}/permissions` cần Admin Active AND MANAGE_PERMISSIONS; giữ ít nhất một Admin Active có MANAGE_USERS và MANAGE_PERMISSIONS để còn khả năng quản trị. Invariant áp dụng các mutation permission/role/status/PUT user liên quan và phải chống thao tác đồng thời; permission trên role tác động mọi account dùng role đó. Không cấm tập rỗng cho mọi role và không tự đổi seed/quyền cloud. GET RBAC Admin-only đã chốt giữ nguyên. Đây là quyết định để triển khai ở session3, không phải trạng thái code hiện hành; kế hoạch/test theo docs03/Active.
-
 <a id="d02"></a>
 ## D02 — Danh mục và giá
 
@@ -69,8 +67,6 @@ Chỉ9môn, giá VND cho trọn12buổi Normal hoặc12credit Advanced:
 - Owner10/11 đồng ý bộ đề xuất dữ liệu chung, yêu cầu giữ nguyên bộ account trong `System Account.pdf`; account demo mới chỉ bổ sung, không thay danh tính gốc. Đồng ý ràng buộc chuyển lớp cùng giá/cùng center. Các câu hỏi về Cash/waitlist, ngoại lệ xác nhận sau mốc24h, xác minh người nhận, cách đếm7ngày làm việc và log center đang được giải thích trong docs03; không tự coi là đã duyệt mọi phương án kỹ thuật/ngoại lệ hoặc mở quyền mới.
 - Owner10/11 chốt tiếp phần3–5: duyệt kiểm lớp tương thích/fallback và điều chỉnh N11 sang Pickleball làm đích N05, không tăng tổng lớp; BE chuẩn bị dữ liệu liên hệ Member, FE quyết định có dùng/hiển thị; ngày làm việc Refund là ngày TT mở theo lịch nghỉ, kể cả T7/CN nếu không đóng. Giữ07ngày làm việc và tài khoản PDF; không áp giả định T2–T6 hoặc tự đổi thành07ngày lịch. Quyết định dữ liệu khác với việc seed/triển khai, trạng thái theo docs00.
 - Owner02/11 đã duyệt riêng bảng max_capacity cũ→mới của7lớp Normal center1 trong DB đang đối soát (ID11/12/13/14/16/17/18; bảng tại docs02). Cho phép điều chỉnh đúng7giới hạn trong cùng transaction chuyển phòng, kiểm lại danh tính lớp và Registered+Pending không vượt mức mới, lưu audit trước/sau; không đổi đăng ký, giá/chứng từ/attendance hoặc tự chia/hủy lớp. Đây là phạm vi theo ID đã được Owner xác nhận, không là quy tắc áp dụng các ID này cho mọi DB. Replay không ghi đè thay đổi có chủ đích về sau.
-
-Owner11/11 đồng ý đồng bộ validation room name50/location100 với VARCHAR(50)/VARCHAR(100) của schema project đang có. Name vẫn bắt buộc, location optional/nullable; quá dài báo400 trước DB, không tự truncate/đổi trim hoặc mở rộng cột. Đây là đồng bộ constraint kỹ thuật hiện có, không là giới hạn lấy từ tiêu chuẩn ngành; implementation/kiểm theo Active.
 
 <a id="d03"></a>
 ## D03 — Mua Advanced
@@ -184,17 +180,6 @@ Manager xem preview ảnh hưởng, xử lý từng lịch riêng qua workflow p
 - Normal gồm12buổi hợp lệ, tối đa15Member, Paid mới Registered. Member nghỉ cá nhân mất buổi, không bù.
 - Sự cố TT thật có thể báo sau khi đã finalise nhưng phải xác minh buổi **thực sự không tổ chức**, có evidence, không dùng để sửa vắng cá nhân. Giữ buổi gốc không hợp lệ, liên kết đúng1makeup, chống bù lặp;13 record vật lý có thể chỉ12buổi hợp lệ.
 - Check-in cửa là nâng cấp sau, default toggle tắt; không dùng check-in/out thay attendance buổi. Giữ code chế tài booking-block nhưng default tắt.
-
-**Owner11/11 — hướng đã duyệt cho ba session P2.2/P2.3, chưa mặc định đã triển khai:**
-
-- GET training-results: staff thường theo center actor phía BE, kết hợp sessionId/memberId/coachId bằng AND; Member/Coach giữ own/author. Admin Active có center NULL và đạt authority đọc được đọc toàn hệ thống theo mẫu AccountScope/TrainingAccessPolicy hiện có; Admin có center theo center được gán. Không suy ngoại lệ này sang tài chính/report, log BUSINESS hoặc các thao tác chỉ CenterManager; D18/RP-43 và quyền từng route giữ nguyên.
-- Content sau buổi: Owner đồng ý Coach được giao, có RECORD_RESULT theo RP-36 sửa content của TrainingResult **đã tồn tại** từ end tới trước00:00 ngày kế tiếp ngày Session, giờ VN; chỉ sửa content, giữ attendance/check-in/note/credit/lịch/quyền. Có audit bằng cơ chế hiện có để truy actor/thời điểm/record, không đòi bảng hoặc màn hình mới. Không tự tạo result/attendance thiếu, không dùng default Present như bằng chứng đã học; method/DTO và test sẽ trình riêng trước sửa ở session2. Quyền correction attendance/note và manual/QR [start,end) ở trên không đổi.
-- Owner12/11 duyệt hình dạng R2 content-only theo resultId: content bắt buộc/non-null, chuỗi rỗng xóa và giữ nguyên khoảng trắng; giữ tác giả/recordedAt gốc. Coach phải vừa đúng phân công buổi vừa là tác giả result, không cấp Coach mới sửa record Coach cũ. Audit cùng transaction, no-op không log thừa; thiếu result không tạo mới. Handoff phải giải thích ảnh hưởng flow POST/correction/PATCH và cách FE đọc lại để bắt nhịp; demo2.2/2.3 vẫn chờ Owner thử hoặc skip riêng.
-- Shared plan: Owner đồng ý xem xét hướng Member chỉ đọc giáo án lớp khi Completed và có bằng chứng quyền Paid hợp lệ; muốn giữ đơn giản, phân quyền đọc là đủ, không làm snapshot/versioning giáo án trong phạm vi này và chỉ bàn nâng cấp nếu Owner hỏi. Own-author read của Coach cũ giữ phạm vi hiện có, không mở mọi roster/attendance hoặc quyền sửa record của Coach khác. Phạm vi Cancelled được đối chiếu bằng ví dụ và đề nghị giữ ngoài mở rộng mới; chưa tự mở quyền chỉ vì từng Paid. Kế hoạch/tác động cần trình trước sửa, không suy quyết định này cho phép hủy/hoàn Normal sau khai giảng. Snapshot consent Normal/receiver Refund đã có vẫn giữ.
-- Owner12/11 chốt sau ví dụ Cancelled legacy/demo: chỉ Registered hoặc Completed với Paid/effective entitlement hợp lệ được shared Normal plan; Cancelled không được shared read dù từng Paid/có kết quả. Giữ own private plan/result/attendance/evaluation history theo scope hiện có, list/detail cùng quyền và không thêm policy hủy/hoàn sau Ongoing. Không thêm bảng, nhân bản plan hoặc snapshot/versioning giáo án.
-- R1: Owner muốn được trình lựa chọn nghĩa filter ngày khi tới mục, chưa chốt nghĩa mới; không sửa query/check-in data trước đó. Ba session làm từng mục có kiểm agent và demo Owner FE/Swagger hoặc skip tường minh, không gộp; trạng thái/bằng chứng ở docs00/QA, điều phối ở docs03.
-
-**Owner12/11 — đã chọn R1 sau giải thích tác động API/FE:** startDate/endDate của GET attendance dùng ngày Session đối với record gắn buổi; lobby lịch sử không có Session dùng ngày checkInTime. Hai đầu ngày đều tính, giờ nghiệp vụ Asia/Ho_Chi_Minh. Bỏ filter ngày giữ tập/phạm vi hiện hành; không giả timestamp cho Absent/null hoặc sửa dữ liệu lịch sử. Giữ endpoint/query/response hiện có, quyền và các luồng ghi; FE cần đối chiếu client filter/grouping và cách xử lý checkInTime:null, chưa suy FE deployed đã tương thích. Triển khai/kiểm theo Active/QA, không tự mở quyền reset/deploy hoặc chuyển2.2.
 
 <a id="d16"></a>
 ## D16 — CashCorrection hẹp

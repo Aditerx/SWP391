@@ -1,6 +1,6 @@
 # SCMS — Bàn giao FE: Refund Normal
 
-Dành cho FE; ngày10/11/2026. Hoàn100% trước khai giảng khi TT hủy/không cung cấp phương án được Member nhận. Đã kiểm local và smoke API/DEMO trên Render trước lần dựng lại DB gần nhất; FE/browser và chuyển khoản ngân hàng thật chưa nghiệm thu. Bằng chứng chuẩn và trạng thái sau reset tại [Active/QA](docs/00-MASTER-CHECKLIST.md#active).
+Dành cho FE; ngày10/11/2026. Hoàn100% trước khai giảng khi TT hủy/không cung cấp phương án được Member nhận; kiểm local, chưa FE/Render/ngân hàng thật. Bằng chứng chuẩn tại [Active/QA](docs/00-MASTER-CHECKLIST.md#active).
 
 ## 1. Kết quả hiện tại
 
@@ -31,6 +31,4 @@ Receptionist chỉ nhận việc đã duyệt, giữ requestId khi retry claim, 
 
 ## 5. Việc còn lại
 
-Phase1 đã phát hành và smoke API/DEMO trong phạm vi Active/QA; Owner đã xác nhận chạy lại bundle sau đó. Cần lấy lại phiên/ID/state trước nhóm kiểm mới, không coi Refund đã Completed trong smoke trước reset là trạng thái hiện tại. FE kiểm browser theo build/phiên hiện hành, lưu rồi tải lại; chứng từ/đối soát mô phỏng phải ghi DEMO, không phải bằng chứng chuyển tiền thật.
-
-Phần matrix/quyền/CRUD/error và policy còn mở theo [bàn giao P2.2/P2.3](docs/03-TODO.md#p22-p23-handoff-20261110). Ngoại lệ sau khai giảng và Member tự hủy lớp vẫn vận hành chưa mở policy; không dùng Refund này cho Advanced. Chuẩn bị/giao diện FE trong SCRIPT là gợi ý để FE quyết định cuối, không thay kiểm quyền/state của BE. SYSTEM-DATA giữ DATA DESIGN, không là dump Supabase.
+Owner review local/main và duyệt phát hành. FE nhận contract, kiểm browser theo build/phiên thật sau triển khai; chuyển khoản ngân hàng thật/FE/Render chưa nghiệm thu. Ngoại lệ sau khai giảng và Member tự hủy lớp vẫn vận hành chưa mở policy; không dùng Refund này cho Advanced. SYSTEM-DATA giữ DATA DESIGN dù fixture đã kiểm local.

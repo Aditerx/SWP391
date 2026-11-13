@@ -29,7 +29,7 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class TrainingResultServiceTest {
     @Mock com.sportscenter.session.ScheduleWriteLock scheduleWriteLock;
-    private final Authentication coachAuth=new org.springframework.security.authentication.UsernamePasswordAuthenticationToken("coach@example.test","",List.of(new SimpleGrantedAuthority("ROLE_COACH"), new SimpleGrantedAuthority("RECORD_RESULT")));
+    private final Authentication coachAuth=new org.springframework.security.authentication.UsernamePasswordAuthenticationToken("coach@example.test","",List.of(new SimpleGrantedAuthority("ROLE_COACH")));
 
     @Mock
     private TrainingResultRepository trainingResultRepository;
@@ -66,9 +66,6 @@ class TrainingResultServiceTest {
         sampleCoach = new User();
         sampleCoach.setId(2); sampleCoach.setCenterId(1);
         sampleCoach.setFullName("Trần Thị Hương");sampleCoach.setStatus("Active");sampleCoach.setEmail("coach@example.test");
-        var coachRole = new com.sportscenter.user.Role();
-        coachRole.setName("Coach");
-        sampleCoach.setRole(coachRole);
 
         sampleMember = new User();
         sampleMember.setId(7); sampleMember.setCenterId(1);
@@ -125,13 +122,13 @@ class TrainingResultServiceTest {
     void searchResults_MemberIsScopedToSelf() {
         sampleMember.setEmail("member@example.test");
         Authentication authentication = org.mockito.Mockito.mock(Authentication.class);
-        when(authentication.isAuthenticated()).thenReturn(true);
         when(authentication.getName()).thenReturn("member@example.test");
+        when(authentication.getAuthorities()).thenAnswer(invocation -> List.of(new SimpleGrantedAuthority("ROLE_MEMBER")));
         when(userRepository.findByEmailIgnoreCase("member@example.test")).thenReturn(Optional.of(sampleMember));
-        when(trainingResultRepository.searchResults(null, 7, null, null)).thenReturn(List.of());
+        when(trainingResultRepository.searchResults(null, 7, null)).thenReturn(List.of());
 
         assertTrue(trainingResultService.searchResults(null, null, null, authentication).isEmpty());
-        verify(trainingResultRepository).searchResults(null, 7, null, null);
+        verify(trainingResultRepository).searchResults(null, 7, null);
     }
 
     @Test
@@ -139,8 +136,8 @@ class TrainingResultServiceTest {
     void searchResults_MemberCannotSpoofMemberId() {
         sampleMember.setEmail("member@example.test");
         Authentication authentication = org.mockito.Mockito.mock(Authentication.class);
-        when(authentication.isAuthenticated()).thenReturn(true);
         when(authentication.getName()).thenReturn("member@example.test");
+        when(authentication.getAuthorities()).thenAnswer(invocation -> List.of(new SimpleGrantedAuthority("ROLE_MEMBER")));
         when(userRepository.findByEmailIgnoreCase("member@example.test")).thenReturn(Optional.of(sampleMember));
 
         assertThrows(org.springframework.security.access.AccessDeniedException.class,
@@ -153,13 +150,13 @@ class TrainingResultServiceTest {
     void searchResults_MemberMayPassOwnMemberId() {
         sampleMember.setEmail("member@example.test");
         Authentication authentication = org.mockito.Mockito.mock(Authentication.class);
-        when(authentication.isAuthenticated()).thenReturn(true);
         when(authentication.getName()).thenReturn("member@example.test");
+        when(authentication.getAuthorities()).thenAnswer(invocation -> List.of(new SimpleGrantedAuthority("ROLE_MEMBER")));
         when(userRepository.findByEmailIgnoreCase("member@example.test")).thenReturn(Optional.of(sampleMember));
-        when(trainingResultRepository.searchResults(1, 7, null, null)).thenReturn(List.of());
+        when(trainingResultRepository.searchResults(1, 7, null)).thenReturn(List.of());
 
         assertTrue(trainingResultService.searchResults(1, 7, null, authentication).isEmpty());
-        verify(trainingResultRepository).searchResults(1, 7, null, null);
+        verify(trainingResultRepository).searchResults(1, 7, null);
     }
 
     @Test
@@ -199,7 +196,7 @@ class TrainingResultServiceTest {
         Authentication authentication = org.mockito.Mockito.mock(Authentication.class);
         when(authentication.isAuthenticated()).thenReturn(true);
         when(authentication.getName()).thenReturn("coach@example.test");
-        when(authentication.getAuthorities()).thenAnswer(invocation -> java.util.List.of(new SimpleGrantedAuthority("ROLE_COACH"), new SimpleGrantedAuthority("RECORD_RESULT")));
+        when(authentication.getAuthorities()).thenAnswer(invocation -> java.util.List.of(new SimpleGrantedAuthority("ROLE_COACH")));
         when(sessionRepository.findByIdForUpdate(1)).thenReturn(Optional.of(sampleSession));
         when(userRepository.findById(7)).thenReturn(Optional.of(sampleMember));
         when(userRepository.findById(2)).thenReturn(Optional.of(sampleCoach));
@@ -210,66 +207,5 @@ class TrainingResultServiceTest {
                 () -> trainingResultService.recordResult(request, authentication));
         verify(userRepository, never()).findById(9);
         verify(trainingResultRepository, never()).save(any(TrainingResult.class));
-    }
-
-    @Test
-    @DisplayName("Content writer must have the persisted Coach role even with Coach authorities")
-    void recordResult_PersistedRoleProtectsServiceEntry() {
-        sampleCoach.getRole().setName("CenterManager");
-        when(sessionRepository.findByIdForUpdate(1)).thenReturn(Optional.of(sampleSession));
-        when(userRepository.findById(7)).thenReturn(Optional.of(sampleMember));
-
-        assertThrows(org.springframework.security.access.AccessDeniedException.class,
-                () -> trainingResultService.recordResult(new TrainingResultRequest(1, 7, 2, "", "Present"), coachAuth));
-        verifyNoInteractions(trainingResultRepository, attendanceRepository, auditService);
-    }
-
-    @Test
-    void searchResults_StaffWithoutCenterCannotBecomeGlobal() {
-        sampleCoach.getRole().setName("CenterManager"); sampleCoach.setCenterId(null);
-        Authentication staff = new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(
-                "coach@example.test", "", List.of(new SimpleGrantedAuthority("MANAGE_CLASSES")));
-
-        assertThrows(org.springframework.security.access.AccessDeniedException.class,
-                () -> trainingResultService.searchResults(null, null, null, staff));
-        verifyNoInteractions(trainingResultRepository);
-    }
-
-    @Test
-    void searchResults_GlobalAdminStillRequiresReadAuthority() {
-        sampleCoach.getRole().setName("Admin"); sampleCoach.setCenterId(null);
-        Authentication admin = new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(
-                "coach@example.test", "", List.of(new SimpleGrantedAuthority("ROLE_ADMIN")));
-
-        assertThrows(org.springframework.security.access.AccessDeniedException.class,
-                () -> trainingResultService.searchResults(null, null, null, admin));
-        verifyNoInteractions(trainingResultRepository);
-    }
-
-    @org.junit.jupiter.params.ParameterizedTest
-    @org.junit.jupiter.params.provider.ValueSource(strings={"date","start","end"})
-    void updateContent_MissingLegacyTimeFailsClosedWithoutWrites(String missing) {
-        var permission = new com.sportscenter.user.Permission(); permission.setName("RECORD_RESULT");
-        sampleCoach.getRole().getPermissions().add(permission);
-        var result = new TrainingResult(); result.setResultId(10); result.setSession(sampleSession);
-        result.setCoach(sampleCoach); result.setMember(sampleMember); result.setContent("Original");
-        when(trainingResultRepository.findSessionIdByResultId(10)).thenReturn(Optional.of(1));
-        when(sessionRepository.findByIdForUpdate(1)).thenReturn(Optional.of(sampleSession));
-        when(trainingResultRepository.findByIdForUpdate(10)).thenReturn(Optional.of(result));
-        switch (missing) {
-            case "date" -> sampleSession.setSessionDate(null);
-            case "start" -> sampleSession.setStartTime(null);
-            default -> sampleSession.setEndTime(null);
-        }
-        var ex = assertThrows(com.sportscenter.common.exception.BusinessException.class,
-                () -> trainingResultService.updateContent(10, new TrainingResultContentRequest("Updated"), coachAuth));
-        assertTrue(ex.getMessage().startsWith("SESSION_TIME_REQUIRED:")); assertEquals("Original", result.getContent());
-        verify(trainingResultRepository, never()).save(any()); verifyNoInteractions(attendanceRepository, auditService);
-        var ordered = inOrder(scheduleWriteLock, sessionRepository, trainingResultRepository);
-        ordered.verify(scheduleWriteLock).acquire(1);
-        ordered.verify(trainingResultRepository).findSessionIdByResultId(10);
-        ordered.verify(sessionRepository).findCenterIdById(1);
-        ordered.verify(sessionRepository).findByIdForUpdate(1);
-        ordered.verify(trainingResultRepository).findByIdForUpdate(10);
     }
 }

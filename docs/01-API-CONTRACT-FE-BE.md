@@ -7,7 +7,6 @@ Gói FE gồm **file này** và [OpenAPI snapshot](../artifacts/fe-handoff/opena
 Bản tóm tắt đợt tích hợp02/11 để gửi riêng một file: [SCMS-BAN-GIAO-FE-2026-11-02.md](../SCMS-BAN-GIAO-FE-2026-11-02.md), gồm room,7giới hạn lớp và báo vắng. Contract đầy đủ vẫn giữ tại đây; trạng thái triển khai theo docs00.
 
 - Rule Owner: [D01–D19](04-DEBUG-NOTE.md). Trạng thái nghiệm thu và phần còn mở: [docs00](00-MASTER-CHECKLIST.md#active).
-- [Kịch bản demo Normal/Lifecycle/Refund](../SCMS-SCRIPT-DEMO-BE.md) điều phối actor/fixture/thứ tự kiểm; phần chuẩn bị và trình bày FE là gợi ý để FE duyệt, quyết định cuối thuộc FE. Contract dưới đây giữ field/state/quyền BE.
 - Snapshot/QA là ghi nhận có thời điểm, không cam kết server hiện tại vẫn cùng trạng thái. Khi tích hợp kiểm lại Live identity và tài khoản thực tế.
 - D01 hồ sơ Member và D09 Coach directory có trong bản tích hợp; trạng thái local/Render theo docs00. Không dùng API quản trị thay self-service hoặc coi GET401 chứng minh directory hết lỗi lazy.
 - JSON dưới đây có nhãn **minh họa** hoặc **trích local đã ghi**. ID/ngày/giá fixture không dùng để replay lên production.
@@ -55,11 +54,6 @@ Cross-site HTTPS cần CORS exact FE origin, credentials và cookie SameSite=Non
 
 FE xử lý **200/201/204** theo route;204 không có body. Lỗi có thể `{code,message}` hoặc `{timestamp,status,error,message}`/body framework: ưu tiên code→message→HTTP fallback.401 đăng nhập lại;403 thiếu quyền;404 có thể che tài nguyên không thuộc chủ;409 tải lại trạng thái/preview. Không lặp vô hạn hoặc tự đổi trạng thái local để vượt lỗi BE.
 
-<a id="error-deprecation-20261113"></a>
-**Error/deprecation — Session3.2,13/11:** giữ các envelope đã công bố; không có một DTO lỗi chung cho mọi route. Với lỗi nghiệp vụ409 dạng `{timestamp,status,error,message}`, `status` phải409 và `error:"Conflict"`; code/message dạng hai field vẫn giữ nguyên. Plain conflict như `NORMAL_VERSION_STALE` tiếp tục nằm trong message, không tự có field code. POST/PUT rooms đụng unique/constraint đều409 dạng bốn field, message generic `Operation violates a database constraint`, không trả SQL/index/stack; ca bị từ chối rollback room/audit. FE lấy HTTP status làm chuẩn và đọc lại trạng thái trước retry. Catalog đầy đủ nơi sinh/body/header/nhóm route ở [docs03](03-TODO.md#session32-error-catalog-20261113); kết quả kiểm/local và phạm vi deploy xem Active/QA.
-
-403 qua method/service thường là dạng bốn field; riêng attendance correction có thể `{code,message}`, account/session filter có `status,error,code,message`, first-login có `{code,message}`. Mã `RESULT_CONTENT_*` của R2 trong message không tự là field code.401 do session/security và parse/binding/method/media/resource errors có thể dùng body framework/rỗng, cần HTTP fallback. Chat giữ code/message và khi429 có `retryAfterSeconds` cùng `Retry-After`; notification404 giữ `NOTIFICATION_NOT_FOUND`. VNPay IPN giữ200 `{RspCode,Message}`, Return giữ302/Location và không ghi Paid. Không suy mọi HTTP200 là giao dịch thành công; không tự logout mọi403 hoặc normalize các protocol này.
-
 **Quyền của phiên đang tồn tại:** trước API có bảo vệ, BE đọc lại account/role/permissions. Account thiếu/không Active/không còn role trả403 `ACCOUNT_NOT_ACTIVE`; không coi `/auth/me`200 cũ là đủ cho các request sau. Role của account đổi trả403 `SESSION_ROLE_CHANGED`, phiên cũ bị hủy: FE đưa về đăng nhập. Cùng role nhưng permission đổi thì gate và authorities trong `/auth/me` dùng quyền hiện hành ngay request tiếp theo. Phiên đã bị đánh dấu thu hồi do reset/cấp lại/đổi password quản trị trả401. Public IPN/Return không phụ thuộc phiên Member. Phạm vi kiểm/deploy xem docs00; đây không phải kết luận nguyên nhân của mọi401/403 lịch sử.
 
 <a id="catalog"></a>
@@ -78,17 +72,9 @@ FE xử lý **200/201/204** theo route;204 không có body. Lỗi có thể `{co
 
 Các group quản trị users/members/staff/roles/permissions/specializations/packages/rooms/classes và training-plan/evaluation/feedback xem OpenAPI. Quyền có thể gồm role+authority+owner/center trong service; snapshot không thay full role matrix. Nhóm baseline chưa có acceptance business đầy đủ chỉ vì route xuất hiện.
 
-<a id="last-administrator-20261113"></a>
-**RBAC — Session3.1,13/11:** PUT `/api/roles/{id}/permissions` cần Admin Active **AND** `MANAGE_PERMISSIONS`; GET `/api/roles`, `/api/roles/{id}`, `/api/permissions` giữ Admin-only, không cần thêm authority. PUT thay toàn bộ permissions trên role, tác động mọi account dùng role đó. Body `{ "permissionIds": [1,2] }`; ID phải dương, không null và tồn tại; ID lặp được gộp, `[]` hợp lệ khi không làm mất quản trị cuối cùng. Không gán mặc định mọi authority cho Admin. Thiếu/sai role/authority/Active bị403; IDs không hợp lệ400 (`INVALID_PERMISSION_IDS` nếu lỗi phần tử/tồn tại), role không tồn tại404; thành công200 `RoleResponse`.
-
-Mọi PUT permissions và PUT `/api/users/{id}`, PATCH `/api/users/{id}/role`, PATCH `/api/users/{id}/status` phải giữ ít nhất một account **Admin Active có đồng thời `MANAGE_USERS` và `MANAGE_PERMISSIONS`**. Vi phạm trả409 `{ "code":"LAST_ADMIN_REQUIRED", "message":"Keep at least one Active Admin with MANAGE_USERS and MANAGE_PERMISSIONS" }`, rollback toàn thao tác, không ghi audit thay đổi. Hai account cùng role không bảo vệ nhau nếu role mất quyền; Admin Inactive hoặc mỗi Admin chỉ giữ một trong hai quyền cũng không đủ. Guard serialize qua các role row theo ID tăng dần trước target user; không có migration/seed mới. Staff/member aliases vẫn chặn target Admin theo loại resource. Sau đổi quyền cùng role, request tiếp và `/api/auth/me` dùng authorities mới cho tất cả phiên; đổi role hủy phiên cũ với403 `SESSION_ROLE_CHANGED`, request tiếp401; account Inactive403 `ACCOUNT_NOT_ACTIVE`. PUT lặp không nhân liên kết quyền; audit vẫn ghi mỗi request PUT hợp lệ theo hành vi hiện có. Bằng chứng/phạm vi nghiệm thu tại Active/QA; FE cần tải lại role/permissions và auth-me sau lưu, hiển thị409 rồi đọc lại, không tự cấp lại quyền hoặc tự retry vô hạn.
-
 **Guard baseline đã bổ sung:** users/members/staff/rooms lọc danh sách và kiểm đối tượng theo center của account hiện hành; role/authority tại controller vẫn cần đạt. Admin có center NULL giữ phạm vi đọc quản trị users/rooms hiện có, không suy ngoại lệ này sang tiền/report. API `/members/{id}` chỉ nhận target role Member; `/staff/{id}` chỉ nhận Coach/Receptionist/CenterManager: PUT/PATCH sai loại hoặc khác center trả403 trước ghi, không dùng các tuyến này để sửa Admin. Tạo Admin phải qua tuyến user administration và guard MANAGE_PERMISSIONS hiện có; POST staff không nhận role Admin/Member. Room mới lấy center từ actor, không nhận center client; Admin center NULL giữ default center1 theo thiết kế hiện tại. RP-04 đã áp dụng ở các mutation users/staff: chỉ Admin được tạo, sửa, đổi status/role hoặc cấp lại mật khẩu tài khoản Admin/CenterManager, kiểm cả role cũ/mới. Không tự gán quyền endpoint cho Admin; quản lý Admin vẫn cần MANAGE_PERMISSIONS như trước. MANAGE_USERS/MANAGE_RBAC trên role khác không vượt trần này. Manager giữ các thao tác hợp quyền trên Coach/Receptionist/Member trong center. Tự đổi password/avatar vẫn qua tuyến self-service. Scope/loại log nghiệp vụ của Manager theo RP-43 còn cần xử lý query/provenance riêng, chưa được nghiệm thu trong nhóm sửa này.
 
 **Room — Owner02/11.** `id`/`roomId` vẫn là số trong path/request lịch; response thêm `roomCode` (ví dụ `C01-TEN-01`) để hiển thị/tìm trong danh sách. Không đổi ID thành mã, không thêm `subjectId`. POST/PUT `/api/rooms` nhận thêm `roomCode` tùy chọn: tối đa40ký tự, chữ hoa, dạng `C[ít nhất2chữ số]-[chữ/số]-[chữ/số]`, tiền tố phải đúng center. POST thiếu mã tự sinh `C01-RM-...`; PUT thiếu mã giữ mã cũ. POST201, PUT200; mã trùng409, sai định dạng400, sai center400 `ROOM_CODE_CENTER_MISMATCH`. Tên/khu vực/loại/sức chứa20tài nguyên theo [danh mục room](../database/README.md#room-catalog); không hardcode ID fixture. GET rooms ẩn phòng `Closed` có mã `LEGACY`, vẫn giữ phòng Maintenance và phòng đóng khác; lịch sử DB không bị xóa.
-
-<a id="room-validation-20261111"></a>
-**Room name/location — Session1.3,11/11:** POST `/api/rooms` và PUT `/api/rooms/{id}` yêu cầu name không null/rỗng/toàn khoảng trắng, tối đa50ký tự; location optional/nullable, tối đa100ký tự. Vượt giới hạn trả400 Bean Validation, message bắt đầu `name:` hoặc `location:`, trước thao tác DB; không lưu thay đổi/audit. Giới hạn áp trên chuỗi đầu vào được lưu, gồm cả khoảng trắng ngoài; không trim hoặc truncate tự động. Giữ semantics hiện có: location bỏ/null lưu null, kể cả PUT; location rỗng/chuỗi trắng được giữ nguyên. Name có khoảng trắng ngoài vẫn giữ nguyên nếu không blank và không vượt50. Giới hạn xuất phát từ VARCHAR(50) NOT NULL/VARCHAR(100) của schema project, không mở rộng cột hoặc tạo migration. Quyền/center, roomCode, activity/facility/capacity/status và khóa/guard lịch không đổi; PATCH status không nhận hai field này. OpenAPI RoomRequest khai báo maxLength và location nullable để FE validate trước gửi; bằng chứng ở Active/QA.
 
 **D01 — hồ sơ của Member.** GET và PATCH đều trả đúng `name,phone,address,dateOfBirth,gender,goal,healthNote`; không có id/email/role/credit/giá. Lấy định danh và email từ `/api/auth/me`. PATCH giữ field vắng mặt, `null` xóa6field nullable, `{}` không đổi dữ liệu. `name` nếu gửi phải là string khác null/rỗng/trắng. Key ngoài7field được bỏ qua, gồm memberId/role/status/centerId/packageId/credit/amount/email/password/avatarUrl; không dùng chúng chọn người hay cấp quyền.
 
@@ -109,7 +95,7 @@ Coach/Member dùng `/api/auth/me`, hồ sơ `me`, roster/enrollment được gia
 
 PATCH status của users/members/staff chỉ nhận Active/Inactive/Locked, trim và không phân biệt hoa thường; Suspended là alias Locked. Thiếu/null/rỗng/sai trả400 `INVALID_ACCOUNT_STATUS`, không đổi tài khoản hoặc ghi audit thành công. Tạo mới vẫn mặc định Active khi bỏ status; PUT bỏ status giữ trạng thái cũ, gửi status sai vẫn400. Guard role/target/center hiện có giữ nguyên.
 
-PUT permissions và guard quản trị cuối cùng theo [Session3.1](#last-administrator-20261113); đoạn policy trước Session3 đã được thay bằng quyết định D01 ngày11/11 và implementation13/11. Không suy gate PUT chỉ từ quyền đọc GET.
+PUT `/api/roles/{id}/permissions` giữ gate MANAGE_PERMISSIONS hiện hành; permissionIds phải là mảng ID dương tồn tại đầy đủ. Null/phần tử null/ID sai trả400; trường hợp service xác định ID sai dùng `INVALID_PERMISSION_IDS`, không thay một phần quyền. ID lặp được gộp, `[]` vẫn là thay bằng tập rỗng theo nghĩa API cũ. Thay toàn bộ tập dưới khóa role, audit actor và tập trước/sau cùng transaction. Không suy từ đó rằng guard quản trị viên cuối cùng hoặc policy đọc full matrix đã được chốt; GET lookup roles/permissions chưa đổi.
 
 POST/PUT/PATCH room cấu hình yêu cầu Admin/CenterManager+MANAGE_CLASSES, Active và scope center hiện hành. Request/response thêm `activityType`: TENNIS, FOOTBALL, ARCHERY, BASKETBALL, VOLLEYBALL, PICKLEBALL, BADMINTON, TABLE_TENNIS hoặc SWIMMING. Đây là loại tài nguyên phục vụ môn, độc lập tên/roomCode và `facilityType` Indoor/Outdoor. Không thêm `subjectId`, không suy môn từ mã/tên. PUT bỏ/null giữ loại cũ; chưa cấu hình trả activityType:null và khi xếp lịch mới trả400 `ROOM_ACTIVITY_UNCONFIGURED`. Giá trị không hỗ trợ400 `INVALID_ROOM_ACTIVITY`; sai môn400 `ROOM_SUBJECT_MISMATCH`. Áp dụng book/create/generate/preview/check-conflict/available-slots có subject+room, reschedule và substitute; admission chỉ tính sân đúng môn và giữ điều kiện Indoor/Outdoor hiện hành. Quy tắc giờ Outdoor D04 không đổi.
 
@@ -172,8 +158,6 @@ POST `/api/classes/{classId}/enroll` và POST `/api/enrollments` chỉ nhận No
 **Đóng thao tác gói chung:** các POST mua hộ `/api/members/{id}/packages` hoặc `/subscriptions`, POST `/api/packages`, PUT `/api/packages/{id}`, PATCH `/api/packages/{id}/status` trả400 LEGACY_MEMBERSHIP_RETIRED khi request hợp lệ/đủ quyền. Với subscription gói chung cũ, POST `/api/member-packages/{id}/extend` hoặc `/api/subscriptions/{id}/extend` và PATCH các alias `/{id}/status` cũng bị từ chối; subscription Advanced vẫn phải theo workflow thanh toán/sự cố, không được mở quyền qua generic extend/status. Tạo Member tại quầy với packageId khác null bị400 LEGACY_MEMBERSHIP_RETIRED trước khi tạo tài khoản; tạo tài khoản không kèm gói vẫn dùng luồng bình thường. Các guard401/403/validation vẫn áp dụng trước nghiệp vụ.
 
 Sau purge, ID subscription cũ không còn tồn tại có thể trả404 khi extend/status phải tra cứu đối tượng; không tự tạo lại record để vượt lỗi. GET subscriptions hiện hành phục vụ quyền Advanced, không phải lịch sử gói chung đã xóa.
-
-**Metadata retired13/11:** OpenAPI đánh `deprecated:true` đúng POST packages, PUT packages/{id}, PATCH packages/{id}/status và các POST mua shared qua members/{memberId}/packages|subscriptions, members/me/subscriptions, member-packages/subscribe-me. Các operation này không hứa201/200; input hợp lệ/đủ quyền vẫn400 `LEGACY_MEMBERSHIP_RETIRED`, auth/validation vẫn có thể chặn trước. Không đổi runtime sang410 hoặc thêm header `Deprecation`/`Sunset`. GET catalog/subscriptions, POST Advanced registration và các alias status/extend có nhánh Advanced **không deprecated**; Advanced generic extend bị400 USE_INCIDENT_RECOVERY, generic đổi status bị400 ADVANCED_STATUS_WORKFLOW_REQUIRED hoặc USE_INCIDENT_RECOVERY khi tái kích hoạt, status Advanced giữ nguyên có thể200. Không dùng route generic để cấp quyền/credit hoặc bỏ workflow sự cố.
 
 <a id="payments"></a>
 ## 5. Thanh toán, biên nhận — D10
@@ -288,7 +272,7 @@ POST `/api/classes/{classId}/enroll` và POST `/api/enrollments` body paymentMet
 
 POST `/api/classes/{id}/confirm-opening` chỉ CenterManager Active+MANAGE_CLASSES cùng center; body tùy chọn `{ "reason": "..." }`. Trước T−24h có thể bỏ reason; từ đúng T−24h tới trước T phải có reason1–2000ký tự, đủ sĩ số Paid+Registered và Coach/phòng/lịch hợp lệ. Chưa đủ trả NORMAL_INSUFFICIENT_PAID; đã tới T trả NORMAL_OPENING_TOO_LATE. Thành công200 SportsClassResponse lưu người/thời điểm; retry không nhân quyết định. Xác nhận không mở lại đăng ký. Job recheck rồi chuyển Ongoing khi đến T; chưa xác nhận hoặc điều kiện sai thì cảnh báo, không tự khai giảng/hủy. Finalizer đóng Closed sau12buổi hợp lệ đã chốt, giữ cửa correction D15. PUT không tự gán Open/Ongoing/Closed/Cancelled ngoài công bố draft; type bất biến, ngày Class theo lịch đã lưu (`NORMAL_LIFECYCLE_ACTION_REQUIRED`, `CLASS_TYPE_IMMUTABLE`, `NORMAL_SCHEDULE_ACTION_REQUIRED`).
 
-API dời khai giảng/chuyển/hủy trước khai giảng và Refund Normal nằm ở [Normal changes](#normal-changes-20261110) và [Normal Refund](#normal-refunds-20261110) bên dưới. Không dùng generic PUT, đổi Session hoặc PaymentResolution cũ để thay các hành động này. SYSTEM-DATA không là DTO/API; trạng thái nghiệm thu ở [Active/QA](00-MASTER-CHECKLIST.md#active).
+**Chưa có API mới cho dời khai giảng/chuyển/hủy trước khai giảng/Refund Normal đầy đủ.** Không dùng generic PUT, đổi Session hoặc PaymentResolution cũ để thay các hành động này. Sáu bảng dự kiến trong SYSTEM-DATA không là DTO/API. Trạng thái và bước triển khai còn lại tại [checkpoint Phase1](03-TODO.md#normal-phase1-foundation-20261110).
 
 **RP-13 — giá lúc tạo/công bố, Phase1 09/11:** POST `/api/classes`, POST `/api/classes/normal-with-sessions` và PUT Class yêu cầu Admin/CenterManager+MANAGE_CLASSES, Active và center hợp lệ. Normal nhận tuitionFee tùy chọn: bỏ/null lúc tạo lấy Subject.normalPrice; gửi giá công bố dương, biểu diễn được NUMERIC(12,2), ví dụ950000 thì Class và đơn Normal mới dùng950000. Không nhận giá bán từ amount do Member gửi. Tạo Normal riêng luôn Closed; đủ12buổi hợp lệ mới công bố Open. Draft mới chưa từng công bố/chưa có enrollment hoặc invoice có thể chọn giá lúc PUT công bố lần đầu; bỏ giá khi PUT giữ giá đã chọn. Subject đổi giá không tự đổi Class đã tạo, đơn Pending/Paid hay purchaseAmount cũ. Advanced vẫn lấy Subject.advancedPrice khi order.
 
@@ -303,54 +287,23 @@ GET `/api/sessions/catalog/{classId}` là lịch Normal trước mua cho ngườ
 
 | API / actor | Hành vi BE attendance (trạng thái kiểm/deploy ở docs00) |
 |---|---|
-| GET `/api/attendances` — Member own; staff có RECORD_RESULT/REGISTER_MEMBER/MANAGE_CLASSES/MANAGE_USERS theo scope hiện hành | Filter tùy chọn sessionId/memberId/recordedBy/state/startDate/endDate; ngày YYYY-MM-DD theo quy tắc R1 bên dưới. Coach giữ phân công; scope center/owner không đổi |
 | GET `/api/attendances/me/checkin-code` — Member | Chỉ payload/expiresInSeconds; TTL còn lại1–30 giây |
-| GET `/api/training-results` — Member/Coach Active; staff Active+MANAGE_CLASSES hoặc MANAGE_USERS | Filter tùy chọn `sessionId`, `memberId`, `coachId`, kết hợp AND với scope BE. Member chỉ own, Coach chỉ author; staff theo center của Session/Class; Admin-null có authority đọc giữ global. Không có kết quả trong scope →200 `[]` |
+| GET `/api/training-results` — Member Active; Coach hoặc MANAGE_CLASSES/MANAGE_USERS theo quyền hiện có | Filter tùy chọn `sessionId`, `memberId`, `coachId`. Member luôn chỉ đọc mình từ phiên; `memberId` khác →403; không có kết quả →200 `[]`. Coach bị ép `coachId` theo phiên |
 | POST `/api/attendances/scan` — staff/Coach có quyền | memberId,code,sessionId; Coach được giao, Paid, trong[start,end), bước hiện tại/chống replay |
-| POST `/api/training-results`, `/bulk` — RECORD_RESULT hoặc MANAGE_CLASSES; content chỉ Coach được giao+RECORD_RESULT | Manual result/attendance chỉ trong buổi, Present/Absent mới; note tùy chọn, response ghi trả note đã lưu; staff giữ quyền attendance đúng center/eligibility |
-| PATCH `/api/training-results/{resultId}/content` — Coach Active+RECORD_RESULT, cùng center/đúng phân công và tác giả result | Chỉ thay content result có sẵn từ end đến trước00:00 ngày kế tiếp ngày Session; không tạo result/Attendance, không đổi state/note/recordedAt/tác giả |
+| POST `/api/training-results`, `/bulk` — Coach được giao | Manual result/attendance chỉ trong buổi, Present/Absent mới; note tùy chọn, response ghi trả note đã lưu |
 | POST `/api/attendances/correct` — Coach được giao+RECORD_RESULT hoặc Manager/Admin+MANAGE_CLASSES | attendanceId **hoặc** sessionId+memberId, newState,reason,note; quyền/hạn và lỗi theo contract09/11 dưới đây |
 
 Alias `/api/attendance` và `/checkin-code`/`/api/members/me/checkin-code` còn để tương thích; chọn1canonical trên FE. QR phải refresh khi hết hạn/foreground, không log payload/secret. Code trong bằng chứng đã redact, không dùng scan. Check-in/out cửa có code nhưng toggle mặc định tắt, không thay attendance ca. Giữ lịch sử Late/Excused; finalizer sau end không tính buổi invalidated và không trừ credit lần hai.
 
-<a id="attendance-date-filter-r1-20261112"></a>
-**R1 — filter ngày attendance, Owner12/11:** GET `/api/attendances` và alias `/api/attendance` giữ nguyên method/param/response. startDate/endDate optional dạng YYYY-MM-DD, so theo ngày nghiệp vụ Asia/Ho_Chi_Minh và bao gồm cả hai đầu ngày. Record có Session dùng sessionDate, kể cả checkInTime:null; chỉ record lobby lịch sử không Session mới dùng ngày checkInTime. Không có ngày để so thì không khớp filter ngày; bỏ cả hai filter ngày giữ record theo scope hiện hành, kể cả lobby thiếu timestamp. startDate/endDate AND với sessionId/memberId/recordedBy/state và quyền hiện có; superseded vẫn không là record hiện hành. Không mở check-in cửa, không tạo/sửa timestamp/state/note/content/credit/lịch hoặc enrollment để phục vụ lọc.
-
-AttendanceResponse đã có sessionDate và checkInTime; shape/enum/sort không đổi. Ví dụ cùng buổi12/11: Present có timestamp và Absent/null đều khớp filter12/11. Dữ liệu legacy có sessionDate11/11 nhưng checkInTime12/11 khớp ngày11/11, không khớp12/11; timestamp gốc giữ nguyên. FE giữ cách gọi API nếu bộ lọc mang nghĩa ngày buổi, dùng sessionDate để nhóm ngày buổi và xử lý checkInTime:null an toàn. State vẫn theo response, không suy null timestamp là Absent. Kết quả list/count tính từ list có thể đổi theo nghĩa mới; FE deployed chưa được xác minh chỉ từ sửa BE. Lỗi parse ngày400, phiên/quyền401/403 và các luồng ghi giữ hiện hành; bằng chứng kiểm/deploy ở Active/QA.
-
 Tên “Check-in/Điểm danh” trong bản thiết kế gốc từng chỉ attendance theo buổi với phạm vi30phút trước/sau. Attendance hiện tách check-in cửa; mốc correction mới Owner chốt09/11 được đặc tả riêng bên dưới. Chọn endpoint theo chức năng và phiên bản đã triển khai, không suy nghĩa từ riêng tên nút. D15 không tự hạn chế thời gian ghi nhận tiến độ/đánh giá chuyên môn ngoài attendance.
 
-**Chọn luồng ghi:** POST `/api/training-results` hoặc `/bulk` chỉ ghi trong buổi, Present/Absent và đúng sessionId. Sau end: sửa attendance/note dùng correct theo quyền/hạn09/11 dưới đây; sửa nhận xét chuyên môn dùng PATCH content R2 riêng theo resultId đã có. Hai request không tạo một transaction chung; không có PATCH bulk. Check-in cửa mặc định tắt (400 LOBBY_CHECKIN_DISABLED), root attendances không có POST (405). Không thử API dự phòng để vượt lỗi hoặc coi GET200 sau request ghi lỗi là ghi thành công. Gợi ý FE xác nhận lưu sau response ghi thành công/readback; cách thể hiện do FE quyết định.
+**Chọn luồng ghi:** POST `/api/training-results` hoặc `/bulk` chỉ ghi trong buổi, Present/Absent và đúng sessionId; sau end dùng correct theo quyền/hạn09/11 dưới đây. Check-in cửa mặc định tắt (400 LOBBY_CHECKIN_DISABLED), root attendances không có POST (405). Không thử API dự phòng để vượt lỗi hoặc coi GET200 sau POST lỗi là ghi thành công. Gợi ý FE xác nhận lưu sau response ghi thành công/readback; cách thể hiện do FE quyết định.
 
 Ngữ cảnh dữ liệu khi đổi lớp/buổi gồm sessionId, attendance, note và record sửa; roster cùng lớp có thể giống nhau nhưng state/attendanceId/note thuộc từng buổi. Gợi ý FE đồng bộ dữ liệu/form với lựa chọn và tránh áp response cũ hoặc gửi record buổi cũ trong lúc tải; cơ chế UI do FE chọn.
 
 **Ghép record trên màn hình attendance:** GET `/api/attendances?sessionId={id}` là record điểm danh của đúng buổi trong phạm vi actor; chọn record bằng sessionId+memberId và giữ attendanceId riêng khi correction. Không dùng attendanceId như sessionId hoặc lấy trạng thái gần nhất của Member qua buổi/lớp khác. Buổi chưa có record không mặc định Present. GET `/api/sessions/catalog/{classId}` chỉ trả session Scheduled của lớp Normal đã công bố, không là lịch sử đầy đủ để dựng màn hình quản lý attendance; dùng GET `/api/sessions?classId={id}` hoặc `/{sessionId}` có phiên cho thông tin ngày/giờ/status trong phạm vi được phép. OPTIONS200 là preflight; GET tải lại200 sau POST403 không là ghi thành công.
 
 **Tách dữ liệu:** content nằm ở training_results.content; note nằm ở attendances.note và được trả cho đúng owner/scope. reason của correct chỉ lưu audit nội bộ, không echo thành note hoặc trả trong AttendanceResponse. Lý do báo vắng gốc giữ ở notice qua absenceNoticeId; không backfill/parse audit thành note. Khi ghi trong buổi, bỏ content giữ content chuyên môn đã có.403 không ghi mutation/reason; badge FE hoặc Payload không là xác nhận đã lưu. Không mở audit-log toàn cục cho Coach.
-
-<a id="training-result-content-20261111"></a>
-**Content đơn/bulk — Session1.1,11/11:** bỏ `content` hoặc gửi `null` giữ nhận xét hiện có; không hiểu null là xóa. Mọi `content` non-null (kể cả `""` hoặc toàn khoảng trắng) cần Coach Active có RECORD_RESULT và đúng Coach được giao cho buổi; Session.coach ưu tiên, thiếu mới lấy Coach lớp. Coach chỉ có MANAGE_CLASSES vẫn403 khi yêu cầu ghi content. Non-Coach dù có RECORD_RESULT/MANAGE_CLASSES gửi content non-null vẫn403; bỏ trường/null để tiếp tục attendance/note hợp quyền. FE staff không serialize ô nhận xét trống thành `""`. Nếu một item bulk lỗi, toàn request rollback, gồm attendance/note/content/audit của item trước. `coachId` client không chọn tác giả/phạm vi; POST đơn vẫn yêu cầu field này theo DTO hiện hành, BE lấy actor từ phiên và phân công đã lưu. POST giữ `[start,end)`, Present/Absent, eligibility/center, check-in/credit/lịch; phần content sau end đi riêng qua PATCH R2 dưới đây. Kết quả/môi trường và demo ở [Active](00-MASTER-CHECKLIST.md#active).
-
-<a id="training-result-after-session-r2-20261112"></a>
-**Content sau buổi — Session2.2/R2,12/11:** PATCH `/api/training-results/{resultId}/content` nhận `{"content":"Nhận xét bổ sung"}`, trả200 `TrainingResultResponse` hiện có. DTO chỉ có content bắt buộc/non-null; bỏ/null400 validation, `""` xóa, khoảng trắng lưu nguyên. Không nhận reason hoặc các định danh/quyền/state/note làm field được hỗ trợ ghi; field lạ hiện bị mapper bỏ qua, không cấp quyền hoặc chọn target khác. Khác POST, null không là thao tác giữ nguyên của PATCH. Không thêm giới hạn độ dài/trim cho content hoặc PATCH bulk.
-
-BE xác định Coach Active, có RECORD_RESULT hiện hành trong role và phiên, cùng center với Session/Class/Member, đúng Session.coach (thiếu mới fallback Class.coach) **và là tác giả result**. Role quản trị/authority MANAGE_CLASSES không thay quyền chuyên môn; đổi Coach không mở Coach B sửa result A hoặc đổi coach_id. Từ end (bao gồm) đến trước00:00 ngày kế tiếp ngày Session, Clock/Asia/Ho_Chi_Minh; không phải24giờ sau end. Chỉ Scheduled/Completed hợp lệ, giữ guard Normal đã khai giảng, chặn Cancelled/centerInvalidated và lịch sử Attendance chỉ còn superseded. Member thuộc buổi cần căn cứ enrollment Registered/Completed hợp lệ/Paid hiệu lực cho Normal hoặc bookedMember+quyền Advanced hợp lệ tại buổi/Paid; không chặn Completed/Expired chỉ vì finalizer đã đóng quyền sau buổi. Không bỏ guard reconciliation/reversed/refund/effective class của helper Invoice hiện có.
-
-Chỉ `training_results.content` thay đổi; coach_id/recorded_at/attendance_status và Attendance/check-in/note/credit/lịch/Enrollment/Invoice giữ nguyên. Result thiếu404, không upsert. Result có sẵn và chưa có Attendance vẫn sửa content được, trả note:null, không tạo Attendance; trường hợp chỉ còn Attendance superseded bị400 ATTENDANCE_SUPERSEDED. No-op vẫn kiểm quyền/hạn/eligibility, trả200 và không thêm audit. Khóa center→Session→result và đọc now sau khóa; audit UPDATE_RESULT_CONTENT cùng transaction, target training_results/resultId, actor/time/session/member/UPDATED hoặc CLEARED, giữ nội bộ. Hai giá trị khác nhau được ghi tuần tự theo khóa; chưa có version/ETag chống tab cũ, không có snapshot/khôi phục phiên bản.
-
-| HTTP PATCH R2 | Body / ý nghĩa FE |
-|---|---|
-| 200 | Response result hiện có; content là giá trị đã lưu. recordedAt vẫn là giờ ghi gốc, không là giờ sửa mới |
-| 400 validation | timestamp/status/error/message; thiếu/null content, message bắt đầu `content:` |
-| 400 business | code/message: RESULT_CONTENT_NOT_OPEN, SESSION_TIME_REQUIRED, SESSION_NOT_HELD, NORMAL_NOT_STARTED, ATTENDANCE_SUPERSEDED hoặc NOT_YOUR_CLASS theo guard thực tế |
-| 401 | Thiếu phiên hợp lệ; đăng nhập/auth-me lại trước nghiệp vụ |
-| 403 | Qua handler: timestamp/status/error/message khi sai role/authority/center/phân công/tác giả hoặc đã tới cutoff; tiền tố RESULT_CONTENT_FORBIDDEN / RESULT_CONTENT_DEADLINE_PASSED của service nằm trong message. Cổng phiên có thể trả body riêng với code ACCOUNT_NOT_ACTIVE, SESSION_ROLE_CHANGED hoặc PASSWORD_CHANGE_REQUIRED; không giả định mọi403 có cùng envelope/code |
-| 404 | timestamp/status/error/message; result không tồn tại, tải lại danh sách và không tự tạo result/Attendance |
-
-FE lấy resultId từ GET `/api/training-results?sessionId=...&memberId=...`, PATCH thành công rồi GET lại đúng ngữ cảnh; Member đọc own content qua GET hiện có. PATCH200/GET readback xác nhận content, không dùng recordedAt thay audit hoặc GET200 sau PATCH lỗi để suy đã lưu. Giữ draft gắn resultId/Session khi đổi buổi và xử lý response trễ; giao diện/câu chữ do FE quyết định. [Bàn giao flow trước–sau và demo](../SCMS-CAP-NHAT/SCMS-BAN-GIAO-FE-TRAINING-RESULT-AFTER-SESSION-2026-11-12.md); kết quả/môi trường ở Active/QA.
-
-<a id="training-result-read-scope-20261111"></a>
-**Scope đọc — Session1.2,11/11:** BE lấy actor Active/role/center từ account hiện hành. Staff thường có MANAGE_CLASSES hoặc MANAGE_USERS chỉ đọc result mà Session.Class cùng center actor; Admin có center cũng theo center được gán. Chỉ Admin Active center NULL và đạt authority đọc mới global. Không nhận centerId/role/actor từ client để mở scope; thiếu center ở non-Admin403. Các filter sessionId/memberId/coachId luôn AND với scope; staff filter trỏ center khác trả200 `[]`. Member vẫn bị ép memberId theo phiên (truyền Member khác403); Coach vẫn bị ép coachId tác giả đã lưu (truyền Coach khác403), kể cả có thêm authority quản trị. Hai nhánh own/author giữ đọc lịch sử, không thêm điều kiện enrollment hiện hành hoặc ép theo center account mới. Thay center/quyền/status có hiệu lực với phiên hiện tại; không suy global read này sang tiền/report, quyền ghi content hoặc thao tác Manager-only. Shape response không đổi; bằng chứng tại Active/QA.
 
 <a id="attendance-correction-20261109"></a>
 **Contract Owner09/11 — BE đã triển khai, phạm vi kiểm/deploy xem docs00:** [Bàn giao flow và gợi ý FE](../SCMS-BAN-GIAO-FE-ATTENDANCE-2026-11-09.md); bố trí UI/câu chữ do FE quyết định, các giới hạn dưới đây được BE thực thi.
@@ -395,21 +348,7 @@ Member đọc toàn bộ content của kết quả thuộc mình. GET `/api/trai
 
 **Ghi giáo án/đánh giá — RP-36:** POST/PUT/DELETE `/api/training-plans` (PUT/DELETE thêm `/{id}`) yêu cầu ROLE_COACH AND MANAGE_TRAINING_PLAN; tương tự `/api/evaluations` yêu cầu ROLE_COACH AND RECORD_RESULT. MANAGE_CLASSES không thay authority chuyên môn; Admin/Manager/Receptionist/Member có thêm authority ghi vẫn403. Service kiểm lại role/authority, actor Active, cùng center và Coach được phân công, kể cả khi không gọi qua controller. Coach chỉ ghi record mang coachId của mình; plan theo classId phải là lớp mình được giao; plan/evaluation theo memberId cần quan hệ khóa Normal Registered+Paid hoặc quyền Advanced đã kích hoạt/Paid gắn Primary Coach đó. Sửa/xóa kiểm record đã lưu, không tin coachId client để chọn phạm vi. Cố chuyển Coach/class/member qua PUT trả400 TRAINING_TARGET_IMMUTABLE; plan PUT có thể bỏ classId/memberId để giữ target cũ. Audit ghi actor thực; quyền Manager correction attendance D15 không mở sang ghi chuyên môn.
 
-<a id="shared-plan-history-20261112"></a>
-**Member đọc shared Normal plan — Session2.3,12/11:** GET `/api/training-plans` và `/{id}` giữ method/query/response; Active Member đọc own private plan theo scope hiện có hoặc shared plan của đúng lớp Normal khi enrollment **Registered hoặc Completed** và có Paid/effective entitlement hợp lệ. Plan shared có `memberId:null/classId` của lớp, không nhân bản nội dung cho từng Member. Mọi filter coachId/classId/memberId optional đều AND với scope; MemberId lấy từ phiên, truyền Member khác403 dù có thêm authority quản trị. Filter classId không trả private plan có classId:null; không dùng danh sách đã lọc lớp để kết luận mất own private history.
-
-Paid hợp lệ cho shared read là Invoice cùng Member, paymentStatus Paid, reconciliationRequired:false, cashConfirmationReversed:false, không có PaymentResolution type Refund/status Completed trên invoice đó; lớp quyền là `coalesce(entitlement_class_id,class_id)`. Refund Completed không đổi Invoice Paid/amount gốc nhưng loại invoice đó khỏi bằng chứng quyền. Transfer giữ Invoice.class_id/amount gốc, quyền theo lớp nhận; không mở lại lớp nguồn chỉ vì hóa đơn gốc vẫn Paid. Chỉ một chữ Paid hoặc chứng từ của Member/lớp khác không đủ. Giữ center scope và tương thích phân loại Normal hiện có; không đổi Invoice/Enrollment/transfer/refund để cấp read.
-
-| Trạng thái quyền shared | GET list | GET detail plan tồn tại |
-|---|---|---|
-| Registered/Completed + Paid hiệu lực hợp lệ, đúng scope | 200 chứa plan | 200 cùng TrainingPlanResponse |
-| Pending/Waitlisted/Cancelled, thiếu enrollment/Paid hoặc invoice bị loại | 200 không chứa plan | 403 |
-| Sau transfer, quyền hợp lệ tại lớp nhận | Chỉ plan lớp nhận đủ điều kiện | Lớp nhận200, lớp nguồn không còn quyền403 |
-| Plan/lớp ngoài scope | 200 không chứa plan | 403 |
-
-ID không tồn tại giữ404; thiếu phiên401; account/role/session guard giữ body hiện có, không chuẩn hóa lỗi ở2.3. Own private plan/result/attendance/evaluation và own-author Coach cũ giữ scope hiện hành, không áp điều kiện shared để xóa own history; không mở mọi roster hoặc quyền sửa của Coach khác. Cancelled đã được Owner chốt ngoài shared read dù từng Paid/có kết quả; không mở policy hủy/hoàn Normal sau Ongoing. Quyền đọc Completed không cấp quyền ghi RP-36, đặt lịch/credit hoặc quyền tiền.
-
-Nội dung là bản plan đang lưu, không có snapshot/versioning mới hoặc cam kết bản tại ngày Member học. startDate/endDate của plan là metadata, không tự khóa đọc lịch sử sau endDate; lớp Closed với enrollment Completed không bị loại chỉ vì đã kết thúc. Response giữ field cũ: classId/className nullable khi private, memberId/memberName nullable khi shared; content/goal/startDate/endDate nullable/optional theo dữ liệu đã lưu. OpenAPI khai nullable đúng payload null đã có, không đổi dữ liệu trả về. FE nhận shared memberId:null qua quyền lớp, rà filter Registered/Ongoing/endDate ở client và tải lại list khi detail403 do quyền hiện hành đổi sau lần đọc trước. GET không ghi dữ liệu/audit; [bàn giao flow và demo riêng](../SCMS-CAP-NHAT/SCMS-BAN-GIAO-FE-SHARED-PLAN-HISTORY-2026-11-12.md), bằng chứng/môi trường tại Active/QA.
+**Member đọc giáo án lớp:** GET `/api/training-plans` và `/{id}` giữ đọc plan gán trực tiếp đúng Member, đồng thời đọc plan chung của đúng lớp Normal có enrollment Registered và invoice Paid hợp lệ (không đối soát/không đảo xác nhận Cash), cùng center. Plan lớp không cần memberId; lọc bằng quan hệ Member→enrollment→Class, không nhân bản nội dung cho mỗi người. List chỉ trả phạm vi hợp lệ; ID plan lớp/Member khác hoặc thiếu quyền lớp403; filter memberId khác403. Pending/Waitlisted/Cancelled hoặc invoice đang đối soát không cấp quyền đọc chung. Plan riêng của Member giữ rule lịch sử hiện có, không tự áp rule lớp để xóa quyền đọc riêng. Các ca hủy/đảo quyền/lịch sử ngoài phạm vi này vẫn cần đối chiếu, không cam kết mọi trường hợp.
 
 <a id="normal-changes-20261110"></a>
 ## Normal dời/chuyển/hủy trước khai giảng
@@ -427,67 +366,6 @@ Manager Active+MANAGE_CLASSES, cùng center; dùng version hiện tại, không 
 changePending=true chặn admission/confirm/job start. Im lặng không là đồng ý; nhắc Member theo ngày VN có dedupe. Waitlist hết hạn mời/order từ hàng chờ quay cuối hàng, job mời tiếp, không autoCash; TTL mời cùng payment.expire-minutes, chưa là quyền học.
 
 Sau chuyển, Invoice.classId/className/amount giữ lớp mua gốc; entitlementClassId chỉ lớp nhận quyền hiện tại (bằng classId khi chưa chuyển). Enrollment cũ Cancelled có link/lý do, đích Registered; lịch/attendance/plan/result/report nhận quyền đích và giữ lịch sử. Không thanh toán lần nữa. NORMAL_CHANGE_PENDING/NORMAL_PRESTART_REQUIRED/NORMAL_POSTPONEMENT_LIMIT/NORMAL_PROPOSAL_STALE/MEMBER_RESPONSES_PENDING/NORMAL_CHOICE_ALREADY_RECORDED/NORMAL_TRANSFER_INCOMPATIBLE/NORMAL_RECEIPT_NOT_ELIGIBLE/CLASS_FULL/REFUND_ALREADY_EXISTS trả400/409 theo response;409 tải lại version/lịch/chỗ. Lịch đề xuất đã đổi chặn Accept cũ nhưng không tước lựa chọn Refund của Member.
-
-<a id="normal-cm-fix-15b-20261111"></a>
-### Xác nhận contract CM-FIX-15B —11/11/2026
-
-Đối chiếu controller/service/DTO/OpenAPI hiện tại; đây là làm rõ contract, không đổi BE hoặc xác nhận build/fixture runtime mới. `ProposalView` trong Java có tên schema OpenAPI `NormalChangeProposalView`.
-
-| POST | Nguồn `version` gửi lên | Body và kết quả |
-|---|---|---|
-| `/api/classes/{id}/normal-proposals` | `SportsClassResponse.lifecycleVersion` từ GET `/api/classes/{id}` mới nhất | `kind`, `version`, `reason`; thêm `shiftDays` cho Postpone hoặc `targetClassId` cho Transfer.200 trả proposal, BE tăng lifecycleVersion lớp và gán proposal.version bằng phiên bản lớp mới |
-| `/api/normal-proposals/{id}/apply` | `NormalChangeProposalView.version` của đúng proposal, từ GET `/api/classes/{classId}/normal-proposals` hoặc response proposal mới nhất | `{ "version": n }`; không yêu cầu reason/fingerprint trên endpoint này. BE tự so proposal.version, lifecycleVersion lớp và fingerprint lịch.200 trả proposal; apply thành công tăng lifecycleVersion lớp, **không tăng proposal.version** |
-| `/api/classes/{id}/cancel-before-opening` | `SportsClassResponse.lifecycleVersion` từ GET `/api/classes/{id}` mới nhất, kể cả sau apply | `version`, `reason`.200 trả SportsClassResponse mới; không dùng proposal.version để hủy lớp |
-
-Không dùng chỉ số mảng/ID làm version, không tự cộng phiên bản hoặc mặc định0 khi response thiếu field. Ví dụ lớp v7 → propose tạo proposal v8/lớp v8 → apply gửi8, trả proposal Applied/v8 nhưng lớp đã v9 → cancel phải GET lớp rồi gửi9. Sau mutation tải lại cả lớp và danh sách proposal.
-
-**Chuỗi chính xác, phân biệt hoa/thường:**
-
-- `kind`: `Postpone`, `Transfer`. Postpone: `shiftDays` nguyên1–366, `targetClassId` bỏ/null, thiếu sĩ số Paid hợp lệ và chưa dời lần nào. Transfer: `targetClassId` khác lớp gốc, cùng môn/giá/center và đủ điều kiện admission/lịch; FE bỏ `shiftDays`.
-- `proposal.status`: `Pending`, `Applied`, `Cancelled`; không phải status của lớp. FE không gửi status để điều khiển ba POST này.
-- `choices[].choice`: `Waiting`, `Accept`, `Refund`. Member chỉ POST `Accept` hoặc `Refund` qua `/respond`, cùng `proposal.version` và `fingerprint`; Manager không chọn thay. `Waiting` do BE tạo, không phải lựa chọn để POST.
-
-**Quyền và Waiting:** cả ba POST yêu cầu account Active, role DB `CenterManager` AND authority `MANAGE_CLASSES`, cùng center lớp; role Admin hoặc chỉ có authority không thay role Manager trên ba tuyến này. Lớp phải là Normal Open đã công bố, không phải pricingDraft, có minimum và còn trước buổi hợp lệ đầu tiên; tạo proposal còn yêu cầu không có changePending. Apply khi bất kỳ response còn Waiting trả400 `MEMBER_RESPONSES_PENDING`, không phải409; im lặng không là đồng ý. Mọi response hết Waiting có thể gồm cả Accept và Refund; không đòi tất cả Accept, nhưng vẫn phải qua kiểm version/lịch/tài nguyên. Apply Transfer không chuyển lại từng Member và vẫn giữ changePending lớp gốc; Manager xử lý hủy trước khai giảng riêng khi phù hợp. Cancel không bị chặn chỉ vì Waiting: đây là quyết định TT hủy độc lập, Pending proposal chuyển Cancelled và phát sinh nghĩa vụ hoàn cho khoản hợp lệ, không biến Waiting thành Accept. Không tự gọi cancel như fallback của apply lỗi.
-
-**Lỗi version/response hiện hành:**
-
-| Trường hợp, sau khi đã đạt auth/scope/prestart | HTTP | Body cần đọc |
-|---|---|---|
-| Propose hoặc cancel có lifecycleVersion cũ |409| `message: "NORMAL_VERSION_STALE"`; **không có field code**. Session3.2 sửa body thành `status:409,error:"Conflict"`; HTTP status vẫn là chuẩn. Quan sát11/11 body400 là lỗi trước sửa, xem [error/deprecation13/11](#error-deprecation-20261113) |
-| Apply proposal Pending có version cũ, version lớp lệch hoặc fingerprint lịch đổi |409| `code:"NORMAL_PROPOSAL_STALE", message:"Reload the current proposal"` |
-| Propose khi lớp còn phương án chưa giải quyết |409| `code:"NORMAL_CHANGE_PENDING"` |
-| Apply Pending còn Member Waiting, sau khi version/lịch hợp lệ |400| `code:"MEMBER_RESPONSES_PENDING", message:"Silence is not consent"` |
-| Thiếu/trắng reason hoặc dài quá2000 ở propose/cancel |400| `code:"REASON_REQUIRED"` |
-
-Đây là dạng wire hiện tại của GlobalExceptionHandler, không cam kết mọi lỗi đều có code. FE có thể đọc `code ?? message` cho các lỗi này, lấy HTTP status thực;409 tải lại dữ liệu và để actor xem lại, không tự tăng version/đổi fingerprint rồi retry mù. Ngoại lệ retry terminal: apply proposal đã Applied trả200 trước kiểm version; cancel lớp đã Cancelled trả200 sau kiểm quyền/center/reason, trước kiểm version. Không dùng hai ngoại lệ này để suy rằng version cũ luôn hợp lệ.
-
-**Ví dụ GET → POST:** JSON trích field, ID/version giả định, không là dữ liệu đã quan sát trên Render hoặc ID được phép dùng sau reset; mỗi GET và POST dùng cùng phiên Manager hợp lệ.
-
-1. Tạo Transfer: GET `/api/classes/101` → `{ "id":101, "classType":"Normal", "status":"Open", "pricingDraft":false, "changePending":false, "lifecycleVersion":7 }`. Đọc thêm GET `/api/classes/202` và lịch để đối chiếu đích, BE vẫn recheck dưới khóa. POST `/api/classes/101/normal-proposals`:
-
-```json
-{"kind":"Transfer","targetClassId":202,"version":7,"reason":"DEMO: trung tâm đề nghị phương án thay thế"}
-```
-
-Response proposal sẽ có id/version riêng, ví dụ id9001/version8/status Pending. Nếu chọn Postpone thay vì Transfer, body tương ứng là:
-
-```json
-{"kind":"Postpone","shiftDays":7,"version":7,"reason":"DEMO: thiếu sĩ số, đề nghị dời khai giảng một lần"}
-```
-
-2. Apply: GET `/api/classes/101/normal-proposals` → trích một item trong mảng: `{ "id":9001, "classId":101, "kind":"Transfer", "status":"Pending", "version":8, "choices":[{"memberId":11,"choice":"Accept"},{"memberId":12,"choice":"Refund"}] }`. Chọn đúng id9001, không còn Waiting; POST `/api/normal-proposals/9001/apply`:
-
-```json
-{"version":8}
-```
-
-3. Hủy trước khai giảng: sau ví dụ apply trên, GET lại `/api/classes/101` → `{ "id":101, "status":"Open", "changePending":true, "lifecycleVersion":9 }`. POST `/api/classes/101/cancel-before-opening`:
-
-```json
-{"version":9,"reason":"DEMO: trung tâm quyết định hủy lớp trước buổi đầu"}
-```
-
-Điểm đối chiếu source: [controller](../src/main/java/com/sportscenter/normal/NormalChangeController.java), [service/DTO/check version](../src/main/java/com/sportscenter/normal/NormalChangeService.java), [SportsClassResponse](../src/main/java/com/sportscenter/sportclass/SportsClassResponse.java), [error handler](../src/main/java/com/sportscenter/common/exception/GlobalExceptionHandler.java). Bố trí UI do FE quyết định; state/version/quyền vẫn do BE kiểm ở mỗi request.
 
 <a id="normal-refunds-20261110"></a>
 ## Refund Normal trước khai giảng — ngân hàng thủ công
@@ -709,7 +587,7 @@ Chat notification types persisted in `notification_type`: `CHAT_MEMBER_MESSAGE` 
 
 | Method | Endpoint | Quyền và phạm vi |
 |---|---|---|
-| `GET` | `/api/training-results?sessionId={id}&memberId={id}&coachId={id}` | Actor Active: Member own, Coach author kể cả có extra authority; staff cần MANAGE_CLASSES/MANAGE_USERS và center Session.Class khớp actor. Admin-null có authority đọc global, Admin có center vẫn theo center. Filter AND với scope, ngoài scope200 `[]`; xem [chi tiết scope11/11](#training-result-read-scope-20261111). |
+| `GET` | `/api/training-results?sessionId={id}&memberId={id}&coachId={id}` | MANAGE_CLASSES, MANAGE_USERS, COACH hoặc MEMBER. Member chỉ đọc kết quả của chính mình; BE lấy User từ session Authentication, tự áp `memberId` hiện tại nếu bỏ trống và trả 403 nếu `memberId` khác. Coach giữ scope hiện có; quyền quản lý giữ hành vi hiện có. |
 | `GET` | `/api/training-plans?coachId={id}&classId={id}&memberId={id}` và `/api/training-plans/{id}` | Member được đọc kế hoạch của chính mình; service kiểm tra ownership. |
 | `GET` | `/api/evaluations?memberId={id}&coachId={id}` và `/api/evaluations/{id}` | Member được đọc đánh giá của chính mình; service kiểm tra ownership. |
 

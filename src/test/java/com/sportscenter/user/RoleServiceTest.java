@@ -22,7 +22,6 @@ class RoleServiceTest {
     @Mock private PermissionRepository permissionRepository;
     @Mock private UserRepository userRepository;
     @Mock private AuditService auditService;
-    @Mock private AdministrationGuard administrationGuard;
 
     @InjectMocks private RoleService roleService;
 
@@ -45,7 +44,7 @@ class RoleServiceTest {
         when(roleRepository.findByIdForUpdate(4)).thenReturn(Optional.of(role));
         when(permissionRepository.findAllById(List.of(1))).thenReturn(List.of(permission));
         when(roleRepository.save(role)).thenReturn(role);
-        when(administrationGuard.requirePermissionAdministrator()).thenReturn(admin);
+        when(userRepository.findByEmailIgnoreCase("admin@example.com")).thenReturn(Optional.of(admin));
         SecurityContextHolder.getContext().setAuthentication(
                 new UsernamePasswordAuthenticationToken("admin@example.com", "n/a", List.of()));
 

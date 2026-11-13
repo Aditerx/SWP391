@@ -31,25 +31,15 @@ public class MemberPackageController {
     }
 
     @PostMapping({"/members/{memberId}/packages", "/members/{memberId}/subscriptions"})
+    @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("hasAuthority('MANAGE_SUBSCRIPTIONS')")
-    @io.swagger.v3.oas.annotations.Operation(deprecated=true, description="Shared membership mutation retired. Valid authorized requests return400 LEGACY_MEMBERSHIP_RETIRED without writes. Use Normal enrollment or Advanced registration; authentication, permissions and validation still apply. No Deprecation or Sunset response header is promised.")
-    @io.swagger.v3.oas.annotations.responses.ApiResponses({
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode="400", description="LEGACY_MEMBERSHIP_RETIRED or invalid request", content=@io.swagger.v3.oas.annotations.media.Content),
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode="401", description="Authentication required", content=@io.swagger.v3.oas.annotations.media.Content),
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode="403", description="Current role, authority, Active account or resource scope denied", content=@io.swagger.v3.oas.annotations.media.Content)
-    })
     public SubscriptionOrderResponse subscribe(@PathVariable Integer memberId, @Valid @RequestBody MemberPackageRequest request, HttpServletRequest httpRequest) {
         return memberPackageService.subscribe(memberId, request, clientIp(httpRequest));
     }
 
     @PostMapping({"/members/me/subscriptions", "/member-packages/subscribe-me"})
+    @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("hasRole('MEMBER')")
-    @io.swagger.v3.oas.annotations.Operation(deprecated=true, description="Shared membership mutation retired. Valid authorized requests return400 LEGACY_MEMBERSHIP_RETIRED without writes. Use Normal enrollment or Advanced registration; authentication, permissions and validation still apply. No Deprecation or Sunset response header is promised.")
-    @io.swagger.v3.oas.annotations.responses.ApiResponses({
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode="400", description="LEGACY_MEMBERSHIP_RETIRED or invalid request", content=@io.swagger.v3.oas.annotations.media.Content),
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode="401", description="Authentication required", content=@io.swagger.v3.oas.annotations.media.Content),
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode="403", description="Current role, authority, Active account or resource scope denied", content=@io.swagger.v3.oas.annotations.media.Content)
-    })
     public SubscriptionOrderResponse subscribeMe(@Valid @RequestBody MemberPackageRequest request, Authentication authentication, HttpServletRequest httpRequest) {
         return memberPackageService.subscribeMe(request, authentication, clientIp(httpRequest));
     }
@@ -61,14 +51,6 @@ public class MemberPackageController {
 
     @PatchMapping({"/member-packages/{id}/status", "/subscriptions/{id}/status"})
     @PreAuthorize("hasAuthority('MANAGE_SUBSCRIPTIONS')")
-    @io.swagger.v3.oas.annotations.Operation(description="This shared route remains available for Advanced subscriptions; not deprecated. Shared membership returns400 LEGACY_MEMBERSHIP_RETIRED; Advanced changes require payment/expiry/attendance/incident workflow and cannot grant rights through generic status.")
-    @io.swagger.v3.oas.annotations.responses.ApiResponses({
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode="200", description="Current Advanced status retained (no-op)"),
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode="400", description="Invalid input, state, time or workflow", content=@io.swagger.v3.oas.annotations.media.Content),
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode="401", description="Authentication required", content=@io.swagger.v3.oas.annotations.media.Content),
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode="403", description="Current role, authority, Active account or resource scope denied", content=@io.swagger.v3.oas.annotations.media.Content),
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode="404", description="Resource not found", content=@io.swagger.v3.oas.annotations.media.Content)
-    })
     public MemberPackageResponse updateStatus(@PathVariable Integer id, @RequestBody Map<String, String> body) {
         String status = body != null ? body.get("status") : null;
         return memberPackageService.updateStatus(id, status);
@@ -76,13 +58,6 @@ public class MemberPackageController {
 
     @PostMapping({"/member-packages/{id}/extend", "/subscriptions/{id}/extend"})
     @PreAuthorize("hasAuthority('MANAGE_SUBSCRIPTIONS')")
-    @io.swagger.v3.oas.annotations.Operation(description="This route is not retired for Advanced workflows. Shared membership returns400 LEGACY_MEMBERSHIP_RETIRED; Advanced generic extension returns400 USE_INCIDENT_RECOVERY. Missing or out-of-scope target retains404/403. Use the verified incident workflow.")
-    @io.swagger.v3.oas.annotations.responses.ApiResponses({
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode="400", description="Invalid input, state, time or workflow", content=@io.swagger.v3.oas.annotations.media.Content),
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode="401", description="Authentication required", content=@io.swagger.v3.oas.annotations.media.Content),
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode="403", description="Current role, authority, Active account or resource scope denied", content=@io.swagger.v3.oas.annotations.media.Content),
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode="404", description="Resource not found", content=@io.swagger.v3.oas.annotations.media.Content)
-    })
     public MemberPackageResponse extendValidity(@PathVariable Integer id,
                                                 @Valid @RequestBody PackageExtensionRequest request,
                                                 Authentication authentication) {

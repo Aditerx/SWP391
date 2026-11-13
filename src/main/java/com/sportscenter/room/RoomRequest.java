@@ -3,12 +3,9 @@ package com.sportscenter.room;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
-import jakarta.validation.constraints.Size;
 
 public record RoomRequest(
-        @NotBlank @Size(max = 50) String name,
-        @Size(max = 100)
-        @io.swagger.v3.oas.annotations.media.Schema(nullable = true)
+        @NotBlank String name,
         String location,
         @NotNull @Positive Integer capacity,
         String status,

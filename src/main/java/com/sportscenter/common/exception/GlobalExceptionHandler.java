@@ -22,7 +22,7 @@ import java.util.Map;
 public class GlobalExceptionHandler {
     @ExceptionHandler(BusinessConflictException.class)
     ResponseEntity<Map<String, Object>> conflict(BusinessConflictException ex) {
-        return business(HttpStatus.CONFLICT, ex);
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(business(ex).getBody());
     }
 
     @ExceptionHandler(ResourceNotFoundException.class)
@@ -61,18 +61,14 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(BusinessException.class)
     ResponseEntity<Map<String, Object>> business(BusinessException ex) {
-        return business(HttpStatus.BAD_REQUEST, ex);
-    }
-
-    private ResponseEntity<Map<String, Object>> business(HttpStatus status, BusinessException ex) {
         int separator = ex.getMessage() == null ? -1 : ex.getMessage().indexOf(":");
         if (separator > 0 && ex.getMessage().substring(0, separator).matches("[A-Z_]+")) {
             Map<String, Object> body = new LinkedHashMap<>();
             body.put("code", ex.getMessage().substring(0, separator));
             body.put("message", ex.getMessage().substring(separator + 1).trim());
-            return ResponseEntity.status(status).body(body);
+            return ResponseEntity.badRequest().body(body);
         }
-        return error(status, ex.getMessage());
+        return error(HttpStatus.BAD_REQUEST, ex.getMessage());
     }
 
     @ExceptionHandler(AuthenticationException.class)
@@ -90,8 +86,8 @@ public class GlobalExceptionHandler {
         return error(HttpStatus.FORBIDDEN, ex.getMessage());
     }
 
-    @ExceptionHandler({DataIntegrityViolationException.class, org.hibernate.exception.ConstraintViolationException.class})
-    ResponseEntity<Map<String, Object>> integrity(RuntimeException ex) {
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    ResponseEntity<Map<String, Object>> integrity(DataIntegrityViolationException ex) {
         return error(HttpStatus.CONFLICT, "Operation violates a database constraint");
     }
 

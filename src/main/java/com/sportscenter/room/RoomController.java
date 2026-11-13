@@ -23,27 +23,12 @@ public class RoomController {
     @org.springframework.web.bind.annotation.ResponseStatus(org.springframework.http.HttpStatus.CREATED)
     @PostMapping
     @PreAuthorize("hasAnyRole('ADMIN','CENTERMANAGER') and hasAuthority('MANAGE_CLASSES')")
-    @io.swagger.v3.oas.annotations.responses.ApiResponses({
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode="201", description="Room created"),
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode="400", description="Invalid room input or configuration", content=@io.swagger.v3.oas.annotations.media.Content),
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode="401", description="Authentication required", content=@io.swagger.v3.oas.annotations.media.Content),
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode="403", description="Current role, authority, Active account or resource scope denied", content=@io.swagger.v3.oas.annotations.media.Content),
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode="409", description="Duplicate name/code or database constraint; no changes saved", content=@io.swagger.v3.oas.annotations.media.Content)
-    })
     public ResponseEntity<RoomResponse> create(@Valid @RequestBody RoomRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(service.create(request));
     }
 
     @PutMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMIN','CENTERMANAGER') and hasAuthority('MANAGE_CLASSES')")
-    @io.swagger.v3.oas.annotations.responses.ApiResponses({
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode="200", description="Room updated"),
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode="400", description="Invalid input, state, time or workflow", content=@io.swagger.v3.oas.annotations.media.Content),
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode="401", description="Authentication required", content=@io.swagger.v3.oas.annotations.media.Content),
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode="403", description="Current role, authority, Active account or resource scope denied", content=@io.swagger.v3.oas.annotations.media.Content),
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode="404", description="Resource not found", content=@io.swagger.v3.oas.annotations.media.Content),
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode="409", description="Duplicate name/code or database constraint; no changes saved", content=@io.swagger.v3.oas.annotations.media.Content)
-    })
     public ResponseEntity<RoomResponse> update(@PathVariable Integer id,
                                                @Valid @RequestBody RoomRequest request) {
         return ResponseEntity.ok(service.update(id, request));

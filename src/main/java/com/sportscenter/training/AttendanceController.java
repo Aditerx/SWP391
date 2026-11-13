@@ -26,9 +26,7 @@ public class AttendanceController {
             @RequestParam(required = false) Integer memberId,
             @RequestParam(required = false) Integer recordedBy,
             @RequestParam(required = false) String state,
-            @io.swagger.v3.oas.annotations.Parameter(description = "Inclusive first day in Asia/Ho_Chi_Minh: sessionDate for session attendance; checkInTime date for legacy lobby records without a session.")
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
-            @io.swagger.v3.oas.annotations.Parameter(description = "Inclusive last day in Asia/Ho_Chi_Minh: sessionDate for session attendance; checkInTime date for legacy lobby records without a session.")
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
             Authentication authentication
     ) {

@@ -7,20 +7,17 @@ from pathlib import Path
 from datetime import date, datetime, timedelta
 from io import BytesIO
 import argparse, contextlib, hashlib, json, runpy, sys, uuid
-from demo_anchor import anchor_date, sql_anchor_guard
 
 ROOT=Path(__file__).resolve().parents[1]
 p=argparse.ArgumentParser(description=__doc__)
-p.add_argument('--anchor',required=True,type=anchor_date)
+p.add_argument('--anchor',required=True)
 p.add_argument('--output',default='database/bootstrap/scms_demo_scenarios.sql')
 p.add_argument('--preview-dir',help='Optional local PDF preview directory; assets themselves are private BYTEA rows')
 a=p.parse_args()
-anchor=a.anchor
-output=(ROOT/a.output).resolve()
-if not output.is_relative_to(ROOT) or output.suffix.lower()!='.sql':p.error('SQL output must remain in the workspace')
+anchor=date.fromisoformat(a.anchor)
 old=sys.argv
 try:
-    sys.argv=['build-system-data.py','--anchor',anchor.isoformat(),'--no-render']
+    sys.argv=['build-system-data.py','--anchor',a.anchor,'--no-render']
     with contextlib.redirect_stdout(BytesIOText:=__import__('io').StringIO()):
         design=runpy.run_path(str(ROOT/'scripts/build-system-data.py'))
 finally:sys.argv=old
@@ -52,7 +49,7 @@ def obligation_created(key):
     return max(datetime.fromisoformat(inv['payment_date'])+timedelta(hours=1),min(first-timedelta(days=2),datetime.fromisoformat(stamp(-3,'00:00'))))
 
 statements += [f"-- Approved synthetic demo fixture. Anchor {anchor} Asia/Ho_Chi_Minh. No real bank/payment events.",
- sql_anchor_guard(anchor),
+ f"DO $anchor$ BEGIN IF CURRENT_DATE<>DATE '{anchor}' THEN RAISE EXCEPTION 'SCMS_DEMO_STALE_ANCHOR: regenerate the bundle for the intended VN date'; END IF; END $anchor$;",
  # These two named time guards use wall-clock CURRENT_DATE. All FK/CHECK/unique constraints stay active.
  "ALTER TABLE classes DISABLE TRIGGER trg_classes_validate;",
  "ALTER TABLE sessions DISABLE TRIGGER trg_sessions_validate;",
@@ -172,6 +169,6 @@ for mid,r in enumerate(t['chat_messages'],1):
 insert('chat_read_state',conversation_id=1,user_id=user['M08'],last_read_message_id=1,updated_at=stamp())
 insert('chat_read_state',conversation_id=1,user_id=user['R1'],last_read_message_id=2,updated_at=stamp())
 statements += ['ALTER TABLE classes ENABLE TRIGGER trg_classes_validate;','ALTER TABLE sessions ENABLE TRIGGER trg_sessions_validate;']
-output.parent.mkdir(parents=True,exist_ok=True)
-output.write_text('\n'.join(statements)+'\n',encoding='utf-8',newline='\n')
+output=(ROOT/a.output).resolve();assert output.is_relative_to(ROOT)
+output.write_text('\n'.join(statements)+'\n',encoding='utf-8')
 print(json.dumps({'output':str(output.relative_to(ROOT)),'anchor':str(anchor),'users':47,'classes':21,'privateDemoPdfs':2,'databaseAccess':False}))

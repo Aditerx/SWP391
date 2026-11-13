@@ -10,22 +10,6 @@ import jakarta.persistence.LockModeType;
 import java.util.Optional;
 
 public interface UserRepository extends JpaRepository<User, Integer> {
-    String CAPABLE_ADMIN = " FROM users u JOIN roles r ON r.role_id=u.role_id "
-            + "WHERE LOWER(r.role_name)='admin' AND LOWER(u.status)='active' "
-            + "AND EXISTS (SELECT 1 FROM role_permissions rp JOIN permissions p ON p.permission_id=rp.permission_id "
-            + "WHERE rp.role_id=r.role_id AND p.permission_name='MANAGE_USERS') "
-            + "AND EXISTS (SELECT 1 FROM role_permissions rp JOIN permissions p ON p.permission_id=rp.permission_id "
-            + "WHERE rp.role_id=r.role_id AND p.permission_name='MANAGE_PERMISSIONS') ";
-
-    @Query(value = "SELECT COUNT(*)" + CAPABLE_ADMIN + "AND r.role_id<>:roleId", nativeQuery = true)
-    long countAdministratorsExcludingRole(@Param("roleId") Integer roleId);
-
-    @Query(value = "SELECT COUNT(*)" + CAPABLE_ADMIN + "AND u.user_id<>:userId", nativeQuery = true)
-    long countAdministratorsExcludingUser(@Param("userId") Integer userId);
-
-    @Query(value = "SELECT COUNT(*) FROM users WHERE role_id=:roleId AND LOWER(status)='active'", nativeQuery = true)
-    long countActiveByRole(@Param("roleId") Integer roleId);
-
     @Override
     @org.springframework.data.jpa.repository.EntityGraph(attributePaths = "role")
     java.util.List<User> findAll();

@@ -6,8 +6,8 @@
   },
   "servers": [
     {
-      "url": "https://scms-app-p1gy.onrender.com",
-      "description": "Canonical FE server; schema generated from integrated local app"
+      "url": "http://localhost",
+      "description": "Generated server url"
     }
   ],
   "security": [
@@ -22,7 +22,7 @@
     },
     {
       "name": "Notifications",
-      "description": "Thông báo trong ứng dụng của người dùng đang đăng nhập"
+      "description": "ThÃ´ng bÃ¡o trong á»©ng dá»¥ng cá»§a ngÆ°á»i dÃ¹ng Äang ÄÄng nháº­p"
     }
   ],
   "paths": {
@@ -147,8 +147,6 @@
         "tags": [
           "training-plan-controller"
         ],
-        "summary": "Read one training plan in the current account scope",
-        "description": "Members read own private plans and shared Normal class plans with Registered or Completed enrollment and valid Paid effective-class entitlement. Reconciliation, reversed cash confirmation or Completed Refund excludes shared access. Cancelled/Pending/Waitlisted do not grant shared access. Existing Coach own-author and center scopes remain; stored plan content is not a historical version snapshot.",
         "operationId": "findById",
         "parameters": [
           {
@@ -531,7 +529,7 @@
         },
         "responses": {
           "200": {
-            "description": "Room updated",
+            "description": "OK",
             "content": {
               "*/*": {
                 "schema": {
@@ -539,21 +537,6 @@
                 }
               }
             }
-          },
-          "409": {
-            "description": "Duplicate name/code or database constraint; no changes saved"
-          },
-          "401": {
-            "description": "Authentication required"
-          },
-          "404": {
-            "description": "Resource not found"
-          },
-          "403": {
-            "description": "Current role, authority, Active account or resource scope denied"
-          },
-          "400": {
-            "description": "Invalid input, state, time or workflow"
           }
         }
       }
@@ -563,7 +546,6 @@
         "tags": [
           "role-controller"
         ],
-        "description": "Active Admin AND MANAGE_PERMISSIONS. Replaces the complete permission set for every account of this role. Empty is allowed only if an Active Admin with both MANAGE_USERS and MANAGE_PERMISSIONS remains. LAST_ADMIN_REQUIRED returns 409 without saving changes.",
         "operationId": "updateRolePermissions",
         "parameters": [
           {
@@ -587,17 +569,8 @@
           "required": true
         },
         "responses": {
-          "409": {
-            "description": "LAST_ADMIN_REQUIRED: preserve one Active Admin with MANAGE_USERS and MANAGE_PERMISSIONS"
-          },
-          "401": {
-            "description": "Authentication required"
-          },
-          "404": {
-            "description": "Resource not found"
-          },
           "200": {
-            "description": "Complete permission set saved",
+            "description": "OK",
             "content": {
               "*/*": {
                 "schema": {
@@ -605,12 +578,6 @@
                 }
               }
             }
-          },
-          "403": {
-            "description": "Current role, authority, Active account or resource scope denied"
-          },
-          "400": {
-            "description": "Invalid input, state, time or workflow"
           }
         }
       }
@@ -620,7 +587,6 @@
         "tags": [
           "membership-package-controller"
         ],
-        "description": "Shared membership mutation retired. Valid authorized requests return400 LEGACY_MEMBERSHIP_RETIRED without writes. Use Normal enrollment or Advanced registration; authentication, permissions and validation still apply. No Deprecation or Sunset response header is promised.",
         "operationId": "update_4",
         "parameters": [
           {
@@ -644,17 +610,17 @@
           "required": true
         },
         "responses": {
-          "400": {
-            "description": "LEGACY_MEMBERSHIP_RETIRED or invalid request"
-          },
-          "401": {
-            "description": "Authentication required"
-          },
-          "403": {
-            "description": "Current role, authority, Active account or resource scope denied"
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/MembershipPackageResponse"
+                }
+              }
+            }
           }
-        },
-        "deprecated": true
+        }
       }
     },
     "/api/members/{id}": {
@@ -1138,7 +1104,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Results within current owner, author or center scope",
+            "description": "OK",
             "content": {
               "*/*": {
                 "schema": {
@@ -1149,12 +1115,6 @@
                 }
               }
             }
-          },
-          "401": {
-            "description": "Authentication required"
-          },
-          "403": {
-            "description": "Current role, authority, Active account or resource scope denied"
           }
         }
       },
@@ -1162,7 +1122,6 @@
         "tags": [
           "training-result-controller"
         ],
-        "description": "Attendance support retains current role/authority rules. Non-null professional content requires the assigned Active Coach with RECORD_RESULT; omitted/null content preserves existing content. Writes require the session attendance window.",
         "operationId": "recordResult",
         "requestBody": {
           "content": {
@@ -1176,7 +1135,7 @@
         },
         "responses": {
           "200": {
-            "description": "Result and permitted attendance fields saved",
+            "description": "OK",
             "content": {
               "*/*": {
                 "schema": {
@@ -1184,18 +1143,6 @@
                 }
               }
             }
-          },
-          "401": {
-            "description": "Authentication required"
-          },
-          "404": {
-            "description": "Resource not found"
-          },
-          "403": {
-            "description": "Current role, authority, Active account or resource scope denied"
-          },
-          "400": {
-            "description": "Invalid input, state, time or workflow"
           }
         }
       }
@@ -1205,7 +1152,6 @@
         "tags": [
           "training-result-controller"
         ],
-        "description": "Same rules as single result. A denied or invalid item rolls back the entire request, including attendance, content and audit.",
         "operationId": "recordBulkResults",
         "requestBody": {
           "content": {
@@ -1218,14 +1164,8 @@
           "required": true
         },
         "responses": {
-          "401": {
-            "description": "Authentication required"
-          },
-          "404": {
-            "description": "Resource not found"
-          },
           "200": {
-            "description": "All results saved atomically",
+            "description": "OK",
             "content": {
               "*/*": {
                 "schema": {
@@ -1236,12 +1176,6 @@
                 }
               }
             }
-          },
-          "403": {
-            "description": "Current role, authority, Active account or resource scope denied"
-          },
-          "400": {
-            "description": "Invalid input, state, time or workflow"
           }
         }
       }
@@ -1251,8 +1185,6 @@
         "tags": [
           "training-plan-controller"
         ],
-        "summary": "List training plans in the current account scope",
-        "description": "Members read own private plans and shared Normal class plans with Registered or Completed enrollment and valid Paid effective-class entitlement. Reconciliation, reversed cash confirmation or Completed Refund excludes shared access. Cancelled/Pending/Waitlisted do not grant shared access. Existing Coach own-author and center scopes remain; stored plan content is not a historical version snapshot.",
         "operationId": "searchPlans",
         "parameters": [
           {
@@ -1930,14 +1862,8 @@
           "required": true
         },
         "responses": {
-          "409": {
-            "description": "Duplicate name/code or database constraint; no changes saved"
-          },
-          "401": {
-            "description": "Authentication required"
-          },
           "201": {
-            "description": "Room created",
+            "description": "Created",
             "content": {
               "*/*": {
                 "schema": {
@@ -1945,12 +1871,6 @@
                 }
               }
             }
-          },
-          "400": {
-            "description": "Invalid room input or configuration"
-          },
-          "403": {
-            "description": "Current role, authority, Active account or resource scope denied"
           }
         }
       }
@@ -2104,7 +2024,6 @@
         "tags": [
           "membership-package-controller"
         ],
-        "description": "Shared membership mutation retired. Valid authorized requests return400 LEGACY_MEMBERSHIP_RETIRED without writes. Use Normal enrollment or Advanced registration; authentication, permissions and validation still apply. No Deprecation or Sunset response header is promised.",
         "operationId": "create_4",
         "requestBody": {
           "content": {
@@ -2117,17 +2036,17 @@
           "required": true
         },
         "responses": {
-          "400": {
-            "description": "LEGACY_MEMBERSHIP_RETIRED or invalid request"
-          },
-          "401": {
-            "description": "Authentication required"
-          },
-          "403": {
-            "description": "Current role, authority, Active account or resource scope denied"
+          "201": {
+            "description": "Created",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/MembershipPackageResponse"
+                }
+              }
+            }
           }
-        },
-        "deprecated": true
+        }
       }
     },
     "/api/normal-refunds/{id}/verify-receiver": {
@@ -2499,7 +2418,6 @@
         "tags": [
           "normal-refund-controller"
         ],
-        "description": "Active CenterManager with MANAGE_INVOICES in the same center. Requires current version, eligible refund and independently verified receiver. Approval is not a completed bank transfer.",
         "operationId": "approve_1",
         "parameters": [
           {
@@ -2523,20 +2441,8 @@
           "required": true
         },
         "responses": {
-          "409": {
-            "description": "Conflict: reload current resource; body status is409 when present"
-          },
-          "401": {
-            "description": "Authentication required"
-          },
-          "404": {
-            "description": "Resource not found"
-          },
-          "403": {
-            "description": "Current role, authority, Active account or resource scope denied"
-          },
           "200": {
-            "description": "Refund approved; no bank payment implied",
+            "description": "OK",
             "content": {
               "*/*": {
                 "schema": {
@@ -2544,9 +2450,6 @@
                 }
               }
             }
-          },
-          "400": {
-            "description": "Invalid input, state, time or workflow"
           }
         }
       }
@@ -2579,11 +2482,8 @@
           "required": true
         },
         "responses": {
-          "409": {
-            "description": "Conflict: reload current resource; body status is409 when present"
-          },
           "200": {
-            "description": "Member choice saved",
+            "description": "OK",
             "content": {
               "*/*": {
                 "schema": {
@@ -2591,18 +2491,6 @@
                 }
               }
             }
-          },
-          "401": {
-            "description": "Authentication required"
-          },
-          "404": {
-            "description": "Resource not found"
-          },
-          "403": {
-            "description": "Current role, authority, Active account or resource scope denied"
-          },
-          "400": {
-            "description": "Invalid input, state, time or workflow"
           }
         }
       }
@@ -2635,11 +2523,8 @@
           "required": true
         },
         "responses": {
-          "409": {
-            "description": "Conflict: reload current resource; body status is409 when present"
-          },
           "200": {
-            "description": "Proposal applied",
+            "description": "OK",
             "content": {
               "*/*": {
                 "schema": {
@@ -2647,18 +2532,6 @@
                 }
               }
             }
-          },
-          "401": {
-            "description": "Authentication required"
-          },
-          "404": {
-            "description": "Resource not found"
-          },
-          "403": {
-            "description": "Current role, authority, Active account or resource scope denied"
-          },
-          "400": {
-            "description": "Invalid input, state, time or workflow"
           }
         }
       }
@@ -2751,7 +2624,6 @@
         "tags": [
           "member-package-controller"
         ],
-        "description": "Shared membership mutation retired. Valid authorized requests return400 LEGACY_MEMBERSHIP_RETIRED without writes. Use Normal enrollment or Advanced registration; authentication, permissions and validation still apply. No Deprecation or Sunset response header is promised.",
         "operationId": "subscribe",
         "parameters": [
           {
@@ -2775,17 +2647,17 @@
           "required": true
         },
         "responses": {
-          "400": {
-            "description": "LEGACY_MEMBERSHIP_RETIRED or invalid request"
-          },
-          "401": {
-            "description": "Authentication required"
-          },
-          "403": {
-            "description": "Current role, authority, Active account or resource scope denied"
+          "201": {
+            "description": "Created",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubscriptionOrderResponse"
+                }
+              }
+            }
           }
-        },
-        "deprecated": true
+        }
       }
     },
     "/api/members/{memberId}/subscriptions": {
@@ -2825,7 +2697,6 @@
         "tags": [
           "member-package-controller"
         ],
-        "description": "Shared membership mutation retired. Valid authorized requests return400 LEGACY_MEMBERSHIP_RETIRED without writes. Use Normal enrollment or Advanced registration; authentication, permissions and validation still apply. No Deprecation or Sunset response header is promised.",
         "operationId": "subscribe_1",
         "parameters": [
           {
@@ -2849,17 +2720,17 @@
           "required": true
         },
         "responses": {
-          "400": {
-            "description": "LEGACY_MEMBERSHIP_RETIRED or invalid request"
-          },
-          "401": {
-            "description": "Authentication required"
-          },
-          "403": {
-            "description": "Current role, authority, Active account or resource scope denied"
+          "201": {
+            "description": "Created",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubscriptionOrderResponse"
+                }
+              }
+            }
           }
-        },
-        "deprecated": true
+        }
       }
     },
     "/api/members/register": {
@@ -2939,7 +2810,6 @@
         "tags": [
           "member-package-controller"
         ],
-        "description": "This route is not retired for Advanced workflows. Shared membership returns400 LEGACY_MEMBERSHIP_RETIRED; Advanced generic extension returns400 USE_INCIDENT_RECOVERY. Missing or out-of-scope target retains404/403. Use the verified incident workflow.",
         "operationId": "extendValidity",
         "parameters": [
           {
@@ -2963,17 +2833,15 @@
           "required": true
         },
         "responses": {
-          "401": {
-            "description": "Authentication required"
-          },
-          "404": {
-            "description": "Resource not found"
-          },
-          "403": {
-            "description": "Current role, authority, Active account or resource scope denied"
-          },
-          "400": {
-            "description": "Invalid input, state, time or workflow"
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemberPackageResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -2983,7 +2851,6 @@
         "tags": [
           "member-package-controller"
         ],
-        "description": "This route is not retired for Advanced workflows. Shared membership returns400 LEGACY_MEMBERSHIP_RETIRED; Advanced generic extension returns400 USE_INCIDENT_RECOVERY. Missing or out-of-scope target retains404/403. Use the verified incident workflow.",
         "operationId": "extendValidity_1",
         "parameters": [
           {
@@ -3007,17 +2874,15 @@
           "required": true
         },
         "responses": {
-          "401": {
-            "description": "Authentication required"
-          },
-          "404": {
-            "description": "Resource not found"
-          },
-          "403": {
-            "description": "Current role, authority, Active account or resource scope denied"
-          },
-          "400": {
-            "description": "Invalid input, state, time or workflow"
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemberPackageResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -3027,7 +2892,6 @@
         "tags": [
           "member-package-controller"
         ],
-        "description": "Shared membership mutation retired. Valid authorized requests return400 LEGACY_MEMBERSHIP_RETIRED without writes. Use Normal enrollment or Advanced registration; authentication, permissions and validation still apply. No Deprecation or Sunset response header is promised.",
         "operationId": "subscribeMe",
         "requestBody": {
           "content": {
@@ -3040,17 +2904,17 @@
           "required": true
         },
         "responses": {
-          "400": {
-            "description": "LEGACY_MEMBERSHIP_RETIRED or invalid request"
-          },
-          "401": {
-            "description": "Authentication required"
-          },
-          "403": {
-            "description": "Current role, authority, Active account or resource scope denied"
+          "201": {
+            "description": "Created",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubscriptionOrderResponse"
+                }
+              }
+            }
           }
-        },
-        "deprecated": true
+        }
       }
     },
     "/api/member-packages/subscribe-me": {
@@ -3058,7 +2922,6 @@
         "tags": [
           "member-package-controller"
         ],
-        "description": "Shared membership mutation retired. Valid authorized requests return400 LEGACY_MEMBERSHIP_RETIRED without writes. Use Normal enrollment or Advanced registration; authentication, permissions and validation still apply. No Deprecation or Sunset response header is promised.",
         "operationId": "subscribeMe_1",
         "requestBody": {
           "content": {
@@ -3071,17 +2934,17 @@
           "required": true
         },
         "responses": {
-          "400": {
-            "description": "LEGACY_MEMBERSHIP_RETIRED or invalid request"
-          },
-          "401": {
-            "description": "Authentication required"
-          },
-          "403": {
-            "description": "Current role, authority, Active account or resource scope denied"
+          "201": {
+            "description": "Created",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubscriptionOrderResponse"
+                }
+              }
+            }
           }
-        },
-        "deprecated": true
+        }
       }
     },
     "/api/invoices/{id}/pay-online": {
@@ -3518,7 +3381,6 @@
         "tags": [
           "normal-change-controller"
         ],
-        "description": "Current class lifecycleVersion required. NORMAL_VERSION_STALE is in message (no code field); HTTP and body status409. Active CenterManager with MANAGE_CLASSES and same center.",
         "operationId": "propose",
         "parameters": [
           {
@@ -3543,7 +3405,7 @@
         },
         "responses": {
           "200": {
-            "description": "Proposal created",
+            "description": "OK",
             "content": {
               "*/*": {
                 "schema": {
@@ -3551,21 +3413,6 @@
                 }
               }
             }
-          },
-          "409": {
-            "description": "Conflict: reload current resource; body status is409 when present"
-          },
-          "401": {
-            "description": "Authentication required"
-          },
-          "404": {
-            "description": "Resource not found"
-          },
-          "403": {
-            "description": "Current role, authority, Active account or resource scope denied"
-          },
-          "400": {
-            "description": "Invalid input, state, time or workflow"
           }
         }
       }
@@ -3615,7 +3462,6 @@
         "tags": [
           "normal-change-controller"
         ],
-        "description": "Current class lifecycleVersion required; stale version returns409 without changes. Active CenterManager with MANAGE_CLASSES and same center.",
         "operationId": "cancel_1",
         "parameters": [
           {
@@ -3639,17 +3485,8 @@
           "required": true
         },
         "responses": {
-          "409": {
-            "description": "Conflict: reload current resource; body status is409 when present"
-          },
-          "401": {
-            "description": "Authentication required"
-          },
-          "404": {
-            "description": "Resource not found"
-          },
           "200": {
-            "description": "Class cancelled before opening",
+            "description": "OK",
             "content": {
               "*/*": {
                 "schema": {
@@ -3657,12 +3494,6 @@
                 }
               }
             }
-          },
-          "403": {
-            "description": "Current role, authority, Active account or resource scope denied"
-          },
-          "400": {
-            "description": "Invalid input, state, time or workflow"
           }
         }
       }
@@ -4099,66 +3930,6 @@
           "chat-controller"
         ],
         "operationId": "requestStaff",
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int32"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ChatConversationResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/chat/conversations/{id}/close": {
-      "post": {
-        "tags": [
-          "chat-controller"
-        ],
-        "operationId": "closeAsMember",
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int32"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ChatConversationResponse"
-                }
-              }
-            }
-          }
-        }
-      },
-      "patch": {
-        "tags": [
-          "chat-controller"
-        ],
-        "operationId": "close",
         "parameters": [
           {
             "name": "id",
@@ -5085,61 +4856,6 @@
         }
       }
     },
-    "/api/training-results/{resultId}/content": {
-      "patch": {
-        "tags": [
-          "training-result-controller"
-        ],
-        "summary": "Replace existing result content after the session",
-        "description": "Active assigned Coach and result author with RECORD_RESULT, same center. From session end inclusive until next session-day midnight exclusive in Asia/Ho_Chi_Minh. Changes content only; no result or attendance creation. Identical content is a no-op.",
-        "operationId": "updateContent",
-        "parameters": [
-          {
-            "name": "resultId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int32"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/TrainingResultContentRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Existing result with saved content",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/TrainingResultResponse"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Invalid content, session state/time or session eligibility"
-          },
-          "401": {
-            "description": "Authentication required"
-          },
-          "403": {
-            "description": "Coach permission, assignment, author, center or deadline denied"
-          },
-          "404": {
-            "description": "Existing result not found"
-          }
-        }
-      }
-    },
     "/api/staff/{id}/status": {
       "patch": {
         "tags": [
@@ -5315,7 +5031,6 @@
         "tags": [
           "membership-package-controller"
         ],
-        "description": "Shared membership mutation retired. Valid authorized requests return400 LEGACY_MEMBERSHIP_RETIRED without writes. Use Normal enrollment or Advanced registration; authentication, permissions and validation still apply. No Deprecation or Sunset response header is promised.",
         "operationId": "updateStatus_3",
         "parameters": [
           {
@@ -5339,17 +5054,17 @@
           "required": true
         },
         "responses": {
-          "400": {
-            "description": "LEGACY_MEMBERSHIP_RETIRED or invalid request"
-          },
-          "401": {
-            "description": "Authentication required"
-          },
-          "403": {
-            "description": "Current role, authority, Active account or resource scope denied"
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/MembershipPackageResponse"
+                }
+              }
+            }
           }
-        },
-        "deprecated": true
+        }
       }
     },
     "/api/notifications/{id}/read": {
@@ -5357,7 +5072,7 @@
         "tags": [
           "Notifications"
         ],
-        "summary": "Đánh dấu thông báo của tôi đã đọc",
+        "summary": "ÄÃ¡nh dáº¥u thÃ´ng bÃ¡o cá»§a tÃ´i ÄÃ£ Äá»c",
         "operationId": "markRead",
         "parameters": [
           {
@@ -5375,7 +5090,7 @@
             "description": "NOTIFICATION_NOT_FOUND"
           },
           "204": {
-            "description": "Đã cập nhật"
+            "description": "ÄÃ£ cáº­p nháº­t"
           }
         }
       }
@@ -5385,14 +5100,14 @@
         "tags": [
           "Notifications"
         ],
-        "summary": "Đánh dấu toàn bộ thông báo của tôi đã đọc",
+        "summary": "ÄÃ¡nh dáº¥u toÃ n bá» thÃ´ng bÃ¡o cá»§a tÃ´i ÄÃ£ Äá»c",
         "operationId": "markAllRead",
         "responses": {
           "401": {
-            "description": "Chưa đăng nhập"
+            "description": "ChÆ°a ÄÄng nháº­p"
           },
           "204": {
-            "description": "Đã cập nhật"
+            "description": "ÄÃ£ cáº­p nháº­t"
           }
         }
       }
@@ -5527,7 +5242,6 @@
         "tags": [
           "member-package-controller"
         ],
-        "description": "This shared route remains available for Advanced subscriptions; not deprecated. Shared membership returns400 LEGACY_MEMBERSHIP_RETIRED; Advanced changes require payment/expiry/attendance/incident workflow and cannot grant rights through generic status.",
         "operationId": "updateStatus_4",
         "parameters": [
           {
@@ -5555,7 +5269,7 @@
         },
         "responses": {
           "200": {
-            "description": "Current Advanced status retained (no-op)",
+            "description": "OK",
             "content": {
               "*/*": {
                 "schema": {
@@ -5563,18 +5277,6 @@
                 }
               }
             }
-          },
-          "401": {
-            "description": "Authentication required"
-          },
-          "404": {
-            "description": "Resource not found"
-          },
-          "403": {
-            "description": "Current role, authority, Active account or resource scope denied"
-          },
-          "400": {
-            "description": "Invalid input, state, time or workflow"
           }
         }
       }
@@ -5584,7 +5286,6 @@
         "tags": [
           "member-package-controller"
         ],
-        "description": "This shared route remains available for Advanced subscriptions; not deprecated. Shared membership returns400 LEGACY_MEMBERSHIP_RETIRED; Advanced changes require payment/expiry/attendance/incident workflow and cannot grant rights through generic status.",
         "operationId": "updateStatus_5",
         "parameters": [
           {
@@ -5612,7 +5313,7 @@
         },
         "responses": {
           "200": {
-            "description": "Current Advanced status retained (no-op)",
+            "description": "OK",
             "content": {
               "*/*": {
                 "schema": {
@@ -5620,18 +5321,6 @@
                 }
               }
             }
-          },
-          "401": {
-            "description": "Authentication required"
-          },
-          "404": {
-            "description": "Resource not found"
-          },
-          "403": {
-            "description": "Current role, authority, Active account or resource scope denied"
-          },
-          "400": {
-            "description": "Invalid input, state, time or workflow"
           }
         }
       }
@@ -5762,6 +5451,37 @@
           "chat-controller"
         ],
         "operationId": "reopen",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatConversationResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/chat/conversations/{id}/close": {
+      "patch": {
+        "tags": [
+          "chat-controller"
+        ],
+        "operationId": "close",
         "parameters": [
           {
             "name": "id",
@@ -5957,7 +5677,7 @@
         "operationId": "getAllRoles",
         "responses": {
           "200": {
-            "description": "Role catalog for Active Admin",
+            "description": "OK",
             "content": {
               "*/*": {
                 "schema": {
@@ -5968,12 +5688,6 @@
                 }
               }
             }
-          },
-          "401": {
-            "description": "Authentication required"
-          },
-          "403": {
-            "description": "Current role, authority, Active account or resource scope denied"
           }
         }
       }
@@ -5996,14 +5710,8 @@
           }
         ],
         "responses": {
-          "401": {
-            "description": "Authentication required"
-          },
-          "403": {
-            "description": "Current role, authority, Active account or resource scope denied"
-          },
           "200": {
-            "description": "Role with permissions",
+            "description": "OK",
             "content": {
               "*/*": {
                 "schema": {
@@ -6011,9 +5719,6 @@
                 }
               }
             }
-          },
-          "404": {
-            "description": "Role not found"
           }
         }
       }
@@ -6173,7 +5878,7 @@
         "operationId": "getAllPermissions",
         "responses": {
           "200": {
-            "description": "Permission catalog for Active Admin",
+            "description": "OK",
             "content": {
               "*/*": {
                 "schema": {
@@ -6184,12 +5889,6 @@
                 }
               }
             }
-          },
-          "401": {
-            "description": "Authentication required"
-          },
-          "403": {
-            "description": "Current role, authority, Active account or resource scope denied"
           }
         }
       }
@@ -6268,14 +5967,14 @@
         "tags": [
           "Notifications"
         ],
-        "summary": "Danh sách thông báo của tôi",
-        "description": "Trả về trang thông báo mới nhất trước của user đang đăng nhập.",
+        "summary": "Danh sÃ¡ch thÃ´ng bÃ¡o cá»§a tÃ´i",
+        "description": "Tráº£ vá» trang thÃ´ng bÃ¡o má»i nháº¥t trÆ°á»c cá»§a user Äang ÄÄng nháº­p.",
         "operationId": "listMine",
         "parameters": [
           {
             "name": "unreadOnly",
             "in": "query",
-            "description": "Chỉ lấy thông báo chưa đọc",
+            "description": "Chá» láº¥y thÃ´ng bÃ¡o chÆ°a Äá»c",
             "required": false,
             "schema": {
               "type": "boolean",
@@ -6285,7 +5984,7 @@
           {
             "name": "type",
             "in": "query",
-            "description": "Lọc theo loại thông báo",
+            "description": "Lá»c theo loáº¡i thÃ´ng bÃ¡o",
             "required": false,
             "schema": {
               "type": "string",
@@ -6313,7 +6012,7 @@
           {
             "name": "pageable",
             "in": "query",
-            "description": "Tham số phân trang",
+            "description": "Tham sá» phÃ¢n trang",
             "required": true,
             "schema": {
               "$ref": "#/components/schemas/Pageable"
@@ -6322,7 +6021,7 @@
         ],
         "responses": {
           "401": {
-            "description": "Chưa đăng nhập",
+            "description": "ChÆ°a ÄÄng nháº­p",
             "content": {
               "*/*": {
                 "schema": {
@@ -6332,7 +6031,7 @@
             }
           },
           "200": {
-            "description": "Danh sách thông báo",
+            "description": "Danh sÃ¡ch thÃ´ng bÃ¡o",
             "content": {
               "*/*": {
                 "schema": {
@@ -6349,11 +6048,11 @@
         "tags": [
           "Notifications"
         ],
-        "summary": "Đếm thông báo chưa đọc của tôi",
+        "summary": "Äáº¿m thÃ´ng bÃ¡o chÆ°a Äá»c cá»§a tÃ´i",
         "operationId": "unreadCount",
         "responses": {
           "200": {
-            "description": "Số lượng chưa đọc",
+            "description": "Sá» lÆ°á»£ng chÆ°a Äá»c",
             "content": {
               "*/*": {
                 "schema": {
@@ -6363,7 +6062,7 @@
             }
           },
           "401": {
-            "description": "Chưa đăng nhập",
+            "description": "ChÆ°a ÄÄng nháº­p",
             "content": {
               "*/*": {
                 "schema": {
@@ -7450,7 +7149,6 @@
           {
             "name": "startDate",
             "in": "query",
-            "description": "Inclusive first day in Asia/Ho_Chi_Minh: sessionDate for session attendance; checkInTime date for legacy lobby records without a session.",
             "required": false,
             "schema": {
               "type": "string",
@@ -7460,7 +7158,6 @@
           {
             "name": "endDate",
             "in": "query",
-            "description": "Inclusive last day in Asia/Ho_Chi_Minh: sessionDate for session attendance; checkInTime date for legacy lobby records without a session.",
             "required": false,
             "schema": {
               "type": "string",
@@ -7530,7 +7227,6 @@
           {
             "name": "startDate",
             "in": "query",
-            "description": "Inclusive first day in Asia/Ho_Chi_Minh: sessionDate for session attendance; checkInTime date for legacy lobby records without a session.",
             "required": false,
             "schema": {
               "type": "string",
@@ -7540,7 +7236,6 @@
           {
             "name": "endDate",
             "in": "query",
-            "description": "Inclusive last day in Asia/Ho_Chi_Minh: sessionDate for session attendance; checkInTime date for legacy lobby records without a session.",
             "required": false,
             "schema": {
               "type": "string",
@@ -7776,42 +7471,34 @@
           },
           "classId": {
             "type": "integer",
-            "format": "int32",
-            "nullable": true
+            "format": "int32"
           },
           "className": {
-            "type": "string",
-            "nullable": true
+            "type": "string"
           },
           "memberId": {
             "type": "integer",
-            "format": "int32",
-            "nullable": true
+            "format": "int32"
           },
           "memberName": {
-            "type": "string",
-            "nullable": true
+            "type": "string"
           },
           "title": {
             "type": "string"
           },
           "content": {
-            "type": "string",
-            "nullable": true
+            "type": "string"
           },
           "goal": {
-            "type": "string",
-            "nullable": true
+            "type": "string"
           },
           "startDate": {
             "type": "string",
-            "format": "date",
-            "nullable": true
+            "format": "date"
           },
           "endDate": {
             "type": "string",
-            "format": "date",
-            "nullable": true
+            "format": "date"
           },
           "createdAt": {
             "type": "string",
@@ -8162,15 +7849,10 @@
         "type": "object",
         "properties": {
           "name": {
-            "maxLength": 50,
-            "minLength": 0,
             "type": "string"
           },
           "location": {
-            "maxLength": 100,
-            "minLength": 0,
-            "type": "string",
-            "nullable": true
+            "type": "string"
           },
           "capacity": {
             "type": "integer",
@@ -8331,6 +8013,38 @@
           },
           "packageType": {
             "pattern": "(?i)Normal|Advanced",
+            "type": "string"
+          },
+          "totalCredit": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "MembershipPackageResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "name": {
+            "type": "string"
+          },
+          "durationDays": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "price": {
+            "type": "number"
+          },
+          "benefits": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "packageType": {
             "type": "string"
           },
           "totalCredit": {
@@ -9649,6 +9363,38 @@
           }
         }
       },
+      "SubscriptionOrderResponse": {
+        "type": "object",
+        "properties": {
+          "subscriptionId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "invoiceId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "invoiceCode": {
+            "type": "string"
+          },
+          "amount": {
+            "type": "number"
+          },
+          "paymentMethod": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "paymentUrl": {
+            "type": "string"
+          }
+        }
+      },
       "InvoiceResponse": {
         "type": "object",
         "properties": {
@@ -9770,6 +9516,70 @@
           },
           "reason": {
             "type": "string"
+          }
+        }
+      },
+      "MemberPackageResponse": {
+        "type": "object",
+        "properties": {
+          "subscriptionId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "memberId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "memberName": {
+            "type": "string"
+          },
+          "packageId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "packageName": {
+            "type": "string"
+          },
+          "price": {
+            "type": "number"
+          },
+          "startDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "endDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "status": {
+            "type": "string"
+          },
+          "packageType": {
+            "type": "string"
+          },
+          "remainingCredit": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "validityDays": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "subjectId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "primaryCoachId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "activatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
           }
         }
       },
@@ -10237,10 +10047,12 @@
             "format": "date-time"
           },
           "handoffSuggested": {
-            "type": "boolean"
+            "type": "boolean",
+            "default": false
           },
           "reasonCode": {
-            "type": "string"
+            "type": "string",
+            "nullable": true
           }
         }
       },
@@ -10537,13 +10349,13 @@
           },
           "avatarUrl": {
             "type": "string"
-          },
-          "isNewAccount": {
-            "type": "boolean"
           }
         }
       },
       "GoogleLoginRequest": {
+        "required": [
+          "credential"
+        ],
         "type": "object",
         "properties": {
           "credential": {
@@ -10820,38 +10632,6 @@
           }
         }
       },
-      "SubscriptionOrderResponse": {
-        "type": "object",
-        "properties": {
-          "subscriptionId": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "invoiceId": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "invoiceCode": {
-            "type": "string"
-          },
-          "amount": {
-            "type": "number"
-          },
-          "paymentMethod": {
-            "type": "string"
-          },
-          "status": {
-            "type": "string"
-          },
-          "expiresAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "paymentUrl": {
-            "type": "string"
-          }
-        }
-      },
       "Decision": {
         "type": "object",
         "properties": {
@@ -10860,18 +10640,6 @@
           },
           "reason": {
             "type": "string"
-          }
-        }
-      },
-      "TrainingResultContentRequest": {
-        "required": [
-          "content"
-        ],
-        "type": "object",
-        "properties": {
-          "content": {
-            "type": "string",
-            "description": "Required non-null replacement. Empty string clears content; whitespace is preserved."
           }
         }
       },
@@ -10989,70 +10757,6 @@
           },
           "healthNote": {
             "type": "string"
-          }
-        }
-      },
-      "MemberPackageResponse": {
-        "type": "object",
-        "properties": {
-          "subscriptionId": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "memberId": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "memberName": {
-            "type": "string"
-          },
-          "packageId": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "packageName": {
-            "type": "string"
-          },
-          "price": {
-            "type": "number"
-          },
-          "startDate": {
-            "type": "string",
-            "format": "date"
-          },
-          "endDate": {
-            "type": "string",
-            "format": "date"
-          },
-          "status": {
-            "type": "string"
-          },
-          "packageType": {
-            "type": "string"
-          },
-          "remainingCredit": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "validityDays": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "subjectId": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "primaryCoachId": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "activatedAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "expiresAt": {
-            "type": "string",
-            "format": "date-time"
           }
         }
       },
@@ -11412,12 +11116,12 @@
           "autowireCapableBeanFactory": {
             "$ref": "#/components/schemas/AutowireCapableBeanFactory"
           },
-          "applicationName": {
-            "type": "string"
-          },
           "startupDate": {
             "type": "integer",
             "format": "int64"
+          },
+          "applicationName": {
+            "type": "string"
           },
           "environment": {
             "$ref": "#/components/schemas/Environment"
@@ -11770,13 +11474,13 @@
       "Environment": {
         "type": "object",
         "properties": {
-          "defaultProfiles": {
+          "activeProfiles": {
             "type": "array",
             "items": {
               "type": "string"
             }
           },
-          "activeProfiles": {
+          "defaultProfiles": {
             "type": "array",
             "items": {
               "type": "string"
@@ -11787,13 +11491,13 @@
       "FilterRegistration": {
         "type": "object",
         "properties": {
-          "urlPatternMappings": {
+          "servletNameMappings": {
             "type": "array",
             "items": {
               "type": "string"
             }
           },
-          "servletNameMappings": {
+          "urlPatternMappings": {
             "type": "array",
             "items": {
               "type": "string"
@@ -11828,10 +11532,10 @@
           "is5xxServerError": {
             "type": "boolean"
           },
-          "is2xxSuccessful": {
+          "is1xxInformational": {
             "type": "boolean"
           },
-          "is1xxInformational": {
+          "is2xxSuccessful": {
             "type": "boolean"
           }
         }
@@ -11839,16 +11543,16 @@
       "JspConfigDescriptor": {
         "type": "object",
         "properties": {
-          "taglibs": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/TaglibDescriptor"
-            }
-          },
           "jspPropertyGroups": {
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/JspPropertyGroupDescriptor"
+            }
+          },
+          "taglibs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TaglibDescriptor"
             }
           }
         }
@@ -11868,28 +11572,28 @@
               "type": "string"
             }
           },
-          "errorOnELNotFound": {
+          "deferredSyntaxAllowedAsLiteral": {
             "type": "string"
           },
           "scriptingInvalid": {
             "type": "string"
           },
-          "deferredSyntaxAllowedAsLiteral": {
+          "errorOnUndeclaredNamespace": {
             "type": "string"
           },
           "trimDirectiveWhitespaces": {
             "type": "string"
           },
-          "errorOnUndeclaredNamespace": {
+          "errorOnELNotFound": {
+            "type": "string"
+          },
+          "isXml": {
             "type": "string"
           },
           "elIgnored": {
             "type": "string"
           },
           "pageEncoding": {
-            "type": "string"
-          },
-          "isXml": {
             "type": "string"
           },
           "includePreludes": {
@@ -12078,15 +11782,16 @@
           "attributeNames": {
             "type": "object"
           },
-          "serverInfo": {
-            "type": "string"
-          },
-          "contextPath": {
-            "type": "string"
-          },
-          "sessionTimeout": {
+          "effectiveMajorVersion": {
             "type": "integer",
             "format": "int32"
+          },
+          "effectiveMinorVersion": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "requestCharacterEncoding": {
+            "type": "string"
           },
           "effectiveSessionTrackingModes": {
             "uniqueItems": true,
@@ -12100,29 +11805,7 @@
               ]
             }
           },
-          "responseCharacterEncoding": {
-            "type": "string"
-          },
-          "effectiveMajorVersion": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "defaultSessionTrackingModes": {
-            "uniqueItems": true,
-            "type": "array",
-            "items": {
-              "type": "string",
-              "enum": [
-                "COOKIE",
-                "URL",
-                "SSL"
-              ]
-            }
-          },
-          "sessionCookieConfig": {
-            "$ref": "#/components/schemas/SessionCookieConfig"
-          },
-          "servletContextName": {
+          "virtualServerName": {
             "type": "string"
           },
           "filterRegistrations": {
@@ -12131,18 +11814,11 @@
               "$ref": "#/components/schemas/FilterRegistration"
             }
           },
-          "initParameterNames": {
-            "type": "object"
+          "sessionCookieConfig": {
+            "$ref": "#/components/schemas/SessionCookieConfig"
           },
-          "requestCharacterEncoding": {
+          "servletContextName": {
             "type": "string"
-          },
-          "jspConfigDescriptor": {
-            "$ref": "#/components/schemas/JspConfigDescriptor"
-          },
-          "effectiveMinorVersion": {
-            "type": "integer",
-            "format": "int32"
           },
           "sessionTrackingModes": {
             "uniqueItems": true,
@@ -12157,28 +11833,56 @@
               ]
             }
           },
-          "virtualServerName": {
-            "type": "string"
-          },
           "servletRegistrations": {
             "type": "object",
             "additionalProperties": {
               "$ref": "#/components/schemas/ServletRegistration"
             }
+          },
+          "initParameterNames": {
+            "type": "object"
+          },
+          "responseCharacterEncoding": {
+            "type": "string"
+          },
+          "defaultSessionTrackingModes": {
+            "uniqueItems": true,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "COOKIE",
+                "URL",
+                "SSL"
+              ]
+            }
+          },
+          "jspConfigDescriptor": {
+            "$ref": "#/components/schemas/JspConfigDescriptor"
+          },
+          "contextPath": {
+            "type": "string"
+          },
+          "serverInfo": {
+            "type": "string"
+          },
+          "sessionTimeout": {
+            "type": "integer",
+            "format": "int32"
           }
         }
       },
       "ServletRegistration": {
         "type": "object",
         "properties": {
-          "runAsRole": {
-            "type": "string"
-          },
           "mappings": {
             "type": "array",
             "items": {
               "type": "string"
             }
+          },
+          "runAsRole": {
+            "type": "string"
           },
           "name": {
             "type": "string"
@@ -12213,15 +11917,15 @@
             "type": "string",
             "deprecated": true
           },
-          "httpOnly": {
-            "type": "boolean"
-          },
           "secure": {
             "type": "boolean"
           },
           "maxAge": {
             "type": "integer",
             "format": "int32"
+          },
+          "httpOnly": {
+            "type": "boolean"
           },
           "domain": {
             "type": "string"
@@ -12231,43 +11935,11 @@
       "TaglibDescriptor": {
         "type": "object",
         "properties": {
-          "taglibLocation": {
-            "type": "string"
-          },
           "taglibURI": {
             "type": "string"
-          }
-        }
-      },
-      "MembershipPackageResponse": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "integer",
-            "format": "int32"
           },
-          "name": {
+          "taglibLocation": {
             "type": "string"
-          },
-          "durationDays": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "price": {
-            "type": "number"
-          },
-          "benefits": {
-            "type": "string"
-          },
-          "status": {
-            "type": "string"
-          },
-          "packageType": {
-            "type": "string"
-          },
-          "totalCredit": {
-            "type": "integer",
-            "format": "int32"
           }
         }
       },
@@ -12327,13 +11999,13 @@
       "PageNotificationResponse": {
         "type": "object",
         "properties": {
-          "totalElements": {
-            "type": "integer",
-            "format": "int64"
-          },
           "totalPages": {
             "type": "integer",
             "format": "int32"
+          },
+          "totalElements": {
+            "type": "integer",
+            "format": "int64"
           },
           "size": {
             "type": "integer",
@@ -12355,15 +12027,15 @@
               "$ref": "#/components/schemas/SortObject"
             }
           },
-          "numberOfElements": {
-            "type": "integer",
-            "format": "int32"
+          "first": {
+            "type": "boolean"
           },
           "last": {
             "type": "boolean"
           },
-          "first": {
-            "type": "boolean"
+          "numberOfElements": {
+            "type": "integer",
+            "format": "int32"
           },
           "pageable": {
             "$ref": "#/components/schemas/PageableObject"
@@ -12386,18 +12058,18 @@
               "$ref": "#/components/schemas/SortObject"
             }
           },
-          "pageSize": {
-            "type": "integer",
-            "format": "int32"
+          "paged": {
+            "type": "boolean"
           },
           "pageNumber": {
             "type": "integer",
             "format": "int32"
           },
-          "unpaged": {
-            "type": "boolean"
+          "pageSize": {
+            "type": "integer",
+            "format": "int32"
           },
-          "paged": {
+          "unpaged": {
             "type": "boolean"
           }
         }
@@ -12731,13 +12403,13 @@
       "PageChatConversationResponse": {
         "type": "object",
         "properties": {
-          "totalElements": {
-            "type": "integer",
-            "format": "int64"
-          },
           "totalPages": {
             "type": "integer",
             "format": "int32"
+          },
+          "totalElements": {
+            "type": "integer",
+            "format": "int64"
           },
           "size": {
             "type": "integer",
@@ -12759,15 +12431,15 @@
               "$ref": "#/components/schemas/SortObject"
             }
           },
-          "numberOfElements": {
-            "type": "integer",
-            "format": "int32"
+          "first": {
+            "type": "boolean"
           },
           "last": {
             "type": "boolean"
           },
-          "first": {
-            "type": "boolean"
+          "numberOfElements": {
+            "type": "integer",
+            "format": "int32"
           },
           "pageable": {
             "$ref": "#/components/schemas/PageableObject"

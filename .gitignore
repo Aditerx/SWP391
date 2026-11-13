@@ -1,7 +1,5 @@
 target/
 node_modules/
-__pycache__/
-*.pyc
 .idea/
 .vscode/
 *.iml

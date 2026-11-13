@@ -238,20 +238,6 @@ public class PhaseWorkflowHttpTest {
         assertEquals("Active",rights.get("status").asText());assertEquals(12,rights.get("remainingCredit").asInt());
         assertEquals(3000000,rights.get("price").asInt());assertEquals("2026-12-12T08:00:00",rights.get("expiresAt").asText());
         call(other,"GET","/api/members/"+memberId+"/subscriptions",null,403);
-        // Session3.2: these alias routes also serve Advanced, so they must not be retired wholesale.
-        var beforeGeneric=jdbc.queryForList("SELECT * FROM member_packages WHERE subscription_id=?",subscriptionId);
-        var invoiceBeforeGeneric=jdbc.queryForList("SELECT * FROM invoices WHERE invoice_id=?",invoiceId);
-        for(String alias:List.of("/api/member-packages/","/api/subscriptions/")) {
-            String path=alias+subscriptionId;
-            var same=call(manager,"PATCH",path+"/status",Map.of("status","Active"),200);
-            assertEquals("Active",same.path("status").asText());assertEquals(12,same.path("remainingCredit").asInt());
-            assertEquals("ADVANCED_STATUS_WORKFLOW_REQUIRED",call(manager,"PATCH",path+"/status",Map.of("status","Expired"),400).path("code").asText());
-            assertEquals("USE_INCIDENT_RECOVERY",call(manager,"POST",path+"/extend",Map.of("extendDays",15,"reason","DEMO use verified incident"),400).path("code").asText());
-            call(member,"PATCH",path+"/status",Map.of("status","Active"),403);
-            call(manager,"POST",alias+"2147483000/extend",Map.of("extendDays",15,"reason","DEMO missing target"),404);
-        }
-        assertEquals(beforeGeneric,jdbc.queryForList("SELECT * FROM member_packages WHERE subscription_id=?",subscriptionId));
-        assertEquals(invoiceBeforeGeneric,jdbc.queryForList("SELECT * FROM invoices WHERE invoice_id=?",invoiceId));
         proof("CASH-SNAPSHOT-RETRY","D02,D03,D10,D12","Catalog changed 3000000 to 3100000 after order; cashier collects once","Paid amount/purchaseAmount remain 3000000; Active/12 credit; deadline 2026-12-12T08:00 including closure; retry 409; other owner rights 403",rightsSql(),subscriptionId);
     }
     @Test @Order(2) void returnCannotPayAndSignedIpnReplaysOnlyOnce() throws Exception {
@@ -885,15 +871,9 @@ public class PhaseWorkflowHttpTest {
         assertTrue(moneyProperties.has("invoiceId"));assertTrue(moneyProperties.has("amount"));assertFalse(moneyProperties.has("sessionId"));
         assertEquals("string",spec.path("components").path("schemas").path("LocalTime").path("type").asText());
         List<String> created=List.of("/api/classes","/api/classes/normal-with-sessions","/api/classes/{classId}/enroll","/api/enrollments",
-                "/api/classes/{classId}/feedback","/api/holidays","/api/rooms","/api/sessions","/api/sessions/book-private",
+                "/api/classes/{classId}/feedback","/api/holidays","/api/packages","/api/rooms","/api/sessions","/api/sessions/book-private",
                 "/api/sessions/generate","/api/subjects","/api/training-plans","/api/evaluations");
         for(String path:created)assertTrue(spec.path("paths").path(path).path("post").path("responses").has("201"),path);
-        // Shared package creation has been retired; its old201 metadata was corrected in EC16.
-        var retiredPackage=spec.path("paths").path("/api/packages").path("post");
-        assertTrue(retiredPackage.path("deprecated").asBoolean());
-        assertTrue(retiredPackage.path("responses").has("400"));
-        assertFalse(retiredPackage.path("responses").has("201"));
-        openApiProof.put("retiredShared400",List.of("POST /api/packages"));
         List<String> noContentPost=List.of("/api/auth/change-password","/api/auth/logout","/api/auth/reset-password","/api/auth/verify-registration","/api/chat/conversations/{id}/read");
         for(String path:noContentPost)assertTrue(spec.path("paths").path(path).path("post").path("responses").has("204"),path);
         List<String> noContentDelete=List.of("/api/evaluations/{id}","/api/sessions/{id}","/api/subjects/{id}","/api/training-plans/{id}","/api/users/me/avatar");
