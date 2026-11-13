@@ -95,7 +95,7 @@ BEGIN
         END IF;
     END LOOP;
     IF NOT EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='private_session_proposals'
-                  AND column_name='id' AND (is_identity='YES' OR column_default LIKE 'nextval(%')))
+                  AND column_name='id' AND (is_identity='YES' OR column_default LIKE 'nextval(%'))
        OR NOT EXISTS(SELECT 1 FROM pg_constraint WHERE conrelid='public.private_session_proposals'::regclass AND contype='p'
                   AND conkey=ARRAY[(SELECT attnum FROM pg_attribute WHERE attrelid='public.private_session_proposals'::regclass AND attname='id')]::smallint[])
        OR NOT EXISTS(SELECT 1 FROM pg_constraint WHERE conrelid='public.private_session_proposals'::regclass AND contype='u'
