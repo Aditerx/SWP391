@@ -9,6 +9,10 @@ import java.util.Optional;
 
 public interface RoleRepository extends JpaRepository<Role, Integer> {
     @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("select r from Role r order by r.id")
+    List<Role> lockAllForAdministration();
+
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
     @Query("select r from Role r where r.id = :id")
     Optional<Role> findByIdForUpdate(@Param("id") Integer id);
 

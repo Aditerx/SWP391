@@ -18,8 +18,6 @@ import org.springframework.security.core.session.SessionInformation;
 import org.springframework.security.core.session.SessionRegistry;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetailsService;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,6 +29,7 @@ import java.util.regex.Pattern;
 @Service
 @RequiredArgsConstructor
 public class UserService {
+    private final AdministrationGuard administrationGuard;
     private final java.time.Clock clock;
     private static final Pattern PASSWORD_POLICY = Pattern.compile("^(?=.*[A-Za-z])(?=.*\\d).{8,}$");
     private final UserRepository userRepository;
@@ -136,7 +135,7 @@ public class UserService {
 
     @Transactional
     public UserResponse updateUser(Integer id, UserRequest request) {
-        User actingUser = AccountScope.actor(userRepository);
+        User actingUser = administrationGuard.lockAndRequire("MANAGE_USERS");
         User user = userRepository.findByIdForUpdate(id)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + id));
         AccountScope.require(actingUser, user.getCenterId());
@@ -179,6 +178,7 @@ public class UserService {
             syncSubtypeRecord(user, newRole.getName());
         }
 
+        administrationGuard.checkAccount(user);
         User savedUser = userRepository.save(user);
         if (savedUser.getRole() != null && "Coach".equalsIgnoreCase(savedUser.getRole().getName())
                 && request.specializationIds() != null) {
@@ -195,7 +195,7 @@ public class UserService {
 
     @Transactional
     public UserResponse updateUserStatus(Integer id, String status) {
-        User actingUser = AccountScope.actor(userRepository);
+        User actingUser = administrationGuard.lockAndRequire("MANAGE_USERS");
         User user = userRepository.findByIdForUpdate(id)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + id));
         AccountScope.require(actingUser, user.getCenterId());
@@ -204,6 +204,7 @@ public class UserService {
         String previousStatus = user.getStatus();
         String newStatus = normalizeUserStatus(status);
         user.setStatus(newStatus);
+        administrationGuard.checkAccount(user);
         User savedUser = userRepository.save(user);
 
         auditService.log(actingUser.getId(), "CHANGE_USER_STATUS", "USER", savedUser.getId(),
@@ -288,7 +289,7 @@ public class UserService {
 
     @Transactional
     public UserResponse updateUserRole(Integer id, Integer roleId) {
-        User actingUser = AccountScope.actor(userRepository);
+        User actingUser = administrationGuard.lockAndRequire("MANAGE_USERS", "MANAGE_RBAC");
         User user = userRepository.findByIdForUpdate(id)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + id));
         AccountScope.require(actingUser, user.getCenterId());
@@ -299,6 +300,7 @@ public class UserService {
 
         String previousRole = user.getRole() != null ? user.getRole().getName() : "None";
         user.setRole(newRole);
+        administrationGuard.checkAccount(user);
         User savedUser = userRepository.save(user);
         syncSubtypeRecord(savedUser, newRole.getName());
 
@@ -317,9 +319,8 @@ public class UserService {
             return;
         }
 
-        var authentication = SecurityContextHolder.getContext().getAuthentication();
-        boolean canManagePermissions = authentication != null && authentication.getAuthorities().contains(
-                new SimpleGrantedAuthority("MANAGE_PERMISSIONS"));
+        boolean canManagePermissions = AccountScope.actor(userRepository).getRole().getPermissions().stream()
+                .anyMatch(p -> "MANAGE_PERMISSIONS".equals(p.getName()));
         if (!canManagePermissions) {
             throw new AccessDeniedException("Only administrators with MANAGE_PERMISSIONS may manage Admin accounts");
         }

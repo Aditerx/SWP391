@@ -24,6 +24,7 @@ Mỗi nguồn có vai trò riêng: quyết định Owner mô tả điều phải
 - PostgreSQL/Supabase là môi trường đang dùng; SQLServer có scripts nhưng runtime chưa được nghiệm thu.
 - Mọi thời điểm nghiệp vụ dùng Spring bean `Clock`, `Asia/Ho_Chi_Minh`. Không dùng `LocalDateTime.now()` thiếu Clock.
 - FE_Project-main là bản tham khảo cũ; nguồn FE hiện hành phải được xác định khi tích hợp.
+- Khi chuẩn bị bộ demo hoặc đổi ngày anchor, đọc [rule anchor/bundle](docs/02-DEPLOYMENT-GUIDE.md#demo-anchor-rules) và [kịch bản demo](SCMS-SCRIPT-DEMO-BE.md). Sinh/kiểm local không tự mở quyền reset cloud; phần chuẩn bị/màn hình/thao tác FE trong kịch bản là gợi ý để FE duyệt, quyết định cuối thuộc FE.
 
 ## 3. Ràng buộc bắt buộc
 
@@ -75,6 +76,7 @@ Mỗi nguồn có vai trò riêng: quyết định Owner mô tả điều phải
 
 ## 6. Hướng dẫn thao tác thủ công
 
+- Trong trao đổi với Owner, khi dẫn file local để mở/review, kèm link click được với nhãn là đường dẫn Windows đầy đủ và đích tuyệt đối tương ứng; không chỉ ghi tên file hoặc đường dẫn tương đối. Không đưa nội dung credential/secret vào trao đổi.
 - Tự thực hiện phần có công cụ và quyền truy cập phù hợp; phần người dùng phải làm cần hướng dẫn cụ thể, dựa trên bước họ đã hoàn thành và giao diện hiện tại.
 - Trước khi hướng dẫn, kiểm tra tài liệu chính thức hoặc ảnh/giao diện tham khảo phù hợp. Không đoán tên menu, vị trí nút hoặc tính năng chưa xác minh.
 - Nếu không tìm được tài liệu phù hợp hoặc giao diện khác tài liệu, yêu cầu ảnh màn hình đúng bước đang vướng; chỉ cần vùng liên quan, che thông tin bí mật. Chỉ yêu cầu ảnh khi thiếu thông tin để hướng dẫn chính xác; chưa hướng dẫn tiếp các bước phụ thuộc vào giao diện chưa rõ.
