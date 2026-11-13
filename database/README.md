@@ -19,7 +19,7 @@ Quyết định, contract, code và DB thực tế có thể lệch nhau; phải
 
 ## 2. Chọn đúng script
 
-**Advanced14/11 — nâng cấp chờ Owner:** [migration24](migrations/24_advanced_session_proposals_postgres.sql) thêm duy nhất `private_session_proposals`, FK/unique/index/guard replay, không sửa hóa đơn/credit/buổi cũ. Hạn xác nhận24giờ dùng `advanced_registrations.accepted_at`, không cần backfill timestamp. Script đã kiểm cú pháp ngoại tuyến; Owner chạy trước deploy BE mới. Kết quả thực thi do Owner báo và kết quả runtime xem Active/QA; agent không tự chạy query. `database/schema_postgres.sql`/bootstrap/compiler/fixture **chưa thêm bảng mới**; đề xuất cập nhật bundle cần Owner duyệt riêng. Không chạy reset để áp migration24.
+**Advanced14/11 — nâng cấp giữ dữ liệu:** [migration24](migrations/24_advanced_session_proposals_postgres.sql) thêm duy nhất `private_session_proposals`, FK/unique/index/guard replay, không sửa hóa đơn/credit/buổi cũ. Hạn xác nhận24giờ dùng `advanced_registrations.accepted_at`, không cần backfill timestamp. Script đã kiểm cú pháp ngoại tuyến; Owner chạy trước deploy BE mới. Kết quả thực thi do Owner báo và kết quả runtime xem Active/QA; agent không tự chạy query. `database/schema_postgres.sql`/bootstrap/compiler/fixture **chưa thêm bảng mới**; đề xuất cập nhật bundle cần Owner duyệt riêng. Không chạy reset để áp migration24.
 
 Hai schema có mục đích khác nhau, không phải hai bản sao đồng bộ:
 

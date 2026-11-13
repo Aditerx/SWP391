@@ -10,7 +10,7 @@
 
 Ngày học linh hoạt trong7ca90phút, theo lịch Coach và sân. Giữ hủy trước ít nhất12giờ, hạn45ngày sử dụng và quy tắc vắng hiện hành. Member xác nhận mua khóa khác với Accept từng buổi.
 
-**Trạng thái phát hành/kiểm:** xem [Active/QA](../00-MASTER-CHECKLIST.md#active). Code/API mới cần migration được Owner chạy trước deploy; FE lưu/đọc lại trên website chưa nghiệm thu.
+**Kết quả BE:** đã phát hành; kiểm API có phiên đọc dữ liệu/quyền và các request bị từ chối đạt trong phạm vi [Active/QA](../00-MASTER-CHECKLIST.md#active). Accept ghi thật trên Render còn chờ phạm vi Owner; FE lưu/đọc lại trên website chưa nghiệm thu.
 
 **Dự toán FE/Codex:** 2–4giờ sửa và test đích; thêm45–90phút kiểm website khi BE/dữ liệu/cửa giờ sẵn. Chưa đo thực tế, không tính thời gian chờ SQL/phát hành hoặc giờ học.
 
@@ -36,7 +36,7 @@ Ví dụ request đề xuất: `{"subscriptionId":42,"subjectId":3,"coachId":7,"
 
 `advanced_registrations` → `member_packages` lưu quyền/credit/hạn; `invoices` liên kết quyền học. Bảng mới `private_session_proposals` lưu lịch chờ và phản hồi, liên kết `sessions` sau Accept. Đề xuất hết cửa trước12giờ hiển thị Expired; đúng mốc12giờ vẫn được Accept nếu các điều kiện khác đạt.
 
-**Ví dụ thành công:** trước Accept quyền học còn12credit và chưa có buổi. Sau Accept: đề xuất `Accepted`, `sessionId:101`, `session.status:Scheduled`, quyền học còn11credit. Gửi lại cùng phản hồi vẫn cùng buổi101 và11credit; phải GET đọc lại để xác nhận.
+**Ví dụ minh họa kết quả thành công:** trước Accept quyền học còn12credit và chưa có buổi. Sau Accept: đề xuất `Accepted`, `sessionId:101`, `session.status:Scheduled`, quyền học còn11credit. Gửi lại cùng phản hồi vẫn cùng buổi101 và11credit; phải GET đọc lại để xác nhận.
 
 ## 4. FE cần làm
 
@@ -50,4 +50,4 @@ Ví dụ request đề xuất: `{"subscriptionId":42,"subjectId":3,"coachId":7,"
 
 FE/Codex xác định lại main và bản website trước sửa; xác nhận `/api/auth/me` và đúng actor. Kiểm tạo đơn trước/đúng/sau24giờ, hạn hóa đơn5phút; đề xuất không giảm credit; Accept rồi đọc lại; từ chối/hết hạn; sai Member/trung tâm; trùng tài nguyên khi Accept; retry không nhân buổi/credit. Kiểm tiếp hủy12giờ và điểm danh trên buổi đã xác nhận.
 
-Chưa sửa/push FE hoặc nghiệm thu lưu trên website. Bàn giao lại file đã sửa, kết quả lưu/đọc lại từng bước và thời gian thực tế; chỉ bắt đầu kiểm tích hợp sau khi Owner chạy migration và BE mới được phát hành đúng phạm vi.
+BE mới đã có trên Render; FE chưa được sửa/push hoặc nghiệm thu lưu trong đợt này. Bàn giao lại file đã sửa, kết quả lưu/đọc lại từng bước và thời gian thực tế; ca Accept ghi thật còn chờ Owner mở phạm vi, không suy từ kiểm đọc/negative thành công.

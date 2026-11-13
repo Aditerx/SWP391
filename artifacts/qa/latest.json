@@ -35634,25 +35634,258 @@
     }
   },
   "advancedConsentRelease20261114": {
-    "status": "CANDIDATE_WAITING_CI",
-    "openedAt": "2026-11-14T05:41:44.613400+07:00",
-    "ownerSqlResult": {
-      "result": "PASS",
-      "migration_key": "20261114_advanced_session_proposals_v1",
-      "added_table": "private_session_proposals",
-      "scope": "Existing invoices, credits and sessions unchanged; demo bundle unchanged"
+  "status": "PASS_SCOPED_RENDER_READ_NEGATIVE_WAITING_POSITIVE_SCOPE",
+  "openedAt": "2026-11-14T05:46:47.040370+07:00",
+  "closedScopedCheckAt": "2026-11-14T06:00:23.675429+07:00",
+  "ownerSqlResult": {
+    "result": "PASS",
+    "migration_key": "20261114_advanced_session_proposals_v1",
+    "added_table": "private_session_proposals",
+    "scope": "Existing invoices, credits and sessions unchanged; demo bundle unchanged"
+  },
+  "ownerSqlExecutionReported": true,
+  "agentSqlExecuted": false,
+  "migrationReadback": "Authenticated GET proposal list succeeded against the same application DB target; not raw SQL, replay proof or exact executed-file byte proof.",
+  "git": {
+    "candidate": "7a57045e208266341c6a48e051a3b58b8ff3d783",
+    "releaseCommit": "0d7ee460a71eee49deb022d67fcd90c45a2cd5ae",
+    "pullRequest": {
+      "number": 28,
+      "url": "https://github.com/Aditerx/SWP391/pull/28"
     },
-    "ownerSqlExecutionReported": true,
-    "agentSqlExecuted": false,
     "testedSrcTree": "1f30de0ef72e4622713081a2f298c9db9a9f40f6",
-    "baseline": {
-      "remoteMain": "a94c9b85ec556c25426abef6f0212e3b91952fd9",
-      "runtime": "48a94559daea388b43a2f2c24cec03e3c37cd8a9",
-      "databaseTargetFingerprint": "188f67654d48aa11c970703f2cdaefc79290f1173a7dedaf93547e74bc6b1048"
+    "candidateAndPublishedBackendEqual": true,
+    "rootMainCheckoutChanged": false,
+    "runtimeCommitMayDifferFromLaterEvidenceOnlyMainCommit": true
+  },
+  "ci": {
+    "candidate": [
+      {
+        "id": 43521431467,
+        "event": "pull_request",
+        "conclusion": "success",
+        "url": "https://github.com/Aditerx/SWP391/actions/runs/43521431467"
+      },
+      {
+        "id": 43521391808,
+        "event": "push",
+        "conclusion": "success",
+        "url": "https://github.com/Aditerx/SWP391/actions/runs/43521391808"
+      }
+    ],
+    "main": [
+      {
+        "id": 43522032969,
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/Aditerx/SWP391/actions/runs/43522032969"
+      }
+    ]
+  },
+  "runtimeIdentity": {
+    "status": "UP",
+    "message": "pong",
+    "diagnosticsVersion": "1",
+    "buildCommit": "0d7ee460a71eee49deb022d67fcd90c45a2cd5ae",
+    "databaseTargetFingerprint": "188f67654d48aa11c970703f2cdaefc79290f1173a7dedaf93547e74bc6b1048"
+  },
+  "baseline": {
+    "result": "PASS_CHECKED_SCOPE",
+    "runtime": "48a94559daea388b43a2f2c24cec03e3c37cd8a9",
+    "authenticatedActors": 8,
+    "checks": 133
+  },
+  "postDeploy": {
+    "result": "PASS_CHECKED_SCOPE",
+    "authenticatedActors": 8,
+    "checks": 139,
+    "catalog": {
+      "status": "PASS",
+      "profile": "demo-reference-2026",
+      "sourceRequirements": {
+        "profile": "demo-reference-2026",
+        "subjectSlugs": [
+          "ban-cung",
+          "boi-loi",
+          "bong-ban",
+          "bong-chuyen",
+          "bong-da",
+          "bong-ro",
+          "cau-long",
+          "pickleball",
+          "quan-vot-tennis"
+        ],
+        "roomCodes": [
+          "C01-ARC-01",
+          "C01-ARC-02",
+          "C01-BAD-01",
+          "C01-BAD-02",
+          "C01-BC-01",
+          "C01-BC-02",
+          "C01-BR-01",
+          "C01-BR-02",
+          "C01-FOOT-01",
+          "C01-FOOT-02",
+          "C01-PICK-01",
+          "C01-PICK-02",
+          "C01-SWIM-01",
+          "C01-SWIM-02",
+          "C01-TEN-01",
+          "C01-TEN-02",
+          "C01-TT-01",
+          "C01-TT-02",
+          "C01-TT-03",
+          "C01-TT-04"
+        ],
+        "holidayDates": [
+          "2026-01-01",
+          "2026-02-16",
+          "2026-02-17",
+          "2026-02-18",
+          "2026-02-19",
+          "2026-02-20",
+          "2026-04-26",
+          "2026-04-30",
+          "2026-05-01",
+          "2026-09-01",
+          "2026-09-02"
+        ],
+        "sources": {
+          "database/bootstrap/scms_demo_reference.sql": "9a5a7ff5f27711d1eb314dd231952ed99ed61184a792da259a623fbc0ce03812",
+          "database/migrations/13_room_catalog_postgres.sql": "56db046f8324a2455d2e6dea8aa1011bc31683a7d2bfe5958c4cd44ca5f82a9b",
+          "database/seed_holidays_catalog_2026.sql": "008b3ebe8ff73fb6298a78c650e536ae73c53a7c78090e53443b32ea0b4e1f0d"
+        }
+      },
+      "observed": {
+        "subjectSlugs": [
+          "ban-cung",
+          "boi-loi",
+          "bong-ban",
+          "bong-chuyen",
+          "bong-da",
+          "bong-ro",
+          "cau-long",
+          "pickleball",
+          "quan-vot-tennis"
+        ],
+        "roomCodes": [
+          "C01-ARC-01",
+          "C01-ARC-02",
+          "C01-BAD-01",
+          "C01-BAD-02",
+          "C01-BC-01",
+          "C01-BC-02",
+          "C01-BR-01",
+          "C01-BR-02",
+          "C01-FOOT-01",
+          "C01-FOOT-02",
+          "C01-PICK-01",
+          "C01-PICK-02",
+          "C01-SWIM-01",
+          "C01-SWIM-02",
+          "C01-TEN-01",
+          "C01-TEN-02",
+          "C01-TT-01",
+          "C01-TT-02",
+          "C01-TT-03",
+          "C01-TT-04"
+        ],
+        "holidayDates": [
+          "2026-01-01",
+          "2026-02-16",
+          "2026-02-17",
+          "2026-02-18",
+          "2026-02-19",
+          "2026-02-20",
+          "2026-04-26",
+          "2026-04-30",
+          "2026-05-01",
+          "2026-09-01",
+          "2026-09-02",
+          "2027-01-03"
+        ],
+        "activeHolidayDates": [
+          "2027-01-03"
+        ],
+        "inactiveHolidayCount": 11,
+        "classCountByType": {
+          "Advanced": 9,
+          "Normal": 12
+        },
+        "classCountByStatus": {
+          "Open": 16,
+          "Cancelled": 2,
+          "Ongoing": 2,
+          "Closed": 1
+        }
+      },
+      "missingRequiredKeys": {},
+      "issues": [],
+      "businessFixtureReadiness": "NOT_RUN",
+      "limits": [
+        "Reference key membership only; extras and authorized flag/price changes are allowed",
+        "All-list includes inactive holidays; active-list may legitimately be empty",
+        "No proof of whole DB completeness, migration markers, fixture window, paid rights or FE browser readiness",
+        "Missing profile means NOT_RUN, never a completeness PASS"
+      ]
     },
-    "localEvidence": "advancedConsentImplementation20261114",
-    "bundleChanged": false,
-    "feSourceChanged": false,
-    "scope": "Publish the already tested Advanced change after Owner SQL; post-deploy API checks before any bundle proposal."
+    "fiveRolesVerified": true,
+    "cleanupFailures": []
+  },
+  "advancedReadNegative": {
+    "result": "PASS_READ_NEGATIVE_CHECKED_SCOPE",
+    "checks": 86,
+    "observed": [
+      "New proposal route reads executed successfully with actor/permission-specific gates.",
+      "OpenAPI has proposal/respond routes and confirmationDeadline; old direct route deprecated without201.",
+      "Actual Coach direct booking returned400 USE_PRIVATE_SESSION_PROPOSAL.",
+      "Active subscription3 with0credit rejected proposed booking with400 OUT_OF_CREDIT; nonexistent room provided as an additional no-write guard.",
+      "Member/Coach wrong-operation roles, nonexistent proposal and missing accepted field denied as expected.",
+      "Subscription data and stable proposal rows unchanged after denied requests; login sessions cleaned up."
+    ],
+    "businessWrites": false
+  },
+  "positiveCase": {
+    "status": "WAITING_OWNER_SCOPE",
+    "approvalReceived": false,
+    "preparedFixture": {
+      "subscriptionId": 6,
+      "memberId": 8,
+      "primaryCoachId": 26,
+      "remainingCredit": 12
+    },
+    "requestedAction": "One demo proposal, Member accept, then early API cancellation restoring the original credit; retain history/audit. No invoice, collection or email.",
+    "reason": "Prior user scope did not authorize cloud business writes; async question remains pending."
+  },
+  "notRun": [
+    "Successful live24hour purchase confirmation/invoice creation",
+    "Live Member proposal Accept/cancellation, pending Owner scope",
+    "FE browser/save acceptance or FE source changes",
+    "PostgreSQL migration/replay tests by agent",
+    "Provider/payment/email calls",
+    "Bundle modification or regeneration"
+  ],
+  "bundle": {
+    "changed": false,
+    "proposalDeferredUntilTestScopeSettled": true
+  },
+  "limits": "Public health or401 alone are not business acceptance. PASS applies only to the explicitly observed authenticated reads/negative checks; local/H2 positive proof remains separate.",
+  "next": "Owner selects the prepared positive case or explicitly read/negative-only scope; finish that scope before a separate bundle proposal.",
+  "evidence": {
+    "artifacts/runs/advanced-release-20261114/baseline-smoke.json": "f5b07cd7f0d9b4e683b7a5e45e937d3d4bfe026948988030adfbaeebaf6b0192",
+    "artifacts/runs/advanced-release-20261114/postdeploy-smoke.json": "dc1c41f33e6f6e91df23d2741613d34f9d3a2490ccdd43bde0d8210a61bab0d6",
+    "artifacts/runs/advanced-release-20261114/new-flow-negative.json": "e4634846fa429a515423b940e380469d231c5c8618f7fea9c927f20cee61fdde",
+    "artifacts/runs/advanced-release-20261114/deployment-poll.json": "3cda6d5ccddde1df6f0afc2bbb405a2255ed059386c40349307644523dd949fa"
+  },
+  "documentationVerification": {
+    "result": "PASS_CHECKED_SCOPE",
+    "checks": [
+      "Existing QA objects preserved; current release key only updated.",
+      "FE handoff has five sections, resolves its links and separates illustration from observed success.",
+      "Unrelated workspace files and root checkout unchanged against release baseline.",
+      "No backend source or demo bundle changes during the deployment/evidence phase."
+    ],
+    "evidenceCommitScope": "Documentation/QA only; skip CI/deploy. Runtime/source release remains the recorded merge SHA."
   }
+}
 }
