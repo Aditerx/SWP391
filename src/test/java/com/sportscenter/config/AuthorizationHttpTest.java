@@ -17,12 +17,13 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@WebMvcTest(value={SessionController.class, InvoiceController.class, TrainingResultController.class}, properties={"scms.frontend-origins=https://frontend.test", "debug=false", "logging.level.org.springframework=WARN"}) @Import(SecurityConfig.class)
+@WebMvcTest(value={SessionController.class, PrivateSessionProposalController.class, InvoiceController.class, TrainingResultController.class}, properties={"scms.frontend-origins=https://frontend.test", "debug=false", "logging.level.org.springframework=WARN"}) @Import(SecurityConfig.class)
 class AuthorizationHttpTest {
     @org.junit.jupiter.api.BeforeEach void accountFixture() { ControllerSecurityFixture.currentAccount(users); }
     @org.springframework.boot.test.mock.mockito.MockBean com.sportscenter.session.SessionAbsenceService phaseAbsence;
     @Autowired MockMvc mvc;
     @MockBean SessionService sessions;
+    @MockBean PrivateSessionProposalService proposals;
     @MockBean AttendanceService attendance;
     @MockBean UserRepository users;
     @MockBean InvoiceService invoices;
@@ -32,7 +33,8 @@ class AuthorizationHttpTest {
     static final String BOOK = "{\"subscriptionId\":1,\"coachId\":2,\"roomId\":1,\"sessionDate\":\"2026-12-01\",\"startTime\":\"06:00\",\"endTime\":\"07:30\",\"classId\":1}";
     @Test void anonymousScheduleRequestIs401() throws Exception { mvc.perform(get("/api/sessions")).andExpect(status().isUnauthorized()); }
 
-    @Test void coachCanCreateForAssignedMember() throws Exception { mvc.perform(post("/api/sessions/book-private").with(user("coach").roles("COACH")).contentType("application/json").content(BOOK)).andExpect(status().isCreated()); }
+    @Test void coachCanProposeForAssignedMember() throws Exception { mvc.perform(post("/api/private-session-proposals").with(user("coach").roles("COACH")).contentType("application/json").content(BOOK)).andExpect(status().isCreated()); }
+    @Test void directBookingCannotBypassMemberConsent() throws Exception { mvc.perform(post("/api/sessions/book-private").with(user("coach").roles("COACH")).contentType("application/json").content(BOOK)).andExpect(status().isBadRequest()).andExpect(jsonPath("code").value("USE_PRIVATE_SESSION_PROPOSAL")); org.mockito.Mockito.verifyNoInteractions(sessions); }
     @Test void receptionistCannotCreateAdvancedSchedule() throws Exception { mvc.perform(post("/api/sessions/book-private").with(user("staff").authorities(new SimpleGrantedAuthority("REGISTER_MEMBER"))).contentType("application/json").content(BOOK)).andExpect(status().isForbidden()); }
 
     @Test void memberCanReadTrainingResults() throws Exception { mvc.perform(get("/api/training-results").with(user("member").roles("MEMBER"))).andExpect(status().isOk()); }
@@ -40,7 +42,7 @@ class AuthorizationHttpTest {
     @Test void coachCanStillReadTrainingResults() throws Exception { mvc.perform(get("/api/training-results").with(user("coach").roles("COACH"))).andExpect(status().isOk()); }
     @Test void managerPermissionCanStillReadTrainingResults() throws Exception { mvc.perform(get("/api/training-results").with(user("manager").authorities(new SimpleGrantedAuthority("MANAGE_CLASSES")))).andExpect(status().isOk()); }
     
-    @Test void centerManagerWithPermissionCanBook() throws Exception { mvc.perform(post("/api/sessions/book-private").with(user("manager").authorities(new SimpleGrantedAuthority("ROLE_CENTERMANAGER"),new SimpleGrantedAuthority("MANAGE_CLASSES"))).contentType("application/json").content(BOOK)).andExpect(status().isCreated()); }
+    @Test void centerManagerWithPermissionCanPropose() throws Exception { mvc.perform(post("/api/private-session-proposals").with(user("manager").authorities(new SimpleGrantedAuthority("ROLE_CENTERMANAGER"),new SimpleGrantedAuthority("MANAGE_CLASSES"))).contentType("application/json").content(BOOK)).andExpect(status().isCreated()); }
     @Test void managerCannotConfirmCashWithoutReceptionistRole() throws Exception { mvc.perform(post("/api/invoices/1/confirm-cash").with(user("manager").authorities(new SimpleGrantedAuthority("ROLE_CENTERMANAGER"),new SimpleGrantedAuthority("MANAGE_INVOICES")))).andExpect(status().isForbidden()); }
     @Test void receptionistWithInvoicePermissionCanConfirmCash() throws Exception { mvc.perform(post("/api/invoices/1/confirm-cash").with(user("staff").authorities(new SimpleGrantedAuthority("ROLE_RECEPTIONIST"),new SimpleGrantedAuthority("MANAGE_INVOICES")))).andExpect(status().isOk()); }
     @Test void configuredFrontendCanUseCredentialedCors() throws Exception { mvc.perform(options("/api/sessions").header("Origin","https://frontend.test").header("Access-Control-Request-Method","GET")).andExpect(status().isOk()).andExpect(header().string("Access-Control-Allow-Origin","https://frontend.test")).andExpect(header().string("Access-Control-Allow-Credentials","true")); }

@@ -60,14 +60,14 @@ public class SessionController {
         return ResponseEntity.ok(sessionService.findById(id, authentication));
     }
 
-    @org.springframework.web.bind.annotation.ResponseStatus(org.springframework.http.HttpStatus.CREATED)
+    @io.swagger.v3.oas.annotations.Operation(deprecated=true,description="Direct booking is closed. Use POST /api/private-session-proposals and owner Member response; no resource or credit mutation here.")
+    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode="400",description="USE_PRIVATE_SESSION_PROPOSAL")
     @PostMapping("/book-private")
     @PreAuthorize("hasRole('COACH') or (hasAnyRole('CENTERMANAGER','ADMIN') and hasAuthority('MANAGE_CLASSES'))")
     public ResponseEntity<SessionResponse> bookPrivate(
             @Valid @RequestBody PrivateBookingRequest request,
             Authentication authentication) {
-        return ResponseEntity.status(HttpStatus.CREATED)
-                .body(sessionService.bookPrivateSession(request, authentication));
+        throw new com.sportscenter.common.exception.BusinessException("USE_PRIVATE_SESSION_PROPOSAL: Send a schedule proposal; the Member must accept before booking");
     }
 
     @PostMapping("/{sessionId}/cancel-private")

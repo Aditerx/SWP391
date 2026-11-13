@@ -35507,5 +35507,152 @@
     },
     "outcome": "RELEASED_CHECKED_SCOPE",
     "closedAt": "2026-11-13T23:35:17.551558+07:00"
+  },
+  "advancedConsentImplementation20261114": {
+    "status": "PASS_LOCAL_PRE_POST_MERGE_WAITING_OWNER_SQL",
+    "checkedAt": "2026-11-14T04:48:38.386507+07:00",
+    "scope": "Implementation and isolated Java17/H2 tests before and after local tai-to-main merge; no PostgreSQL/Supabase query or cloud deployment.",
+    "decisions": [
+      "D03: Member confirms purchase before acceptedAt+24hours; creates the existing5minute invoice only then.",
+      "D04: Immutable non-reserving schedule proposal; owner Member accepts before Scheduled and1credit deduction.",
+      "Keep7fixed90minute slots,45usable days and12hour cancellation; communicate outside SCMS."
+    ],
+    "git": {
+      "remoteMainBase": "a94c9b85ec556c25426abef6f0212e3b91952fd9",
+      "implementationCommit": "aac0ead9b75809d8ec486bb8a59b13f98fa2c55e",
+      "taiFinal": "407680ba450e876d42d3670d84e50bbda852a0c6",
+      "initialLocalMerge": "4be8ad961adde099d5170f21f40f82e78110a128",
+      "finalLocalMerge": "c744cda619b4c7639efc03bb10ae2e22d55a6628",
+      "testedSrcTree": "1f30de0ef72e4622713081a2f298c9db9a9f40f6",
+      "postmergeTestStartedAtInitialMerge": true,
+      "finalMergeDiff": "SQL identity guard syntax only; backend/test tree unchanged during postmerge clean test.",
+      "rootMainHeadPreserved": "fac80f4be081c0f2b36214ad1c8c7fef182d7abd",
+      "localIntegrationRef": "integration/advanced-main-20261114",
+      "pushPerformed": false,
+      "deployPerformed": false
+    },
+    "tests": {
+      "command": "mvnw.cmd -o --batch-mode --no-transfer-progress clean test",
+      "environment": "Java17, isolated source without .env, H2; local HTTP login/auth-me, committed-state assertions and races. PostgreSQL opt-in suites skipped.",
+      "premerge": {
+        "run": 762,
+        "pass": 728,
+        "skip": 34,
+        "failures": 0,
+        "errors": 0
+      },
+      "postmerge": {
+        "run": 762,
+        "pass": 728,
+        "skip": 34,
+        "failures": 0,
+        "errors": 0
+      },
+      "newConsentHttpTests": 10,
+      "acceptance": [
+        "At/exceeding24hours creates no invoice/subscription; just before it creates a separate5minute invoice.",
+        "Retry retains invoice/deadline, and proposal/body/response retries retain the same outcome.",
+        "Pending/rejected/expired proposal has no session or credit debit.",
+        "Only owner Member can accept; actor/center/revoked proposer/block/resource/credit guards are rechecked.",
+        "Concurrent duplicate accepts debit once; competing proposals reserve nothing and only one conflicting schedule commits.",
+        "Accepted retry after cancellation never rebooks or debits again; exact12hour acceptance and existing45day/cancellation/incident workflows retained."
+      ],
+      "initialFailuresRetained": {
+        "targetWorkflow": "OpenAPI missing201 metadata for the new proposal route; fixed with ResponseStatus(CREATED).",
+        "firstClean": {
+          "run": 761,
+          "failures": 2,
+          "errors": 0,
+          "skip": 34,
+          "cause": "Old authorization tests expected direct-booking201; updated to new proposal route, added direct bypass rejection. Business expected12h/45days/credit unchanged."
+        }
+      }
+    },
+    "openapi": {
+      "path": "artifacts/fe-handoff/openapi.json",
+      "generatedBy": "Authenticated local new workflow test",
+      "canonicalServersPreserved": true,
+      "operations": 215,
+      "sourceRoutesMatched": 215,
+      "retainedWireChecker": "REVIEW_REQUIRED: retained historical POST book-private201 is no longer published; old evidence unchanged.",
+      "newContractVerifiedByHttpTests": true
+    },
+    "migration": {
+      "path": "database/migrations/24_advanced_session_proposals_postgres.sql",
+      "syntax": {
+        "sqlSyntax": "PASS",
+        "plpgsqlSyntax": "PASS",
+        "statements": 12,
+        "blocks": 3,
+        "parser": "v8.8",
+        "databaseConnection": false,
+        "migrationExecution": "NOT_RUN",
+        "sha256": "b78305c142a6bcc20768152c0ad1f316a46294fac4199d8502f92851fa77d8e1",
+        "initialParserFailure": "Extra closing parenthesis in identity guard; corrected before any SQL execution"
+      },
+      "postgresqlExecution": "NOT_RUN",
+      "supabaseExecution": "NOT_RUN",
+      "replayAndDataPreservationRuntime": "NOT_RUN",
+      "scope": "Add private_session_proposals/FK/unique/check/index and remove direct browser grants on this new table/identity sequence only; no reset, seed or update to historical rows.",
+      "ownerInstruction": "Cần chạy query thì dừng và chờ tôi",
+      "agentPausedBeforeQuery": true,
+      "expectedOwnerResult": {
+        "result": "PASS",
+        "migration_key": "20261114_advanced_session_proposals_v1"
+      }
+    },
+    "bundle": {
+      "changed": false,
+      "regenerated": false,
+      "next": "After Owner SQL confirmation, propose bootstrap/whitelist/compiler/fixture/gate changes for separate approval; do not reset cloud."
+    },
+    "feHandoff": {
+      "path": "docs/reference/SCMS-BAN-GIAO-FE-ADVANCED-2026-11-14.md",
+      "sections": 5,
+      "lines": 53,
+      "flowArrows": true,
+      "dataAndSuccessExample": true,
+      "sourceFilesToChange": true,
+      "uiSuggestion": true,
+      "feReviewedSha": "b392bdbe6592d8a7fce4af46a2a3e850f74386e1",
+      "feSourceEdited": false,
+      "feBrowserBusinessAcceptance": "NOT_RUN"
+    },
+    "preservation": {
+      "unrelatedBaselineFilesUnchanged": 858,
+      "preExistingDeletionsPreserved": true,
+      "fourFeatureHandoffUnchanged": true,
+      "bundleAndGeneratorsUnchanged": true,
+      "credentialsRead": false,
+      "postgresqlOrSupabaseQueries": false,
+      "h2Queries": "Test fixture/assertion queries only",
+      "cloudBusinessWrites": false
+    },
+    "next": "Owner executes/reports migration24; then review the separate demo-bundle proposal and explicitly open publication/live checks. Local merge is not a remote push or deployment.",
+    "evidence": {
+      "artifacts/runs/advanced-consent-20261114/verification.json": "a80f152e76822a7875de345c64982747592e594c01a4a4bf3b92ed8b0f30cc72"
+    }
+  },
+  "advancedConsentRelease20261114": {
+    "status": "CANDIDATE_WAITING_CI",
+    "openedAt": "2026-11-14T05:41:44.613400+07:00",
+    "ownerSqlResult": {
+      "result": "PASS",
+      "migration_key": "20261114_advanced_session_proposals_v1",
+      "added_table": "private_session_proposals",
+      "scope": "Existing invoices, credits and sessions unchanged; demo bundle unchanged"
+    },
+    "ownerSqlExecutionReported": true,
+    "agentSqlExecuted": false,
+    "testedSrcTree": "1f30de0ef72e4622713081a2f298c9db9a9f40f6",
+    "baseline": {
+      "remoteMain": "a94c9b85ec556c25426abef6f0212e3b91952fd9",
+      "runtime": "48a94559daea388b43a2f2c24cec03e3c37cd8a9",
+      "databaseTargetFingerprint": "188f67654d48aa11c970703f2cdaefc79290f1173a7dedaf93547e74bc6b1048"
+    },
+    "localEvidence": "advancedConsentImplementation20261114",
+    "bundleChanged": false,
+    "feSourceChanged": false,
+    "scope": "Publish the already tested Advanced change after Owner SQL; post-deploy API checks before any bundle proposal."
   }
 }

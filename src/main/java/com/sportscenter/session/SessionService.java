@@ -218,6 +218,15 @@ public class SessionService {
 
     @Transactional
     public SessionResponse bookPrivateSession(PrivateBookingRequest request, Authentication authentication) {
+        return privateBooking(request,authentication,true);
+    }
+
+    @Transactional
+    public void validatePrivateProposal(PrivateBookingRequest request, Authentication authentication) {
+        privateBooking(request,authentication,false);
+    }
+
+    private SessionResponse privateBooking(PrivateBookingRequest request,Authentication authentication,boolean persist) {
         User currentUser = userRepository.findByEmailIgnoreCase(authentication.getName())
                 .orElseThrow(() -> new ResourceNotFoundException("Authenticated user not found"));
 
@@ -239,9 +248,11 @@ public class SessionService {
                 throw new com.sportscenter.common.exception.BusinessConflictException("IDEMPOTENCY_CONFLICT: Booking key already has a different schedule");
             return SessionResponse.from(old,"Cancelled".equals(old.getStatus())?0:1);
         }
-        if(request.incidentId()!=null)centerIncidentService.approveMakeupEnd(request.incidentId(),subscription,request.sessionDate().atTime(request.endTime()),request.extraValidityReason(),currentUser);
+        boolean pendingRecovery=!persist&&request.incidentId()!=null;
+        if(pendingRecovery)centerIncidentService.validateMakeupRequest(request.incidentId(),subscription,request.extraValidityReason(),currentUser);
+        if(persist&&request.incidentId()!=null)centerIncidentService.approveMakeupEnd(request.incidentId(),subscription,request.sessionDate().atTime(request.endTime()),request.extraValidityReason(),currentUser);
 
-        if (!"Active".equalsIgnoreCase(subscription.getStatus())) {
+        if (!pendingRecovery && !"Active".equalsIgnoreCase(subscription.getStatus())) {
             throw new BusinessException("Gói hội viên chưa được kích hoạt hoặc đã hết hiệu lực.");
         }
 
@@ -249,12 +260,12 @@ public class SessionService {
             throw new BusinessException("Chỉ có thể đặt lịch 1:1 bằng gói hội viên Advanced (12 credit).");
         }
 
-        if (subscription.getRemainingCredit() == null || subscription.getRemainingCredit() < 1) {
+        if (!pendingRecovery && (subscription.getRemainingCredit() == null || subscription.getRemainingCredit() < 1)) {
             throw new BusinessException("OUT_OF_CREDIT: Gói học 1:1 đã hết tín chỉ (Credit = 0). Vui lòng mua thêm gói.");
         }
 
-        if (!com.sportscenter.membership.EntitlementTimePolicy.validThrough(subscription,request.sessionDate().atTime(request.endTime()))
-                || subscription.getExpiresAt()==null || !subscription.getExpiresAt().isAfter(LocalDateTime.now(clock)))
+        if (!pendingRecovery && (!com.sportscenter.membership.EntitlementTimePolicy.validThrough(subscription,request.sessionDate().atTime(request.endTime()))
+                || subscription.getExpiresAt()==null || !subscription.getExpiresAt().isAfter(LocalDateTime.now(clock))))
             throw new BusinessException("ADVANCED_PACKAGE_EXPIRED: Session must end within the exact entitlement deadline");
         if(!subscription.getPrimaryCoach().getId().equals(request.coachId()))throw new BusinessException("PRIMARY_COACH_REQUIRED: Initial booking must use the Primary Coach");
         if (!"Active".equalsIgnoreCase(subscription.getMember().getStatus())) {
@@ -328,6 +339,8 @@ public class SessionService {
         if (!memberConflicts.isEmpty()) {
             throw new BusinessException("Hội viên đã có lịch học khác trong khung giờ này.");
         }
+
+        if(!persist)return null; // A proposal reserves no session, room, Coach or credit.
 
         // Deduct 1 credit
         subscription.setRemainingCredit(subscription.getRemainingCredit() - 1);
