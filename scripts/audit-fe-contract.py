@@ -234,6 +234,17 @@ if session3.get('status') == 'PASS_LOCAL_CHECKED_SCOPE':
         hash_match=True
         reference=source.get('head',reference)
         source_verification='Session3 scoped local acceptance verifies the working tree; retained wire rows remain historical structural examples, not fresh business or FE/cloud acceptance'
+release=qa.get('session123Release20261113',{}).get('predeploy',{})
+if release.get('status') == 'PASS_LOCAL_INTEGRATED':
+    clean=release.get('clean',{})
+    pg=release.get('postgres',{})
+    if (clean.get('tests',0)>0 and clean.get('failures')==0 and clean.get('errors')==0
+            and pg.get('tests',0)>0 and pg.get('failures')==0 and pg.get('errors')==0 and pg.get('skipped')==0
+            and schema_hash==release.get('openApiSha256')):
+        backend_match=source_fingerprints(ROOT)==release.get('sourceFingerprints')
+        hash_match=True
+        reference=release.get('baseMain',reference)
+        source_verification='Integrated Session1-3 and current main tested locally; retained wire examples remain historical; deployment and FE acceptance are recorded separately'
 result={'result':'PASS' if not issues and not missing and not extra and hash_match and backend_match else 'REVIEW_REQUIRED',
         'mode':'OFFLINE_RETAINED_EVIDENCE_CHECK','checkedAtUtc':dt.datetime.now(dt.timezone.utc).isoformat(),
         'backendTestsExecuted':False,'liveProbePerformed':False,'evidenceSourceCommit':reference,

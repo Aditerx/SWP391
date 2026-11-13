@@ -1,6 +1,7 @@
 package com.sportscenter.common.exception;
 
 import com.sportscenter.feedback.ClassFeedbackConflictException;
+import com.sportscenter.auth.GoogleAuthException;
 import com.sportscenter.chat.ChatException;
 import com.sportscenter.invoice.InvoiceConflictException;
 import com.sportscenter.notification.NotificationNotFoundException;
@@ -40,6 +41,14 @@ public class GlobalExceptionHandler {
             response.header("Retry-After", String.valueOf(ex.getRetryAfterSeconds()));
         }
         return response.body(body);
+    }
+
+    @ExceptionHandler(GoogleAuthException.class)
+    ResponseEntity<Map<String, Object>> googleAuth(GoogleAuthException ex) {
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("code", ex.getCode());
+        body.put("message", ex.getMessage());
+        return ResponseEntity.status(ex.getStatus()).body(body);
     }
 
     @ExceptionHandler(NotificationNotFoundException.class)

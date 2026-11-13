@@ -2,12 +2,17 @@ package com.sportscenter.chat.ai;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
+import jakarta.annotation.PostConstruct;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Component
 @ConfigurationProperties(prefix = "scms.ai.chat")
 public class ChatAiProperties {
+    private static final Logger log = LoggerFactory.getLogger(ChatAiProperties.class);
     private boolean enabled;
     private String newConversationHandler = "STAFF";
+    private String handoffMode = "SUGGEST";
     private String provider = "mock";
     private String model = "";
     private String apiKey = "";
@@ -28,12 +33,28 @@ public class ChatAiProperties {
     private String deepseekApiKey = "";
     private int deepseekTimeoutSeconds = 12;
     private int deepseekMaxTokens = 400;
+    private boolean dbToolsEnabled;
+    private boolean markdownEnabled;
+    private int toolMaxRounds = 3;
+    private int toolMaxRows = 10;
     private String mockReply = "Xin ch\u00e0o! T\u00f4i l\u00e0 tr\u1ee3 l\u00fd h\u1ed7 tr\u1ee3 SCMS. T\u00f4i c\u00f3 th\u1ec3 gi\u00fap b\u1ea1n t\u00ecm hi\u1ec3u d\u1ecbch v\u1ee5, l\u1ecbch t\u1eadp, g\u00f3i t\u1eadp v\u00e0 ch\u00ednh s\u00e1ch c\u1ee7a trung t\u00e2m. V\u1edbi th\u00f4ng tin t\u00e0i kho\u1ea3n ho\u1eb7c y\u00eau c\u1ea7u c\u1ea7n x\u1eed l\u00fd, vui l\u00f2ng ch\u1ecdn g\u1eb7p nh\u00e2n vi\u00ean.";
 
     public boolean isEnabled() { return enabled; }
     public void setEnabled(boolean enabled) { this.enabled = enabled; }
     public String getNewConversationHandler() { return newConversationHandler; }
     public void setNewConversationHandler(String value) { this.newConversationHandler = value; }
+    public String getHandoffMode() { return handoffMode; }
+    public void setHandoffMode(String value) { this.handoffMode = value; normalizeHandoffMode(); }
+    public boolean isSuggestHandoff() { return !"AUTO".equalsIgnoreCase(handoffMode); }
+    @PostConstruct
+    void normalizeHandoffMode() {
+        if ("AUTO".equalsIgnoreCase(handoffMode)) handoffMode = "AUTO";
+        else if (handoffMode == null || handoffMode.isBlank() || "SUGGEST".equalsIgnoreCase(handoffMode)) handoffMode = "SUGGEST";
+        else {
+            log.warn("Invalid scms.ai.chat.handoff-mode='{}'; using SUGGEST", handoffMode);
+            handoffMode = "SUGGEST";
+        }
+    }
     public String getProvider() { return provider; }
     public void setProvider(String provider) { this.provider = provider; }
     public String getModel() { return model; }
@@ -76,4 +97,12 @@ public class ChatAiProperties {
     public void setDeepseekTimeoutSeconds(int value) { this.deepseekTimeoutSeconds = value; }
     public int getDeepseekMaxTokens() { return deepseekMaxTokens; }
     public void setDeepseekMaxTokens(int value) { this.deepseekMaxTokens = value; }
+    public boolean isDbToolsEnabled() { return dbToolsEnabled; }
+    public void setDbToolsEnabled(boolean value) { this.dbToolsEnabled = value; }
+    public boolean isMarkdownEnabled() { return markdownEnabled; }
+    public void setMarkdownEnabled(boolean value) { this.markdownEnabled = value; }
+    public int getToolMaxRounds() { return Math.max(1, Math.min(5, toolMaxRounds)); }
+    public void setToolMaxRounds(int value) { this.toolMaxRounds = value; }
+    public int getToolMaxRows() { return Math.max(1, Math.min(25, toolMaxRows)); }
+    public void setToolMaxRows(int value) { this.toolMaxRows = value; }
 }

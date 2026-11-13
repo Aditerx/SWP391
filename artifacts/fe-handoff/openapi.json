@@ -6,8 +6,8 @@
   },
   "servers": [
     {
-      "url": "http://localhost",
-      "description": "Generated server url"
+      "url": "https://scms-app-p1gy.onrender.com",
+      "description": "Canonical FE server; schema generated from integrated local app"
     }
   ],
   "security": [
@@ -22,7 +22,7 @@
     },
     {
       "name": "Notifications",
-      "description": "ThÃ´ng bÃ¡o trong á»©ng dá»¥ng cá»§a ngÆ°á»i dÃ¹ng Äang ÄÄng nháº­p"
+      "description": "Thông báo trong ứng dụng của người dùng đang đăng nhập"
     }
   ],
   "paths": {
@@ -147,6 +147,8 @@
         "tags": [
           "training-plan-controller"
         ],
+        "summary": "Read one training plan in the current account scope",
+        "description": "Members read own private plans and shared Normal class plans with Registered or Completed enrollment and valid Paid effective-class entitlement. Reconciliation, reversed cash confirmation or Completed Refund excludes shared access. Cancelled/Pending/Waitlisted do not grant shared access. Existing Coach own-author and center scopes remain; stored plan content is not a historical version snapshot.",
         "operationId": "findById",
         "parameters": [
           {
@@ -170,9 +172,7 @@
               }
             }
           }
-        },
-        "summary": "Read one training plan in the current account scope",
-        "description": "Members read own private plans and shared Normal class plans with Registered or Completed enrollment and valid Paid effective-class entitlement. Reconciliation, reversed cash confirmation or Completed Refund excludes shared access. Cancelled/Pending/Waitlisted do not grant shared access. Existing Coach own-author and center scopes remain; stored plan content is not a historical version snapshot."
+        }
       },
       "put": {
         "tags": [
@@ -543,17 +543,17 @@
           "409": {
             "description": "Duplicate name/code or database constraint; no changes saved"
           },
-          "403": {
-            "description": "Current role, authority, Active account or resource scope denied"
-          },
           "401": {
             "description": "Authentication required"
           },
-          "400": {
-            "description": "Invalid input, state, time or workflow"
-          },
           "404": {
             "description": "Resource not found"
+          },
+          "403": {
+            "description": "Current role, authority, Active account or resource scope denied"
+          },
+          "400": {
+            "description": "Invalid input, state, time or workflow"
           }
         }
       }
@@ -587,6 +587,15 @@
           "required": true
         },
         "responses": {
+          "409": {
+            "description": "LAST_ADMIN_REQUIRED: preserve one Active Admin with MANAGE_USERS and MANAGE_PERMISSIONS"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "404": {
+            "description": "Resource not found"
+          },
           "200": {
             "description": "Complete permission set saved",
             "content": {
@@ -600,17 +609,8 @@
           "403": {
             "description": "Current role, authority, Active account or resource scope denied"
           },
-          "409": {
-            "description": "LAST_ADMIN_REQUIRED: preserve one Active Admin with MANAGE_USERS and MANAGE_PERMISSIONS"
-          },
-          "401": {
-            "description": "Authentication required"
-          },
           "400": {
             "description": "Invalid input, state, time or workflow"
-          },
-          "404": {
-            "description": "Resource not found"
           }
         }
       }
@@ -647,11 +647,11 @@
           "400": {
             "description": "LEGACY_MEMBERSHIP_RETIRED or invalid request"
           },
-          "403": {
-            "description": "Current role, authority, Active account or resource scope denied"
-          },
           "401": {
             "description": "Authentication required"
+          },
+          "403": {
+            "description": "Current role, authority, Active account or resource scope denied"
           }
         },
         "deprecated": true
@@ -1150,11 +1150,11 @@
               }
             }
           },
-          "403": {
-            "description": "Current role, authority, Active account or resource scope denied"
-          },
           "401": {
             "description": "Authentication required"
+          },
+          "403": {
+            "description": "Current role, authority, Active account or resource scope denied"
           }
         }
       },
@@ -1185,17 +1185,17 @@
               }
             }
           },
-          "403": {
-            "description": "Current role, authority, Active account or resource scope denied"
-          },
           "401": {
             "description": "Authentication required"
           },
-          "400": {
-            "description": "Invalid input, state, time or workflow"
-          },
           "404": {
             "description": "Resource not found"
+          },
+          "403": {
+            "description": "Current role, authority, Active account or resource scope denied"
+          },
+          "400": {
+            "description": "Invalid input, state, time or workflow"
           }
         }
       }
@@ -1218,11 +1218,11 @@
           "required": true
         },
         "responses": {
-          "403": {
-            "description": "Current role, authority, Active account or resource scope denied"
-          },
           "401": {
             "description": "Authentication required"
+          },
+          "404": {
+            "description": "Resource not found"
           },
           "200": {
             "description": "All results saved atomically",
@@ -1237,11 +1237,11 @@
               }
             }
           },
+          "403": {
+            "description": "Current role, authority, Active account or resource scope denied"
+          },
           "400": {
             "description": "Invalid input, state, time or workflow"
-          },
-          "404": {
-            "description": "Resource not found"
           }
         }
       }
@@ -1251,6 +1251,8 @@
         "tags": [
           "training-plan-controller"
         ],
+        "summary": "List training plans in the current account scope",
+        "description": "Members read own private plans and shared Normal class plans with Registered or Completed enrollment and valid Paid effective-class entitlement. Reconciliation, reversed cash confirmation or Completed Refund excludes shared access. Cancelled/Pending/Waitlisted do not grant shared access. Existing Coach own-author and center scopes remain; stored plan content is not a historical version snapshot.",
         "operationId": "searchPlans",
         "parameters": [
           {
@@ -1295,9 +1297,7 @@
               }
             }
           }
-        },
-        "summary": "List training plans in the current account scope",
-        "description": "Members read own private plans and shared Normal class plans with Registered or Completed enrollment and valid Paid effective-class entitlement. Reconciliation, reversed cash confirmation or Completed Refund excludes shared access. Cancelled/Pending/Waitlisted do not grant shared access. Existing Coach own-author and center scopes remain; stored plan content is not a historical version snapshot."
+        }
       },
       "post": {
         "tags": [
@@ -1933,6 +1933,9 @@
           "409": {
             "description": "Duplicate name/code or database constraint; no changes saved"
           },
+          "401": {
+            "description": "Authentication required"
+          },
           "201": {
             "description": "Room created",
             "content": {
@@ -1948,9 +1951,6 @@
           },
           "403": {
             "description": "Current role, authority, Active account or resource scope denied"
-          },
-          "401": {
-            "description": "Authentication required"
           }
         }
       }
@@ -2120,11 +2120,11 @@
           "400": {
             "description": "LEGACY_MEMBERSHIP_RETIRED or invalid request"
           },
-          "403": {
-            "description": "Current role, authority, Active account or resource scope denied"
-          },
           "401": {
             "description": "Authentication required"
+          },
+          "403": {
+            "description": "Current role, authority, Active account or resource scope denied"
           }
         },
         "deprecated": true
@@ -2526,11 +2526,14 @@
           "409": {
             "description": "Conflict: reload current resource; body status is409 when present"
           },
-          "403": {
-            "description": "Current role, authority, Active account or resource scope denied"
-          },
           "401": {
             "description": "Authentication required"
+          },
+          "404": {
+            "description": "Resource not found"
+          },
+          "403": {
+            "description": "Current role, authority, Active account or resource scope denied"
           },
           "200": {
             "description": "Refund approved; no bank payment implied",
@@ -2544,9 +2547,6 @@
           },
           "400": {
             "description": "Invalid input, state, time or workflow"
-          },
-          "404": {
-            "description": "Resource not found"
           }
         }
       }
@@ -2592,17 +2592,17 @@
               }
             }
           },
-          "403": {
-            "description": "Current role, authority, Active account or resource scope denied"
-          },
           "401": {
             "description": "Authentication required"
           },
-          "400": {
-            "description": "Invalid input, state, time or workflow"
-          },
           "404": {
             "description": "Resource not found"
+          },
+          "403": {
+            "description": "Current role, authority, Active account or resource scope denied"
+          },
+          "400": {
+            "description": "Invalid input, state, time or workflow"
           }
         }
       }
@@ -2648,17 +2648,17 @@
               }
             }
           },
-          "403": {
-            "description": "Current role, authority, Active account or resource scope denied"
-          },
           "401": {
             "description": "Authentication required"
           },
-          "400": {
-            "description": "Invalid input, state, time or workflow"
-          },
           "404": {
             "description": "Resource not found"
+          },
+          "403": {
+            "description": "Current role, authority, Active account or resource scope denied"
+          },
+          "400": {
+            "description": "Invalid input, state, time or workflow"
           }
         }
       }
@@ -2778,11 +2778,11 @@
           "400": {
             "description": "LEGACY_MEMBERSHIP_RETIRED or invalid request"
           },
-          "403": {
-            "description": "Current role, authority, Active account or resource scope denied"
-          },
           "401": {
             "description": "Authentication required"
+          },
+          "403": {
+            "description": "Current role, authority, Active account or resource scope denied"
           }
         },
         "deprecated": true
@@ -2852,11 +2852,11 @@
           "400": {
             "description": "LEGACY_MEMBERSHIP_RETIRED or invalid request"
           },
-          "403": {
-            "description": "Current role, authority, Active account or resource scope denied"
-          },
           "401": {
             "description": "Authentication required"
+          },
+          "403": {
+            "description": "Current role, authority, Active account or resource scope denied"
           }
         },
         "deprecated": true
@@ -2963,17 +2963,17 @@
           "required": true
         },
         "responses": {
-          "403": {
-            "description": "Current role, authority, Active account or resource scope denied"
-          },
           "401": {
             "description": "Authentication required"
           },
-          "400": {
-            "description": "Invalid input, state, time or workflow"
-          },
           "404": {
             "description": "Resource not found"
+          },
+          "403": {
+            "description": "Current role, authority, Active account or resource scope denied"
+          },
+          "400": {
+            "description": "Invalid input, state, time or workflow"
           }
         }
       }
@@ -3007,17 +3007,17 @@
           "required": true
         },
         "responses": {
-          "403": {
-            "description": "Current role, authority, Active account or resource scope denied"
-          },
           "401": {
             "description": "Authentication required"
           },
-          "400": {
-            "description": "Invalid input, state, time or workflow"
-          },
           "404": {
             "description": "Resource not found"
+          },
+          "403": {
+            "description": "Current role, authority, Active account or resource scope denied"
+          },
+          "400": {
+            "description": "Invalid input, state, time or workflow"
           }
         }
       }
@@ -3043,11 +3043,11 @@
           "400": {
             "description": "LEGACY_MEMBERSHIP_RETIRED or invalid request"
           },
-          "403": {
-            "description": "Current role, authority, Active account or resource scope denied"
-          },
           "401": {
             "description": "Authentication required"
+          },
+          "403": {
+            "description": "Current role, authority, Active account or resource scope denied"
           }
         },
         "deprecated": true
@@ -3074,11 +3074,11 @@
           "400": {
             "description": "LEGACY_MEMBERSHIP_RETIRED or invalid request"
           },
-          "403": {
-            "description": "Current role, authority, Active account or resource scope denied"
-          },
           "401": {
             "description": "Authentication required"
+          },
+          "403": {
+            "description": "Current role, authority, Active account or resource scope denied"
           }
         },
         "deprecated": true
@@ -3555,17 +3555,17 @@
           "409": {
             "description": "Conflict: reload current resource; body status is409 when present"
           },
-          "403": {
-            "description": "Current role, authority, Active account or resource scope denied"
-          },
           "401": {
             "description": "Authentication required"
           },
-          "400": {
-            "description": "Invalid input, state, time or workflow"
-          },
           "404": {
             "description": "Resource not found"
+          },
+          "403": {
+            "description": "Current role, authority, Active account or resource scope denied"
+          },
+          "400": {
+            "description": "Invalid input, state, time or workflow"
           }
         }
       }
@@ -3642,11 +3642,11 @@
           "409": {
             "description": "Conflict: reload current resource; body status is409 when present"
           },
-          "403": {
-            "description": "Current role, authority, Active account or resource scope denied"
-          },
           "401": {
             "description": "Authentication required"
+          },
+          "404": {
+            "description": "Resource not found"
           },
           "200": {
             "description": "Class cancelled before opening",
@@ -3658,11 +3658,11 @@
               }
             }
           },
+          "403": {
+            "description": "Current role, authority, Active account or resource scope denied"
+          },
           "400": {
             "description": "Invalid input, state, time or workflow"
-          },
-          "404": {
-            "description": "Resource not found"
           }
         }
       }
@@ -4099,6 +4099,66 @@
           "chat-controller"
         ],
         "operationId": "requestStaff",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatConversationResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/chat/conversations/{id}/close": {
+      "post": {
+        "tags": [
+          "chat-controller"
+        ],
+        "operationId": "closeAsMember",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatConversationResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "chat-controller"
+        ],
+        "operationId": "close",
         "parameters": [
           {
             "name": "id",
@@ -5025,6 +5085,61 @@
         }
       }
     },
+    "/api/training-results/{resultId}/content": {
+      "patch": {
+        "tags": [
+          "training-result-controller"
+        ],
+        "summary": "Replace existing result content after the session",
+        "description": "Active assigned Coach and result author with RECORD_RESULT, same center. From session end inclusive until next session-day midnight exclusive in Asia/Ho_Chi_Minh. Changes content only; no result or attendance creation. Identical content is a no-op.",
+        "operationId": "updateContent",
+        "parameters": [
+          {
+            "name": "resultId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TrainingResultContentRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Existing result with saved content",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/TrainingResultResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid content, session state/time or session eligibility"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Coach permission, assignment, author, center or deadline denied"
+          },
+          "404": {
+            "description": "Existing result not found"
+          }
+        }
+      }
+    },
     "/api/staff/{id}/status": {
       "patch": {
         "tags": [
@@ -5227,11 +5342,11 @@
           "400": {
             "description": "LEGACY_MEMBERSHIP_RETIRED or invalid request"
           },
-          "403": {
-            "description": "Current role, authority, Active account or resource scope denied"
-          },
           "401": {
             "description": "Authentication required"
+          },
+          "403": {
+            "description": "Current role, authority, Active account or resource scope denied"
           }
         },
         "deprecated": true
@@ -5242,7 +5357,7 @@
         "tags": [
           "Notifications"
         ],
-        "summary": "ÄÃ¡nh dáº¥u thÃ´ng bÃ¡o cá»§a tÃ´i ÄÃ£ Äá»c",
+        "summary": "Đánh dấu thông báo của tôi đã đọc",
         "operationId": "markRead",
         "parameters": [
           {
@@ -5260,7 +5375,7 @@
             "description": "NOTIFICATION_NOT_FOUND"
           },
           "204": {
-            "description": "ÄÃ£ cáº­p nháº­t"
+            "description": "Đã cập nhật"
           }
         }
       }
@@ -5270,14 +5385,14 @@
         "tags": [
           "Notifications"
         ],
-        "summary": "ÄÃ¡nh dáº¥u toÃ n bá» thÃ´ng bÃ¡o cá»§a tÃ´i ÄÃ£ Äá»c",
+        "summary": "Đánh dấu toàn bộ thông báo của tôi đã đọc",
         "operationId": "markAllRead",
         "responses": {
           "401": {
-            "description": "ChÆ°a ÄÄng nháº­p"
+            "description": "Chưa đăng nhập"
           },
           "204": {
-            "description": "ÄÃ£ cáº­p nháº­t"
+            "description": "Đã cập nhật"
           }
         }
       }
@@ -5449,17 +5564,17 @@
               }
             }
           },
-          "403": {
-            "description": "Current role, authority, Active account or resource scope denied"
-          },
           "401": {
             "description": "Authentication required"
           },
-          "400": {
-            "description": "Invalid input, state, time or workflow"
-          },
           "404": {
             "description": "Resource not found"
+          },
+          "403": {
+            "description": "Current role, authority, Active account or resource scope denied"
+          },
+          "400": {
+            "description": "Invalid input, state, time or workflow"
           }
         }
       }
@@ -5506,17 +5621,17 @@
               }
             }
           },
-          "403": {
-            "description": "Current role, authority, Active account or resource scope denied"
-          },
           "401": {
             "description": "Authentication required"
           },
-          "400": {
-            "description": "Invalid input, state, time or workflow"
-          },
           "404": {
             "description": "Resource not found"
+          },
+          "403": {
+            "description": "Current role, authority, Active account or resource scope denied"
+          },
+          "400": {
+            "description": "Invalid input, state, time or workflow"
           }
         }
       }
@@ -5647,37 +5762,6 @@
           "chat-controller"
         ],
         "operationId": "reopen",
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int32"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/ChatConversationResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/chat/conversations/{id}/close": {
-      "patch": {
-        "tags": [
-          "chat-controller"
-        ],
-        "operationId": "close",
         "parameters": [
           {
             "name": "id",
@@ -5885,11 +5969,11 @@
               }
             }
           },
-          "403": {
-            "description": "Current role, authority, Active account or resource scope denied"
-          },
           "401": {
             "description": "Authentication required"
+          },
+          "403": {
+            "description": "Current role, authority, Active account or resource scope denied"
           }
         }
       }
@@ -5912,14 +5996,11 @@
           }
         ],
         "responses": {
-          "403": {
-            "description": "Current role, authority, Active account or resource scope denied"
-          },
           "401": {
             "description": "Authentication required"
           },
-          "404": {
-            "description": "Role not found"
+          "403": {
+            "description": "Current role, authority, Active account or resource scope denied"
           },
           "200": {
             "description": "Role with permissions",
@@ -5930,6 +6011,9 @@
                 }
               }
             }
+          },
+          "404": {
+            "description": "Role not found"
           }
         }
       }
@@ -6101,11 +6185,11 @@
               }
             }
           },
-          "403": {
-            "description": "Current role, authority, Active account or resource scope denied"
-          },
           "401": {
             "description": "Authentication required"
+          },
+          "403": {
+            "description": "Current role, authority, Active account or resource scope denied"
           }
         }
       }
@@ -6184,14 +6268,14 @@
         "tags": [
           "Notifications"
         ],
-        "summary": "Danh sÃ¡ch thÃ´ng bÃ¡o cá»§a tÃ´i",
-        "description": "Tráº£ vá» trang thÃ´ng bÃ¡o má»i nháº¥t trÆ°á»c cá»§a user Äang ÄÄng nháº­p.",
+        "summary": "Danh sách thông báo của tôi",
+        "description": "Trả về trang thông báo mới nhất trước của user đang đăng nhập.",
         "operationId": "listMine",
         "parameters": [
           {
             "name": "unreadOnly",
             "in": "query",
-            "description": "Chá» láº¥y thÃ´ng bÃ¡o chÆ°a Äá»c",
+            "description": "Chỉ lấy thông báo chưa đọc",
             "required": false,
             "schema": {
               "type": "boolean",
@@ -6201,7 +6285,7 @@
           {
             "name": "type",
             "in": "query",
-            "description": "Lá»c theo loáº¡i thÃ´ng bÃ¡o",
+            "description": "Lọc theo loại thông báo",
             "required": false,
             "schema": {
               "type": "string",
@@ -6229,7 +6313,7 @@
           {
             "name": "pageable",
             "in": "query",
-            "description": "Tham sá» phÃ¢n trang",
+            "description": "Tham số phân trang",
             "required": true,
             "schema": {
               "$ref": "#/components/schemas/Pageable"
@@ -6238,7 +6322,7 @@
         ],
         "responses": {
           "401": {
-            "description": "ChÆ°a ÄÄng nháº­p",
+            "description": "Chưa đăng nhập",
             "content": {
               "*/*": {
                 "schema": {
@@ -6248,7 +6332,7 @@
             }
           },
           "200": {
-            "description": "Danh sÃ¡ch thÃ´ng bÃ¡o",
+            "description": "Danh sách thông báo",
             "content": {
               "*/*": {
                 "schema": {
@@ -6265,11 +6349,11 @@
         "tags": [
           "Notifications"
         ],
-        "summary": "Äáº¿m thÃ´ng bÃ¡o chÆ°a Äá»c cá»§a tÃ´i",
+        "summary": "Đếm thông báo chưa đọc của tôi",
         "operationId": "unreadCount",
         "responses": {
           "200": {
-            "description": "Sá» lÆ°á»£ng chÆ°a Äá»c",
+            "description": "Số lượng chưa đọc",
             "content": {
               "*/*": {
                 "schema": {
@@ -6279,7 +6363,7 @@
             }
           },
           "401": {
-            "description": "ChÆ°a ÄÄng nháº­p",
+            "description": "Chưa đăng nhập",
             "content": {
               "*/*": {
                 "schema": {
@@ -7366,22 +7450,22 @@
           {
             "name": "startDate",
             "in": "query",
+            "description": "Inclusive first day in Asia/Ho_Chi_Minh: sessionDate for session attendance; checkInTime date for legacy lobby records without a session.",
             "required": false,
             "schema": {
               "type": "string",
               "format": "date"
-            },
-            "description": "Inclusive first day in Asia/Ho_Chi_Minh: sessionDate for session attendance; checkInTime date for legacy lobby records without a session."
+            }
           },
           {
             "name": "endDate",
             "in": "query",
+            "description": "Inclusive last day in Asia/Ho_Chi_Minh: sessionDate for session attendance; checkInTime date for legacy lobby records without a session.",
             "required": false,
             "schema": {
               "type": "string",
               "format": "date"
-            },
-            "description": "Inclusive last day in Asia/Ho_Chi_Minh: sessionDate for session attendance; checkInTime date for legacy lobby records without a session."
+            }
           }
         ],
         "responses": {
@@ -7446,22 +7530,22 @@
           {
             "name": "startDate",
             "in": "query",
+            "description": "Inclusive first day in Asia/Ho_Chi_Minh: sessionDate for session attendance; checkInTime date for legacy lobby records without a session.",
             "required": false,
             "schema": {
               "type": "string",
               "format": "date"
-            },
-            "description": "Inclusive first day in Asia/Ho_Chi_Minh: sessionDate for session attendance; checkInTime date for legacy lobby records without a session."
+            }
           },
           {
             "name": "endDate",
             "in": "query",
+            "description": "Inclusive last day in Asia/Ho_Chi_Minh: sessionDate for session attendance; checkInTime date for legacy lobby records without a session.",
             "required": false,
             "schema": {
               "type": "string",
               "format": "date"
-            },
-            "description": "Inclusive last day in Asia/Ho_Chi_Minh: sessionDate for session attendance; checkInTime date for legacy lobby records without a session."
+            }
           }
         ],
         "responses": {
@@ -7517,61 +7601,6 @@
                 }
               }
             }
-          }
-        }
-      }
-    },
-    "/api/training-results/{resultId}/content": {
-      "patch": {
-        "tags": [
-          "training-result-controller"
-        ],
-        "summary": "Replace existing result content after the session",
-        "description": "Active assigned Coach and result author with RECORD_RESULT, same center. From session end inclusive until next session-day midnight exclusive in Asia/Ho_Chi_Minh. Changes content only; no result or attendance creation. Identical content is a no-op.",
-        "operationId": "updateContent",
-        "parameters": [
-          {
-            "name": "resultId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int32"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/TrainingResultContentRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "401": {
-            "description": "Authentication required"
-          },
-          "200": {
-            "description": "Existing result with saved content",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/TrainingResultResponse"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Coach permission, assignment, author, center or deadline denied"
-          },
-          "404": {
-            "description": "Existing result not found"
-          },
-          "400": {
-            "description": "Invalid content, session state/time or session eligibility"
           }
         }
       }
@@ -8302,38 +8331,6 @@
           },
           "packageType": {
             "pattern": "(?i)Normal|Advanced",
-            "type": "string"
-          },
-          "totalCredit": {
-            "type": "integer",
-            "format": "int32"
-          }
-        }
-      },
-      "MembershipPackageResponse": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "name": {
-            "type": "string"
-          },
-          "durationDays": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "price": {
-            "type": "number"
-          },
-          "benefits": {
-            "type": "string"
-          },
-          "status": {
-            "type": "string"
-          },
-          "packageType": {
             "type": "string"
           },
           "totalCredit": {
@@ -9652,38 +9649,6 @@
           }
         }
       },
-      "SubscriptionOrderResponse": {
-        "type": "object",
-        "properties": {
-          "subscriptionId": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "invoiceId": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "invoiceCode": {
-            "type": "string"
-          },
-          "amount": {
-            "type": "number"
-          },
-          "paymentMethod": {
-            "type": "string"
-          },
-          "status": {
-            "type": "string"
-          },
-          "expiresAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "paymentUrl": {
-            "type": "string"
-          }
-        }
-      },
       "InvoiceResponse": {
         "type": "object",
         "properties": {
@@ -9805,70 +9770,6 @@
           },
           "reason": {
             "type": "string"
-          }
-        }
-      },
-      "MemberPackageResponse": {
-        "type": "object",
-        "properties": {
-          "subscriptionId": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "memberId": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "memberName": {
-            "type": "string"
-          },
-          "packageId": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "packageName": {
-            "type": "string"
-          },
-          "price": {
-            "type": "number"
-          },
-          "startDate": {
-            "type": "string",
-            "format": "date"
-          },
-          "endDate": {
-            "type": "string",
-            "format": "date"
-          },
-          "status": {
-            "type": "string"
-          },
-          "packageType": {
-            "type": "string"
-          },
-          "remainingCredit": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "validityDays": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "subjectId": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "primaryCoachId": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "activatedAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "expiresAt": {
-            "type": "string",
-            "format": "date-time"
           }
         }
       },
@@ -10334,6 +10235,12 @@
           "createdAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "handoffSuggested": {
+            "type": "boolean"
+          },
+          "reasonCode": {
+            "type": "string"
           }
         }
       },
@@ -10630,13 +10537,13 @@
           },
           "avatarUrl": {
             "type": "string"
+          },
+          "isNewAccount": {
+            "type": "boolean"
           }
         }
       },
       "GoogleLoginRequest": {
-        "required": [
-          "credential"
-        ],
         "type": "object",
         "properties": {
           "credential": {
@@ -10913,6 +10820,38 @@
           }
         }
       },
+      "SubscriptionOrderResponse": {
+        "type": "object",
+        "properties": {
+          "subscriptionId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "invoiceId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "invoiceCode": {
+            "type": "string"
+          },
+          "amount": {
+            "type": "number"
+          },
+          "paymentMethod": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "paymentUrl": {
+            "type": "string"
+          }
+        }
+      },
       "Decision": {
         "type": "object",
         "properties": {
@@ -10921,6 +10860,18 @@
           },
           "reason": {
             "type": "string"
+          }
+        }
+      },
+      "TrainingResultContentRequest": {
+        "required": [
+          "content"
+        ],
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "string",
+            "description": "Required non-null replacement. Empty string clears content; whitespace is preserved."
           }
         }
       },
@@ -11038,6 +10989,70 @@
           },
           "healthNote": {
             "type": "string"
+          }
+        }
+      },
+      "MemberPackageResponse": {
+        "type": "object",
+        "properties": {
+          "subscriptionId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "memberId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "memberName": {
+            "type": "string"
+          },
+          "packageId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "packageName": {
+            "type": "string"
+          },
+          "price": {
+            "type": "number"
+          },
+          "startDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "endDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "status": {
+            "type": "string"
+          },
+          "packageType": {
+            "type": "string"
+          },
+          "remainingCredit": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "validityDays": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "subjectId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "primaryCoachId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "activatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
           }
         }
       },
@@ -11397,12 +11412,12 @@
           "autowireCapableBeanFactory": {
             "$ref": "#/components/schemas/AutowireCapableBeanFactory"
           },
+          "applicationName": {
+            "type": "string"
+          },
           "startupDate": {
             "type": "integer",
             "format": "int64"
-          },
-          "applicationName": {
-            "type": "string"
           },
           "environment": {
             "$ref": "#/components/schemas/Environment"
@@ -11755,13 +11770,13 @@
       "Environment": {
         "type": "object",
         "properties": {
-          "activeProfiles": {
+          "defaultProfiles": {
             "type": "array",
             "items": {
               "type": "string"
             }
           },
-          "defaultProfiles": {
+          "activeProfiles": {
             "type": "array",
             "items": {
               "type": "string"
@@ -11772,13 +11787,13 @@
       "FilterRegistration": {
         "type": "object",
         "properties": {
-          "servletNameMappings": {
+          "urlPatternMappings": {
             "type": "array",
             "items": {
               "type": "string"
             }
           },
-          "urlPatternMappings": {
+          "servletNameMappings": {
             "type": "array",
             "items": {
               "type": "string"
@@ -11813,10 +11828,10 @@
           "is5xxServerError": {
             "type": "boolean"
           },
-          "is1xxInformational": {
+          "is2xxSuccessful": {
             "type": "boolean"
           },
-          "is2xxSuccessful": {
+          "is1xxInformational": {
             "type": "boolean"
           }
         }
@@ -11824,16 +11839,16 @@
       "JspConfigDescriptor": {
         "type": "object",
         "properties": {
-          "jspPropertyGroups": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/JspPropertyGroupDescriptor"
-            }
-          },
           "taglibs": {
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/TaglibDescriptor"
+            }
+          },
+          "jspPropertyGroups": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/JspPropertyGroupDescriptor"
             }
           }
         }
@@ -11853,28 +11868,28 @@
               "type": "string"
             }
           },
-          "deferredSyntaxAllowedAsLiteral": {
+          "errorOnELNotFound": {
             "type": "string"
           },
           "scriptingInvalid": {
             "type": "string"
           },
-          "errorOnUndeclaredNamespace": {
+          "deferredSyntaxAllowedAsLiteral": {
             "type": "string"
           },
           "trimDirectiveWhitespaces": {
             "type": "string"
           },
-          "errorOnELNotFound": {
-            "type": "string"
-          },
-          "isXml": {
+          "errorOnUndeclaredNamespace": {
             "type": "string"
           },
           "elIgnored": {
             "type": "string"
           },
           "pageEncoding": {
+            "type": "string"
+          },
+          "isXml": {
             "type": "string"
           },
           "includePreludes": {
@@ -12063,16 +12078,15 @@
           "attributeNames": {
             "type": "object"
           },
-          "effectiveMajorVersion": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "effectiveMinorVersion": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "requestCharacterEncoding": {
+          "serverInfo": {
             "type": "string"
+          },
+          "contextPath": {
+            "type": "string"
+          },
+          "sessionTimeout": {
+            "type": "integer",
+            "format": "int32"
           },
           "effectiveSessionTrackingModes": {
             "uniqueItems": true,
@@ -12086,7 +12100,29 @@
               ]
             }
           },
-          "virtualServerName": {
+          "responseCharacterEncoding": {
+            "type": "string"
+          },
+          "effectiveMajorVersion": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "defaultSessionTrackingModes": {
+            "uniqueItems": true,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "COOKIE",
+                "URL",
+                "SSL"
+              ]
+            }
+          },
+          "sessionCookieConfig": {
+            "$ref": "#/components/schemas/SessionCookieConfig"
+          },
+          "servletContextName": {
             "type": "string"
           },
           "filterRegistrations": {
@@ -12095,11 +12131,18 @@
               "$ref": "#/components/schemas/FilterRegistration"
             }
           },
-          "sessionCookieConfig": {
-            "$ref": "#/components/schemas/SessionCookieConfig"
+          "initParameterNames": {
+            "type": "object"
           },
-          "servletContextName": {
+          "requestCharacterEncoding": {
             "type": "string"
+          },
+          "jspConfigDescriptor": {
+            "$ref": "#/components/schemas/JspConfigDescriptor"
+          },
+          "effectiveMinorVersion": {
+            "type": "integer",
+            "format": "int32"
           },
           "sessionTrackingModes": {
             "uniqueItems": true,
@@ -12114,56 +12157,28 @@
               ]
             }
           },
+          "virtualServerName": {
+            "type": "string"
+          },
           "servletRegistrations": {
             "type": "object",
             "additionalProperties": {
               "$ref": "#/components/schemas/ServletRegistration"
             }
-          },
-          "initParameterNames": {
-            "type": "object"
-          },
-          "responseCharacterEncoding": {
-            "type": "string"
-          },
-          "defaultSessionTrackingModes": {
-            "uniqueItems": true,
-            "type": "array",
-            "items": {
-              "type": "string",
-              "enum": [
-                "COOKIE",
-                "URL",
-                "SSL"
-              ]
-            }
-          },
-          "jspConfigDescriptor": {
-            "$ref": "#/components/schemas/JspConfigDescriptor"
-          },
-          "contextPath": {
-            "type": "string"
-          },
-          "serverInfo": {
-            "type": "string"
-          },
-          "sessionTimeout": {
-            "type": "integer",
-            "format": "int32"
           }
         }
       },
       "ServletRegistration": {
         "type": "object",
         "properties": {
+          "runAsRole": {
+            "type": "string"
+          },
           "mappings": {
             "type": "array",
             "items": {
               "type": "string"
             }
-          },
-          "runAsRole": {
-            "type": "string"
           },
           "name": {
             "type": "string"
@@ -12198,15 +12213,15 @@
             "type": "string",
             "deprecated": true
           },
+          "httpOnly": {
+            "type": "boolean"
+          },
           "secure": {
             "type": "boolean"
           },
           "maxAge": {
             "type": "integer",
             "format": "int32"
-          },
-          "httpOnly": {
-            "type": "boolean"
           },
           "domain": {
             "type": "string"
@@ -12216,11 +12231,43 @@
       "TaglibDescriptor": {
         "type": "object",
         "properties": {
-          "taglibURI": {
-            "type": "string"
-          },
           "taglibLocation": {
             "type": "string"
+          },
+          "taglibURI": {
+            "type": "string"
+          }
+        }
+      },
+      "MembershipPackageResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "name": {
+            "type": "string"
+          },
+          "durationDays": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "price": {
+            "type": "number"
+          },
+          "benefits": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "packageType": {
+            "type": "string"
+          },
+          "totalCredit": {
+            "type": "integer",
+            "format": "int32"
           }
         }
       },
@@ -12280,13 +12327,13 @@
       "PageNotificationResponse": {
         "type": "object",
         "properties": {
-          "totalPages": {
-            "type": "integer",
-            "format": "int32"
-          },
           "totalElements": {
             "type": "integer",
             "format": "int64"
+          },
+          "totalPages": {
+            "type": "integer",
+            "format": "int32"
           },
           "size": {
             "type": "integer",
@@ -12308,15 +12355,15 @@
               "$ref": "#/components/schemas/SortObject"
             }
           },
-          "first": {
-            "type": "boolean"
+          "numberOfElements": {
+            "type": "integer",
+            "format": "int32"
           },
           "last": {
             "type": "boolean"
           },
-          "numberOfElements": {
-            "type": "integer",
-            "format": "int32"
+          "first": {
+            "type": "boolean"
           },
           "pageable": {
             "$ref": "#/components/schemas/PageableObject"
@@ -12339,18 +12386,18 @@
               "$ref": "#/components/schemas/SortObject"
             }
           },
-          "paged": {
-            "type": "boolean"
+          "pageSize": {
+            "type": "integer",
+            "format": "int32"
           },
           "pageNumber": {
             "type": "integer",
             "format": "int32"
           },
-          "pageSize": {
-            "type": "integer",
-            "format": "int32"
-          },
           "unpaged": {
+            "type": "boolean"
+          },
+          "paged": {
             "type": "boolean"
           }
         }
@@ -12684,13 +12731,13 @@
       "PageChatConversationResponse": {
         "type": "object",
         "properties": {
-          "totalPages": {
-            "type": "integer",
-            "format": "int32"
-          },
           "totalElements": {
             "type": "integer",
             "format": "int64"
+          },
+          "totalPages": {
+            "type": "integer",
+            "format": "int32"
           },
           "size": {
             "type": "integer",
@@ -12712,15 +12759,15 @@
               "$ref": "#/components/schemas/SortObject"
             }
           },
-          "first": {
-            "type": "boolean"
+          "numberOfElements": {
+            "type": "integer",
+            "format": "int32"
           },
           "last": {
             "type": "boolean"
           },
-          "numberOfElements": {
-            "type": "integer",
-            "format": "int32"
+          "first": {
+            "type": "boolean"
           },
           "pageable": {
             "$ref": "#/components/schemas/PageableObject"
@@ -12767,18 +12814,6 @@
           },
           "scopeSource": {
             "type": "string"
-          }
-        }
-      },
-      "TrainingResultContentRequest": {
-        "required": [
-          "content"
-        ],
-        "type": "object",
-        "properties": {
-          "content": {
-            "type": "string",
-            "description": "Required non-null replacement. Empty string clears content; whitespace is preserved."
           }
         }
       }

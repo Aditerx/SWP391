@@ -23,11 +23,89 @@ import com.sun.net.httpserver.HttpServer;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
+import com.sportscenter.chat.ai.tool.AiTool;
+import com.sportscenter.chat.ai.tool.AiToolRegistry;
+import com.sportscenter.chat.ai.tool.ToolContext;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 class DeepSeekChatClientTest {
+    @Test void rejectsAdditionalToolRoundBeyondConfiguredLimit() throws Exception {
+        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/chat/completions", exchange -> {
+            String body = "{\"model\":\"deepseek-flash\",\"choices\":[{\"finish_reason\":\"tool_calls\",\"message\":{\"role\":\"assistant\",\"content\":null,\"tool_calls\":[{\"id\":\"call-1\",\"type\":\"function\",\"function\":{\"name\":\"read\",\"arguments\":\"{}\"}}]}}]}";
+            byte[] response = body.getBytes(StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().set("Content-Type", "application/json");
+            exchange.sendResponseHeaders(200, response.length);
+            exchange.getResponseBody().write(response);
+            exchange.close();
+        });
+        server.start();
+        try {
+            ChatAiProperties properties = new ChatAiProperties();
+            properties.setDeepseekApiKey("test-key");
+            properties.setDeepseekBaseUrl("http://127.0.0.1:" + server.getAddress().getPort());
+            DeepSeekChatClient client = new DeepSeekChatClient(RestClient.builder(), new org.springframework.http.client.SimpleClientHttpRequestFactory(), properties);
+            AiTool tool = mock(AiTool.class);
+            when(tool.name()).thenReturn("read");
+            when(tool.description()).thenReturn("read");
+            when(tool.parametersSchema()).thenReturn(new ObjectMapper().createObjectNode().put("type", "object"));
+            AiToolRegistry registry = mock(AiToolRegistry.class);
+            when(registry.all()).thenReturn(List.of(tool));
+            when(registry.execute(eq("read"), any(), any())).thenReturn("[]");
+            client.setToolRegistry(registry);
+            assertThrows(AiProviderException.class, () -> client.completeWithTools("s", List.of(new AiChatMessage("user", "q")), 20, new ToolContext(7), 1));
+            verify(registry, times(1)).execute(eq("read"), any(), any());
+        } finally { server.stop(0); }
+    }
+
+    @Test void toolCallsAreExecutedOnlyByRegistryAndUsageIsAccumulated() throws Exception {
+        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        java.util.concurrent.atomic.AtomicInteger calls = new java.util.concurrent.atomic.AtomicInteger();
+        java.util.concurrent.atomic.AtomicReference<String> secondRequest = new java.util.concurrent.atomic.AtomicReference<>();
+        server.createContext("/chat/completions", exchange -> {
+            String request = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+            int count = calls.incrementAndGet();
+            if (count == 2) secondRequest.set(request);
+            String body = count == 1
+                    ? "{\"model\":\"deepseek-flash\",\"choices\":[{\"finish_reason\":\"tool_calls\",\"message\":{\"role\":\"assistant\",\"content\":null,\"tool_calls\":[{\"id\":\"call-1\",\"type\":\"function\",\"function\":{\"name\":\"get_my_subscriptions\",\"arguments\":\"{}\"}}]}}],\"usage\":{\"prompt_tokens\":11,\"completion_tokens\":2}}"
+                    : "{\"model\":\"deepseek-flash\",\"choices\":[{\"finish_reason\":\"stop\",\"message\":{\"role\":\"assistant\",\"content\":\"You have one subscription.\"}}],\"usage\":{\"prompt_tokens\":13,\"completion_tokens\":4}}";
+            byte[] response = body.getBytes(StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().set("Content-Type", "application/json");
+            exchange.sendResponseHeaders(200, response.length);
+            exchange.getResponseBody().write(response);
+            exchange.close();
+        });
+        server.start();
+        try {
+            ChatAiProperties properties = new ChatAiProperties();
+            properties.setDeepseekApiKey("integration-key");
+            properties.setDeepseekBaseUrl("http://127.0.0.1:" + server.getAddress().getPort());
+            DeepSeekChatClient client = new DeepSeekChatClient(RestClient.builder(), new org.springframework.http.client.SimpleClientHttpRequestFactory(), properties);
+            AiTool tool = mock(AiTool.class);
+            when(tool.name()).thenReturn("get_my_subscriptions");
+            when(tool.description()).thenReturn("subscriptions");
+            when(tool.parametersSchema()).thenReturn(new ObjectMapper().createObjectNode().put("type", "object"));
+            AiToolRegistry registry = mock(AiToolRegistry.class);
+            when(registry.all()).thenReturn(List.of(tool));
+            when(registry.execute(eq("get_my_subscriptions"), any(), any())).thenReturn("[]");
+            client.setToolRegistry(registry);
+
+            var result = client.completeWithTools("system", List.of(new AiChatMessage("user", "my subscriptions")), 40,
+                    new ToolContext(123), 3);
+
+            assertEquals("You have one subscription.", result.completion().text());
+            assertEquals(24, result.completion().inputTokens());
+            assertEquals(6, result.completion().outputTokens());
+            assertEquals(List.of("get_my_subscriptions"), result.tools());
+            assertEquals(1, result.toolRounds());
+            assertTrue(secondRequest.get().contains("\"role\":\"tool\""));
+            assertTrue(secondRequest.get().contains("\"tool_call_id\":\"call-1\""));
+            verify(registry).execute(eq("get_my_subscriptions"), eq(new ToolContext(123)), any());
+        } finally { server.stop(0); }
+    }
+
     @Test void bindsFlatConfigurationAndSendsTrimmedAuthorizationHeader() throws Exception {
         HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         java.util.concurrent.atomic.AtomicReference<String> authorization = new java.util.concurrent.atomic.AtomicReference<>();

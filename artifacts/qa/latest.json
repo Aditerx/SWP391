@@ -30877,5 +30877,216 @@
       "brokenLinks": []
     },
     "closedAt": "2026-11-13T21:03:13.143904+07:00"
+  },
+  "deepseekChatDbTools20261112": {
+    "result": "PASS_LOCAL",
+    "checkedDate": "2026-11-12",
+    "baseCommit": "37dcf0baef914f9823e57c9fb219ee8c1b0e5cf7",
+    "workingTreeUncommitted": true,
+    "sourceTestManifest": {
+      "algorithm": "SHA-256",
+      "files": 18,
+      "digest": "16bb8f3bfed8dcba2dfc6635aaede1049105e0be9b34f899c9dcfcff2fc134eb"
+    },
+    "cleanTest": {
+      "command": ".\\mvnw.cmd -q clean test",
+      "status": "PASS",
+      "tests": 572,
+      "passed": 540,
+      "skipped": 32,
+      "failures": 0,
+      "errors": 0,
+      "java": "17.0.20.1"
+    },
+    "targetedChatToolTests": {
+      "status": "PASS",
+      "tests": 7,
+      "skipped": 0
+    },
+    "scope": [
+      "Fixed read-only DB tools, default disabled",
+      "Member scope sourced from responder context and excluded from tool schemas",
+      "DTO whitelist, bounded rows/result characters, read-only transaction",
+      "DeepSeek tool call loop, aggregate token use, fallback and round limit",
+      "Date range validation, implicit 31-day window, truncated and total",
+      "Invoice ordering by paymentDate/createdAt and newest-5 note",
+      "HCM prompt calendar, personal-tool guidance, Markdown gate and runtime fallback"
+    ],
+    "notRun": [
+      "Isolated PostgreSQL fixtures/query validation for all six tools",
+      "Real DeepSeek provider call",
+      "FE/browser and Render"
+    ],
+    "providerCalls": false,
+    "databaseMutation": false
+  },
+  "session123Release20261113": {
+    "openedAt": "2026-11-13T22:21:45.812996+07:00",
+    "ownerAuthorization": "13/11 integrate/test before deploy, merge main then smoke; undo release immediately if unsuccessful. No cloud reset/seed/migration/SQL16/provider/ZIP",
+    "originalWorkspace": {
+      "base": "88ef854ad80c828ff0980542884a612cff29843e",
+      "snapshotCommit": "3d83fda1552acc6d1843c252bb4449383f85511d",
+      "all98ChangedPathsPreservedPrivately": true,
+      "unrelatedLocalNotesNotPublished": [
+        "CM-FIX-158.md",
+        "gui-backend-doi-link-vibesports.md",
+        "image-normal-class-erd-example.png",
+        "note-db-261029.md",
+        "note-db-261110.md",
+        "note-erd-261112.md"
+      ]
+    },
+    "integration": {
+      "baseMain": "1dcf5cbf342d3d5b678c47048783dcfb10290eaf",
+      "branch": "release/session123-20261113",
+      "conflictsResolved": [
+        "artifacts/qa/latest.json",
+        "docs/00-MASTER-CHECKLIST.md"
+      ],
+      "resolution": "QA recursive three-way union preserved both sides without semantic overwrite; checklist retained both chronological/source scopes. Handler auto-merge retains GoogleAuthException and Session3 conflict/constraint fixes. OpenAPI regenerated from integrated app; unrelated demo/bundle/holiday/asset bytes unchanged."
+    },
+    "baseline": {
+      "commit": "1dcf5cbf342d3d5b678c47048783dcfb10290eaf",
+      "runtime": {
+        "message": "pong",
+        "status": "UP",
+        "diagnosticsVersion": "1",
+        "buildCommit": "1dcf5cbf342d3d5b678c47048783dcfb10290eaf",
+        "databaseTargetFingerprint": "188f67654d48aa11c970703f2cdaefc79290f1173a7dedaf93547e74bc6b1048"
+      },
+      "authenticated": {
+        "result": "PASS_CHECKED_SCOPE",
+        "actors": [
+          {
+            "alias": "ADM",
+            "role": "Admin",
+            "userId": 1
+          },
+          {
+            "alias": "CM1",
+            "role": "CenterManager",
+            "userId": 32
+          },
+          {
+            "alias": "R1",
+            "role": "Receptionist",
+            "userId": 30
+          },
+          {
+            "alias": "BAD-A",
+            "role": "Coach",
+            "userId": 26
+          },
+          {
+            "alias": "PICK-A",
+            "role": "Coach",
+            "userId": 16
+          },
+          {
+            "alias": "M01",
+            "role": "Member",
+            "userId": 2
+          },
+          {
+            "alias": "M04",
+            "role": "Member",
+            "userId": 5
+          },
+          {
+            "alias": "M14",
+            "role": "Member",
+            "userId": 37
+          }
+        ],
+        "scope": "fresh login/auth-me eight authorized DEMO accounts, five roles, read scopes and logout; public health/CORS; no business writes/provider"
+      },
+      "administration": {
+        "authenticatedAdminVerified": true,
+        "capableActiveAdminCount": 1,
+        "credentialOrAccountListRecorded": false
+      }
+    },
+    "predeploy": {
+      "status": "PASS_LOCAL_INTEGRATED",
+      "baseMain": "1dcf5cbf342d3d5b678c47048783dcfb10290eaf",
+      "clean": {
+        "tests": 751,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 34,
+        "passed": 717
+      },
+      "postgres": {
+        "tests": 204,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "passed": 204
+      },
+      "sourceFingerprints": {
+        "src/main": "649dec29bfaaf3b834a60dacecefa3f0b422ce3bf30f707be46c2f52b7e9a8e6",
+        "src/test": "aa1acb341dc52f464aac664b9f61216c4c933b7ef01c21069a329ccd186926f2",
+        "database": "6c31e63190c0e89bce7759f8565a3ead05f071958c3d6da3e15ce765cd348ea3",
+        "pom.xml": "050f3393d2ecdc350e8ac52acab26c052ba35a1ea0e509fffe45db122e882bf7",
+        "schema_postgres.sql": null,
+        "scripts/test-room-absence-postgres.py": "cbf51776a4e5238cc9afcf463133411d49c82a260cb506d97e236bc5f43b75f6",
+        "scripts/test-phases-postgres.py": "7b5cb63ef1d5385baab6dcb9c4daaa4074d56129841dc77e53f520ddf89efd3e",
+        "scripts/prepare-phases-release.py": "e6c525b8a70562527d606b0017d72199865c838df31b6bbc995acb1405deb5a5"
+      },
+      "openApiSha256": "eb6ae953c441a028bbcfd7342e58ea6d2496c53a572adc156736040749205d45",
+      "environment": "Windows Java17.0.12, H2 and PostgreSQL17.11 127.0.0.1:55440, source copies without.env; jobs/mail/provider mocks or loopback only",
+      "compiledRuntimeMatchesFinal": true,
+      "testHarnessCorrections": [
+        "Opt-in JPA slice lacked ObjectMapper: import JacksonAutoConfiguration; no runtime code change",
+        "First communication fixtures loaded bootstrap without google_sub: provisioned fresh full local schema/migrations; no cloud SQL",
+        "Close retry assertion compared nanosecond first response to microsecond DB: now first response within1microsecond of commit, retry exactly equals committed timestamp and DB remains unchanged. Expected idempotency unchanged; explained before correction."
+      ],
+      "limits": [
+        "Full clean had34skip including PG/live opt-ins; separate PG204cases0skip",
+        "Final two opt-in harness files were recompiled/exercised in verified PG run; branch CI must clean verify final committed tree before merge",
+        "DB tool PG tests prove query execution/filter shapes, not live provider behavior; existing unit tests cover scoped DTO/context",
+        "FE browser/real Google/AI/bank/mail delivery not tested"
+      ],
+      "checker": {
+        "result": "PASS",
+        "mode": "OFFLINE_RETAINED_EVIDENCE_CHECK",
+        "checkedAtUtc": "2026-11-13T15:22:33.462790+00:00",
+        "backendTestsExecuted": false,
+        "liveProbePerformed": false,
+        "evidenceSourceCommit": "1dcf5cbf342d3d5b678c47048783dcfb10290eaf",
+        "retainedWireEvidenceSourceCommit": "ec2325df07df053257df09698857b27e36489820",
+        "sourceVerification": "Integrated Session1-3 and current main tested locally; retained wire examples remain historical; deployment and FE acceptance are recorded separately",
+        "sourceTreeMatchesAcceptanceEvidence": true,
+        "retainedBackendTreeMatchesSource": true,
+        "openApiHashMatchesRecord": true,
+        "operations": 211,
+        "sourceRoutesMatched": 211,
+        "missingSourceRoutes": [],
+        "extraSourceRoutes": [],
+        "positiveRecordedExchanges": 52,
+        "bodyTypePropertyChecks": 82,
+        "wireIssues": [],
+        "limits": [
+          "Static route parser, not a complete Java or authorization analysis",
+          "Compatibility covers recorded positive status/basic types/properties; nullability/required/format/range/negative errors need separate tests",
+          "This does not rerun business tests or certify the current production state"
+        ]
+      }
+    },
+    "ci": {
+      "status": "PENDING_FINAL_COMMITTED_TREE"
+    },
+    "deployment": {
+      "status": "NOT_RUN"
+    },
+    "postDeploySmoke": {
+      "status": "NOT_RUN"
+    },
+    "rollback": {
+      "baselineMain": "1dcf5cbf342d3d5b678c47048783dcfb10290eaf",
+      "strategy": "On failed new build/smoke push forward revert commit with exact baseline tree; preserve release branch; no reset/force push or DB rollback",
+      "renderArtifactRollback": "Optional plugin unconnected; no claim of direct Render control"
+    },
+    "next": "Push isolated release branch, require CI success, merge to main, verify exact runtime identity and run scoped smoke; rollback if fail"
   }
 }
