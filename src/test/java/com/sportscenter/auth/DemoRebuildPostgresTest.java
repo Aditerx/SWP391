@@ -85,13 +85,16 @@ class DemoRebuildPostgresTest extends DemoSchemaLoginPostgresTest {
         var booking = new HashMap<String,Object>(Map.of("subscriptionId", subscription, "coachId", tennisCoach,
                 "subjectId", tennis, "roomId", archeryRoom, "sessionDate", bookingDate.toString(),
                 "startTime", "07:45", "endTime", "09:15", "requestKey", "clean-demo-private"));
-        assertEquals("AGREEMENT_REQUIRED", write(coach, "/api/sessions/book-private", booking, 400).path("code").asText());
+        assertEquals("AGREEMENT_REQUIRED", write(coach, "/api/private-session-proposals", booking, 400).path("code").asText());
         booking.put("agreementConfirmed", true);
-        assertEquals("ROOM_SUBJECT_MISMATCH", write(coach, "/api/sessions/book-private", booking, 400).path("code").asText());
+        assertEquals("ROOM_SUBJECT_MISMATCH", write(coach, "/api/private-session-proposals", booking, 400).path("code").asText());
         assertEquals(12, credit(subscription));
         booking.put("roomId", tennisRoom);
-        int session = write(coach, "/api/sessions/book-private", booking, 201).path("id").asInt();
-        assertEquals(session, write(coach, "/api/sessions/book-private", booking, 201).path("id").asInt());
+        int proposal = write(coach, "/api/private-session-proposals", booking, 201).path("id").asInt();
+        assertEquals(12,credit(subscription));
+        assertEquals(proposal, write(coach, "/api/private-session-proposals", booking, 201).path("id").asInt());
+        int session=write(member,"/api/private-session-proposals/"+proposal+"/respond",Map.of("accepted",true),200).path("sessionId").asInt();
+        assertEquals(session,write(member,"/api/private-session-proposals/"+proposal+"/respond",Map.of("accepted",true),200).path("sessionId").asInt());
         assertEquals(11, credit(subscription));
         assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM sessions WHERE subscription_id=?", Integer.class, subscription));
         assertEquals(attendanceBefore, jdbc.queryForObject("SELECT count(*) FROM attendances", Integer.class));

@@ -75,6 +75,8 @@ Owner11/11 đồng ý đồng bộ validation room name50/location100 với VARC
 <a id="d03"></a>
 ## D03 — Mua Advanced
 
+**Owner14/11:** sau Coach Accepted, Member có24giờ từ `acceptedAt` để xác nhận mua qua order; chỉ lúc đó tạo hóa đơn và bắt đầu hạn thanh toán5phút riêng. Đúng/quá24giờ chưa tạo đơn thì chặn; retry không kéo hạn hoặc sinh thêm đơn. Giữ Paid hợp lệ mới cấp12credit/bắt đầu45ngày sử dụng. Quyết định này thêm hạn xác nhận, không đổi cutoff hủy12giờ.
+
 - **Thuật ngữ/phạm vi06/11:** hệ thống hiện tại bán khóa Normal và quyền học Advanced theo môn/Primary Coach, không dùng gói hội viên chung tháng/VIP làm sản phẩm hoặc điều kiện đăng ký. `member_packages` hiện lưu đăng ký/quyền học Advanced, không phải lý do giữ mô hình hội viên chung. Owner yêu cầu loại bỏ dữ liệu thực sự thuộc mô hình cũ sau kiểm kê/phân loại, không giữ để tương thích dự phòng. Phạm vi bản ghi/DB và phụ thuộc cần xác định trước migration; không suy tên bảng hoặc package_id khác NULL là dữ liệu bỏ được. Không tự xóa quyền học/chứng từ của mô hình hiện tại.
 - Chọn môn và Primary Coach trước thu tiền; từng đăng ký có môn/Coach/credit/hạn riêng.12 credit chỉ đúng môn và Coach chính/Coach thay hợp lệ.
 - Owner06/11 duyệt B: tuyến enroll lớp/enrollments chỉ nhận Normal; Advanced bị USE_ADVANCED_REGISTRATION và phải dùng flow chọn môn/Coach nhận. Không tự cấp ghi danh từ waitlist Advanced legacy.
@@ -87,7 +89,7 @@ Owner11/11 đồng ý đồng bộ validation room name50/location100 với VARC
 <a id="d04"></a>
 ## D04 — Người tạo Advanced
 
-Primary Coach tạo sau trao đổi; Manager cùng center hỗ trợ có lý do/audit. Actor/time từ BE và xác nhận đã thống nhất đúng lịch; đây là lời xác nhận của người tạo, không thêm vòng Member bấm duyệt. Coach thay một buổi không tự được tạo mọi ca của gói.
+**Owner14/11 thay bước xác nhận khi tạo buổi:** hai người trao đổi ngoài SCMS; Primary Coach hoặc Manager cùng center có quyền/lý do gửi đề xuất lịch bất biến. Đề xuất không giữ sân/Coach/credit. Chỉ Member sở hữu Accept đúng đề xuất mới tạo Scheduled/trừ1credit sau kiểm lại nguyên khối; từ chối/quá cửa12giờ không tạo buổi/không trừ. Retry không nhân buổi/credit, đề xuất chưa chấp nhận không được tính là đã lên lịch. Giữ7ca90phút, ngày linh hoạt theo lịch hai người và tài nguyên; không thêm chat trực tiếp hoặc giờ tự do. Coach thay một buổi không tự được tạo mọi ca của gói. Các buổi đã tồn tại và workflow dời/thay/bù hiện hành giữ nguyên; không backfill đồng ý của Member.
 
 Kiểm Paid/Active, member active/block, đúng môn/Coach, credit, notice>=12h, lịch làm, phòng/Coach/Member không trùng, Holiday/Outdoor và sessionEnd<=deadline. Tạo ca/giữ tài nguyên/trừ1credit/audit cùng commit, thông báo sau commit. Retry cùng key/body cùng kết quả; khác body conflict; không tạo/thay trạng thái Advanced qua CRUD chung để bỏ workflow.
 

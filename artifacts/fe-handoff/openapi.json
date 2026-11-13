@@ -540,20 +540,20 @@
               }
             }
           },
-          "409": {
-            "description": "Duplicate name/code or database constraint; no changes saved"
+          "404": {
+            "description": "Resource not found"
           },
           "401": {
             "description": "Authentication required"
-          },
-          "404": {
-            "description": "Resource not found"
           },
           "403": {
             "description": "Current role, authority, Active account or resource scope denied"
           },
           "400": {
             "description": "Invalid input, state, time or workflow"
+          },
+          "409": {
+            "description": "Duplicate name/code or database constraint; no changes saved"
           }
         }
       }
@@ -587,14 +587,17 @@
           "required": true
         },
         "responses": {
-          "409": {
-            "description": "LAST_ADMIN_REQUIRED: preserve one Active Admin with MANAGE_USERS and MANAGE_PERMISSIONS"
+          "404": {
+            "description": "Resource not found"
           },
           "401": {
             "description": "Authentication required"
           },
-          "404": {
-            "description": "Resource not found"
+          "403": {
+            "description": "Current role, authority, Active account or resource scope denied"
+          },
+          "400": {
+            "description": "Invalid input, state, time or workflow"
           },
           "200": {
             "description": "Complete permission set saved",
@@ -606,11 +609,8 @@
               }
             }
           },
-          "403": {
-            "description": "Current role, authority, Active account or resource scope denied"
-          },
-          "400": {
-            "description": "Invalid input, state, time or workflow"
+          "409": {
+            "description": "LAST_ADMIN_REQUIRED: preserve one Active Admin with MANAGE_USERS and MANAGE_PERMISSIONS"
           }
         }
       }
@@ -644,14 +644,14 @@
           "required": true
         },
         "responses": {
-          "400": {
-            "description": "LEGACY_MEMBERSHIP_RETIRED or invalid request"
-          },
           "401": {
             "description": "Authentication required"
           },
           "403": {
             "description": "Current role, authority, Active account or resource scope denied"
+          },
+          "400": {
+            "description": "LEGACY_MEMBERSHIP_RETIRED or invalid request"
           }
         },
         "deprecated": true
@@ -1137,6 +1137,12 @@
           }
         ],
         "responses": {
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Current role, authority, Active account or resource scope denied"
+          },
           "200": {
             "description": "Results within current owner, author or center scope",
             "content": {
@@ -1149,12 +1155,6 @@
                 }
               }
             }
-          },
-          "401": {
-            "description": "Authentication required"
-          },
-          "403": {
-            "description": "Current role, authority, Active account or resource scope denied"
           }
         }
       },
@@ -1175,6 +1175,15 @@
           "required": true
         },
         "responses": {
+          "404": {
+            "description": "Resource not found"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Current role, authority, Active account or resource scope denied"
+          },
           "200": {
             "description": "Result and permitted attendance fields saved",
             "content": {
@@ -1184,15 +1193,6 @@
                 }
               }
             }
-          },
-          "401": {
-            "description": "Authentication required"
-          },
-          "404": {
-            "description": "Resource not found"
-          },
-          "403": {
-            "description": "Current role, authority, Active account or resource scope denied"
           },
           "400": {
             "description": "Invalid input, state, time or workflow"
@@ -1218,11 +1218,17 @@
           "required": true
         },
         "responses": {
+          "404": {
+            "description": "Resource not found"
+          },
           "401": {
             "description": "Authentication required"
           },
-          "404": {
-            "description": "Resource not found"
+          "403": {
+            "description": "Current role, authority, Active account or resource scope denied"
+          },
+          "400": {
+            "description": "Invalid input, state, time or workflow"
           },
           "200": {
             "description": "All results saved atomically",
@@ -1236,12 +1242,6 @@
                 }
               }
             }
-          },
-          "403": {
-            "description": "Current role, authority, Active account or resource scope denied"
-          },
-          "400": {
-            "description": "Invalid input, state, time or workflow"
           }
         }
       }
@@ -1867,6 +1867,7 @@
         "tags": [
           "session-controller"
         ],
+        "description": "Direct booking is closed. Use POST /api/private-session-proposals and owner Member response; no resource or credit mutation here.",
         "operationId": "bookPrivate",
         "requestBody": {
           "content": {
@@ -1879,8 +1880,8 @@
           "required": true
         },
         "responses": {
-          "201": {
-            "description": "Created",
+          "400": {
+            "description": "USE_PRIVATE_SESSION_PROPOSAL",
             "content": {
               "*/*": {
                 "schema": {
@@ -1889,7 +1890,8 @@
               }
             }
           }
-        }
+        },
+        "deprecated": true
       }
     },
     "/api/rooms": {
@@ -1930,11 +1932,14 @@
           "required": true
         },
         "responses": {
-          "409": {
-            "description": "Duplicate name/code or database constraint; no changes saved"
-          },
           "401": {
             "description": "Authentication required"
+          },
+          "400": {
+            "description": "Invalid room input or configuration"
+          },
+          "403": {
+            "description": "Current role, authority, Active account or resource scope denied"
           },
           "201": {
             "description": "Room created",
@@ -1946,11 +1951,100 @@
               }
             }
           },
-          "400": {
-            "description": "Invalid room input or configuration"
+          "409": {
+            "description": "Duplicate name/code or database constraint; no changes saved"
+          }
+        }
+      }
+    },
+    "/api/private-session-proposals": {
+      "get": {
+        "tags": [
+          "private-session-proposal-controller"
+        ],
+        "operationId": "list",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PrivateSessionProposalResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "private-session-proposal-controller"
+        ],
+        "operationId": "propose",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PrivateBookingRequest"
+              }
+            }
           },
-          "403": {
-            "description": "Current role, authority, Active account or resource scope denied"
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrivateSessionProposalResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/private-session-proposals/{id}/respond": {
+      "post": {
+        "tags": [
+          "private-session-proposal-controller"
+        ],
+        "operationId": "respond",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PrivateSessionProposalDecision"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrivateSessionProposalResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -1960,7 +2054,7 @@
         "tags": [
           "payment-resolution-controller"
         ],
-        "operationId": "list",
+        "operationId": "list_1",
         "responses": {
           "200": {
             "description": "OK",
@@ -2117,14 +2211,14 @@
           "required": true
         },
         "responses": {
-          "400": {
-            "description": "LEGACY_MEMBERSHIP_RETIRED or invalid request"
-          },
           "401": {
             "description": "Authentication required"
           },
           "403": {
             "description": "Current role, authority, Active account or resource scope denied"
+          },
+          "400": {
+            "description": "LEGACY_MEMBERSHIP_RETIRED or invalid request"
           }
         },
         "deprecated": true
@@ -2523,17 +2617,20 @@
           "required": true
         },
         "responses": {
-          "409": {
-            "description": "Conflict: reload current resource; body status is409 when present"
+          "404": {
+            "description": "Resource not found"
           },
           "401": {
             "description": "Authentication required"
           },
-          "404": {
-            "description": "Resource not found"
-          },
           "403": {
             "description": "Current role, authority, Active account or resource scope denied"
+          },
+          "400": {
+            "description": "Invalid input, state, time or workflow"
+          },
+          "409": {
+            "description": "Conflict: reload current resource; body status is409 when present"
           },
           "200": {
             "description": "Refund approved; no bank payment implied",
@@ -2544,9 +2641,6 @@
                 }
               }
             }
-          },
-          "400": {
-            "description": "Invalid input, state, time or workflow"
           }
         }
       }
@@ -2556,7 +2650,7 @@
         "tags": [
           "normal-change-controller"
         ],
-        "operationId": "respond",
+        "operationId": "respond_1",
         "parameters": [
           {
             "name": "id",
@@ -2579,8 +2673,17 @@
           "required": true
         },
         "responses": {
-          "409": {
-            "description": "Conflict: reload current resource; body status is409 when present"
+          "404": {
+            "description": "Resource not found"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Current role, authority, Active account or resource scope denied"
+          },
+          "400": {
+            "description": "Invalid input, state, time or workflow"
           },
           "200": {
             "description": "Member choice saved",
@@ -2592,17 +2695,8 @@
               }
             }
           },
-          "401": {
-            "description": "Authentication required"
-          },
-          "404": {
-            "description": "Resource not found"
-          },
-          "403": {
-            "description": "Current role, authority, Active account or resource scope denied"
-          },
-          "400": {
-            "description": "Invalid input, state, time or workflow"
+          "409": {
+            "description": "Conflict: reload current resource; body status is409 when present"
           }
         }
       }
@@ -2635,8 +2729,17 @@
           "required": true
         },
         "responses": {
-          "409": {
-            "description": "Conflict: reload current resource; body status is409 when present"
+          "404": {
+            "description": "Resource not found"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Current role, authority, Active account or resource scope denied"
+          },
+          "400": {
+            "description": "Invalid input, state, time or workflow"
           },
           "200": {
             "description": "Proposal applied",
@@ -2648,17 +2751,8 @@
               }
             }
           },
-          "401": {
-            "description": "Authentication required"
-          },
-          "404": {
-            "description": "Resource not found"
-          },
-          "403": {
-            "description": "Current role, authority, Active account or resource scope denied"
-          },
-          "400": {
-            "description": "Invalid input, state, time or workflow"
+          "409": {
+            "description": "Conflict: reload current resource; body status is409 when present"
           }
         }
       }
@@ -2775,14 +2869,14 @@
           "required": true
         },
         "responses": {
-          "400": {
-            "description": "LEGACY_MEMBERSHIP_RETIRED or invalid request"
-          },
           "401": {
             "description": "Authentication required"
           },
           "403": {
             "description": "Current role, authority, Active account or resource scope denied"
+          },
+          "400": {
+            "description": "LEGACY_MEMBERSHIP_RETIRED or invalid request"
           }
         },
         "deprecated": true
@@ -2849,14 +2943,14 @@
           "required": true
         },
         "responses": {
-          "400": {
-            "description": "LEGACY_MEMBERSHIP_RETIRED or invalid request"
-          },
           "401": {
             "description": "Authentication required"
           },
           "403": {
             "description": "Current role, authority, Active account or resource scope denied"
+          },
+          "400": {
+            "description": "LEGACY_MEMBERSHIP_RETIRED or invalid request"
           }
         },
         "deprecated": true
@@ -2963,11 +3057,11 @@
           "required": true
         },
         "responses": {
-          "401": {
-            "description": "Authentication required"
-          },
           "404": {
             "description": "Resource not found"
+          },
+          "401": {
+            "description": "Authentication required"
           },
           "403": {
             "description": "Current role, authority, Active account or resource scope denied"
@@ -3007,11 +3101,11 @@
           "required": true
         },
         "responses": {
-          "401": {
-            "description": "Authentication required"
-          },
           "404": {
             "description": "Resource not found"
+          },
+          "401": {
+            "description": "Authentication required"
           },
           "403": {
             "description": "Current role, authority, Active account or resource scope denied"
@@ -3040,14 +3134,14 @@
           "required": true
         },
         "responses": {
-          "400": {
-            "description": "LEGACY_MEMBERSHIP_RETIRED or invalid request"
-          },
           "401": {
             "description": "Authentication required"
           },
           "403": {
             "description": "Current role, authority, Active account or resource scope denied"
+          },
+          "400": {
+            "description": "LEGACY_MEMBERSHIP_RETIRED or invalid request"
           }
         },
         "deprecated": true
@@ -3071,14 +3165,14 @@
           "required": true
         },
         "responses": {
-          "400": {
-            "description": "LEGACY_MEMBERSHIP_RETIRED or invalid request"
-          },
           "401": {
             "description": "Authentication required"
           },
           "403": {
             "description": "Current role, authority, Active account or resource scope denied"
+          },
+          "400": {
+            "description": "LEGACY_MEMBERSHIP_RETIRED or invalid request"
           }
         },
         "deprecated": true
@@ -3486,7 +3580,7 @@
         "tags": [
           "normal-change-controller"
         ],
-        "operationId": "list_2",
+        "operationId": "list_3",
         "parameters": [
           {
             "name": "id",
@@ -3519,7 +3613,7 @@
           "normal-change-controller"
         ],
         "description": "Current class lifecycleVersion required. NORMAL_VERSION_STALE is in message (no code field); HTTP and body status409. Active CenterManager with MANAGE_CLASSES and same center.",
-        "operationId": "propose",
+        "operationId": "propose_1",
         "parameters": [
           {
             "name": "id",
@@ -3542,6 +3636,9 @@
           "required": true
         },
         "responses": {
+          "404": {
+            "description": "Resource not found"
+          },
           "200": {
             "description": "Proposal created",
             "content": {
@@ -3552,20 +3649,17 @@
               }
             }
           },
-          "409": {
-            "description": "Conflict: reload current resource; body status is409 when present"
-          },
           "401": {
             "description": "Authentication required"
-          },
-          "404": {
-            "description": "Resource not found"
           },
           "403": {
             "description": "Current role, authority, Active account or resource scope denied"
           },
           "400": {
             "description": "Invalid input, state, time or workflow"
+          },
+          "409": {
+            "description": "Conflict: reload current resource; body status is409 when present"
           }
         }
       }
@@ -3639,14 +3733,20 @@
           "required": true
         },
         "responses": {
-          "409": {
-            "description": "Conflict: reload current resource; body status is409 when present"
+          "404": {
+            "description": "Resource not found"
           },
           "401": {
             "description": "Authentication required"
           },
-          "404": {
-            "description": "Resource not found"
+          "403": {
+            "description": "Current role, authority, Active account or resource scope denied"
+          },
+          "400": {
+            "description": "Invalid input, state, time or workflow"
+          },
+          "409": {
+            "description": "Conflict: reload current resource; body status is409 when present"
           },
           "200": {
             "description": "Class cancelled before opening",
@@ -3657,12 +3757,6 @@
                 }
               }
             }
-          },
-          "403": {
-            "description": "Current role, authority, Active account or resource scope denied"
-          },
-          "400": {
-            "description": "Invalid input, state, time or workflow"
           }
         }
       }
@@ -4220,7 +4314,7 @@
         "tags": [
           "center-incident-controller"
         ],
-        "operationId": "list_3",
+        "operationId": "list_4",
         "responses": {
           "200": {
             "description": "OK",
@@ -4868,7 +4962,7 @@
         "tags": [
           "advanced-registration-controller"
         ],
-        "operationId": "list_4",
+        "operationId": "list_5",
         "responses": {
           "200": {
             "description": "OK",
@@ -5125,17 +5219,17 @@
               }
             }
           },
-          "400": {
-            "description": "Invalid content, session state/time or session eligibility"
-          },
           "401": {
             "description": "Authentication required"
           },
-          "403": {
-            "description": "Coach permission, assignment, author, center or deadline denied"
-          },
           "404": {
             "description": "Existing result not found"
+          },
+          "400": {
+            "description": "Invalid content, session state/time or session eligibility"
+          },
+          "403": {
+            "description": "Coach permission, assignment, author, center or deadline denied"
           }
         }
       }
@@ -5339,14 +5433,14 @@
           "required": true
         },
         "responses": {
-          "400": {
-            "description": "LEGACY_MEMBERSHIP_RETIRED or invalid request"
-          },
           "401": {
             "description": "Authentication required"
           },
           "403": {
             "description": "Current role, authority, Active account or resource scope denied"
+          },
+          "400": {
+            "description": "LEGACY_MEMBERSHIP_RETIRED or invalid request"
           }
         },
         "deprecated": true
@@ -5480,7 +5574,7 @@
         "tags": [
           "member-self-profile-controller"
         ],
-        "operationId": "get_1",
+        "operationId": "get_2",
         "responses": {
           "200": {
             "description": "OK",
@@ -5554,6 +5648,12 @@
           "required": true
         },
         "responses": {
+          "404": {
+            "description": "Resource not found"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
           "200": {
             "description": "Current Advanced status retained (no-op)",
             "content": {
@@ -5563,12 +5663,6 @@
                 }
               }
             }
-          },
-          "401": {
-            "description": "Authentication required"
-          },
-          "404": {
-            "description": "Resource not found"
           },
           "403": {
             "description": "Current role, authority, Active account or resource scope denied"
@@ -5611,6 +5705,12 @@
           "required": true
         },
         "responses": {
+          "404": {
+            "description": "Resource not found"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
           "200": {
             "description": "Current Advanced status retained (no-op)",
             "content": {
@@ -5620,12 +5720,6 @@
                 }
               }
             }
-          },
-          "401": {
-            "description": "Authentication required"
-          },
-          "404": {
-            "description": "Resource not found"
           },
           "403": {
             "description": "Current role, authority, Active account or resource scope denied"
@@ -5956,6 +6050,12 @@
         ],
         "operationId": "getAllRoles",
         "responses": {
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Current role, authority, Active account or resource scope denied"
+          },
           "200": {
             "description": "Role catalog for Active Admin",
             "content": {
@@ -5968,12 +6068,6 @@
                 }
               }
             }
-          },
-          "401": {
-            "description": "Authentication required"
-          },
-          "403": {
-            "description": "Current role, authority, Active account or resource scope denied"
           }
         }
       }
@@ -6002,6 +6096,9 @@
           "403": {
             "description": "Current role, authority, Active account or resource scope denied"
           },
+          "404": {
+            "description": "Role not found"
+          },
           "200": {
             "description": "Role with permissions",
             "content": {
@@ -6011,9 +6108,6 @@
                 }
               }
             }
-          },
-          "404": {
-            "description": "Role not found"
           }
         }
       }
@@ -6165,6 +6259,37 @@
         }
       }
     },
+    "/api/private-session-proposals/{id}": {
+      "get": {
+        "tags": [
+          "private-session-proposal-controller"
+        ],
+        "operationId": "get",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrivateSessionProposalResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/permissions": {
       "get": {
         "tags": [
@@ -6292,6 +6417,8 @@
               "enum": [
                 "ENROLLMENT_CONFIRMED",
                 "PRIVATE_BOOKING_CONFIRMED",
+                "PRIVATE_BOOKING_PROPOSED",
+                "PRIVATE_BOOKING_DECLINED",
                 "PRIVATE_BOOKING_CANCELLED",
                 "SESSION_RESCHEDULED",
                 "COACH_SUBSTITUTED",
@@ -6380,7 +6507,7 @@
         "tags": [
           "normal-refund-controller"
         ],
-        "operationId": "list_1",
+        "operationId": "list_2",
         "responses": {
           "200": {
             "description": "OK",
@@ -6403,7 +6530,7 @@
         "tags": [
           "normal-refund-controller"
         ],
-        "operationId": "get",
+        "operationId": "get_1",
         "parameters": [
           {
             "name": "id",
@@ -9192,6 +9319,8 @@
             "type": "string"
           },
           "supportReason": {
+            "maxLength": 2000,
+            "minLength": 0,
             "type": "string"
           },
           "incidentId": {
@@ -9199,7 +9328,93 @@
             "format": "int32"
           },
           "extraValidityReason": {
+            "maxLength": 2000,
+            "minLength": 0,
             "type": "string"
+          }
+        }
+      },
+      "PrivateSessionProposalResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "subscriptionId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "memberId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "coachId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "roomId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "classId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "subjectId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "sessionDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "startTime": {
+            "$ref": "#/components/schemas/LocalTime"
+          },
+          "endTime": {
+            "$ref": "#/components/schemas/LocalTime"
+          },
+          "status": {
+            "type": "string"
+          },
+          "proposedBy": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "respondBy": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "respondedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "sessionId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "session": {
+            "$ref": "#/components/schemas/SessionResponse"
+          },
+          "serverTime": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "PrivateSessionProposalDecision": {
+        "required": [
+          "accepted"
+        ],
+        "type": "object",
+        "properties": {
+          "accepted": {
+            "type": "boolean"
           }
         }
       },
@@ -10805,6 +11020,10 @@
           "expiresAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "confirmationDeadline": {
+            "type": "string",
+            "format": "date-time"
           }
         }
       },
@@ -11409,15 +11628,15 @@
           "displayName": {
             "type": "string"
           },
-          "autowireCapableBeanFactory": {
-            "$ref": "#/components/schemas/AutowireCapableBeanFactory"
+          "startupDate": {
+            "type": "integer",
+            "format": "int64"
           },
           "applicationName": {
             "type": "string"
           },
-          "startupDate": {
-            "type": "integer",
-            "format": "int64"
+          "autowireCapableBeanFactory": {
+            "$ref": "#/components/schemas/AutowireCapableBeanFactory"
           },
           "environment": {
             "$ref": "#/components/schemas/Environment"
@@ -11770,13 +11989,13 @@
       "Environment": {
         "type": "object",
         "properties": {
-          "defaultProfiles": {
+          "activeProfiles": {
             "type": "array",
             "items": {
               "type": "string"
             }
           },
-          "activeProfiles": {
+          "defaultProfiles": {
             "type": "array",
             "items": {
               "type": "string"
@@ -11787,13 +12006,13 @@
       "FilterRegistration": {
         "type": "object",
         "properties": {
-          "urlPatternMappings": {
+          "servletNameMappings": {
             "type": "array",
             "items": {
               "type": "string"
             }
           },
-          "servletNameMappings": {
+          "urlPatternMappings": {
             "type": "array",
             "items": {
               "type": "string"
@@ -11819,19 +12038,19 @@
           "error": {
             "type": "boolean"
           },
-          "is3xxRedirection": {
+          "is5xxServerError": {
             "type": "boolean"
           },
           "is4xxClientError": {
             "type": "boolean"
           },
-          "is5xxServerError": {
-            "type": "boolean"
-          },
-          "is2xxSuccessful": {
+          "is3xxRedirection": {
             "type": "boolean"
           },
           "is1xxInformational": {
+            "type": "boolean"
+          },
+          "is2xxSuccessful": {
             "type": "boolean"
           }
         }
@@ -11868,28 +12087,31 @@
               "type": "string"
             }
           },
-          "errorOnELNotFound": {
-            "type": "string"
-          },
           "scriptingInvalid": {
-            "type": "string"
-          },
-          "deferredSyntaxAllowedAsLiteral": {
             "type": "string"
           },
           "trimDirectiveWhitespaces": {
             "type": "string"
           },
+          "errorOnELNotFound": {
+            "type": "string"
+          },
           "errorOnUndeclaredNamespace": {
             "type": "string"
           },
-          "elIgnored": {
+          "deferredSyntaxAllowedAsLiteral": {
             "type": "string"
+          },
+          "includeCodas": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           },
           "pageEncoding": {
             "type": "string"
           },
-          "isXml": {
+          "elIgnored": {
             "type": "string"
           },
           "includePreludes": {
@@ -11898,11 +12120,8 @@
               "type": "string"
             }
           },
-          "includeCodas": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
+          "isXml": {
+            "type": "string"
           }
         }
       },
@@ -11986,8 +12205,11 @@
           "redirectView": {
             "type": "boolean"
           },
-          "attributesCSV": {
-            "type": "string",
+          "attributes": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
             "writeOnly": true
           },
           "attributesMap": {
@@ -11996,11 +12218,8 @@
               "type": "object"
             }
           },
-          "attributes": {
-            "type": "object",
-            "additionalProperties": {
-              "type": "string"
-            },
+          "attributesCSV": {
+            "type": "string",
             "writeOnly": true
           }
         }
@@ -12075,18 +12294,23 @@
             "type": "integer",
             "format": "int32"
           },
+          "contextPath": {
+            "type": "string"
+          },
           "attributeNames": {
             "type": "object"
           },
           "serverInfo": {
             "type": "string"
           },
-          "contextPath": {
-            "type": "string"
+          "sessionCookieConfig": {
+            "$ref": "#/components/schemas/SessionCookieConfig"
           },
-          "sessionTimeout": {
-            "type": "integer",
-            "format": "int32"
+          "servletRegistrations": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/ServletRegistration"
+            }
           },
           "effectiveSessionTrackingModes": {
             "uniqueItems": true,
@@ -12100,13 +12324,6 @@
               ]
             }
           },
-          "responseCharacterEncoding": {
-            "type": "string"
-          },
-          "effectiveMajorVersion": {
-            "type": "integer",
-            "format": "int32"
-          },
           "defaultSessionTrackingModes": {
             "uniqueItems": true,
             "type": "array",
@@ -12119,30 +12336,11 @@
               ]
             }
           },
-          "sessionCookieConfig": {
-            "$ref": "#/components/schemas/SessionCookieConfig"
-          },
-          "servletContextName": {
+          "virtualServerName": {
             "type": "string"
-          },
-          "filterRegistrations": {
-            "type": "object",
-            "additionalProperties": {
-              "$ref": "#/components/schemas/FilterRegistration"
-            }
-          },
-          "initParameterNames": {
-            "type": "object"
           },
           "requestCharacterEncoding": {
             "type": "string"
-          },
-          "jspConfigDescriptor": {
-            "$ref": "#/components/schemas/JspConfigDescriptor"
-          },
-          "effectiveMinorVersion": {
-            "type": "integer",
-            "format": "int32"
           },
           "sessionTrackingModes": {
             "uniqueItems": true,
@@ -12157,28 +12355,49 @@
               ]
             }
           },
-          "virtualServerName": {
+          "jspConfigDescriptor": {
+            "$ref": "#/components/schemas/JspConfigDescriptor"
+          },
+          "servletContextName": {
             "type": "string"
           },
-          "servletRegistrations": {
+          "filterRegistrations": {
             "type": "object",
             "additionalProperties": {
-              "$ref": "#/components/schemas/ServletRegistration"
+              "$ref": "#/components/schemas/FilterRegistration"
             }
+          },
+          "effectiveMajorVersion": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "responseCharacterEncoding": {
+            "type": "string"
+          },
+          "effectiveMinorVersion": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "initParameterNames": {
+            "type": "object"
+          },
+          "sessionTimeout": {
+            "type": "integer",
+            "format": "int32"
           }
         }
       },
       "ServletRegistration": {
         "type": "object",
         "properties": {
-          "runAsRole": {
-            "type": "string"
-          },
           "mappings": {
             "type": "array",
             "items": {
               "type": "string"
             }
+          },
+          "runAsRole": {
+            "type": "string"
           },
           "name": {
             "type": "string"
@@ -12197,10 +12416,23 @@
       "SessionCookieConfig": {
         "type": "object",
         "properties": {
-          "name": {
+          "domain": {
             "type": "string"
           },
+          "httpOnly": {
+            "type": "boolean"
+          },
           "path": {
+            "type": "string"
+          },
+          "maxAge": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "secure": {
+            "type": "boolean"
+          },
+          "name": {
             "type": "string"
           },
           "attributes": {
@@ -12212,29 +12444,16 @@
           "comment": {
             "type": "string",
             "deprecated": true
-          },
-          "httpOnly": {
-            "type": "boolean"
-          },
-          "secure": {
-            "type": "boolean"
-          },
-          "maxAge": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "domain": {
-            "type": "string"
           }
         }
       },
       "TaglibDescriptor": {
         "type": "object",
         "properties": {
-          "taglibLocation": {
+          "taglibURI": {
             "type": "string"
           },
-          "taglibURI": {
+          "taglibLocation": {
             "type": "string"
           }
         }
@@ -12327,13 +12546,13 @@
       "PageNotificationResponse": {
         "type": "object",
         "properties": {
-          "totalElements": {
-            "type": "integer",
-            "format": "int64"
-          },
           "totalPages": {
             "type": "integer",
             "format": "int32"
+          },
+          "totalElements": {
+            "type": "integer",
+            "format": "int64"
           },
           "size": {
             "type": "integer",
@@ -12355,18 +12574,18 @@
               "$ref": "#/components/schemas/SortObject"
             }
           },
-          "numberOfElements": {
-            "type": "integer",
-            "format": "int32"
+          "first": {
+            "type": "boolean"
           },
           "last": {
             "type": "boolean"
           },
-          "first": {
-            "type": "boolean"
-          },
           "pageable": {
             "$ref": "#/components/schemas/PageableObject"
+          },
+          "numberOfElements": {
+            "type": "integer",
+            "format": "int32"
           },
           "empty": {
             "type": "boolean"
@@ -12386,6 +12605,12 @@
               "$ref": "#/components/schemas/SortObject"
             }
           },
+          "unpaged": {
+            "type": "boolean"
+          },
+          "paged": {
+            "type": "boolean"
+          },
           "pageSize": {
             "type": "integer",
             "format": "int32"
@@ -12393,12 +12618,6 @@
           "pageNumber": {
             "type": "integer",
             "format": "int32"
-          },
-          "unpaged": {
-            "type": "boolean"
-          },
-          "paged": {
-            "type": "boolean"
           }
         }
       },
@@ -12731,13 +12950,13 @@
       "PageChatConversationResponse": {
         "type": "object",
         "properties": {
-          "totalElements": {
-            "type": "integer",
-            "format": "int64"
-          },
           "totalPages": {
             "type": "integer",
             "format": "int32"
+          },
+          "totalElements": {
+            "type": "integer",
+            "format": "int64"
           },
           "size": {
             "type": "integer",
@@ -12759,18 +12978,18 @@
               "$ref": "#/components/schemas/SortObject"
             }
           },
-          "numberOfElements": {
-            "type": "integer",
-            "format": "int32"
+          "first": {
+            "type": "boolean"
           },
           "last": {
             "type": "boolean"
           },
-          "first": {
-            "type": "boolean"
-          },
           "pageable": {
             "$ref": "#/components/schemas/PageableObject"
+          },
+          "numberOfElements": {
+            "type": "integer",
+            "format": "int32"
           },
           "empty": {
             "type": "boolean"

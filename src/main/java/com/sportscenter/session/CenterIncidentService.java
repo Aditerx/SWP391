@@ -97,6 +97,15 @@ public class CenterIncidentService {
     }
 
     /** Called only within a validated booking/reschedule transaction. Extends exactly to the agreed session end. */
+    public void validateMakeupRequest(Integer incidentId,MemberPackage sub,String reason,User actor) {
+        ActorPolicy.manager(actor);ActorPolicy.reason(reason);requirePaid(sub);
+        CenterIncident i=entity(incidentId);
+        if(i.getSession().getMemberPackage()==null||!Objects.equals(i.getSession().getMemberPackage().getSubscriptionId(),sub.getSubscriptionId())||!"Resolved".equals(i.getStatus()))
+            throw new BusinessException("INCIDENT_RECOVERY_REQUIRED: Resolved incident for this subscription required");
+        ActorPolicy.center(actor,sub.getMember().getCenterId());
+        if("Cancelled".equals(sub.getStatus())||i.getOriginalDeadline()==null||!i.getStartedAt().isBefore(i.getOriginalDeadline()))throw new BusinessException("INCIDENT_OUTSIDE_ENTITLEMENT: No valid recovery evidence");
+    }
+
     public void approveMakeupEnd(Integer incidentId,MemberPackage sub,LocalDateTime targetEnd,String reason,User actor) {
         ActorPolicy.manager(actor);ActorPolicy.reason(reason);
         requirePaid(sub);

@@ -24,6 +24,7 @@ public class AuditProvenance {
             case "INVOICE", "INVOICES" -> "select e.member.centerId from Invoice e where e.invoiceId=:id";
             case "CLASS_ENROLLMENT", "CLASS_ENROLLMENTS" -> "select e.sportsClass.centerId from ClassEnrollment e where e.id=:id";
             case "MEMBER_PACKAGE", "MEMBER_PACKAGES" -> "select e.member.centerId from MemberPackage e where e.subscriptionId=:id";
+            case "PRIVATE_SESSION_PROPOSAL" -> "select e.subscription.member.centerId from PrivateSessionProposal e where e.id=:id";
             case "ADVANCED_REGISTRATION", "ADVANCED_REGISTRATIONS" -> "select e.member.centerId from AdvancedRegistration e where e.id=:id";
             case "ATTENDANCE", "ATTENDANCES" -> "select e.session.sportsClass.centerId from Attendance e where e.attendanceId=:id";
             case "TRAINING_RESULTS" -> "select e.session.sportsClass.centerId from TrainingResult e where e.resultId=:id";

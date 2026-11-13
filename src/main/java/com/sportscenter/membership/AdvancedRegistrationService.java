@@ -86,6 +86,9 @@ public class AdvancedRegistrationService {
             return response(r.getSubscription(), payments.existingOrder(invoice, clientIp));
         }
         if (!"Accepted".equals(r.getStatus())) throw new BusinessException("COACH_ACCEPTANCE_REQUIRED: Coach must accept before an invoice can be issued");
+        if(r.getAcceptedAt()==null)throw new BusinessException("REGISTRATION_RECONCILIATION_REQUIRED: Coach acceptance timestamp is missing");
+        if(!LocalDateTime.now(clock).isBefore(r.getAcceptedAt().plusHours(24)))
+            throw new BusinessConflictException("REGISTRATION_CONFIRMATION_EXPIRED: Confirm enrollment within24hours of Coach acceptance");
         capacity.requireCoach(r.getCoach(), r.getSubject(), actor.getCenterId());
         capacity.requireCapacity(r.getCoach(), r.getSubject());
         if (!"Active".equals(r.getSubject().getStatus())) throw new BusinessException("SUBJECT_UNAVAILABLE: Subject is inactive");
