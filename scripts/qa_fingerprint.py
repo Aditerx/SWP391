@@ -10,5 +10,11 @@ def source_fingerprints(base):
                 digest.update(path.relative_to(base).as_posix().encode()+b'\0'+path.read_bytes()+b'\0')
         result[folder]=digest.hexdigest()
     for name in ['pom.xml','schema_postgres.sql','scripts/test-room-absence-postgres.py','scripts/test-phases-postgres.py','scripts/prepare-phases-release.py']:
-        result[name]=hashlib.sha256((base/name).read_bytes()).hexdigest()
+        path = base/name
+        # The legacy root schema was deliberately removed. Preserve that fact in
+        # NEW evidence; never substitute another file or rewrite historical hashes.
+        if name == 'schema_postgres.sql' and not path.exists():
+            result[name] = None
+        else:
+            result[name]=hashlib.sha256(path.read_bytes()).hexdigest()
     return result

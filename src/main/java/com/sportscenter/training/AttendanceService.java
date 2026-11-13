@@ -65,6 +65,8 @@ public class AttendanceService {
             resolvedMemberId = currentUser.getId();
         }
         final Integer effectiveMemberId = resolvedMemberId;
+        LocalDate startDay = startDate == null ? null : startDate.toLocalDate();
+        LocalDate endDay = endDate == null ? null : endDate.toLocalDate();
         User actor = userRepository.findByEmailIgnoreCase(authentication.getName()).orElseThrow(() -> new AccessDeniedException("Account not found"));
         if (!"Active".equalsIgnoreCase(actor.getStatus())) throw new AccessDeniedException("ACCOUNT_NOT_ACTIVE: Active account required");
         boolean coachRole = authentication.getAuthorities().stream().anyMatch(a -> "ROLE_COACH".equals(a.getAuthority()));
@@ -76,10 +78,17 @@ public class AttendanceService {
                 .filter(a -> effectiveMemberId == null || (a.getMember() != null && effectiveMemberId.equals(a.getMember().getId())))
                 .filter(a -> recordedBy == null || (a.getRecordedBy() != null && recordedBy.equals(a.getRecordedBy().getId())))
                 .filter(a -> state == null || state.isBlank() || (a.getState() != null && a.getState().equalsIgnoreCase(state)))
-                .filter(a -> startDate == null || (a.getCheckInTime() != null && !a.getCheckInTime().isBefore(startDate)))
-                .filter(a -> endDate == null || (a.getCheckInTime() != null && !a.getCheckInTime().isAfter(endDate)))
+                .filter(a -> matchesAttendanceDay(a, startDay, endDay))
                 .map(a -> AttendanceResponse.from(a, actor, clock))
                 .toList();
+    }
+
+    private static boolean matchesAttendanceDay(Attendance attendance, LocalDate startDay, LocalDate endDay) {
+        if (startDay == null && endDay == null) return true;
+        LocalDate day = attendance.getSession() != null ? attendance.getSession().getSessionDate()
+                : attendance.getCheckInTime() != null ? attendance.getCheckInTime().toLocalDate() : null;
+        return day != null && (startDay == null || !day.isBefore(startDay))
+                && (endDay == null || !day.isAfter(endDay));
     }
 
     @Transactional

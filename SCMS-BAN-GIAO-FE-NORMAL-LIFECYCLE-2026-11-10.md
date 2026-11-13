@@ -1,6 +1,6 @@
 # SCMS — Bàn giao FE: Normal Lifecycle
 
-Dành cho FE; ngày10/11/2026. Phạm vi BE/schema/fixture local, chưa phát hành hoặc nghiệm thu FE/Render. Kết quả chuẩn và giới hạn tại [Active/QA](docs/00-MASTER-CHECKLIST.md#active).
+Dành cho FE; ngày10/11/2026. Phase1 đã phát hành và có smoke API/DEMO trên Render trước lần dựng lại DB gần nhất; FE/browser chưa nghiệm thu. Trạng thái sau reset, build và giới hạn từng lượt kiểm tra tại [Active/QA](docs/00-MASTER-CHECKLIST.md#active).
 
 ## 1. Kết quả hiện tại
 
@@ -35,4 +35,6 @@ Sau Accept Transfer, tải lại enrollments/lịch/invoice; không tạo đơn 
 
 ## 5. Việc còn lại
 
-Owner review thay đổi local/main và duyệt phát hành/bundle trước thao tác cloud. FE xác định repo/build hiện hành rồi smoke/auth-me/readback trên build mới; matrix/CRUD/FE/live và policy R1/R2 còn thuộc Phase2. SYSTEM-DATA vẫn DATA DESIGN, không chứng nhận đã reset Supabase.
+Phase1 đã merge/push và có kiểm API trong phạm vi Active/QA; Owner đã xác nhận chạy lại bundle sau đó. Không dùng ID/state/cookie hoặc kết quả smoke trước reset để chứng nhận trạng thái hiện tại. FE xác định repo/build hiện hành rồi đăng nhập mới/auth-me, kiểm browser/lưu/tải lại và dữ liệu sau commit; API PASS không thay browser PASS.
+
+P2.2/P2.3 tiếp tục theo [bàn giao session mới](docs/03-TODO.md#p22-p23-handoff-20261110): review R1/R2/policy và matrix/CRUD/error còn thiếu, không triển khai lại phần đã đạt. Các gợi ý chuẩn bị/giao diện ở [SCRIPT-DEMO](SCMS-SCRIPT-DEMO-BE.md) để FE duyệt, quyết định cuối thuộc FE; giới hạn quyền/state của API vẫn do BE kiểm. SYSTEM-DATA giữ DATA DESIGN, không là dump Supabase.

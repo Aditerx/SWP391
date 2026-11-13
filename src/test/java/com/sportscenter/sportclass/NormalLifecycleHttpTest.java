@@ -186,6 +186,30 @@ class NormalLifecycleHttpTest {
         postAs("/api/normal-refunds/"+id+"/verify-receiver",manager,Map.of("version",1,"source","DEMO Member ownership and account independently checked"),200);
         return postAs("/api/normal-refunds/"+id+"/approve",manager,Map.of("version",2),200);
     }
+    @Test void refundApprovalRoleAuthorityCenterMatrixPreservesRejectedState()throws Exception {
+        int id=cancelledRefund();
+        postAs("/api/normal-refunds/"+id+"/receiver",member,Map.of("version",0,"bank","DEMO BANK","accountNumber","DEMOACCOUNT123","accountName","DEMO Member"),200);
+        postAs("/api/normal-refunds/"+id+"/verify-receiver",manager,Map.of("version",1,"source","DEMO independent verification"),200);
+        User admin= new org.springframework.transaction.support.TransactionTemplate(transactions).execute(t->user("admin-matrix",role("Admin","MANAGE_USERS","MANAGE_PERMISSIONS","MANAGE_INVOICES"),1));
+        tx(()->{var permission=em.createQuery("select p from Permission p where p.name='MANAGE_INVOICES'",Permission.class).getSingleResult();em.find(Role.class,memberRole.getId()).getPermissions().add(permission);em.find(Role.class,coachRole.getId()).getPermissions().add(permission);});
+        var before=List.of(jdbc.queryForList("SELECT * FROM normal_refunds"),jdbc.queryForList("SELECT * FROM payment_resolutions"),jdbc.queryForList("SELECT * FROM normal_refund_receivers"),jdbc.queryForList("SELECT * FROM invoices"),jdbc.queryForList("SELECT * FROM system_logs"));
+        try {
+            for(User actor:List.of(admin,coach,member,cashier,outsider)){
+                postAs("/api/normal-refunds/"+id+"/approve",actor,Map.of("version",2),403);
+                assertEquals(before,List.of(jdbc.queryForList("SELECT * FROM normal_refunds"),jdbc.queryForList("SELECT * FROM payment_resolutions"),jdbc.queryForList("SELECT * FROM normal_refund_receivers"),jdbc.queryForList("SELECT * FROM invoices"),jdbc.queryForList("SELECT * FROM system_logs")));
+            }
+            var session=login(manager);
+            tx(()->em.find(Role.class,managerRole.getId()).getPermissions().removeIf(p->"MANAGE_INVOICES".equals(p.getName())));
+            mvc.perform(get("/api/auth/me").session(session)).andExpect(status().isOk()).andExpect(jsonPath("$.authorities",org.hamcrest.Matchers.not(org.hamcrest.Matchers.hasItem("MANAGE_INVOICES"))));
+            mvc.perform(post("/api/normal-refunds/"+id+"/approve").session(session).contentType("application/json").content("{\"version\":2}")).andExpect(status().isForbidden());
+            assertEquals(before,List.of(jdbc.queryForList("SELECT * FROM normal_refunds"),jdbc.queryForList("SELECT * FROM payment_resolutions"),jdbc.queryForList("SELECT * FROM normal_refund_receivers"),jdbc.queryForList("SELECT * FROM invoices"),jdbc.queryForList("SELECT * FROM system_logs")));
+        } finally {
+            tx(()->{var permission=em.createQuery("select p from Permission p where p.name='MANAGE_INVOICES'",Permission.class).getSingleResult();em.find(Role.class,managerRole.getId()).getPermissions().add(permission);em.find(Role.class,memberRole.getId()).getPermissions().removeIf(p->"MANAGE_INVOICES".equals(p.getName()));em.find(Role.class,coachRole.getId()).getPermissions().removeIf(p->"MANAGE_INVOICES".equals(p.getName()));});
+        }
+        var approved=postAs("/api/normal-refunds/"+id+"/approve",manager,Map.of("version",2),200);assertEquals("Approved",approved.path("status").asText());assertEquals(3,approved.path("version").asLong());
+        assertEquals("Approved",jdbc.queryForObject("SELECT p.status FROM payment_resolutions p JOIN normal_refunds r ON r.id=p.id WHERE r.id=?",String.class,id));
+        var after=jdbc.queryForList("SELECT * FROM system_logs");postAs("/api/normal-refunds/"+id+"/approve",manager,Map.of("version",2),409);assertEquals(after,jdbc.queryForList("SELECT * FROM system_logs"));
+    }
     @Test void cancellationCreatesEveryReceiptObligationAndRejectsOngoingAndRoleAliases()throws Exception {
         int c=create(4,null).path("id").asInt();var a=enroll(c,member,"Cash");enroll(c,second,"Cash");enroll(c,third,"VNPay");
         postAs("/api/classes/"+c+"/cancel-before-opening",cashier,Map.of("version",0,"reason","Cancel"),403);
@@ -332,6 +356,15 @@ class NormalLifecycleHttpTest {
         assertEquals("Paid",jdbc.queryForObject("SELECT payment_status FROM invoices WHERE invoice_id=?",String.class,invoice));
         assertEquals(1,jdbc.queryForObject("SELECT count(*) FROM normal_refunds f JOIN payment_resolutions r ON r.id=f.id WHERE r.invoice_id=?",Integer.class,invoice));
         assertEquals("Cancelled",jdbc.queryForObject("SELECT status FROM class_enrollments WHERE class_id=?",String.class,c));
+    }
+    @Test void staleClassVersionUsesConsistent409AndLeavesCommittedStateUntouched()throws Exception {
+        int id=create(4,null).path("id").asInt();var session=login(manager);
+        var before=List.of(jdbc.queryForList("SELECT * FROM classes WHERE class_id=?",id),jdbc.queryForList("SELECT * FROM sessions WHERE class_id=?",id),jdbc.queryForList("SELECT * FROM normal_proposals"),jdbc.queryForList("SELECT * FROM invoices"),jdbc.queryForList("SELECT * FROM system_logs"));
+        for(int retry=0;retry<2;retry++){
+            mvc.perform(post("/api/classes/"+id+"/normal-proposals").session(session).contentType("application/json").content(json.writeValueAsString(Map.of("kind","Postpone","shiftDays",7,"version",999,"reason","DEMO stale version"))))
+                    .andExpect(status().isConflict()).andExpect(jsonPath("$.status").value(409)).andExpect(jsonPath("$.error").value("Conflict")).andExpect(jsonPath("$.message").value("NORMAL_VERSION_STALE")).andExpect(jsonPath("$.code").doesNotExist());
+            assertEquals(before,List.of(jdbc.queryForList("SELECT * FROM classes WHERE class_id=?",id),jdbc.queryForList("SELECT * FROM sessions WHERE class_id=?",id),jdbc.queryForList("SELECT * FROM normal_proposals"),jdbc.queryForList("SELECT * FROM invoices"),jdbc.queryForList("SELECT * FROM system_logs")));
+        }
     }
     @Test void staleTransferScheduleCannotApplyOldConsentButMemberStillCanChooseRefund()throws Exception {
         int source=create(4,null).path("id").asInt();enroll(source,member,"Cash");

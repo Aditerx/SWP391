@@ -218,11 +218,28 @@ if complete.get('result')=='PASS_LOCAL' and complete.get('phase1Complete') is Tr
         hash_match=True
         reference=complete.get('gitIntegration',{}).get('head',complete.get('baseCommit',reference))
         source_verification='Normal Phase1 behavior/schema/approved synthetic fixture verified locally; historical wire rows remain structural compatibility evidence; FE/cloud/provider not accepted'
+# Current scoped acceptance can verify the changed tree without relabelling the
+# retained legacy wire rows as fresh business tests. Missing legacy schema is an
+# explicit fingerprint value, not a skipped comparison.
+session3=qa.get('session33Readiness20261113',{})
+if session3.get('status') == 'PASS_LOCAL_CHECKED_SCOPE':
+    clean=session3.get('cleanTest',{})
+    pg=session3.get('postgres',{})
+    source=session3.get('source',{})
+    if (clean.get('tests',0)>0 and clean.get('failures')==0 and clean.get('errors')==0
+            and pg.get('tests',0)>0 and pg.get('failures')==0 and pg.get('errors')==0 and pg.get('skipped')==0
+            and source.get('testedCopiesMatch') is True
+            and schema_hash==session3.get('openApi',{}).get('sha256')):
+        backend_match=source_fingerprints(ROOT)==source.get('fingerprints')
+        hash_match=True
+        reference=source.get('head',reference)
+        source_verification='Session3 scoped local acceptance verifies the working tree; retained wire rows remain historical structural examples, not fresh business or FE/cloud acceptance'
 result={'result':'PASS' if not issues and not missing and not extra and hash_match and backend_match else 'REVIEW_REQUIRED',
         'mode':'OFFLINE_RETAINED_EVIDENCE_CHECK','checkedAtUtc':dt.datetime.now(dt.timezone.utc).isoformat(),
         'backendTestsExecuted':False,'liveProbePerformed':False,'evidenceSourceCommit':reference,
         'retainedWireEvidenceSourceCommit':wire_reference,
         'sourceVerification':source_verification,
+        'sourceTreeMatchesAcceptanceEvidence':backend_match,
         'retainedBackendTreeMatchesSource':backend_match,'openApiHashMatchesRecord':hash_match,
         'operations':len(operations),'sourceRoutesMatched':len(operations)-len(missing),'missingSourceRoutes':missing,'extraSourceRoutes':extra,
         'positiveRecordedExchanges':positive,'bodyTypePropertyChecks':body_checks,'wireIssues':sorted(set(tuple(x) for x in issues)),

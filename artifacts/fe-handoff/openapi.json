@@ -170,7 +170,9 @@
               }
             }
           }
-        }
+        },
+        "summary": "Read one training plan in the current account scope",
+        "description": "Members read own private plans and shared Normal class plans with Registered or Completed enrollment and valid Paid effective-class entitlement. Reconciliation, reversed cash confirmation or Completed Refund excludes shared access. Cancelled/Pending/Waitlisted do not grant shared access. Existing Coach own-author and center scopes remain; stored plan content is not a historical version snapshot."
       },
       "put": {
         "tags": [
@@ -529,7 +531,7 @@
         },
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Room updated",
             "content": {
               "*/*": {
                 "schema": {
@@ -537,6 +539,21 @@
                 }
               }
             }
+          },
+          "409": {
+            "description": "Duplicate name/code or database constraint; no changes saved"
+          },
+          "403": {
+            "description": "Current role, authority, Active account or resource scope denied"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "400": {
+            "description": "Invalid input, state, time or workflow"
+          },
+          "404": {
+            "description": "Resource not found"
           }
         }
       }
@@ -546,6 +563,7 @@
         "tags": [
           "role-controller"
         ],
+        "description": "Active Admin AND MANAGE_PERMISSIONS. Replaces the complete permission set for every account of this role. Empty is allowed only if an Active Admin with both MANAGE_USERS and MANAGE_PERMISSIONS remains. LAST_ADMIN_REQUIRED returns 409 without saving changes.",
         "operationId": "updateRolePermissions",
         "parameters": [
           {
@@ -570,7 +588,7 @@
         },
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Complete permission set saved",
             "content": {
               "*/*": {
                 "schema": {
@@ -578,6 +596,21 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Current role, authority, Active account or resource scope denied"
+          },
+          "409": {
+            "description": "LAST_ADMIN_REQUIRED: preserve one Active Admin with MANAGE_USERS and MANAGE_PERMISSIONS"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "400": {
+            "description": "Invalid input, state, time or workflow"
+          },
+          "404": {
+            "description": "Resource not found"
           }
         }
       }
@@ -587,6 +620,7 @@
         "tags": [
           "membership-package-controller"
         ],
+        "description": "Shared membership mutation retired. Valid authorized requests return400 LEGACY_MEMBERSHIP_RETIRED without writes. Use Normal enrollment or Advanced registration; authentication, permissions and validation still apply. No Deprecation or Sunset response header is promised.",
         "operationId": "update_4",
         "parameters": [
           {
@@ -610,17 +644,17 @@
           "required": true
         },
         "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/MembershipPackageResponse"
-                }
-              }
-            }
+          "400": {
+            "description": "LEGACY_MEMBERSHIP_RETIRED or invalid request"
+          },
+          "403": {
+            "description": "Current role, authority, Active account or resource scope denied"
+          },
+          "401": {
+            "description": "Authentication required"
           }
-        }
+        },
+        "deprecated": true
       }
     },
     "/api/members/{id}": {
@@ -1104,7 +1138,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Results within current owner, author or center scope",
             "content": {
               "*/*": {
                 "schema": {
@@ -1115,6 +1149,12 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Current role, authority, Active account or resource scope denied"
+          },
+          "401": {
+            "description": "Authentication required"
           }
         }
       },
@@ -1122,6 +1162,7 @@
         "tags": [
           "training-result-controller"
         ],
+        "description": "Attendance support retains current role/authority rules. Non-null professional content requires the assigned Active Coach with RECORD_RESULT; omitted/null content preserves existing content. Writes require the session attendance window.",
         "operationId": "recordResult",
         "requestBody": {
           "content": {
@@ -1135,7 +1176,7 @@
         },
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Result and permitted attendance fields saved",
             "content": {
               "*/*": {
                 "schema": {
@@ -1143,6 +1184,18 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Current role, authority, Active account or resource scope denied"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "400": {
+            "description": "Invalid input, state, time or workflow"
+          },
+          "404": {
+            "description": "Resource not found"
           }
         }
       }
@@ -1152,6 +1205,7 @@
         "tags": [
           "training-result-controller"
         ],
+        "description": "Same rules as single result. A denied or invalid item rolls back the entire request, including attendance, content and audit.",
         "operationId": "recordBulkResults",
         "requestBody": {
           "content": {
@@ -1164,8 +1218,14 @@
           "required": true
         },
         "responses": {
+          "403": {
+            "description": "Current role, authority, Active account or resource scope denied"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
           "200": {
-            "description": "OK",
+            "description": "All results saved atomically",
             "content": {
               "*/*": {
                 "schema": {
@@ -1176,6 +1236,12 @@
                 }
               }
             }
+          },
+          "400": {
+            "description": "Invalid input, state, time or workflow"
+          },
+          "404": {
+            "description": "Resource not found"
           }
         }
       }
@@ -1229,7 +1295,9 @@
               }
             }
           }
-        }
+        },
+        "summary": "List training plans in the current account scope",
+        "description": "Members read own private plans and shared Normal class plans with Registered or Completed enrollment and valid Paid effective-class entitlement. Reconciliation, reversed cash confirmation or Completed Refund excludes shared access. Cancelled/Pending/Waitlisted do not grant shared access. Existing Coach own-author and center scopes remain; stored plan content is not a historical version snapshot."
       },
       "post": {
         "tags": [
@@ -1862,8 +1930,11 @@
           "required": true
         },
         "responses": {
+          "409": {
+            "description": "Duplicate name/code or database constraint; no changes saved"
+          },
           "201": {
-            "description": "Created",
+            "description": "Room created",
             "content": {
               "*/*": {
                 "schema": {
@@ -1871,6 +1942,15 @@
                 }
               }
             }
+          },
+          "400": {
+            "description": "Invalid room input or configuration"
+          },
+          "403": {
+            "description": "Current role, authority, Active account or resource scope denied"
+          },
+          "401": {
+            "description": "Authentication required"
           }
         }
       }
@@ -2024,6 +2104,7 @@
         "tags": [
           "membership-package-controller"
         ],
+        "description": "Shared membership mutation retired. Valid authorized requests return400 LEGACY_MEMBERSHIP_RETIRED without writes. Use Normal enrollment or Advanced registration; authentication, permissions and validation still apply. No Deprecation or Sunset response header is promised.",
         "operationId": "create_4",
         "requestBody": {
           "content": {
@@ -2036,17 +2117,17 @@
           "required": true
         },
         "responses": {
-          "201": {
-            "description": "Created",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/MembershipPackageResponse"
-                }
-              }
-            }
+          "400": {
+            "description": "LEGACY_MEMBERSHIP_RETIRED or invalid request"
+          },
+          "403": {
+            "description": "Current role, authority, Active account or resource scope denied"
+          },
+          "401": {
+            "description": "Authentication required"
           }
-        }
+        },
+        "deprecated": true
       }
     },
     "/api/normal-refunds/{id}/verify-receiver": {
@@ -2418,6 +2499,7 @@
         "tags": [
           "normal-refund-controller"
         ],
+        "description": "Active CenterManager with MANAGE_INVOICES in the same center. Requires current version, eligible refund and independently verified receiver. Approval is not a completed bank transfer.",
         "operationId": "approve_1",
         "parameters": [
           {
@@ -2441,8 +2523,17 @@
           "required": true
         },
         "responses": {
+          "409": {
+            "description": "Conflict: reload current resource; body status is409 when present"
+          },
+          "403": {
+            "description": "Current role, authority, Active account or resource scope denied"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
           "200": {
-            "description": "OK",
+            "description": "Refund approved; no bank payment implied",
             "content": {
               "*/*": {
                 "schema": {
@@ -2450,6 +2541,12 @@
                 }
               }
             }
+          },
+          "400": {
+            "description": "Invalid input, state, time or workflow"
+          },
+          "404": {
+            "description": "Resource not found"
           }
         }
       }
@@ -2482,8 +2579,11 @@
           "required": true
         },
         "responses": {
+          "409": {
+            "description": "Conflict: reload current resource; body status is409 when present"
+          },
           "200": {
-            "description": "OK",
+            "description": "Member choice saved",
             "content": {
               "*/*": {
                 "schema": {
@@ -2491,6 +2591,18 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Current role, authority, Active account or resource scope denied"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "400": {
+            "description": "Invalid input, state, time or workflow"
+          },
+          "404": {
+            "description": "Resource not found"
           }
         }
       }
@@ -2523,8 +2635,11 @@
           "required": true
         },
         "responses": {
+          "409": {
+            "description": "Conflict: reload current resource; body status is409 when present"
+          },
           "200": {
-            "description": "OK",
+            "description": "Proposal applied",
             "content": {
               "*/*": {
                 "schema": {
@@ -2532,6 +2647,18 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Current role, authority, Active account or resource scope denied"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "400": {
+            "description": "Invalid input, state, time or workflow"
+          },
+          "404": {
+            "description": "Resource not found"
           }
         }
       }
@@ -2624,6 +2751,7 @@
         "tags": [
           "member-package-controller"
         ],
+        "description": "Shared membership mutation retired. Valid authorized requests return400 LEGACY_MEMBERSHIP_RETIRED without writes. Use Normal enrollment or Advanced registration; authentication, permissions and validation still apply. No Deprecation or Sunset response header is promised.",
         "operationId": "subscribe",
         "parameters": [
           {
@@ -2647,17 +2775,17 @@
           "required": true
         },
         "responses": {
-          "201": {
-            "description": "Created",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/SubscriptionOrderResponse"
-                }
-              }
-            }
+          "400": {
+            "description": "LEGACY_MEMBERSHIP_RETIRED or invalid request"
+          },
+          "403": {
+            "description": "Current role, authority, Active account or resource scope denied"
+          },
+          "401": {
+            "description": "Authentication required"
           }
-        }
+        },
+        "deprecated": true
       }
     },
     "/api/members/{memberId}/subscriptions": {
@@ -2697,6 +2825,7 @@
         "tags": [
           "member-package-controller"
         ],
+        "description": "Shared membership mutation retired. Valid authorized requests return400 LEGACY_MEMBERSHIP_RETIRED without writes. Use Normal enrollment or Advanced registration; authentication, permissions and validation still apply. No Deprecation or Sunset response header is promised.",
         "operationId": "subscribe_1",
         "parameters": [
           {
@@ -2720,17 +2849,17 @@
           "required": true
         },
         "responses": {
-          "201": {
-            "description": "Created",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/SubscriptionOrderResponse"
-                }
-              }
-            }
+          "400": {
+            "description": "LEGACY_MEMBERSHIP_RETIRED or invalid request"
+          },
+          "403": {
+            "description": "Current role, authority, Active account or resource scope denied"
+          },
+          "401": {
+            "description": "Authentication required"
           }
-        }
+        },
+        "deprecated": true
       }
     },
     "/api/members/register": {
@@ -2810,6 +2939,7 @@
         "tags": [
           "member-package-controller"
         ],
+        "description": "This route is not retired for Advanced workflows. Shared membership returns400 LEGACY_MEMBERSHIP_RETIRED; Advanced generic extension returns400 USE_INCIDENT_RECOVERY. Missing or out-of-scope target retains404/403. Use the verified incident workflow.",
         "operationId": "extendValidity",
         "parameters": [
           {
@@ -2833,15 +2963,17 @@
           "required": true
         },
         "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/MemberPackageResponse"
-                }
-              }
-            }
+          "403": {
+            "description": "Current role, authority, Active account or resource scope denied"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "400": {
+            "description": "Invalid input, state, time or workflow"
+          },
+          "404": {
+            "description": "Resource not found"
           }
         }
       }
@@ -2851,6 +2983,7 @@
         "tags": [
           "member-package-controller"
         ],
+        "description": "This route is not retired for Advanced workflows. Shared membership returns400 LEGACY_MEMBERSHIP_RETIRED; Advanced generic extension returns400 USE_INCIDENT_RECOVERY. Missing or out-of-scope target retains404/403. Use the verified incident workflow.",
         "operationId": "extendValidity_1",
         "parameters": [
           {
@@ -2874,15 +3007,17 @@
           "required": true
         },
         "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/MemberPackageResponse"
-                }
-              }
-            }
+          "403": {
+            "description": "Current role, authority, Active account or resource scope denied"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "400": {
+            "description": "Invalid input, state, time or workflow"
+          },
+          "404": {
+            "description": "Resource not found"
           }
         }
       }
@@ -2892,6 +3027,7 @@
         "tags": [
           "member-package-controller"
         ],
+        "description": "Shared membership mutation retired. Valid authorized requests return400 LEGACY_MEMBERSHIP_RETIRED without writes. Use Normal enrollment or Advanced registration; authentication, permissions and validation still apply. No Deprecation or Sunset response header is promised.",
         "operationId": "subscribeMe",
         "requestBody": {
           "content": {
@@ -2904,17 +3040,17 @@
           "required": true
         },
         "responses": {
-          "201": {
-            "description": "Created",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/SubscriptionOrderResponse"
-                }
-              }
-            }
+          "400": {
+            "description": "LEGACY_MEMBERSHIP_RETIRED or invalid request"
+          },
+          "403": {
+            "description": "Current role, authority, Active account or resource scope denied"
+          },
+          "401": {
+            "description": "Authentication required"
           }
-        }
+        },
+        "deprecated": true
       }
     },
     "/api/member-packages/subscribe-me": {
@@ -2922,6 +3058,7 @@
         "tags": [
           "member-package-controller"
         ],
+        "description": "Shared membership mutation retired. Valid authorized requests return400 LEGACY_MEMBERSHIP_RETIRED without writes. Use Normal enrollment or Advanced registration; authentication, permissions and validation still apply. No Deprecation or Sunset response header is promised.",
         "operationId": "subscribeMe_1",
         "requestBody": {
           "content": {
@@ -2934,17 +3071,17 @@
           "required": true
         },
         "responses": {
-          "201": {
-            "description": "Created",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/SubscriptionOrderResponse"
-                }
-              }
-            }
+          "400": {
+            "description": "LEGACY_MEMBERSHIP_RETIRED or invalid request"
+          },
+          "403": {
+            "description": "Current role, authority, Active account or resource scope denied"
+          },
+          "401": {
+            "description": "Authentication required"
           }
-        }
+        },
+        "deprecated": true
       }
     },
     "/api/invoices/{id}/pay-online": {
@@ -3381,6 +3518,7 @@
         "tags": [
           "normal-change-controller"
         ],
+        "description": "Current class lifecycleVersion required. NORMAL_VERSION_STALE is in message (no code field); HTTP and body status409. Active CenterManager with MANAGE_CLASSES and same center.",
         "operationId": "propose",
         "parameters": [
           {
@@ -3405,7 +3543,7 @@
         },
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Proposal created",
             "content": {
               "*/*": {
                 "schema": {
@@ -3413,6 +3551,21 @@
                 }
               }
             }
+          },
+          "409": {
+            "description": "Conflict: reload current resource; body status is409 when present"
+          },
+          "403": {
+            "description": "Current role, authority, Active account or resource scope denied"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "400": {
+            "description": "Invalid input, state, time or workflow"
+          },
+          "404": {
+            "description": "Resource not found"
           }
         }
       }
@@ -3462,6 +3615,7 @@
         "tags": [
           "normal-change-controller"
         ],
+        "description": "Current class lifecycleVersion required; stale version returns409 without changes. Active CenterManager with MANAGE_CLASSES and same center.",
         "operationId": "cancel_1",
         "parameters": [
           {
@@ -3485,8 +3639,17 @@
           "required": true
         },
         "responses": {
+          "409": {
+            "description": "Conflict: reload current resource; body status is409 when present"
+          },
+          "403": {
+            "description": "Current role, authority, Active account or resource scope denied"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
           "200": {
-            "description": "OK",
+            "description": "Class cancelled before opening",
             "content": {
               "*/*": {
                 "schema": {
@@ -3494,6 +3657,12 @@
                 }
               }
             }
+          },
+          "400": {
+            "description": "Invalid input, state, time or workflow"
+          },
+          "404": {
+            "description": "Resource not found"
           }
         }
       }
@@ -5031,6 +5200,7 @@
         "tags": [
           "membership-package-controller"
         ],
+        "description": "Shared membership mutation retired. Valid authorized requests return400 LEGACY_MEMBERSHIP_RETIRED without writes. Use Normal enrollment or Advanced registration; authentication, permissions and validation still apply. No Deprecation or Sunset response header is promised.",
         "operationId": "updateStatus_3",
         "parameters": [
           {
@@ -5054,17 +5224,17 @@
           "required": true
         },
         "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "$ref": "#/components/schemas/MembershipPackageResponse"
-                }
-              }
-            }
+          "400": {
+            "description": "LEGACY_MEMBERSHIP_RETIRED or invalid request"
+          },
+          "403": {
+            "description": "Current role, authority, Active account or resource scope denied"
+          },
+          "401": {
+            "description": "Authentication required"
           }
-        }
+        },
+        "deprecated": true
       }
     },
     "/api/notifications/{id}/read": {
@@ -5242,6 +5412,7 @@
         "tags": [
           "member-package-controller"
         ],
+        "description": "This shared route remains available for Advanced subscriptions; not deprecated. Shared membership returns400 LEGACY_MEMBERSHIP_RETIRED; Advanced changes require payment/expiry/attendance/incident workflow and cannot grant rights through generic status.",
         "operationId": "updateStatus_4",
         "parameters": [
           {
@@ -5269,7 +5440,7 @@
         },
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Current Advanced status retained (no-op)",
             "content": {
               "*/*": {
                 "schema": {
@@ -5277,6 +5448,18 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Current role, authority, Active account or resource scope denied"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "400": {
+            "description": "Invalid input, state, time or workflow"
+          },
+          "404": {
+            "description": "Resource not found"
           }
         }
       }
@@ -5286,6 +5469,7 @@
         "tags": [
           "member-package-controller"
         ],
+        "description": "This shared route remains available for Advanced subscriptions; not deprecated. Shared membership returns400 LEGACY_MEMBERSHIP_RETIRED; Advanced changes require payment/expiry/attendance/incident workflow and cannot grant rights through generic status.",
         "operationId": "updateStatus_5",
         "parameters": [
           {
@@ -5313,7 +5497,7 @@
         },
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Current Advanced status retained (no-op)",
             "content": {
               "*/*": {
                 "schema": {
@@ -5321,6 +5505,18 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Current role, authority, Active account or resource scope denied"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "400": {
+            "description": "Invalid input, state, time or workflow"
+          },
+          "404": {
+            "description": "Resource not found"
           }
         }
       }
@@ -5677,7 +5873,7 @@
         "operationId": "getAllRoles",
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Role catalog for Active Admin",
             "content": {
               "*/*": {
                 "schema": {
@@ -5688,6 +5884,12 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Current role, authority, Active account or resource scope denied"
+          },
+          "401": {
+            "description": "Authentication required"
           }
         }
       }
@@ -5710,8 +5912,17 @@
           }
         ],
         "responses": {
+          "403": {
+            "description": "Current role, authority, Active account or resource scope denied"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "404": {
+            "description": "Role not found"
+          },
           "200": {
-            "description": "OK",
+            "description": "Role with permissions",
             "content": {
               "*/*": {
                 "schema": {
@@ -5878,7 +6089,7 @@
         "operationId": "getAllPermissions",
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Permission catalog for Active Admin",
             "content": {
               "*/*": {
                 "schema": {
@@ -5889,6 +6100,12 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Current role, authority, Active account or resource scope denied"
+          },
+          "401": {
+            "description": "Authentication required"
           }
         }
       }
@@ -7153,7 +7370,8 @@
             "schema": {
               "type": "string",
               "format": "date"
-            }
+            },
+            "description": "Inclusive first day in Asia/Ho_Chi_Minh: sessionDate for session attendance; checkInTime date for legacy lobby records without a session."
           },
           {
             "name": "endDate",
@@ -7162,7 +7380,8 @@
             "schema": {
               "type": "string",
               "format": "date"
-            }
+            },
+            "description": "Inclusive last day in Asia/Ho_Chi_Minh: sessionDate for session attendance; checkInTime date for legacy lobby records without a session."
           }
         ],
         "responses": {
@@ -7231,7 +7450,8 @@
             "schema": {
               "type": "string",
               "format": "date"
-            }
+            },
+            "description": "Inclusive first day in Asia/Ho_Chi_Minh: sessionDate for session attendance; checkInTime date for legacy lobby records without a session."
           },
           {
             "name": "endDate",
@@ -7240,7 +7460,8 @@
             "schema": {
               "type": "string",
               "format": "date"
-            }
+            },
+            "description": "Inclusive last day in Asia/Ho_Chi_Minh: sessionDate for session attendance; checkInTime date for legacy lobby records without a session."
           }
         ],
         "responses": {
@@ -7296,6 +7517,61 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "/api/training-results/{resultId}/content": {
+      "patch": {
+        "tags": [
+          "training-result-controller"
+        ],
+        "summary": "Replace existing result content after the session",
+        "description": "Active assigned Coach and result author with RECORD_RESULT, same center. From session end inclusive until next session-day midnight exclusive in Asia/Ho_Chi_Minh. Changes content only; no result or attendance creation. Identical content is a no-op.",
+        "operationId": "updateContent",
+        "parameters": [
+          {
+            "name": "resultId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TrainingResultContentRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "401": {
+            "description": "Authentication required"
+          },
+          "200": {
+            "description": "Existing result with saved content",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/TrainingResultResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Coach permission, assignment, author, center or deadline denied"
+          },
+          "404": {
+            "description": "Existing result not found"
+          },
+          "400": {
+            "description": "Invalid content, session state/time or session eligibility"
           }
         }
       }
@@ -7471,34 +7747,42 @@
           },
           "classId": {
             "type": "integer",
-            "format": "int32"
+            "format": "int32",
+            "nullable": true
           },
           "className": {
-            "type": "string"
+            "type": "string",
+            "nullable": true
           },
           "memberId": {
             "type": "integer",
-            "format": "int32"
+            "format": "int32",
+            "nullable": true
           },
           "memberName": {
-            "type": "string"
+            "type": "string",
+            "nullable": true
           },
           "title": {
             "type": "string"
           },
           "content": {
-            "type": "string"
+            "type": "string",
+            "nullable": true
           },
           "goal": {
-            "type": "string"
+            "type": "string",
+            "nullable": true
           },
           "startDate": {
             "type": "string",
-            "format": "date"
+            "format": "date",
+            "nullable": true
           },
           "endDate": {
             "type": "string",
-            "format": "date"
+            "format": "date",
+            "nullable": true
           },
           "createdAt": {
             "type": "string",
@@ -7849,10 +8133,15 @@
         "type": "object",
         "properties": {
           "name": {
+            "maxLength": 50,
+            "minLength": 0,
             "type": "string"
           },
           "location": {
-            "type": "string"
+            "maxLength": 100,
+            "minLength": 0,
+            "type": "string",
+            "nullable": true
           },
           "capacity": {
             "type": "integer",
@@ -12478,6 +12767,18 @@
           },
           "scopeSource": {
             "type": "string"
+          }
+        }
+      },
+      "TrainingResultContentRequest": {
+        "required": [
+          "content"
+        ],
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "string",
+            "description": "Required non-null replacement. Empty string clears content; whitespace is preserved."
           }
         }
       }
