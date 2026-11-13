@@ -8,7 +8,7 @@ Bộ cập nhật được chia thành các bản bàn giao ngắn theo từng l
 
 `KIEM-TRA.md` là mục lục kiêm checklist tổng: tóm tắt từng nhóm cập nhật và liên kết tới file bàn giao chi tiết để dễ tra cứu, đối chiếu và bắt nhịp. Giữ cách tổ chức theo luồng Owner đã duyệt12/11; kết quả Session3 bổ sung đúng ngày13/11.
 
-Mỗi bản giữ một luồng và năm mục theo AGENTS. Contract chính thức ở [docs01](../docs/01-API-CONTRACT-FE-BE.md); trạng thái/bằng chứng chuẩn ở [Active](../docs/00-MASTER-CHECKLIST.md#active) và [QA](../artifacts/qa/latest.json). File này không chép lại log, SHA/count test hoặc toàn bộ contract. Owner13/11 đã mở Session3 và skip demo; không mở quyền tích hợp FE/cloud, merge/push/deploy/reset/provider hoặc tạo ZIP.
+Mỗi bản giữ một luồng và năm mục theo AGENTS. Contract chính thức ở [docs01](../docs/01-API-CONTRACT-FE-BE.md); trạng thái/bằng chứng chuẩn ở [Active](../docs/00-MASTER-CHECKLIST.md#active) và [QA](../artifacts/qa/latest.json). File này không chép lại log, SHA/count test hoặc toàn bộ contract. Khi mở Session3, Owner chỉ duyệt BE local và skip demo. Sau đó Owner mở riêng đợt predeploy → merge main/deploy → smoke và hoàn nguyên nếu thất bại; kết quả cuối của đợt này ở phần trạng thái phát hành phía trên. Không mở thêm tích hợp FE, reset/seed cloud, provider hoặc tạo ZIP.
 
 ## 1. Bộ bàn giao Session1–3
 
@@ -43,8 +43,8 @@ Các fixture/port/ngày trong từng bản là checkpoint local đã chuẩn b�
 - PUT room trùng tên500 trước sửa đã được xử lý/kiểm trong3.2. Checker được sửa để ghi nhận root schema bị xóa, giữ deletion và fingerprint lịch sử; kết quả source/hash/route/type/property cuối tại Active/QA.
 - Đối chiếu giao nhau: POST content bỏ/null khác PATCH content bắt buộc; shared Completed/Paid khác Cancelled; Admin authority không thay role tài chính; shared retired khác Advanced đang dùng; body status409 khi có field status không đổi coded-error hai field.
 - Readiness đủ cho phạm vi BE local có evidence ở [matrix](../docs/03-TODO.md#session33-risk-matrix-20261113). Các method/case chưa có bằng chứng riêng trong inventory vẫn NOT_RUN; checker offline không là full JSON Schema hoặc full business/role matrix.
-- FE build/API origin, browser/cookie/proxy, Render/cloud/live smoke/provider tiếp tục **NOT_RUN**; mọi ô FE giữ trống. Không suy BE local hoặc demo skip thành FE PASS.
-- Demo1.1→3.3 giữ **SKIPPED_BY_OWNER** theo các quyết định đã ghi; không giữ checkpoint đòi Owner thử lại demo. Bước tiếp thuộc đợt tích hợp/kiểm FE được mở riêng; Owner tự đóng gói ZIP khi cần.
+- FE build/API origin, browser/cookie/proxy và provider thật vẫn **NOT_RUN**; mọi ô FE giữ trống. Đợt phát hành riêng đã lên Render rồi hoàn nguyên vì timeout đọc schema trước auth; nghiệp vụ có phiên của bản mới **NOT_RUN**. Smoke baseline sau hoàn nguyên PASS trong phạm vi ghi ở Active/QA, không là nghiệm thu Session1–3 trên cloud.
+- Demo1.1→3.3 giữ **SKIPPED_BY_OWNER** theo các quyết định đã ghi; không giữ checkpoint đòi Owner thử lại demo. Source và sửa smoke được giữ ở nhánh release; chưa phát hành lại sau hoàn nguyên. FE cần một đợt kiểm riêng; Owner tự đóng gói ZIP khi cần.
 
 ## 4. Phạm vi thư mục và đóng gói
 
