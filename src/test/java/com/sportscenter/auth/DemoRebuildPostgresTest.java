@@ -12,6 +12,7 @@ import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.Clock;
+import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.List;
@@ -78,8 +79,11 @@ class DemoRebuildPostgresTest extends DemoSchemaLoginPostgresTest {
         write(cashier, "/api/invoices/"+order.path("invoiceId").asInt()+"/confirm-cash", Map.of(), 200);
         write(cashier, "/api/invoices/"+order.path("invoiceId").asInt()+"/confirm-cash", Map.of(), 409);
         assertEquals(12, credit(subscription));
+        // Demo Coaches work Monday-Saturday; a Thursday run must not choose Sunday.
+        LocalDate bookingDate = LocalDate.now(clock).plusDays(3);
+        if (bookingDate.getDayOfWeek() == DayOfWeek.SUNDAY) bookingDate = bookingDate.plusDays(1);
         var booking = new HashMap<String,Object>(Map.of("subscriptionId", subscription, "coachId", tennisCoach,
-                "subjectId", tennis, "roomId", archeryRoom, "sessionDate", LocalDate.now(clock).plusDays(3).toString(),
+                "subjectId", tennis, "roomId", archeryRoom, "sessionDate", bookingDate.toString(),
                 "startTime", "07:45", "endTime", "09:15", "requestKey", "clean-demo-private"));
         assertEquals("AGREEMENT_REQUIRED", write(coach, "/api/sessions/book-private", booking, 400).path("code").asText());
         booking.put("agreementConfirmed", true);

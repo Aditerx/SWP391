@@ -1,4 +1,4 @@
-"""Render the approved demo DATA DESIGN for FE. Never connects to or seeds a database."""
+"""Compile DATA DESIGN or export a pristine loopback fixture; never access cloud or seed a DB."""
 from pathlib import Path
 from datetime import date, datetime, time, timedelta
 import argparse
@@ -7,18 +7,26 @@ import hashlib
 import json
 import re
 import uuid
+from demo_anchor import anchor_date, TIMEZONE, FIXTURE_VERSION
+from demo_handoff import render as render_handoff
 
 ROOT = Path(__file__).resolve().parents[1]
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument('--check', action='store_true')
-parser.add_argument('--anchor', default='2026-11-10', help='Vietnam business date for the reproducible demo design')
+parser.add_argument('--anchor', required=True, type=anchor_date, help='Explicit YYYY-MM-DD installation anchor in Vietnam')
 parser.add_argument('--manifest', help='Write the same validated design as JSON for the SQL fixture compiler')
 parser.add_argument('--no-render',action='store_true',help='Compile source rows without overwriting the reviewed SYSTEM-DATA export')
 parser.add_argument('--from-local-pg',help='Export actual fixture rows from an explicitly disposable loopback database')
+parser.add_argument('--output',default='SYSTEM-DATA.md',help='Markdown export path in workspace; staging is supported')
 args = parser.parse_args()
 if not args.no_render and not args.from_local_pg:
     parser.error("Use --from-local-pg scms_schema_demo_phase1_<new> to render/check verified fixture rows; --no-render compiles the design only")
-ANCHOR = date.fromisoformat(args.anchor)
+ANCHOR = args.anchor
+output=(ROOT/args.output).resolve()
+if not output.is_relative_to(ROOT) or output.suffix.lower()!='.md':
+    parser.error('Markdown output must remain in the workspace')
+if args.manifest and not (ROOT/args.manifest).resolve().is_relative_to(ROOT):
+    parser.error('Manifest output must remain in the workspace')
 tables = {}
 notes = {}
 
@@ -360,7 +368,7 @@ notes.update({
  'role_permissions':'Baseline hiện hành; permission legacy có thể tồn tại nhưng không làm API legacy hoạt động trở lại. Không mở thêm Admin tài chính hoặc quyền Coach ngoài assignment.',
  'coach_work_slots':'Mỗi dòng là một slot thật của quan hệ. T2–T7 là lịch Coach demo, không phải định nghĩa ngày làm việc của TT; Chủ nhật trống để trình diễn cấu hình. Outdoor vẫn cấm ca3/4.',
  'classes':'Migration21/BE đã có phần lõi minimum/confirmation/start-close; dời/chuyển/hủy/Refund và fixture vẫn chưa hoàn tất theo checkpoint Phase1. Các dòng này là thiết kế, không là dữ liệu đã thực thi. Status Class không có Completed;9Advanced là template chưa có buổi, không cấp quyền học.',
- 'sessions':'Mốc thiết kế cố định2026-11-10 00:00 VN. Script demo thực thi sau này phải chọn lại anchor hợp lệ, kiểm resource/Member conflict và TTL. Không tự sửa Clock Render để giữ kịch bản sống. N10 có13record/12hợp lệ; makeup giữ buổi gốc.',
+ 'sessions':f'Mốc fixture {ANCHOR} 00:00 VN. Đổi ngày phải tái sinh toàn bộ bundle và kiểm resource/Member conflict/cửa thời gian; không tự sửa Clock Render hoặc TTL. N10 có13record/12hợp lệ; makeup giữ buổi gốc.',
  'invoices':'key ở đây là mã manifest, không phải invoiceCode gửi gateway. InvoiceCode thật do sequence không tái dùng cấp. Tất cả khoản này là dữ liệu mô phỏng được duyệt, không có thu/chuyển tiền thật hoặc callback gateway thật.',
  'payment_resolutions':'Tên state/field ở đây diễn đạt giai đoạn nghiệp vụ để thống nhất dữ liệu, chưa là enum/DTO/API đã triển khai. Receiver DEMO không phải tài khoản ngân hàng có thể chuyển tiền. Contact phone tùy FE dùng, không thay xác minh tài khoản.',
  'refund_documents':'Chỉ định nghĩa asset DEMO cần có khi thực hiện fixture; chưa tạo file/URL thật. Chứng từ phải private, không dùng avatar/public URL; Completed trong bản thiết kế giả định có đủ asset và xác minh mô phỏng khi seed sau này.',
@@ -446,6 +454,9 @@ def validate():
         invoice=next(i for i in tables['invoices'] if i['key']==row['invoice'])
         assert invoice['status']=='Paid' and invoice['amount']==row['amount'] and invoice['member']==row['member']
     for row in tables['training_results']:
+        assert row.get('attendance_status') in {'Present', 'Absent', 'Late', 'Excused'}, (
+            'TRAINING_RESULT_STATE_REQUIRED: fixture must supply an explicit valid attendance_status; '
+            'do not infer Present from content or rely on the database default', row.get('key'))
         session=next(s for s in tables['sessions'] if s['key']==row['session'])
         assert session['status']=='Completed' and not session['center_invalidated']
     holiday_dates={h['date'] for h in tables['holidays'] if h['is_active']}
@@ -478,7 +489,7 @@ Nguồn: [Owner decisions](docs/04-DEBUG-NOTE.md), [review và phê duyệt](doc
 
 ## Quy ước
 
-- Anchor thiết kế:2026-11-10 00:00 Asia/Ho_Chi_Minh, không phải cấu hình Clock cho môi trường deploy. Fixture thực thi phải chọn lại ngày và kiểm conflict/ràng buộc trước commit.
+- Anchor thiết kế:ANCHOR_DATE 00:00 Asia/Ho_Chi_Minh, không phải cấu hình Clock cho môi trường deploy. Fixture thực thi phải chọn lại ngày và kiểm conflict/ràng buộc trước commit.
 - Giữ33account PDF, thêm14account riêng. Mật khẩu demo theo quyết định Owner; không đưa hash/secret vào bảng. Chỉ account demo bỏ first-login; không đổi policy tạo account thực qua API.
 - 9môn/20room/9template Advanced/12Normal; N05→N11 Pickleball cùng1.800.000đ/center1, Member đồng ý rõ. Không tăng số lớp để bổ sung đích.
 - Ngày làm việc hoàn tiền = ngày TT mở theo Holiday, tính T7/CN nếu không đóng; giữ7ngày làm việc. Lịch nghỉ Coach không dừng SLA của trung tâm.
@@ -487,7 +498,7 @@ Nguồn: [Owner decisions](docs/04-DEBUG-NOTE.md), [review và phê duyệt](doc
 - Dữ liệu tài chính/chứng từ đều là mô phỏng có nhãn DEMO; không tạo reference giả giống giao dịch ngân hàng thật, không gọi mail/gateway/ngân hàng. Unlisted nullable/runtime columns dùng DEFAULT/NULL theo schema khi triển khai; bảng này không cung cấp secret.
 
 ## Các bảng dữ liệu
-''']
+'''.replace('ANCHOR_DATE',ANCHOR.isoformat())]
 for index,table in enumerate(existing+new,1):
     rows=tables[table]
     parts.append(f'\n### {index}. `{table}`'+(' — bảng mới dự kiến' if table in new else '')+'\n')
@@ -516,7 +527,6 @@ parts.append('''
 Sau khi hoàn tất fixture: chạy kiểm local cô lập, xuất lại dữ liệu từ đúng manifest đã kiểm và thay phần DATA DESIGN bằng trạng thái đã seed tương ứng. Không chạy bản reset tham chiếu rỗng chỉ vì file này đã được tạo.
 ''')
 data=('\n'.join(parts)+'\n').encode('utf-8')
-output=ROOT/'SYSTEM-DATA.md'
 if args.from_local_pg:
     import subprocess
     database=args.from_local_pg
@@ -528,9 +538,18 @@ if args.from_local_pg:
         return subprocess.check_output(['docker','exec',container,'psql','-X','-At','-v','ON_ERROR_STOP=1','-U','postgres','-d',database,'-c',query],text=True,encoding='utf-8').strip()
     assert sql('SELECT count(*) FROM users')=='47' and sql('SELECT count(*) FROM classes')=='21'
     assert sql('SELECT count(*) FROM normal_refund_documents')=='2'
+    metadata=json.loads(sql("SELECT after_data::jsonb FROM scms_data_migration_audit WHERE migration_key='20261110_demo_rebuild_v3'"))
+    assert (metadata.get('anchor_date'),metadata.get('business_timezone'),metadata.get('fixture_version'))==(ANCHOR.isoformat(),TIMEZONE,FIXTURE_VERSION),'DB fixture anchor/version differs; regenerate or select the matching pristine local DB'
+    assert sql('SELECT count(*) FROM invoices')==str(len(tables['invoices'])),'Fixture already consumed: invoice count changed'
+    assert sql('SELECT count(*) FROM class_enrollments')==str(len(tables['class_enrollments'])),'Fixture already consumed: enrollment count changed'
+    assert sql("SELECT (NOT EXISTS(SELECT 1 FROM normal_transfers) AND NOT EXISTS(SELECT 1 FROM normal_refunds WHERE version<>0) AND NOT EXISTS(SELECT 1 FROM classes WHERE status='Open' AND opening_confirmed_at IS NOT NULL))::text")=='true','Fixture already consumed: transfer/Refund/opening changed'
     header='''# SYSTEM DATA — Bộ demo SCMS đã duyệt
 
-**DATA DESIGN — fixture đã thực thi và kiểm trên PostgreSQL local cô lập; CHƯA SEED/RESET SUPABASE.**
+**DATA DESIGN — xuất từ fixture PostgreSQL local nguyên trạng; không là dump Supabase hoặc nghiệm thu cloud.**
+**Mục đích của SYSTEM-DATA:** giúp BE/FE tra cứu tài khoản, lớp, lịch và hồ sơ mẫu, nối các mã trong SCRIPT với ID và quan hệ dữ liệu cụ thể. Dùng file này để chuẩn bị đầu vào và đối chiếu kết quả demo; trình tự thao tác nằm ở [SCMS-SCRIPT-DEMO-BE](SCMS-SCRIPT-DEMO-BE.md), còn lệnh dựng lại bundle ở docs02.
+
+Đọc nhanh: [N01–N12](#normal-class-index) → [tài khoản demo](#demo-actor-index) → [proposal/Refund](#demo-financial-index) → [các bảng chi tiết](#table-data). Các gợi ý chuẩn bị/giao diện trong SCRIPT để FE duyệt, quyết định cuối thuộc FE.
+
 Đây là dữ liệu demo tổng hợp có nhãn DEMO, không phải dữ liệu/tiền/chứng từ ngân hàng thật hoặc bằng chứng nghiệp vụ cloud. Bảng bên dưới được xuất từ đúng fixture SQL đã chạy local, gồm các cột thực tế; không còn sáu tên bảng dự kiến đứng song song với schema.
 
 Nguồn: [Normal Lifecycle](SCMS_BE_Normal_Lifecycle_DA_CHOT.md), [Normal Refund](SCMS_BE_Refund_Normal_DA_CHOT.md), [schema/generator](database/README.md), [kết quả và giới hạn](docs/00-MASTER-CHECKLIST.md#active).
@@ -540,14 +559,15 @@ Mốc ngày VN của fixture: ANCHOR_DATE. Khi chuẩn bị chạy ở ngày kh�
 
 Mọi lịch sử học/thu/hoàn ở đây là ví dụ tổng hợp được duyệt, không khẳng định đã thực hiện ngoài SCMS. Hai PDF nằm trong normal_refund_documents.content riêng tư, có chữ DEMO; bảng chỉ xuất kích thước/hash. Không xuất password/hash, OTP, QR secret, cookie, token hoặc nội dung binary.
 
-## Dữ liệu thực thi theo bảng
 '''.replace('ANCHOR_DATE',ANCHOR.isoformat())
     actual=[header]
+    exported_rows={}
     for index,table in enumerate(existing,1):
         assert re.fullmatch(r'[a-z_]+',table)
         query="SELECT coalesce(jsonb_agg(j ORDER BY j::text),'[]'::jsonb) FROM (SELECT to_jsonb(t)-ARRAY['password_hash','checkin_secret','checkin_last_step','google_sub','content']||CASE WHEN '"+table+"'='normal_refund_documents' THEN jsonb_build_object('private_content','OMITTED; authenticated download only') ELSE CASE WHEN to_jsonb(t) ? 'content' THEN jsonb_build_object('content',to_jsonb(t)->'content') ELSE '{}'::jsonb END END AS j FROM public."+table+" t) x"
         rows=json.loads(sql(query))
-        actual.append(f'\n### {index}. `{table}`\n')
+        exported_rows[table]=rows
+        actual.append(f'\n<a id="table-{table}"></a>\n\n### {index}. `{table}`\n')
         if not rows:
             reasons={'normal_class_requests':'Fixture SQL tạo lớp trực tiếp có nhãn DEMO; không giả idempotency request/hash của API.',
               'normal_transfers':'Chuyển N05→N11 do Member xác nhận qua API trong demo; M01/M03 đang Waiting, preview không giữ chỗ.',
@@ -557,6 +577,7 @@ Mọi lịch sử học/thu/hoàn ở đây là ví dụ tổng hợp được d
             actual.append('Rỗng. '+reasons.get(table,'Không tạo lịch sử giả cho thao tác chưa có trong kịch bản nền.')+'\n');continue
         columns=list(rows[0]);actual.append('| '+' | '.join(columns)+' |\n| '+' | '.join(['---']*len(columns))+' |')
         for row in rows:actual.append('| '+' | '.join(cell(row.get(k)) for k in columns)+' |')
+    actual.insert(1,render_handoff(exported_rows,tables)+'\n<a id="table-data"></a>\n## Dữ liệu thực thi theo bảng\n')
     actual.append('''
 ## Kịch bản động và giới hạn
 
@@ -573,7 +594,8 @@ if args.no_render:
 elif args.check:
     assert output.read_bytes()==data,'SYSTEM-DATA.md is stale; run build-system-data.py'
 else:
+    output.parent.mkdir(parents=True,exist_ok=True)
     output.write_bytes(data)
-print(json.dumps({'file':'SYSTEM-DATA.md','mode':'DATA_DESIGN_NOT_SEEDED','tables':len(existing) if args.from_local_pg else len(tables),
+print(json.dumps({'file':str(output.relative_to(ROOT)),'mode':'DATA_DESIGN_NOT_SEEDED','tables':len(existing) if args.from_local_pg else len(tables),
                   'users':len(tables['users']),'classes':len(tables['classes']),
                   'sha256':hashlib.sha256(data).hexdigest(),'databaseAccess':bool(args.from_local_pg),'cloudAccess':False}))
