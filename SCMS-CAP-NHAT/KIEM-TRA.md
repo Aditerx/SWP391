@@ -1,8 +1,8 @@
 # SCMS-CAP-NHAT — Mục lục và checklist đối chiếu FE
 
-Đối tượng: FE tích hợp và Owner review. Cập nhật13/11/2026: bộ bàn giao Session1–3 đã được bổ sung theo từng luồng; phạm vi BE local và giới hạn nghiệm thu theo [Active](../docs/00-MASTER-CHECKLIST.md#active)/QA. Demo từng mục **SKIPPED_BY_OWNER**; chưa nghiệm thu FE/browser/Render/cloud.
+Đối tượng: FE tích hợp và Owner review. Cập nhật13/11/2026: bộ bàn giao Session1–3 đã được bổ sung theo từng luồng; phạm vi BE local và giới hạn nghiệm thu theo [Active](../docs/00-MASTER-CHECKLIST.md#active)/QA. Demo từng mục **SKIPPED_BY_OWNER**; phạm vi Render kiểm riêng theo Active/QA; chưa nghiệm thu FE/browser hoặc toàn bộ nghiệp vụ cloud.
 
-**Trạng thái phát hành cuối13/11:** đợt phát hành tích hợp đã hoàn nguyên sau timeout smoke đọc OpenAPI lúc startup; baseline đã Live và được kiểm có phiên lại theo Active/QA. Bản nguồn trong bộ này vẫn có Session1–3, nhưng Render hiện giữ baseline trước đợt này. Trước kiểm FE phải đối chiếu SHA/runtime, không suy local/source đã được phát hành hoặc bản mới đã qua authenticated business. Bản sửa smoke readiness giữ ở nhánh release, chưa triển khai lại.
+**Trạng thái phát hành hiện hành:** Lượt phát hành lại đã đạt CI và scoped smoke trên Render theo đúng SHA/DB ở Active/QA; không rollback trong lượt mới. Các route Session1–3 đã hiện diện trên runtime được kiểm. FE/browser/provider và full API matrix chưa được nghiệm thu.
 
 Bộ cập nhật được chia thành các bản bàn giao ngắn theo từng luồng/tính năng. Mỗi bản trình bày vấn đề, phần đã sửa/cập nhật, API/DB liên quan và việc FE cần điều chỉnh hoặc kiểm tra.
 
@@ -43,8 +43,8 @@ Các fixture/port/ngày trong từng bản là checkpoint local đã chuẩn b�
 - PUT room trùng tên500 trước sửa đã được xử lý/kiểm trong3.2. Checker được sửa để ghi nhận root schema bị xóa, giữ deletion và fingerprint lịch sử; kết quả source/hash/route/type/property cuối tại Active/QA.
 - Đối chiếu giao nhau: POST content bỏ/null khác PATCH content bắt buộc; shared Completed/Paid khác Cancelled; Admin authority không thay role tài chính; shared retired khác Advanced đang dùng; body status409 khi có field status không đổi coded-error hai field.
 - Readiness đủ cho phạm vi BE local có evidence ở [matrix](../docs/03-TODO.md#session33-risk-matrix-20261113). Các method/case chưa có bằng chứng riêng trong inventory vẫn NOT_RUN; checker offline không là full JSON Schema hoặc full business/role matrix.
-- FE build/API origin, browser/cookie/proxy và provider thật vẫn **NOT_RUN**; mọi ô FE giữ trống. Đợt phát hành riêng đã lên Render rồi hoàn nguyên vì timeout đọc schema trước auth; nghiệp vụ có phiên của bản mới **NOT_RUN**. Smoke baseline sau hoàn nguyên PASS trong phạm vi ghi ở Active/QA, không là nghiệm thu Session1–3 trên cloud.
-- Demo1.1→3.3 giữ **SKIPPED_BY_OWNER** theo các quyết định đã ghi; không giữ checkpoint đòi Owner thử lại demo. Source và sửa smoke được giữ ở nhánh release; chưa phát hành lại sau hoàn nguyên. FE cần một đợt kiểm riêng; Owner tự đóng gói ZIP khi cần.
+- FE build/API origin, browser/cookie/proxy và provider thật vẫn **NOT_RUN**; mọi ô FE giữ trống. Đợt đầu hoàn nguyên vì timeout schema trước auth; bằng chứng đó giữ nguyên. Lượt phát hành lại có kết quả riêng tại Active/QA; smoke chỉ login/logout, đọc và negative đã chứng minh rollback local, không nghiệm thu positive/race cloud hoặc mọi API.
+- Demo1.1→3.3 giữ **SKIPPED_BY_OWNER** theo các quyết định đã ghi; không giữ checkpoint đòi Owner thử lại demo. Source và sửa smoke được giữ ở nhánh release; trạng thái lượt phát hành lại theo Active/QA. FE cần một đợt kiểm riêng; Owner tự đóng gói ZIP khi cần.
 
 ## 4. Phạm vi thư mục và đóng gói
 

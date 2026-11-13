@@ -33670,7 +33670,7 @@
       "checker": {
         "result": "PASS",
         "mode": "OFFLINE_RETAINED_EVIDENCE_CHECK",
-        "checkedAtUtc": "2026-11-13T16:20:41.360187+00:00",
+        "checkedAtUtc": "2026-11-13T16:22:27.957088+00:00",
         "backendTestsExecuted": false,
         "liveProbePerformed": false,
         "evidenceSourceCommit": "fac80f4be081c0f2b36214ad1c8c7fef182d7abd",
@@ -34185,7 +34185,7 @@
     "notRun": [
       "FE browser/build/API-origin integration",
       "Real bank/mail/AI/Google providers",
-      "Positive/race/account-permission cloud mutations",
+      "Positive cloud writes, race or actual permission/status changes",
       "API cases outside explicit matrix evidence"
     ],
     "demo": "SKIPPED_BY_OWNER",
@@ -34193,14 +34193,1319 @@
     "providersCalled": false,
     "rollback": {
       "strategy": "Forward commit with exact baselineMain tree, no reset/force-push/DB changes",
-      "baselineTree": "ac5c4a5eff8c93ea31d2145897ffffcd06c47b9f"
+      "baselineTree": "ac5c4a5eff8c93ea31d2145897ffffcd06c47b9f",
+      "required": false,
+      "performed": false
     },
     "ci": {
-      "status": "NOT_RUN"
+      "candidateCi": {
+        "sha": "131617fa774c37b75b83c4290df50b8084a54bca",
+        "runs": [
+          {
+            "id": 43462140101,
+            "event": "pull_request",
+            "status": "completed",
+            "conclusion": "success",
+            "url": "https://github.com/Aditerx/SWP391/actions/runs/43462140101"
+          },
+          {
+            "id": 43462133837,
+            "event": "push",
+            "status": "completed",
+            "conclusion": "success",
+            "url": "https://github.com/Aditerx/SWP391/actions/runs/43462133837"
+          }
+        ]
+      },
+      "mainCi": {
+        "sha": "48a94559daea388b43a2f2c24cec03e3c37cd8a9",
+        "runs": [
+          {
+            "id": 43462743539,
+            "event": "push",
+            "status": "completed",
+            "conclusion": "success",
+            "url": "https://github.com/Aditerx/SWP391/actions/runs/43462743539"
+          }
+        ]
+      }
     },
     "deployment": {
-      "status": "NOT_RUN"
+      "status": "PASS_SCOPED_RENDER",
+      "pr": "https://github.com/Aditerx/SWP391/pull/27",
+      "releaseCommit": "48a94559daea388b43a2f2c24cec03e3c37cd8a9",
+      "candidateTreeEqualsMergedTree": true,
+      "baselineMain": "fac80f4be081c0f2b36214ad1c8c7fef182d7abd",
+      "databaseTargetFingerprint": "188f67654d48aa11c970703f2cdaefc79290f1173a7dedaf93547e74bc6b1048",
+      "readinessDeadlineSeconds": 900,
+      "evidenceUpdatePolicy": "Final evidence-only commit [skip ci] [skip render]; deployed application SHA remains releaseCommit, code tree unchanged."
     },
-    "next": "Publish one isolated candidate, require CI, merge and wait correct runtime/DB; scoped smoke or immediate baseline forward revert."
+    "next": "FE review/integration in a separate authorized scope; full API cases/providers remain NOT_RUN.",
+    "testedSourceCommit": "131617fa774c37b75b83c4290df50b8084a54bca",
+    "postDeploySmoke": {
+      "checkedAt": "2026-11-13T23:31:54.716016+07:00",
+      "smokeHarnessSha256": "6c8210c8f5cbe7a3cca58488164f7c194eacf111b2f8f13a72828e7724ae4427",
+      "phase": "post-deploy",
+      "baseUrl": "https://scms-app-p1gy.onrender.com",
+      "expectedCommit": "48a94559daea388b43a2f2c24cec03e3c37cd8a9",
+      "cases": [
+        {
+          "case": "public:GET /api/health",
+          "result": "PASS",
+          "http": 200,
+          "expected": [
+            200
+          ],
+          "responseSha256": "a0f7f58a3dce193f1cbd1bc7f7cbf1a75d7ab086bf9c2b685cfa8e5e89c2b4cc"
+        },
+        {
+          "case": "runtime identity",
+          "result": "PASS",
+          "observedCommit": "48a94559daea388b43a2f2c24cec03e3c37cd8a9"
+        },
+        {
+          "case": "same database target",
+          "result": "PASS"
+        },
+        {
+          "case": "public:GET /actuator/health",
+          "result": "PASS",
+          "http": 200,
+          "expected": [
+            200
+          ],
+          "responseSha256": "ced986b60ba56429bfceb06e287939d2c72b9985c526b233008d9ca108bcf87f"
+        },
+        {
+          "case": "dependency health",
+          "result": "PASS"
+        },
+        {
+          "case": "public:GET /v3/api-docs",
+          "result": "PASS",
+          "http": 200,
+          "expected": [
+            200
+          ],
+          "responseSha256": "8b2eaff42e933330dc855780d61c814737a05ad87e3a966de52bfd99f5f4d6da"
+        },
+        {
+          "case": "OpenAPI document",
+          "result": "PASS"
+        },
+        {
+          "case": "published patch /api/training-results/{resultId}/content",
+          "result": "PASS"
+        },
+        {
+          "case": "published post /api/chat/conversations/{id}/close",
+          "result": "PASS"
+        },
+        {
+          "case": "published put /api/roles/{id}/permissions",
+          "result": "PASS"
+        },
+        {
+          "case": "retired metadata /api/packages",
+          "result": "PASS"
+        },
+        {
+          "case": "retired metadata /api/packages/{id}",
+          "result": "PASS"
+        },
+        {
+          "case": "retired metadata /api/packages/{id}/status",
+          "result": "PASS"
+        },
+        {
+          "case": "anonymous:GET /api/auth/me",
+          "result": "PASS",
+          "http": 401,
+          "expected": [
+            401
+          ],
+          "responseSha256": "ff9c0c3ad7ea03171ad9f2b94775028b41416847db92abad14539d8127a451aa"
+        },
+        {
+          "case": "public:OPTIONS /api/auth/login",
+          "result": "PASS",
+          "http": 200,
+          "expected": [
+            200
+          ],
+          "responseSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "case": "frontend CORS credentials",
+          "result": "PASS"
+        },
+        {
+          "case": "five DEMO roles supplied",
+          "result": "PASS"
+        },
+        {
+          "case": "ADM:POST /api/auth/login",
+          "result": "PASS",
+          "http": 200,
+          "expected": [
+            200
+          ],
+          "responseSha256": "f9798a4259f9ad06de3e19ac96872e2fd3edba0c575a1067c04f0a58dd34cdd0"
+        },
+        {
+          "case": "ADM:GET /api/auth/me",
+          "result": "PASS",
+          "http": 200,
+          "expected": [
+            200
+          ],
+          "responseSha256": "f9798a4259f9ad06de3e19ac96872e2fd3edba0c575a1067c04f0a58dd34cdd0"
+        },
+        {
+          "case": "ADM:verified current identity",
+          "result": "PASS"
+        },
+        {
+          "case": "ADM:GET /api/rooms",
+          "result": "PASS",
+          "http": 200,
+          "expected": [
+            200
+          ],
+          "responseSha256": "d38c37bcc2805e0cb4b34570d5c6672def0306fcdb4d1e4851ce6653d90498f0"
+        },
+        {
+          "case": "ADM:GET /api/notifications/me",
+          "result": "PASS",
+          "http": 200,
+          "expected": [
+            200
+          ],
+          "responseSha256": "1ef9946331daae4ad7b215a86f811652416a1fa8523312afe21df66a6d07e166"
+        },
+        {
+          "case": "ADM:GET /api/notifications/me/unread-count",
+          "result": "PASS",
+          "http": 200,
+          "expected": [
+            200
+          ],
+          "responseSha256": "c49e6de84f25edf96cc935c48e58d37a5408a994966b768710360004efb4b9e3"
+        },
+        {
+          "case": "ADM:GET /api/roles",
+          "result": "PASS",
+          "http": 200,
+          "expected": [
+            200
+          ],
+          "responseSha256": "7cbc352ad3b7802e5edb42d93b5f288f8bd7de1900f303e2443a21559606b42c"
+        },
+        {
+          "case": "ADM:GET /api/permissions",
+          "result": "PASS",
+          "http": 200,
+          "expected": [
+            200
+          ],
+          "responseSha256": "84f4be7ad3582ee9a1ae62e7a6b4b2da1fba19d7f7b903d10bff891d07687d8d"
+        },
+        {
+          "case": "ADM:GET /api/training-results",
+          "result": "PASS",
+          "http": 200,
+          "expected": [
+            200
+          ],
+          "responseSha256": "97fba5f793aac15aff44c92ba8ccdab7c9485026bbf71818e08d94a1c718d95f"
+        },
+        {
+          "case": "CM1:POST /api/auth/login",
+          "result": "PASS",
+          "http": 200,
+          "expected": [
+            200
+          ],
+          "responseSha256": "c6481e729e4dccc4ba45879e715a104e9ae8e6e22cebf6ba9cc1db3fb94204c7"
+        },
+        {
+          "case": "CM1:GET /api/auth/me",
+          "result": "PASS",
+          "http": 200,
+          "expected": [
+            200
+          ],
+          "responseSha256": "c6481e729e4dccc4ba45879e715a104e9ae8e6e22cebf6ba9cc1db3fb94204c7"
+        },
+        {
+          "case": "CM1:verified current identity",
+          "result": "PASS"
+        },
+        {
+          "case": "CM1:GET /api/rooms",
+          "result": "PASS",
+          "http": 200,
+          "expected": [
+            200
+          ],
+          "responseSha256": "d38c37bcc2805e0cb4b34570d5c6672def0306fcdb4d1e4851ce6653d90498f0"
+        },
+        {
+          "case": "CM1:GET /api/notifications/me",
+          "result": "PASS",
+          "http": 200,
+          "expected": [
+            200
+          ],
+          "responseSha256": "0d1727faeeeb3d97904eeee4ef7d14ee87d1d9550469100945fc3653f36cd5a7"
+        },
+        {
+          "case": "CM1:GET /api/notifications/me/unread-count",
+          "result": "PASS",
+          "http": 200,
+          "expected": [
+            200
+          ],
+          "responseSha256": "7a363b666166a18c17d3ddd7b04d119a2dbba004d70d2bc8780a50b8a69e11cd"
+        },
+        {
+          "case": "CM1:GET /api/roles",
+          "result": "PASS",
+          "http": 403,
+          "expected": [
+            403
+          ],
+          "responseSha256": "9aa58e0b9c6bb49d18a77f77a9a2ede3d9f3b9a6386ab42380e250d6f1735664"
+        },
+        {
+          "case": "CM1:GET /api/permissions",
+          "result": "PASS",
+          "http": 403,
+          "expected": [
+            403
+          ],
+          "responseSha256": "6b96f8a4626221add539952e8cdbfb492be2d706a52fe52ab85275c5e188ffd1"
+        },
+        {
+          "case": "CM1:GET /api/training-results",
+          "result": "PASS",
+          "http": 200,
+          "expected": [
+            200
+          ],
+          "responseSha256": "97fba5f793aac15aff44c92ba8ccdab7c9485026bbf71818e08d94a1c718d95f"
+        },
+        {
+          "case": "R1:POST /api/auth/login",
+          "result": "PASS",
+          "http": 200,
+          "expected": [
+            200
+          ],
+          "responseSha256": "4844ededb7c5f4deb621b1b19bf293d31be69bcb204b007e38cf88f1b14d8a91"
+        },
+        {
+          "case": "R1:GET /api/auth/me",
+          "result": "PASS",
+          "http": 200,
+          "expected": [
+            200
+          ],
+          "responseSha256": "4844ededb7c5f4deb621b1b19bf293d31be69bcb204b007e38cf88f1b14d8a91"
+        },
+        {
+          "case": "R1:verified current identity",
+          "result": "PASS"
+        },
+        {
+          "case": "R1:GET /api/rooms",
+          "result": "PASS",
+          "http": 200,
+          "expected": [
+            200
+          ],
+          "responseSha256": "d38c37bcc2805e0cb4b34570d5c6672def0306fcdb4d1e4851ce6653d90498f0"
+        },
+        {
+          "case": "R1:GET /api/notifications/me",
+          "result": "PASS",
+          "http": 200,
+          "expected": [
+            200
+          ],
+          "responseSha256": "bdf207582311a178a87eb90eb36a972d4f0f10c17a6ed8b5a16c76b52106364f"
+        },
+        {
+          "case": "R1:GET /api/notifications/me/unread-count",
+          "result": "PASS",
+          "http": 200,
+          "expected": [
+            200
+          ],
+          "responseSha256": "c49e6de84f25edf96cc935c48e58d37a5408a994966b768710360004efb4b9e3"
+        },
+        {
+          "case": "R1:GET /api/roles",
+          "result": "PASS",
+          "http": 403,
+          "expected": [
+            403
+          ],
+          "responseSha256": "340aedc3857de5ef460490d5171c393dad9811ec40716f7fb5ceff930d221821"
+        },
+        {
+          "case": "R1:GET /api/permissions",
+          "result": "PASS",
+          "http": 403,
+          "expected": [
+            403
+          ],
+          "responseSha256": "112ed7025e288a9c4bdece58d949637f76166be65a5ed31fa223f3e392da00de"
+        },
+        {
+          "case": "R1:GET /api/training-results",
+          "result": "PASS",
+          "http": 403,
+          "expected": [
+            403
+          ],
+          "responseSha256": "bcff5239fa9801310c4d24db83f43a217e2bb6d73ec554ff392024c686e01fd0"
+        },
+        {
+          "case": "BAD-A:POST /api/auth/login",
+          "result": "PASS",
+          "http": 200,
+          "expected": [
+            200
+          ],
+          "responseSha256": "5501eb3ae7318b116e7776b54b99261a61a2a906362d69382ac894ce5be4f744"
+        },
+        {
+          "case": "BAD-A:GET /api/auth/me",
+          "result": "PASS",
+          "http": 200,
+          "expected": [
+            200
+          ],
+          "responseSha256": "5501eb3ae7318b116e7776b54b99261a61a2a906362d69382ac894ce5be4f744"
+        },
+        {
+          "case": "BAD-A:verified current identity",
+          "result": "PASS"
+        },
+        {
+          "case": "BAD-A:GET /api/rooms",
+          "result": "PASS",
+          "http": 200,
+          "expected": [
+            200
+          ],
+          "responseSha256": "d38c37bcc2805e0cb4b34570d5c6672def0306fcdb4d1e4851ce6653d90498f0"
+        },
+        {
+          "case": "BAD-A:GET /api/notifications/me",
+          "result": "PASS",
+          "http": 200,
+          "expected": [
+            200
+          ],
+          "responseSha256": "8d355467152aa48da3e089e779f1441a4130a029c04d5386b0cdb9bc913ac084"
+        },
+        {
+          "case": "BAD-A:GET /api/notifications/me/unread-count",
+          "result": "PASS",
+          "http": 200,
+          "expected": [
+            200
+          ],
+          "responseSha256": "96be1d23535763b37084003bf8b4d02de2aa3a4823ebe4ef7a4464777d41e754"
+        },
+        {
+          "case": "BAD-A:GET /api/roles",
+          "result": "PASS",
+          "http": 403,
+          "expected": [
+            403
+          ],
+          "responseSha256": "01e398a1902f0eacc6518722c38fba33bc77bbf518eeae8750d6ee0bdb5deaa0"
+        },
+        {
+          "case": "BAD-A:GET /api/permissions",
+          "result": "PASS",
+          "http": 403,
+          "expected": [
+            403
+          ],
+          "responseSha256": "b0dba01f6829497ecd638f9d8715c4520ff3dd9c14c462a8f9c11b30862b376d"
+        },
+        {
+          "case": "BAD-A:GET /api/training-results",
+          "result": "PASS",
+          "http": 200,
+          "expected": [
+            200
+          ],
+          "responseSha256": "37f63342157ce8987576be0f0079bcc0fdd61e82e8bb35972508b4ba521509ad"
+        },
+        {
+          "case": "BAD-A:GET /api/training-plans",
+          "result": "PASS",
+          "http": 200,
+          "expected": [
+            200
+          ],
+          "responseSha256": "408c8910657f78757e112937d63bcd62e5eb8c3b4a4cac86030811f26c4c8045"
+        },
+        {
+          "case": "BAD-A:GET /api/attendances",
+          "result": "PASS",
+          "http": 200,
+          "expected": [
+            200
+          ],
+          "responseSha256": "27148b9fb47c10c9f88b42e60427b5b314e8a331bb795303e64fb0d2b1326601"
+        },
+        {
+          "case": "PICK-A:POST /api/auth/login",
+          "result": "PASS",
+          "http": 200,
+          "expected": [
+            200
+          ],
+          "responseSha256": "191226b64adb85a7a0b2d833dd471559a3d0c1c980c4c18550e9c93d33698d09"
+        },
+        {
+          "case": "PICK-A:GET /api/auth/me",
+          "result": "PASS",
+          "http": 200,
+          "expected": [
+            200
+          ],
+          "responseSha256": "191226b64adb85a7a0b2d833dd471559a3d0c1c980c4c18550e9c93d33698d09"
+        },
+        {
+          "case": "PICK-A:verified current identity",
+          "result": "PASS"
+        },
+        {
+          "case": "PICK-A:GET /api/rooms",
+          "result": "PASS",
+          "http": 200,
+          "expected": [
+            200
+          ],
+          "responseSha256": "d38c37bcc2805e0cb4b34570d5c6672def0306fcdb4d1e4851ce6653d90498f0"
+        },
+        {
+          "case": "PICK-A:GET /api/notifications/me",
+          "result": "PASS",
+          "http": 200,
+          "expected": [
+            200
+          ],
+          "responseSha256": "1ef9946331daae4ad7b215a86f811652416a1fa8523312afe21df66a6d07e166"
+        },
+        {
+          "case": "PICK-A:GET /api/notifications/me/unread-count",
+          "result": "PASS",
+          "http": 200,
+          "expected": [
+            200
+          ],
+          "responseSha256": "c49e6de84f25edf96cc935c48e58d37a5408a994966b768710360004efb4b9e3"
+        },
+        {
+          "case": "PICK-A:GET /api/roles",
+          "result": "PASS",
+          "http": 403,
+          "expected": [
+            403
+          ],
+          "responseSha256": "b1dbfd2978d754751081137a07751025bb82bc807fc359b7eb002a94a8584a3d"
+        },
+        {
+          "case": "PICK-A:GET /api/permissions",
+          "result": "PASS",
+          "http": 403,
+          "expected": [
+            403
+          ],
+          "responseSha256": "53a6a5a75c444f5a953a529302f62173a29e9321fdfbc7395b166dc7f2db6639"
+        },
+        {
+          "case": "PICK-A:GET /api/training-results",
+          "result": "PASS",
+          "http": 200,
+          "expected": [
+            200
+          ],
+          "responseSha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+        },
+        {
+          "case": "PICK-A:GET /api/training-plans",
+          "result": "PASS",
+          "http": 200,
+          "expected": [
+            200
+          ],
+          "responseSha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+        },
+        {
+          "case": "PICK-A:GET /api/attendances",
+          "result": "PASS",
+          "http": 200,
+          "expected": [
+            200
+          ],
+          "responseSha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+        },
+        {
+          "case": "M01:POST /api/auth/login",
+          "result": "PASS",
+          "http": 200,
+          "expected": [
+            200
+          ],
+          "responseSha256": "d79878dec0f8405a9d90629f2c6c36b343e3b0d8412abdb5bd012d140f31fcc6"
+        },
+        {
+          "case": "M01:GET /api/auth/me",
+          "result": "PASS",
+          "http": 200,
+          "expected": [
+            200
+          ],
+          "responseSha256": "d79878dec0f8405a9d90629f2c6c36b343e3b0d8412abdb5bd012d140f31fcc6"
+        },
+        {
+          "case": "M01:verified current identity",
+          "result": "PASS"
+        },
+        {
+          "case": "M01:GET /api/rooms",
+          "result": "PASS",
+          "http": 200,
+          "expected": [
+            200
+          ],
+          "responseSha256": "d38c37bcc2805e0cb4b34570d5c6672def0306fcdb4d1e4851ce6653d90498f0"
+        },
+        {
+          "case": "M01:GET /api/notifications/me",
+          "result": "PASS",
+          "http": 200,
+          "expected": [
+            200
+          ],
+          "responseSha256": "e5b811bf403df664f4bc490c8040572463bf765d99608a79b020a4366d0e6366"
+        },
+        {
+          "case": "M01:GET /api/notifications/me/unread-count",
+          "result": "PASS",
+          "http": 200,
+          "expected": [
+            200
+          ],
+          "responseSha256": "0fa23dd64139700d9dd375f02c0c00f06f43d98ffd1e9fdac3149d202d784c7c"
+        },
+        {
+          "case": "M01:GET /api/roles",
+          "result": "PASS",
+          "http": 403,
+          "expected": [
+            403
+          ],
+          "responseSha256": "b2cd748bf701435658e5349bfc4fefe1ec49e207bc0e9426832d73fe051edb50"
+        },
+        {
+          "case": "M01:GET /api/permissions",
+          "result": "PASS",
+          "http": 403,
+          "expected": [
+            403
+          ],
+          "responseSha256": "1f03ae7fd9020fa913d50408c6d7edd2d82df9e948fd2c014277278345ba6110"
+        },
+        {
+          "case": "M01:GET /api/members/me",
+          "result": "PASS",
+          "http": 200,
+          "expected": [
+            200
+          ],
+          "responseSha256": "047a6cb1d76b4b33376f7063520b42ee1c2fa4bac208d92a069aa40401d3a382"
+        },
+        {
+          "case": "M01:profile whitelist",
+          "result": "PASS"
+        },
+        {
+          "case": "M01:GET /api/training-results",
+          "result": "PASS",
+          "http": 200,
+          "expected": [
+            200
+          ],
+          "responseSha256": "134212a6c938bcdb691c829d6d603bf66f702035d0a2a9eaa265bf2ade790dbc"
+        },
+        {
+          "case": "M01:GET /api/training-plans",
+          "result": "PASS",
+          "http": 200,
+          "expected": [
+            200
+          ],
+          "responseSha256": "a0f63e27bb8724b42f8e00b2b5200009e9d080a9c32b7a3c02bfd8d169b7acfa"
+        },
+        {
+          "case": "M01:GET /api/attendances",
+          "result": "PASS",
+          "http": 200,
+          "expected": [
+            200
+          ],
+          "responseSha256": "a648a71a77dde63c968e9799f697130ff093d37db4057c7096c074aa52f39908"
+        },
+        {
+          "case": "M01:GET /api/members/me/invoices",
+          "result": "PASS",
+          "http": 200,
+          "expected": [
+            200
+          ],
+          "responseSha256": "2a769c8d76f2e3e79d012ee126b69b6e830a676c8edb705b2b5bf183b3cbf762"
+        },
+        {
+          "case": "M01:GET /api/normal-refunds",
+          "result": "PASS",
+          "http": 200,
+          "expected": [
+            200
+          ],
+          "responseSha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+        },
+        {
+          "case": "M04:POST /api/auth/login",
+          "result": "PASS",
+          "http": 200,
+          "expected": [
+            200
+          ],
+          "responseSha256": "1460707c82ccb009b3222dd77b7e24dce226978b08951dfc0c3a51f482769a71"
+        },
+        {
+          "case": "M04:GET /api/auth/me",
+          "result": "PASS",
+          "http": 200,
+          "expected": [
+            200
+          ],
+          "responseSha256": "1460707c82ccb009b3222dd77b7e24dce226978b08951dfc0c3a51f482769a71"
+        },
+        {
+          "case": "M04:verified current identity",
+          "result": "PASS"
+        },
+        {
+          "case": "M04:GET /api/rooms",
+          "result": "PASS",
+          "http": 200,
+          "expected": [
+            200
+          ],
+          "responseSha256": "d38c37bcc2805e0cb4b34570d5c6672def0306fcdb4d1e4851ce6653d90498f0"
+        },
+        {
+          "case": "M04:GET /api/notifications/me",
+          "result": "PASS",
+          "http": 200,
+          "expected": [
+            200
+          ],
+          "responseSha256": "0a47d789000277e81f07a8268e66672b310440150726a610d78e0071d7c21906"
+        },
+        {
+          "case": "M04:GET /api/notifications/me/unread-count",
+          "result": "PASS",
+          "http": 200,
+          "expected": [
+            200
+          ],
+          "responseSha256": "fe1265455534da316675d95b3019d81d0a26441724d4c428688467975a28e331"
+        },
+        {
+          "case": "M04:GET /api/roles",
+          "result": "PASS",
+          "http": 403,
+          "expected": [
+            403
+          ],
+          "responseSha256": "67eff49fcc48f5f588e721b478079b49da38b68b55585037f9ab863027c64c94"
+        },
+        {
+          "case": "M04:GET /api/permissions",
+          "result": "PASS",
+          "http": 403,
+          "expected": [
+            403
+          ],
+          "responseSha256": "3f8becac791507585b56d729233e454f82025ef924b27a2fc13438cd14b15c02"
+        },
+        {
+          "case": "M04:GET /api/members/me",
+          "result": "PASS",
+          "http": 200,
+          "expected": [
+            200
+          ],
+          "responseSha256": "83d51b17c45ab59c2c23d2d265af228d2d72f69d5b3d04c6a6b5c5f4ac0f415b"
+        },
+        {
+          "case": "M04:profile whitelist",
+          "result": "PASS"
+        },
+        {
+          "case": "M04:GET /api/training-results",
+          "result": "PASS",
+          "http": 200,
+          "expected": [
+            200
+          ],
+          "responseSha256": "6496ac32abd2394d4769c2aed1b6c766de2f28a12694ccbd761ca3c8ff1dac15"
+        },
+        {
+          "case": "M04:GET /api/training-plans",
+          "result": "PASS",
+          "http": 200,
+          "expected": [
+            200
+          ],
+          "responseSha256": "9173c8e18c4b4af7f1c84751d87b9b76b4e7373ebc45313fa34a9a7d1b7f99ca"
+        },
+        {
+          "case": "M04:GET /api/attendances",
+          "result": "PASS",
+          "http": 200,
+          "expected": [
+            200
+          ],
+          "responseSha256": "a827f78c66fc606c535856d7e1ae196d5f0d4bef5c563388f71d7e97f090680f"
+        },
+        {
+          "case": "M04:GET /api/members/me/invoices",
+          "result": "PASS",
+          "http": 200,
+          "expected": [
+            200
+          ],
+          "responseSha256": "ce0b6a6ac2c11bfbb1993b87bc22bf304d37d7ed7f572e965fcf9925ffdd6384"
+        },
+        {
+          "case": "M04:GET /api/normal-refunds",
+          "result": "PASS",
+          "http": 200,
+          "expected": [
+            200
+          ],
+          "responseSha256": "214a1e7ee2cab013e14fae38949ba34609c99a709993b46a26725bc09f472c9e"
+        },
+        {
+          "case": "M14:POST /api/auth/login",
+          "result": "PASS",
+          "http": 200,
+          "expected": [
+            200
+          ],
+          "responseSha256": "5a998148a86c98934ea0d249c2ed16ba65baca0dfab479f6fc71b02e6ffd78f2"
+        },
+        {
+          "case": "M14:GET /api/auth/me",
+          "result": "PASS",
+          "http": 200,
+          "expected": [
+            200
+          ],
+          "responseSha256": "5a998148a86c98934ea0d249c2ed16ba65baca0dfab479f6fc71b02e6ffd78f2"
+        },
+        {
+          "case": "M14:verified current identity",
+          "result": "PASS"
+        },
+        {
+          "case": "M14:GET /api/rooms",
+          "result": "PASS",
+          "http": 200,
+          "expected": [
+            200
+          ],
+          "responseSha256": "d38c37bcc2805e0cb4b34570d5c6672def0306fcdb4d1e4851ce6653d90498f0"
+        },
+        {
+          "case": "M14:GET /api/notifications/me",
+          "result": "PASS",
+          "http": 200,
+          "expected": [
+            200
+          ],
+          "responseSha256": "1ef9946331daae4ad7b215a86f811652416a1fa8523312afe21df66a6d07e166"
+        },
+        {
+          "case": "M14:GET /api/notifications/me/unread-count",
+          "result": "PASS",
+          "http": 200,
+          "expected": [
+            200
+          ],
+          "responseSha256": "c49e6de84f25edf96cc935c48e58d37a5408a994966b768710360004efb4b9e3"
+        },
+        {
+          "case": "M14:GET /api/roles",
+          "result": "PASS",
+          "http": 403,
+          "expected": [
+            403
+          ],
+          "responseSha256": "9ec7c5ec7098c68850c3c1b83198c492e024683d75ac75f6d2a2e709ed1e47bb"
+        },
+        {
+          "case": "M14:GET /api/permissions",
+          "result": "PASS",
+          "http": 403,
+          "expected": [
+            403
+          ],
+          "responseSha256": "8135638afe27247ba0c505d770436fd938f76c44336529a4fd3a630ac76442aa"
+        },
+        {
+          "case": "M14:GET /api/members/me",
+          "result": "PASS",
+          "http": 200,
+          "expected": [
+            200
+          ],
+          "responseSha256": "2f21fe1155dcc5f3e1b39828a8a8d37555a41c1f05dc72d7dd731c82827e5027"
+        },
+        {
+          "case": "M14:profile whitelist",
+          "result": "PASS"
+        },
+        {
+          "case": "M14:GET /api/training-results",
+          "result": "PASS",
+          "http": 200,
+          "expected": [
+            200
+          ],
+          "responseSha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+        },
+        {
+          "case": "M14:GET /api/training-plans",
+          "result": "PASS",
+          "http": 200,
+          "expected": [
+            200
+          ],
+          "responseSha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+        },
+        {
+          "case": "M14:GET /api/attendances",
+          "result": "PASS",
+          "http": 200,
+          "expected": [
+            200
+          ],
+          "responseSha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+        },
+        {
+          "case": "M14:GET /api/members/me/invoices",
+          "result": "PASS",
+          "http": 200,
+          "expected": [
+            200
+          ],
+          "responseSha256": "6ba4ff1f2606e1099eb08712c0335412e8edb79d2dd9a3588b5e48d0004150f7"
+        },
+        {
+          "case": "M14:GET /api/normal-refunds",
+          "result": "PASS",
+          "http": 200,
+          "expected": [
+            200
+          ],
+          "responseSha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+        },
+        {
+          "case": "ADM:GET /api/roles",
+          "result": "PASS",
+          "http": 200,
+          "expected": [
+            200
+          ],
+          "responseSha256": "4c009f80970eaee1f6f9f4396d67f2249255478b1d5376ca40c21cb821e23b5e"
+        },
+        {
+          "case": "ADM:GET /api/users",
+          "result": "PASS",
+          "http": 200,
+          "expected": [
+            200
+          ],
+          "responseSha256": "46e95361afdb3fbb072a005b5cea41ed6bc8522d09b704041cb448b22dda57d2"
+        },
+        {
+          "case": "at least one capable Active administrator",
+          "result": "PASS",
+          "capableActiveAdminCount": 1
+        },
+        {
+          "case": "M01:PUT /api/roles/5/permissions",
+          "result": "PASS",
+          "http": 403,
+          "expected": [
+            403
+          ],
+          "responseSha256": "acc5a255b0a44ffddb657a50a580219769e6fd3e690e997f17d149d7a600f927"
+        },
+        {
+          "case": "ADM:GET /api/roles",
+          "result": "PASS",
+          "http": 200,
+          "expected": [
+            200
+          ],
+          "responseSha256": "114c43c4f8b1af2495ff8586f8ceeef4b61ff5a7a278f4d774378c4d5cb7d09f"
+        },
+        {
+          "case": "denied RBAC retains role permission sets",
+          "result": "PASS"
+        },
+        {
+          "case": "CM1:GET /api/rooms",
+          "result": "PASS",
+          "http": 200,
+          "expected": [
+            200
+          ],
+          "responseSha256": "d38c37bcc2805e0cb4b34570d5c6672def0306fcdb4d1e4851ce6653d90498f0"
+        },
+        {
+          "case": "CM1:POST /api/rooms",
+          "result": "PASS",
+          "http": 400,
+          "expected": [
+            400
+          ],
+          "responseSha256": "6d838769d462aefa91c5d547bddc171ca62e51860c3bc3613ddb36b977cb7406"
+        },
+        {
+          "case": "CM1:PUT /api/rooms/1",
+          "result": "PASS",
+          "http": 409,
+          "expected": [
+            409
+          ],
+          "responseSha256": "b47482c8691a8f5dcabbf90ad45ff65ef0bbe28d37760695037db06774bbb44d"
+        },
+        {
+          "case": "duplicate room error body",
+          "result": "PASS"
+        },
+        {
+          "case": "CM1:GET /api/rooms",
+          "result": "PASS",
+          "http": 200,
+          "expected": [
+            200
+          ],
+          "responseSha256": "d38c37bcc2805e0cb4b34570d5c6672def0306fcdb4d1e4851ce6653d90498f0"
+        },
+        {
+          "case": "invalid/duplicate room requests retain committed rooms",
+          "result": "PASS"
+        },
+        {
+          "case": "public:GET /api/health",
+          "result": "PASS",
+          "http": 200,
+          "expected": [
+            200
+          ],
+          "responseSha256": "a0f7f58a3dce193f1cbd1bc7f7cbf1a75d7ab086bf9c2b685cfa8e5e89c2b4cc"
+        },
+        {
+          "case": "runtime stayed on expected release",
+          "result": "PASS"
+        },
+        {
+          "case": "database target stayed unchanged",
+          "result": "PASS"
+        },
+        {
+          "case": "ADM:POST /api/auth/logout",
+          "result": "PASS",
+          "http": 204,
+          "expected": [
+            204
+          ],
+          "responseSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "case": "ADM:GET /api/auth/me",
+          "result": "PASS",
+          "http": 401,
+          "expected": [
+            401
+          ],
+          "responseSha256": "07f9c456b3b3f19817715839f94008357cc07b9fa69f0eb2bea608d228a8bd37"
+        },
+        {
+          "case": "CM1:POST /api/auth/logout",
+          "result": "PASS",
+          "http": 204,
+          "expected": [
+            204
+          ],
+          "responseSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "case": "CM1:GET /api/auth/me",
+          "result": "PASS",
+          "http": 401,
+          "expected": [
+            401
+          ],
+          "responseSha256": "91228176b9ac36633b090da7e25e9a7a8a3a76a657d9714315a10ae2af6e4095"
+        },
+        {
+          "case": "R1:POST /api/auth/logout",
+          "result": "PASS",
+          "http": 204,
+          "expected": [
+            204
+          ],
+          "responseSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "case": "R1:GET /api/auth/me",
+          "result": "PASS",
+          "http": 401,
+          "expected": [
+            401
+          ],
+          "responseSha256": "8ae96dce2b4a85205e0e50140dba19a8ac59fd555e2566f008f5c07a326ee383"
+        },
+        {
+          "case": "BAD-A:POST /api/auth/logout",
+          "result": "PASS",
+          "http": 204,
+          "expected": [
+            204
+          ],
+          "responseSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "case": "BAD-A:GET /api/auth/me",
+          "result": "PASS",
+          "http": 401,
+          "expected": [
+            401
+          ],
+          "responseSha256": "9e2c85e265aaa3913c26b18ba09c50dfc70999c76d2cb8e702fa63b5d6e8f87f"
+        },
+        {
+          "case": "PICK-A:POST /api/auth/logout",
+          "result": "PASS",
+          "http": 204,
+          "expected": [
+            204
+          ],
+          "responseSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "case": "PICK-A:GET /api/auth/me",
+          "result": "PASS",
+          "http": 401,
+          "expected": [
+            401
+          ],
+          "responseSha256": "f285bef4210b4c37d6723dbb53835fe8f3867ff41e488bc9c62711752655aec5"
+        },
+        {
+          "case": "M01:POST /api/auth/logout",
+          "result": "PASS",
+          "http": 204,
+          "expected": [
+            204
+          ],
+          "responseSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "case": "M01:GET /api/auth/me",
+          "result": "PASS",
+          "http": 401,
+          "expected": [
+            401
+          ],
+          "responseSha256": "9b3ac1cd2dfc067cf2823ac54f31781f7a0f660f0c876c6eed33dcab2a47c292"
+        },
+        {
+          "case": "M04:POST /api/auth/logout",
+          "result": "PASS",
+          "http": 204,
+          "expected": [
+            204
+          ],
+          "responseSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "case": "M04:GET /api/auth/me",
+          "result": "PASS",
+          "http": 401,
+          "expected": [
+            401
+          ],
+          "responseSha256": "22d99db56785e734fb61fca0dcf5fbf056d37ee1e1322f6585b65a7c57c5a2c2"
+        },
+        {
+          "case": "M14:POST /api/auth/logout",
+          "result": "PASS",
+          "http": 204,
+          "expected": [
+            204
+          ],
+          "responseSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "case": "M14:GET /api/auth/me",
+          "result": "PASS",
+          "http": 401,
+          "expected": [
+            401
+          ],
+          "responseSha256": "d5ea9a6858d3ab81fdeaa6b015c109d582cdf3561fd43039048eeca7865b9a6f"
+        }
+      ],
+      "authenticatedActors": [
+        {
+          "alias": "ADM",
+          "role": "Admin",
+          "userId": 1
+        },
+        {
+          "alias": "CM1",
+          "role": "CenterManager",
+          "userId": 32
+        },
+        {
+          "alias": "R1",
+          "role": "Receptionist",
+          "userId": 30
+        },
+        {
+          "alias": "BAD-A",
+          "role": "Coach",
+          "userId": 26
+        },
+        {
+          "alias": "PICK-A",
+          "role": "Coach",
+          "userId": 16
+        },
+        {
+          "alias": "M01",
+          "role": "Member",
+          "userId": 2
+        },
+        {
+          "alias": "M04",
+          "role": "Member",
+          "userId": 5
+        },
+        {
+          "alias": "M14",
+          "role": "Member",
+          "userId": 37
+        }
+      ],
+      "cloudSqlExecuted": false,
+      "providersCalled": false,
+      "credentialsRecorded": false,
+      "negativeMutationsEnabled": true,
+      "startupPolicy": {
+        "attempts": 3,
+        "requestTimeoutSeconds": 35,
+        "deadlineSeconds": 110,
+        "delaySeconds": 2
+      },
+      "startupAttempts": [
+        {
+          "alias": "public",
+          "method": "GET",
+          "path": "/api/health",
+          "attempt": 1,
+          "outcome": "SUCCESS",
+          "reason": "HTTP_200",
+          "elapsedSeconds": 0.208
+        },
+        {
+          "alias": "public",
+          "method": "GET",
+          "path": "/actuator/health",
+          "attempt": 1,
+          "outcome": "SUCCESS",
+          "reason": "HTTP_200",
+          "elapsedSeconds": 4.564
+        },
+        {
+          "alias": "public",
+          "method": "GET",
+          "path": "/v3/api-docs",
+          "attempt": 1,
+          "outcome": "RETRY",
+          "reason": "TimeoutError",
+          "elapsedSeconds": 35.112
+        },
+        {
+          "alias": "public",
+          "method": "GET",
+          "path": "/v3/api-docs",
+          "attempt": 2,
+          "outcome": "SUCCESS",
+          "reason": "HTTP_200",
+          "elapsedSeconds": 11.439
+        },
+        {
+          "alias": "public",
+          "method": "GET",
+          "path": "/api/health",
+          "attempt": 1,
+          "outcome": "SUCCESS",
+          "reason": "HTTP_200",
+          "elapsedSeconds": 0.18
+        }
+      ],
+      "limits": [
+        "Bounded HTTP smoke, not every API/input/role combination",
+        "No FE browser, bank, mail inbox, AI or Google provider acceptance"
+      ],
+      "runtimeIdentity": {
+        "buildCommit": "48a94559daea388b43a2f2c24cec03e3c37cd8a9",
+        "databaseTargetFingerprint": "188f67654d48aa11c970703f2cdaefc79290f1173a7dedaf93547e74bc6b1048",
+        "diagnosticsVersion": "1"
+      },
+      "firstStartupFailure": {
+        "alias": "public",
+        "method": "GET",
+        "path": "/v3/api-docs",
+        "attempt": 1,
+        "outcome": "RETRY",
+        "reason": "TimeoutError",
+        "elapsedSeconds": 35.112
+      },
+      "pathCount": 172,
+      "result": "PASS_CHECKED_SCOPE"
+    },
+    "outcome": "RELEASED_CHECKED_SCOPE",
+    "closedAt": "2026-11-13T23:35:17.551558+07:00"
   }
 }
