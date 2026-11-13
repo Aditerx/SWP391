@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 import re
 import subprocess
+from datetime import date,timedelta
 
 p = argparse.ArgumentParser(description=__doc__)
 p.add_argument('--database', required=True)
@@ -20,8 +21,13 @@ assert inspection['HostConfig']['PortBindings']['5432/tcp'] == [{'HostIp': '127.
 schema_path = (root / args.schema).resolve()
 assert schema_path.is_relative_to(root)
 schema = schema_path.read_text(encoding='utf-8')
+anchor_match=re.search(r"business_date<>DATE '(\d{4}-\d{2}-\d{2})'",schema)
+if not anchor_match:p.error('Regenerate bundle with the early anchor preflight')
+anchor=date.fromisoformat(anchor_match.group(1))
+assert schema.index('SCMS_DEMO_STALE_ANCHOR')<schema.index('CREATE SCHEMA')<schema.index('DROP TABLE')
 proof = {'database': args.database, 'localOnly': True, 'envLoaded': False,
-         'schemaSha256': hashlib.sha256(schema_path.read_bytes()).hexdigest(), 'checks': []}
+         'schemaSha256': hashlib.sha256(schema_path.read_bytes()).hexdigest(),
+         'anchorDate':anchor.isoformat(),'timeZone':'Asia/Ho_Chi_Minh','checks': []}
 
 
 def sql(statement, database=None, error=None):
@@ -41,6 +47,8 @@ def check(name, statement=None, expected=None):
     proof['checks'].append({'name': name, 'status': 'PASS'})
 
 
+actual_date=sql("SELECT (clock_timestamp() AT TIME ZONE 'Asia/Ho_Chi_Minh')::date",'postgres')
+if actual_date!=anchor.isoformat():p.error('Anchor differs from current VN date; no database created, no Clock override')
 sql('CREATE DATABASE ' + args.database, 'postgres')  # fails if it exists; never reset an arbitrary DB
 sql("""DO $$ BEGIN
  IF NOT EXISTS(SELECT 1 FROM pg_roles WHERE rolname='anon') THEN CREATE ROLE anon NOLOGIN; END IF;
@@ -54,6 +62,14 @@ CREATE FUNCTION public.demo_external_function() RETURNS INT LANGUAGE SQL AS 'SEL
 CREATE SEQUENCE public.demo_external_sequence START 391;
 """)
 sql(schema)
+check('anchor_metadata_matches_bundle',"SELECT (after_data::jsonb->>'anchor_date')||','||(after_data::jsonb->>'business_timezone')||','||(after_data::jsonb->>'fixture_version') FROM scms_data_migration_audit WHERE migration_key='20261110_demo_rebuild_v3'",anchor.isoformat()+',Asia/Ho_Chi_Minh,normal-phase1-v3')
+before_anchor=sql("SELECT md5(string_agg(to_jsonb(u)::text,',' ORDER BY user_id)) FROM users u")
+previous=(anchor-timedelta(days=1)).isoformat();future=(anchor+timedelta(days=1)).isoformat()
+for invalid in [previous,future]:
+    # Negative fixture only: deliberately stale date; the canonical bundle/guard is unchanged.
+    sql(schema.replace("DATE '"+anchor.isoformat()+"'","DATE '"+invalid+"'"),error='SCMS_DEMO_STALE_ANCHOR')
+    assert before_anchor==sql("SELECT md5(string_agg(to_jsonb(u)::text,',' ORDER BY user_id)) FROM users u")
+check('past_and_future_anchor_rejected_before_ddl_with_rows_preserved')
 check('fresh_install_reference_counts', "SELECT concat_ws(',',(SELECT count(*) FROM users),(SELECT count(*) FROM subjects),(SELECT count(*) FROM rooms),(SELECT count(*) FROM classes),(SELECT count(*) FROM coach_work_slots))", '47,9,20,21,756')
 check('unlisted_objects_and_grants_preserved', "SELECT concat_ws(',',(SELECT id FROM demo_external_sentinel),demo_external_function(),nextval('demo_external_sequence'),has_table_privilege('anon','demo_external_sentinel','SELECT'))", '391,391,391,t')
 check('scms_direct_browser_grants_revoked', """SELECT count(*) FROM information_schema.role_table_grants
