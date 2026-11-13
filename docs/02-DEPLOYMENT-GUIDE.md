@@ -179,6 +179,19 @@ Báo cáo đủ: `Dxx/case →actor/fixture →expected →response+state →PAS
 
 ## 3. Deploy
 
+<a id="advanced-member-acceptance-20261114"></a>
+### Advanced14/11 — chờ Owner chạy SQL trước deploy
+
+Lượt này chỉ được chạy test local; không áp query/migration trên DB đang dùng. [Migration24](../database/migrations/24_advanced_session_proposals_postgres.sql) là nâng cấp cộng thêm bảng, không reset/seed và không thay quyền học/chứng từ cũ. Script đã soạn nhưng chưa có nghiệm thu PostgreSQL/replay; H2 không thay kiểm migration này.
+
+Khi Owner mở bước SQL: review đúng file, chạy toàn bộ trên DB SCMS đích; kết quả mong đợi `result=PASS`, `migration_key=20261114_advanced_session_proposals_v1`. Nếu có SCMS_ADVANCED_PROPOSAL_DEPENDENCY/INCOMPATIBLE hoặc timeout thì dừng, giữ lỗi và kiểm hiện trạng, không bỏ guard. Owner gửi kết quả đã che thông tin riêng; agent chưa tự readback khi quyền query vẫn đang dừng. Chỉ tiếp tục deploy/kiểm live khi Owner xác nhận bước này và mở phạm vi tiếp theo.
+
+Sau SQL và phát hành đúng source: GET health/build, auth-me đúng actor rồi kiểm luồng [bàn giao Advanced](reference/SCMS-BAN-GIAO-FE-ADVANCED-2026-11-14.md). Chỉ kiểm ghi trong phạm vi được mở; không tự tạo giao dịch/email hoặc sửa quyền. Merge code và test local không là deploy hoặc FE/browser PASS.
+
+Checker offline giữ wire cũ POST `book-private`→201 sẽ báo REVIEW_REQUIRED vì route đó nay bị đóng. Giữ nguyên bằng chứng cũ; đối chiếu case mới đề xuất→Member Accept và OpenAPI hiện hành, không sửa response lịch sử hoặc gọi toàn checker là PASS.
+
+**Đề xuất bundle chờ duyệt:** thêm bảng mới vào bootstrap và whitelist dựng lại theo thứ tự FK; đưa migration24 vào compiler; thêm fixture đề xuất có nhãn minh họa, cập nhật gate/count và kiểm fresh/replay/rollback rồi sinh bundle cùng anchor. Chưa sửa hoặc sinh lại bundle hiện tại; không cần reset DB đang dùng sau migration24.
+
 <a id="rbac-fe-verification"></a>
 ### Kiểm phản hồi FE sau bản sửa RBAC
 

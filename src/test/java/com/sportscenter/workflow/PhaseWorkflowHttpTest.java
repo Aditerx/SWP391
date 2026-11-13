@@ -183,6 +183,11 @@ public class PhaseWorkflowHttpTest {
         if(expected>0)assertEquals(expected,response.statusCode(),method+" "+path+": "+response.body());
         return response.body().isBlank()||response.statusCode()==302?json.createObjectNode():json.readTree(response.body());
     }
+    JsonNode bookConfirmed(HttpClient proposer,Object body) throws Exception {
+        var proposal=call(proposer,"POST","/api/private-session-proposals",body,201);
+        var accepted=call(member,"POST","/api/private-session-proposals/"+proposal.path("id").asInt()+"/respond",Map.of("accepted",true),200);
+        return accepted.path("session");
+    }
     String actor(HttpClient client) {
         if(client==member)return "MEMBER_A";if(client==other)return "MEMBER_B";
         if(client==coach)return "PRIMARY_COACH";if(client==manager)return "CENTER_MANAGER";
@@ -292,11 +297,11 @@ public class PhaseWorkflowHttpTest {
     int scheduledId;
     @Test @Order(4) void primaryCoachBooksAndMemberCancellationAtTwelveHoursReturnsOneCredit() throws Exception {
         var payload=booking("book-boundary",LocalDate.of(2026,10,28),"06:00","07:30");
-        call(member,"POST","/api/sessions/book-private",payload,403);
+        call(member,"POST","/api/private-session-proposals",payload,403);
         var missing=new HashMap<>(payload);missing.put("agreementConfirmed",false);
-        call(coach,"POST","/api/sessions/book-private",missing,400);
-        var created=call(coach,"POST","/api/sessions/book-private",payload,201);int id=created.get("id").asInt();
-        assertEquals(id,call(coach,"POST","/api/sessions/book-private",payload,201).get("id").asInt());
+        call(coach,"POST","/api/private-session-proposals",missing,400);
+        var created=bookConfirmed(coach,payload);int id=created.get("id").asInt();
+        assertEquals(id,bookConfirmed(coach,payload).get("id").asInt());
         assertEquals(11,credit());
         assertEquals(11,call(member,"GET","/api/members/"+memberId+"/subscriptions",null,200).get(0).get("remainingCredit").asInt());
         assertEquals(1,jdbc.queryForObject("SELECT count(*) FROM notifications WHERE dedupe_key=?",Integer.class,"PRIVATE_BOOKING_CONFIRMED:"+id));
@@ -310,7 +315,7 @@ public class PhaseWorkflowHttpTest {
         assertEquals(12,credit());
         assertEquals(12,call(member,"GET","/api/members/"+memberId+"/subscriptions",null,200).get(0).get("remainingCredit").asInt());
         proof("CANCEL-EXACT-12H","D05","Member A cancels own 06:00 session at previous day 18:00","200 then repeated cancellation 400; exactly one credit restored to 12",cancellationSql(),id);
-        var next=call(coach,"POST","/api/sessions/book-private",booking("notice-session",LocalDate.of(2026,10,28),"07:45","09:15"),201);
+        var next=bookConfirmed(coach,booking("notice-session",LocalDate.of(2026,10,28),"07:45","09:15"));
         scheduledId=next.get("id").asInt();
         clock.current=LocalDateTime.of(2026,10,28,0,0).atZone(clock.getZone()).toInstant();
         var notice=call(member,"POST","/api/sessions/"+scheduledId+"/absence",Map.of("reason","Unexpected personal issue"),200);
@@ -410,7 +415,7 @@ public class PhaseWorkflowHttpTest {
         var bookedOrder=requestOrder("cash-with-history","Cash",member);int historyInvoice=bookedOrder.get("invoiceId").asInt();
         call(cashier,"POST","/api/invoices/"+historyInvoice+"/confirm-cash",Map.of("note","LOCAL TEST actual receipt; booking later cancelled"),200);
         var booking=booking("history-booking",LocalDate.of(2026,11,3),"14:45","16:15");booking.put("subscriptionId",bookedOrder.get("subscriptionId").asInt());
-        int bookedId=call(coach,"POST","/api/sessions/book-private",booking,201).get("id").asInt();call(member,"POST","/api/sessions/"+bookedId+"/cancel-private",null,200);
+        int bookedId=bookConfirmed(coach,booking).get("id").asInt();call(member,"POST","/api/sessions/"+bookedId+"/cancel-private",null,200);
         assertEquals(12,jdbc.queryForObject("SELECT remaining_credit FROM member_packages WHERE subscription_id=?",Integer.class,bookedOrder.get("subscriptionId").asInt()));
         var protectedCase=call(cashier,"POST","/api/payment-resolutions",Map.of("invoiceId",historyInvoice,"type","CashCorrection","reason","History must block automatic reversal"),200);
         assertEquals("Blocked",call(manager,"POST","/api/payment-resolutions/"+protectedCase.get("id").asInt()+"/approve",null,200).get("status").asText());
@@ -430,14 +435,14 @@ public class PhaseWorkflowHttpTest {
     }
     @Test @Order(8) void incidentWaitingThroughExpiryRestoresThreeRevokedCreditsAndOneCancelledSessionExactlyOnce() throws Exception {
         List<Integer> booked=new ArrayList<>();
-        for(int day=2;day<=9;day++)booked.add(call(coach,"POST","/api/sessions/book-private",booking("expiry-book-"+day,LocalDate.of(2026,11,day),"07:45","09:15"),201).get("id").asInt());
+        for(int day=2;day<=9;day++)booked.add(bookConfirmed(coach,booking("expiry-book-"+day,LocalDate.of(2026,11,day),"07:45","09:15")).get("id").asInt());
         assertEquals(3,credit());
         at("2026-11-08T08:00:00");int affected=booked.get(booked.size()-1);
         var incident=call(manager,"POST","/api/center-incidents",Map.of("sessionId",affected,"startedAt","2026-11-08T08:00:00","reason","Verified service interruption","evidence","LOCAL TEST closure report","requestKey","waiting-through-expiry"),200);int id=incident.get("id").asInt();
         assertEquals("WaitingForRecovery",incident.get("status").asText());LocalDateTime prior=deadline();assertEquals(3,credit());
         at(prior.toString());int expired=subscriptionService.expireOutdatedPackages();trace.add("JOB expireOutdatedPackages => "+expired);
         assertEquals(0,credit());assertEquals(3,jdbc.queryForObject("SELECT expiry_revoked_credit FROM member_packages WHERE subscription_id=?",Integer.class,subscriptionId));
-        call(coach,"POST","/api/sessions/book-private",booking("expired-attempt",prior.toLocalDate().plusDays(2),"06:00","07:30"),400);
+        call(coach,"POST","/api/private-session-proposals",booking("expired-attempt",prior.toLocalDate().plusDays(2),"06:00","07:30"),400);
         proof("INCIDENT-WAIT-EXPIRY","D08,D12","WaitingForRecovery through exact package deadline; 3 unused credit before expiry","Expired balance 0, expiry_revoked_credit 3; booking rejected",rightsSql(),subscriptionId);
         var resolution=Map.of("endedAt",prior.toString());call(manager,"POST","/api/center-incidents/"+id+"/resolve",resolution,200);assertEquals(3,credit());assertTrue(deadline().isAfter(prior));
         call(manager,"POST","/api/center-incidents/"+id+"/resolve",resolution,200);assertEquals(3,credit());
@@ -445,12 +450,12 @@ public class PhaseWorkflowHttpTest {
         call(manager,"POST","/api/center-incidents/"+id+"/compensate",compensation,200);call(manager,"POST","/api/center-incidents/"+id+"/compensate",compensation,200);assertEquals(4,credit());
         proof("INCIDENT-RESTORE-RETRY","D06,D08","Resolve/retry then compensate/retry verified unheld session","Restore exactly 3 revoked + 1 cancelled credit = 4; never reset 12",rightsSql(),subscriptionId);
         call(manager,"POST","/api/sessions/"+affected+"/reschedule",move("no-history-rewrite",prior.toLocalDate().plusDays(2).toString(),"06:00","07:30","CENTER_INCIDENT",id),400);
-        call(coach,"POST","/api/sessions/book-private",booking("rebook-after-recovery",prior.toLocalDate().plusDays(2),"06:00","07:30"),201);assertEquals(3,credit());
+        bookConfirmed(coach,booking("rebook-after-recovery",prior.toLocalDate().plusDays(2),"06:00","07:30"));assertEquals(3,credit());
         assertEquals(0,jdbc.queryForObject("SELECT expiry_revoked_credit FROM member_packages WHERE subscription_id=?",Integer.class,subscriptionId));
         var extra=booking("approved-minimum",LocalDate.of(2027,1,21),"18:15","19:45");
-        call(coach,"POST","/api/sessions/book-private",extra,400);
+        call(coach,"POST","/api/private-session-proposals",extra,400);
         extra.put("incidentId",id);extra.put("extraValidityReason","Minimum extension for the agreed replacement slot");extra.put("supportReason","Manager supports the agreed makeup");
-        call(manager,"POST","/api/sessions/book-private",extra,201);assertEquals(LocalDateTime.of(2027,1,21,19,45),deadline());assertEquals(2,credit());
+        bookConfirmed(manager,extra);assertEquals(LocalDateTime.of(2027,1,21,19,45),deadline());assertEquals(2,credit());
         proof("INCIDENT-MINIMUM-END","D04,D08,D12","Makeup beyond computed deadline; Coach rejected, Manager reason and incident provided","No historical reschedule; recovered booking allowed; explicit minimum extension ends exactly 2027-01-21T19:45, credit 2",rightsSql(),subscriptionId);
     }
     @Test @Order(9) void normalPaidCourseLateIncidentCreatesOneLinkedMakeupAndCompletesTwelveValidSessions() throws Exception {
@@ -506,8 +511,8 @@ public class PhaseWorkflowHttpTest {
         var order=requestOrder("acceptance-race-cash","Cash",member);invoiceId=order.get("invoiceId").asInt();subscriptionId=order.get("subscriptionId").asInt();
         var payload=booking("center-denied",LocalDate.of(2027,2,2),"06:00","07:30");payload.put("supportReason","Agreed support by manager");
         call(cashier2,"POST","/api/invoices/"+invoiceId+"/confirm-cash",null,403);
-        call(manager2,"POST","/api/sessions/book-private",payload,403);
-        call(cashier,"POST","/api/sessions/book-private",payload,403);
+        call(manager2,"POST","/api/private-session-proposals",payload,403);
+        call(cashier,"POST","/api/private-session-proposals",payload,403);
         assertEquals("Pending",jdbc.queryForObject("SELECT payment_status FROM invoices WHERE invoice_id=?",String.class,invoiceId));assertEquals(0,credit());
         proof("CROSS-CENTER-ACTOR","D03,D04,D10","Verified sessions: cashier/manager center 2, Receptionist; center 1 Pending order","All three writes 403; original invoice Pending, credit 0; no booking",rightsSql(),subscriptionId);
         call(unassigned,"GET","/api/reports/revenue",null,403);
@@ -518,7 +523,7 @@ public class PhaseWorkflowHttpTest {
         assertEquals(12,credit());assertEquals("Paid",jdbc.queryForObject("SELECT payment_status FROM invoices WHERE invoice_id=?",String.class,invoiceId));
         assertEquals(1,jdbc.queryForObject("SELECT count(*) FROM invoices WHERE subscription_id=?",Integer.class,subscriptionId));
         proof("CASH-RACE","D03,D10","Two real HTTP Cash confirmations released together by latch, one Pending invoice","Exactly statuses 200/409; single Paid invoice, Active credit 12",rightsSql(),subscriptionId);
-        call(unassigned,"POST","/api/sessions/book-private",payload,403);assertEquals(12,credit());
+        call(unassigned,"POST","/api/private-session-proposals",payload,403);assertEquals(12,credit());
         proof("BOOK-UNASSIGNED-COACH","D04","Active Paid subscription; valid same-center Coach who is not Primary Coach","403; no booking/deduction",rightsSql(),subscriptionId);
     }
 
@@ -538,30 +543,25 @@ public class PhaseWorkflowHttpTest {
     @Test @Order(11) void bookingAndCancellationRacesProtectResourcesAndCredit() throws Exception {
         var a=booking("race-book-a",LocalDate.of(2027,2,2),"06:00","07:30");
         var b=new HashMap<>(a);b.put("requestKey","race-book-b");
-        race(new HttpClient[]{coach,coach},"/api/sessions/book-private",new Object[]{a,b},List.of(201,409));
-        assertEquals(11,credit());
-        int id=jdbc.queryForObject("SELECT session_id FROM sessions WHERE subscription_id=? AND status='Scheduled'",Integer.class,subscriptionId);
-        assertEquals(1,jdbc.queryForObject("SELECT count(*) FROM sessions WHERE subscription_id=?",Integer.class,subscriptionId));
-        assertEquals(1,jdbc.queryForObject("SELECT count(*) FROM notifications WHERE dedupe_key=?",Integer.class,"PRIVATE_BOOKING_CONFIRMED:"+id));
-        proof("BOOK-RESOURCE-RACE","D04","Two distinct booking keys concurrently target same subscription/Coach/room/time","One 201, one 409; one session and notification; exactly 1 credit consumed",rightsSql(),subscriptionId);
-        var winning="race-book-a".equals(jdbc.queryForObject("SELECT booking_key FROM sessions WHERE session_id=?",String.class,id))?a:b;
-        var changed=new HashMap<>(winning);changed.put("startTime","07:45");changed.put("endTime","09:15");
-        call(coach,"POST","/api/sessions/book-private",changed,409);assertEquals(11,credit());
-        call(other,"POST","/api/sessions/"+id+"/cancel-private",null,403);assertEquals(11,credit());
-        proof("BOOK-KEY-OWNER","D04,D05","Winning key reused with different slot; Member B targets Member A session","Changed body 409; other owner 403; Scheduled/11 credit unchanged",cancellationSql(),id);
-        race(new HttpClient[]{member,member},"/api/sessions/"+id+"/cancel-private",new Object[]{null,null},List.of(200,400));
-        assertEquals(12,credit());assertTrue(jdbc.queryForObject("SELECT credit_returned FROM sessions WHERE session_id=?",Boolean.class,id));
-        proof("CANCEL-RACE","D05","Two concurrent owner cancellations >=12h before session","One 200, one 400; Cancelled/credit_returned true; credit restored once to 12",cancellationSql(),id);
+        var p=call(coach,"POST","/api/private-session-proposals",a,201);
+        var q=call(coach,"POST","/api/private-session-proposals",b,201);
+        assertEquals(12,credit()); // Both proposals are non-reserving.
+        var accepted=call(member,"POST","/api/private-session-proposals/"+p.path("id").asInt()+"/respond",Map.of("accepted",true),200);
+        call(member,"POST","/api/private-session-proposals/"+q.path("id").asInt()+"/respond",Map.of("accepted",true),409);
+        int id=accepted.path("sessionId").asInt();assertEquals(11,credit());
+        var changed=new HashMap<>(a);changed.put("startTime","07:45");changed.put("endTime","09:15");
+        call(coach,"POST","/api/private-session-proposals",changed,409);
+        call(other,"POST","/api/sessions/"+id+"/cancel-private",null,403);
+        race(new HttpClient[]{member,member},"/api/sessions/"+id+"/cancel-private",new Object[]{null,null},List.of(200,400));assertEquals(12,credit());
         var retry=booking("same-key-race",LocalDate.of(2027,2,3),"06:00","07:30");
-        var replayed=race(new HttpClient[]{coach,coach},"/api/sessions/book-private",new Object[]{retry,retry},List.of(201,201));
-        assertEquals(replayed.get(0).path("id"),replayed.get(1).path("id"));
-        assertEquals(11,credit());assertEquals(1,jdbc.queryForObject("SELECT count(*) FROM sessions WHERE subscription_id=? AND booking_key='same-key-race'",Integer.class,subscriptionId));
-        proof("BOOK-SAME-KEY-RACE","D04","Two concurrent identical key/body bookings","Both 201 reference same committed session; one deduction to 11",rightsSql(),subscriptionId);
-        var first=booking("different-slot-a",LocalDate.of(2027,2,4),"06:00","07:30");
-        var second=booking("different-slot-b",LocalDate.of(2027,2,4),"07:45","09:15");
-        race(new HttpClient[]{coach,coach},"/api/sessions/book-private",new Object[]{first,second},List.of(201,201));
-        assertEquals(9,credit());
-        proof("BOOK-DIFFERENT-SLOT-RACE","D04","Concurrent different slots against same credit balance","Both 201; both deductions retained, balance 9",rightsSql(),subscriptionId);
+        var replayed=race(new HttpClient[]{coach,coach},"/api/private-session-proposals",new Object[]{retry,retry},List.of(201,201));
+        assertEquals(replayed.get(0).path("id"),replayed.get(1).path("id"));assertEquals(12,credit());
+        int same=replayed.get(0).path("id").asInt();
+        call(member,"POST","/api/private-session-proposals/"+same+"/respond",Map.of("accepted",true),200);
+        call(member,"POST","/api/private-session-proposals/"+same+"/respond",Map.of("accepted",true),200);assertEquals(11,credit());
+        bookConfirmed(coach,booking("different-slot-a",LocalDate.of(2027,2,4),"06:00","07:30"));
+        bookConfirmed(coach,booking("different-slot-b",LocalDate.of(2027,2,4),"07:45","09:15"));assertEquals(9,credit());
+        proof("PROPOSAL-BOOK-CANCEL","D04,D05","Non-reserving proposals and owner Member acceptance","One deduction per accepted session; repeated accept unchanged; cancellation returns credit once",rightsSql(),subscriptionId);
     }
 
     @Test @Order(12) void callbackForgeryAndConcurrentValidIpns() throws Exception {
@@ -592,14 +592,14 @@ public class PhaseWorkflowHttpTest {
         call(cashier,"POST","/api/invoices/"+order.path("invoiceId").asInt()+"/confirm-cash",null,200);
         assertEquals(LocalDateTime.of(2027,3,21,7,30),deadline());
         var outside=booking("end-after-deadline",LocalDate.of(2027,3,21),"07:45","09:15");
-        call(coach,"POST","/api/sessions/book-private",outside,400);assertEquals(12,credit());
-        call(coach,"POST","/api/sessions/book-private",booking("end-equal-deadline",LocalDate.of(2027,3,21),"06:00","07:30"),201);assertEquals(11,credit());
+        call(coach,"POST","/api/private-session-proposals",outside,400);assertEquals(12,credit());
+        bookConfirmed(coach,booking("end-equal-deadline",LocalDate.of(2027,3,21),"06:00","07:30"));assertEquals(11,credit());
         proof("BOOK-EXACT-DEADLINE","D04,D12","Paid at 2027-02-04T07:30; no future holidays; deadline 2027-03-21T07:30","End beyond deadline rejected 400 without deduction; end exactly equal accepted 201, balance 11",rightsSql(),subscriptionId);
         var candidate=booking("member-inactive-blocked",LocalDate.of(2027,2,6),"06:00","07:30");
         tx.executeWithoutResult(t->users.findById(memberId).orElseThrow().setStatus("Inactive"));
-        try {call(coach,"POST","/api/sessions/book-private",candidate,400);} finally {tx.executeWithoutResult(t->users.findById(memberId).orElseThrow().setStatus("Active"));}
+        try {call(coach,"POST","/api/private-session-proposals",candidate,400);} finally {tx.executeWithoutResult(t->users.findById(memberId).orElseThrow().setStatus("Active"));}
         tx.executeWithoutResult(t->members.findById(memberId).orElseThrow().setBookingBlockedUntil(LocalDateTime.now(clock).plusDays(7)));
-        try {call(coach,"POST","/api/sessions/book-private",candidate,400);} finally {tx.executeWithoutResult(t->members.findById(memberId).orElseThrow().setBookingBlockedUntil(null));}
+        try {call(coach,"POST","/api/private-session-proposals",candidate,400);} finally {tx.executeWithoutResult(t->members.findById(memberId).orElseThrow().setBookingBlockedUntil(null));}
         assertEquals(11,credit());
         proof("BOOK-MEMBER-ACTIVE-BLOCK","D03,D04,D15","Coach has valid session; Member temporarily Inactive then existing booking block in isolated fixture","Each request 400; no session/deduction; default sanctions toggle not enabled",rightsSql(),subscriptionId);
         tx.executeWithoutResult(t->user("phase.noauthority",role("Admin")));
@@ -609,8 +609,8 @@ public class PhaseWorkflowHttpTest {
         try {call(manager,"GET","/api/reports/dashboard",null,403);} finally {tx.executeWithoutResult(t->users.findById(managerId).orElseThrow().setStatus("Active"));}
         proof("REPORT-AUTHORITY-ACTIVE","D18","Admin without VIEW_REPORTS; existing Manager session after account becomes Inactive","Both 403; no authority changes to any cloud account","SELECT user_id,status FROM users WHERE user_id=?",managerId);
         at("2027-02-04T18:00:01");var exact=booking("exact-12h-create",LocalDate.of(2027,2,5),"06:00","07:30");
-        call(coach,"POST","/api/sessions/book-private",exact,400);assertEquals(11,credit());
-        at("2027-02-04T18:00:00");int session=call(coach,"POST","/api/sessions/book-private",exact,201).path("id").asInt();assertEquals(10,credit());
+        call(coach,"POST","/api/private-session-proposals",exact,400);assertEquals(11,credit());
+        at("2027-02-04T18:00:00");int session=bookConfirmed(coach,exact).path("id").asInt();assertEquals(10,credit());
         at("2027-02-04T18:00:01");call(member,"POST","/api/sessions/"+session+"/cancel-private",null,400);assertEquals(10,credit());
         at("2027-02-05T06:00:00");call(member,"POST","/api/sessions/"+session+"/absence",Map.of("reason","Too late at start"),400);
         assertEquals(0,jdbc.queryForObject("SELECT count(*) FROM session_absence_notices WHERE session_id=?",Integer.class,session));
@@ -640,7 +640,7 @@ public class PhaseWorkflowHttpTest {
         });
         var replacementClient=login("phase.unassigned");
         call(manager,"PUT","/api/coaches/"+replacement+"/work-schedule",Map.of("weeklySlots",allSlots(),"daysOff",List.of(),"acceptingNew",true),200);
-        int sid=call(coach,"POST","/api/sessions/book-private",booking("substitute-original",LocalDate.of(2027,2,8),"07:45","09:15"),201).path("id").asInt();int before=credit();
+        int sid=bookConfirmed(coach,booking("substitute-original",LocalDate.of(2027,2,8),"07:45","09:15")).path("id").asInt();int before=credit();
         at("2027-02-07T20:00:00");
         int notice=call(member,"POST","/api/sessions/"+sid+"/absence",Map.of("reason","Personal uncertainty before substitution"),200).path("id").asInt();
         int incident=call(manager,"POST","/api/center-incidents",Map.of("sessionId",sid,"startedAt","2027-02-07T20:00:00","reason","Primary Coach unavailable","evidence","LOCAL TEST verified staffing incident","requestKey","substitute-incident"),200).path("id").asInt();
@@ -652,7 +652,7 @@ public class PhaseWorkflowHttpTest {
         change.put("newCoachId",coachId);call(manager,"POST","/api/sessions/"+sid+"/substitute-coach",change,409);
         assertEquals(coachId,jdbc.queryForObject("SELECT primary_coach_id FROM member_packages WHERE subscription_id=?",Integer.class,subscriptionId));
         assertTrue(jdbc.queryForObject("SELECT active FROM session_absence_notices WHERE id=?",Boolean.class,notice));assertEquals(before,credit());
-        call(replacementClient,"POST","/api/sessions/book-private",booking("substitute-cannot-own-package",LocalDate.of(2027,2,9),"06:00","07:30"),403);
+        call(replacementClient,"POST","/api/private-session-proposals",booking("substitute-cannot-own-package",LocalDate.of(2027,2,9),"06:00","07:30"),403);
         proof("CENTER-SUBSTITUTE-CONSENT","D04,D06,D07","Qualified same-center substitute Coach with schedule; Manager incident and exact-plan consent; active absence notice","No consent 400, Coach 403; Manager/retry 200; changed plan under same key 409; session Coach changes, Primary Coach/credit/notice preserved; substitute cannot create other package sessions","SELECT s.coach_id,s.status,p.primary_coach_id,p.remaining_credit,n.active AS notice_active FROM sessions s JOIN member_packages p ON p.subscription_id=s.subscription_id JOIN session_absence_notices n ON n.session_id=s.session_id WHERE s.session_id=?",sid);
     }
 
@@ -702,11 +702,11 @@ public class PhaseWorkflowHttpTest {
         var tennis=requestOrder("outdoor-after-capacity-expanded","Cash",member,fixture[1],fixture[0],capacityCoach);int tennisSub=tennis.path("subscriptionId").asInt();
         call(cashier,"POST","/api/invoices/"+tennis.path("invoiceId").asInt()+"/confirm-cash",null,200);
         var payload=booking("outdoor-hot-slot",LocalDate.of(2027,2,12),"09:30","11:00");payload.put("subscriptionId",tennisSub);payload.put("coachId",fixture[0]);payload.put("subjectId",fixture[1]);payload.put("roomId",fixture[2]);payload.put("classId",fixture[3]);
-        assertEquals("OUTDOOR_HEAT_BLOCK",call(capacityCoach,"POST","/api/sessions/book-private",payload,400).path("code").asText());
+        assertEquals("OUTDOOR_HEAT_BLOCK",call(capacityCoach,"POST","/api/private-session-proposals",payload,400).path("code").asText());
         payload.put("startTime","13:00");payload.put("endTime","14:30");
-        assertEquals("OUTDOOR_HEAT_BLOCK",call(capacityCoach,"POST","/api/sessions/book-private",payload,400).path("code").asText());
+        assertEquals("OUTDOOR_HEAT_BLOCK",call(capacityCoach,"POST","/api/private-session-proposals",payload,400).path("code").asText());
         assertEquals(12,jdbc.queryForObject("SELECT remaining_credit FROM member_packages WHERE subscription_id=?",Integer.class,tennisSub));
-        payload.put("startTime","06:00");payload.put("endTime","07:30");call(capacityCoach,"POST","/api/sessions/book-private",payload,201);
+        payload.put("startTime","06:00");payload.put("endTime","07:30");bookConfirmed(capacityCoach,payload);
         assertEquals(11,jdbc.queryForObject("SELECT remaining_credit FROM member_packages WHERE subscription_id=?",Integer.class,tennisSub));
         proof("OUTDOOR-HEAT-HTTP","D04,D12","Paid Tennis/Outdoor metadata; Coach published all 7 slots; dedicated Outdoor court","Slots 3/4 each 400 OUTDOOR_HEAT_BLOCK without deduction; slot 1 accepted 201 and consumes only 1 credit",rightsSql(),tennisSub);
     }
@@ -797,9 +797,9 @@ public class PhaseWorkflowHttpTest {
         at("2027-06-01T00:00:00");
         var order=requestOrder("absence-lifecycle","Cash",member);subscriptionId=order.path("subscriptionId").asInt();
         call(cashier,"POST","/api/invoices/"+order.path("invoiceId").asInt()+"/confirm-cash",null,200);
-        int first=call(coach,"POST","/api/sessions/book-private",booking("absence-finalize",LocalDate.of(2027,6,3),"07:45","09:15"),201).path("id").asInt();
-        int second=call(coach,"POST","/api/sessions/book-private",booking("absence-coach",LocalDate.of(2027,6,4),"07:45","09:15"),201).path("id").asInt();
-        int rollback=call(coach,"POST","/api/sessions/book-private",booking("absence-rollback",LocalDate.of(2027,6,5),"07:45","09:15"),201).path("id").asInt();
+        int first=bookConfirmed(coach,booking("absence-finalize",LocalDate.of(2027,6,3),"07:45","09:15")).path("id").asInt();
+        int second=bookConfirmed(coach,booking("absence-coach",LocalDate.of(2027,6,4),"07:45","09:15")).path("id").asInt();
+        int rollback=bookConfirmed(coach,booking("absence-rollback",LocalDate.of(2027,6,5),"07:45","09:15")).path("id").asInt();
         at("2027-06-03T01:45:00");
         tx.executeWithoutResult(t->{User outside=user("phase.absenceoutside",roles.findAll().stream().filter(r->"Member".equals(r.getName())).findFirst().orElseThrow());outside.setCenterId(2);Member m=new Member();m.setUser(outside);m.setJoinDate(LocalDate.now(clock));members.save(m);});
         call(login("phase.absenceoutside"),"POST","/api/sessions/"+first+"/absence",Map.of("reason","Other center"),403);
@@ -885,7 +885,7 @@ public class PhaseWorkflowHttpTest {
         assertTrue(moneyProperties.has("invoiceId"));assertTrue(moneyProperties.has("amount"));assertFalse(moneyProperties.has("sessionId"));
         assertEquals("string",spec.path("components").path("schemas").path("LocalTime").path("type").asText());
         List<String> created=List.of("/api/classes","/api/classes/normal-with-sessions","/api/classes/{classId}/enroll","/api/enrollments",
-                "/api/classes/{classId}/feedback","/api/holidays","/api/rooms","/api/sessions","/api/sessions/book-private",
+                "/api/classes/{classId}/feedback","/api/holidays","/api/rooms","/api/sessions","/api/private-session-proposals",
                 "/api/sessions/generate","/api/subjects","/api/training-plans","/api/evaluations");
         for(String path:created)assertTrue(spec.path("paths").path(path).path("post").path("responses").has("201"),path);
         // Shared package creation has been retired; its old201 metadata was corrected in EC16.

@@ -149,6 +149,8 @@ Ngày `YYYY-MM-DD`, giờ **string** `HH:mm` hoặc `HH:mm:ss[.fraction]`. Busin
 <a id="advanced"></a>
 ## 4. Đăng ký và mua Advanced — D03
 
+**Owner14/11 — xác nhận mua:** response đăng ký thêm `confirmationDeadline=acceptedAt+24h` (null khi chưa có quyết định). Member POST order phải trước mốc này; đúng/quá mốc trả409 `REGISTRATION_CONFIRMATION_EXPIRED`, không tạo Invoice/subscription. Chỉ lần tạo đơn đầu chịu hạn này; retry đơn cũ giữ invoiceId/phương thức/deadline, không mở lại đơn hết hạn hoặc ghi Paid từ Return. Hóa đơn vẫn5phút từ lúc tạo, quyền45ngày từ Paid; đọc lại trạng thái từ BE.
+
 **Phân biệt sản phẩm:** Normal là khóa học nhóm mua theo lớp; Advanced là quyền học1:1 theo môn/Primary Coach. Không có sản phẩm gói hội viên chung trước khi mua khóa. `MemberPackageResponse`/subscriptions vẫn là tên kỹ thuật cho quyền Advanced. Các API mua/gia hạn gói chung đã bị đóng tại BE bằng400 LEGACY_MEMBERSHIP_RETIRED; giữ tuyến GET quyền Advanced, không suy danh từ “package” là một sản phẩm hội viên khác.
 
 | Bước / actor | API | Payload và kết quả |
@@ -211,9 +213,23 @@ Lỗi:401 chưa đăng nhập;403 sai role/không Active/thiếu hồ sơ Member
 <a id="booking"></a>
 ## 6. Coach tạo Advanced — D04/D12
 
-POST `/api/sessions/book-private` →**201 SessionResponse**. Chỉ Primary Coach hoặc Manager/Admin+MANAGE_CLASSES hỗ trợ đúng center; Member/Receptionist không tự tạo.
+<a id="advanced-member-acceptance-20261114"></a>
+**Owner14/11 — đề xuất rồi Member Accept:**
 
-Luồng mới gửi subscriptionId,coachId,roomId,subjectId,sessionDate,startTime,endTime,agreementConfirmed:true,requestKey; Manager thêm supportReason. classId optional tương thích; incidentId/extraValidityReason chỉ theo recovery hợp lệ. Không gửi actor/memberId/amount thay danh tính.
+| API | Actor/input | Kết quả |
+|---|---|---|
+| POST `/api/private-session-proposals` | Primary Coach; Manager/Admin cùng center+MANAGE_CLASSES hỗ trợ có reason. Body theo `PrivateBookingRequest`, `agreementConfirmed:true` xác nhận đã trao đổi, requestKey riêng | 201 `PrivateSessionProposalResponse`; Pending, chưa có Session/không giữ tài nguyên hoặc trừ credit |
+| GET `/api/private-session-proposals`, `/{id}` | Member own, Coach của buổi, Manager/Admin cùng center+MANAGE_CLASSES; role khác403 | Danh sách/detail; lọc role/owner/center tại BE, không nhận actor từ client |
+| POST `/api/private-session-proposals/{id}/respond` | Chỉ Member sở hữu, `{ "accepted": true }` hoặc false bắt buộc/non-null | 200 Accepted có sessionId/session Scheduled và trừ1credit; Rejected không tạo Session/không trừ |
+| POST `/api/sessions/book-private` | Tuyến cũ đã đóng đặt trực tiếp | Actor đạt gate cũ nhận400 USE_PRIVATE_SESSION_PROPOSAL, không ghi; role không đạt vẫn403 |
+
+DTO đề xuất: id/subscriptionId/memberId/coachId/roomId/classId/subjectId, sessionDate/startTime/endTime, status, proposedBy/createdAt/respondBy/respondedAt, sessionId/session/serverTime. `respondBy=start-12h`, giờ VN; đúng mốc vẫn hợp lệ, sau mốc409 PROPOSAL_EXPIRED và GET hiển thị Expired. Expired suy từ thời gian, không cần job để chặn. Payload đề xuất bất biến; cùng key/body trả cùng bản, khác body409 IDEMPOTENCY_CONFLICT. Cùng phản hồi retry trả cùng kết quả, đổi phản hồi sau xử lý409 PROPOSAL_STATE_CONFLICT.
+
+Accept kiểm lại quyền hiện tại của Member và người đề xuất, Paid/Active, credit, môn/Primary Coach, lịch làm, sân/trùng lịch/ngày nghỉ/Outdoor và end<=deadline. Transaction khóa center→subscription→proposal, tạo Session/trừ credit/audit cùng commit; thông báo sau commit. Nếu đã có xung đột thì trả lỗi và giữ Pending/credit, không tự đổi lịch; hai đề xuất trùng giờ có thể cùng Pending nhưng chỉ một được Accept thành công. Liên kết session/booking key do BE tạo; client không truyền sessionId hoặc actor xác nhận.
+
+Đề xuất thường không gia hạn quyền. Nhánh incident do Manager có lý do/hồ sơ vẫn chỉ thực hiện bù hợp lệ khi Member Accept; gửi đề xuất không gia hạn/restore credit. Các buổi đã tồn tại và luồng dời/thay/bù khác giữ nguyên.
+
+Request đề xuất gửi subscriptionId,coachId,roomId,subjectId,sessionDate,startTime,endTime,agreementConfirmed:true,requestKey; Manager thêm supportReason. classId optional tương thích; incidentId/extraValidityReason chỉ theo recovery hợp lệ. Không gửi actor/memberId/amount thay danh tính.
 
 BE kiểm Paid/Active/credit, môn/Coach/member, lịch làm/tài nguyên,>=12h, Holiday/Outdoor và end<=deadline. Khung ca theo [D12](04-DEBUG-NOTE.md#d12). Retry cùng key/body trả cùng ca, không trừ lần hai. SessionResponse có centerInvalidated/makeupForSessionId/creditReturned/createdBy/agreementConfirmedAt; **không có remainingCredit**, FE đọc lại subscriptions.
 
