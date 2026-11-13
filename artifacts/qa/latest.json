@@ -35632,5 +35632,27 @@
     "evidence": {
       "artifacts/runs/advanced-consent-20261114/verification.json": "a80f152e76822a7875de345c64982747592e594c01a4a4bf3b92ed8b0f30cc72"
     }
+  },
+  "advancedConsentRelease20261114": {
+    "status": "CANDIDATE_WAITING_CI",
+    "openedAt": "2026-11-14T05:41:44.613400+07:00",
+    "ownerSqlResult": {
+      "result": "PASS",
+      "migration_key": "20261114_advanced_session_proposals_v1",
+      "added_table": "private_session_proposals",
+      "scope": "Existing invoices, credits and sessions unchanged; demo bundle unchanged"
+    },
+    "ownerSqlExecutionReported": true,
+    "agentSqlExecuted": false,
+    "testedSrcTree": "1f30de0ef72e4622713081a2f298c9db9a9f40f6",
+    "baseline": {
+      "remoteMain": "a94c9b85ec556c25426abef6f0212e3b91952fd9",
+      "runtime": "48a94559daea388b43a2f2c24cec03e3c37cd8a9",
+      "databaseTargetFingerprint": "188f67654d48aa11c970703f2cdaefc79290f1173a7dedaf93547e74bc6b1048"
+    },
+    "localEvidence": "advancedConsentImplementation20261114",
+    "bundleChanged": false,
+    "feSourceChanged": false,
+    "scope": "Publish the already tested Advanced change after Owner SQL; post-deploy API checks before any bundle proposal."
   }
 }

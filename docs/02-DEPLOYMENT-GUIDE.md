@@ -180,9 +180,9 @@ Báo cáo đủ: `Dxx/case →actor/fixture →expected →response+state →PAS
 ## 3. Deploy
 
 <a id="advanced-member-acceptance-20261114"></a>
-### Advanced14/11 — chờ Owner chạy SQL trước deploy
+### Advanced14/11 — SQL trước deploy và kiểm sau phát hành
 
-Lượt này chỉ được chạy test local; không áp query/migration trên DB đang dùng. [Migration24](../database/migrations/24_advanced_session_proposals_postgres.sql) là nâng cấp cộng thêm bảng, không reset/seed và không thay quyền học/chứng từ cũ. Script đã soạn nhưng chưa có nghiệm thu PostgreSQL/replay; H2 không thay kiểm migration này.
+Agent không tự áp query/migration trên DB đang dùng; Owner thực hiện bước SQL trước phát hành. [Migration24](../database/migrations/24_advanced_session_proposals_postgres.sql) là nâng cấp cộng thêm bảng, không reset/seed và không thay quyền học/chứng từ cũ. Script đã soạn nhưng chưa có nghiệm thu PostgreSQL/replay; H2 không thay kiểm migration này.
 
 Khi Owner mở bước SQL: review đúng file, chạy toàn bộ trên DB SCMS đích; kết quả mong đợi `result=PASS`, `migration_key=20261114_advanced_session_proposals_v1`. Nếu có SCMS_ADVANCED_PROPOSAL_DEPENDENCY/INCOMPATIBLE hoặc timeout thì dừng, giữ lỗi và kiểm hiện trạng, không bỏ guard. Owner gửi kết quả đã che thông tin riêng; agent chưa tự readback khi quyền query vẫn đang dừng. Chỉ tiếp tục deploy/kiểm live khi Owner xác nhận bước này và mở phạm vi tiếp theo.
 
