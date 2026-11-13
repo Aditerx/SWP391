@@ -13,9 +13,31 @@ import hashlib
 import http.cookiejar
 import json
 import sys
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
+
+
+def open_with_startup_retry(opener, request, record_retry, delay=2):
+    """Retry only public readiness/schema reads; never repeat login or a mutation."""
+    path = urllib.parse.urlsplit(request.full_url).path
+    warmup = request.get_method() == 'GET' and path in {
+        '/api/health', '/actuator/health', '/v3/api-docs'}
+    attempts = 3 if warmup else 1
+    for attempt in range(1, attempts + 1):
+        try:
+            return opener.open(request, timeout=35)
+        except urllib.error.HTTPError as error:
+            if not warmup or error.code not in (502, 503, 504) or attempt == attempts:
+                raise
+            error.close()
+            record_retry(attempt, 'HTTP_' + str(error.code))
+        except (TimeoutError, urllib.error.URLError, ConnectionError) as error:
+            if not warmup or attempt == attempts:
+                raise
+            record_retry(attempt, type(error).__name__)
+        time.sleep(delay)
 
 
 def run(args):
@@ -48,7 +70,10 @@ def run(args):
             hdrs['Content-Type'] = 'application/json'
         req = urllib.request.Request(base + path, data=payload, method=method, headers=hdrs)
         try:
-            with opener.open(req, timeout=35) as response:
+            def retry_event(attempt, reason):
+                checks.append({'case': method + ' ' + path.split('?')[0] + ':startup read',
+                               'result': 'RETRY', 'attempt': attempt, 'reason': reason})
+            with open_with_startup_retry(opener, req, retry_event) as response:
                 status, raw, response_headers = response.status, response.read(), response.headers
         except urllib.error.HTTPError as error:
             status, raw, response_headers = error.code, error.read(), error.headers
@@ -160,6 +185,8 @@ def run(args):
             _, rooms_after, _ = request(manager['alias'], 'GET', '/api/rooms', expected=(200,))
             stable = lambda rows: sorted(rows, key=lambda row: row['id'])
             check('invalid/duplicate room requests retain committed rooms', stable(rooms_before) == stable(rooms_after))
+        _, final_health, _ = request('public', 'GET', '/api/health', expected=(200,))
+        check('runtime stayed on expected release', final_health.get('buildCommit') == args.expected_commit)
         for actor in actor_data:
             request(actor['alias'], 'POST', '/api/auth/logout', expected=(204,))
             request(actor['alias'], 'GET', '/api/auth/me', expected=(401,))

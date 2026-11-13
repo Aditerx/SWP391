@@ -2,6 +2,8 @@
 
 Đối tượng: FE tích hợp và Owner review. Cập nhật13/11/2026: bộ bàn giao Session1–3 đã được bổ sung theo từng luồng; phạm vi BE local và giới hạn nghiệm thu theo [Active](../docs/00-MASTER-CHECKLIST.md#active)/QA. Demo từng mục **SKIPPED_BY_OWNER**; chưa nghiệm thu FE/browser/Render/cloud.
 
+**Trạng thái phát hành cuối13/11:** đợt phát hành tích hợp đã hoàn nguyên sau timeout smoke đọc OpenAPI lúc startup; baseline đã Live và được kiểm có phiên lại theo Active/QA. Bản nguồn trong bộ này vẫn có Session1–3, nhưng Render hiện giữ baseline trước đợt này. Trước kiểm FE phải đối chiếu SHA/runtime, không suy local/source đã được phát hành hoặc bản mới đã qua authenticated business. Bản sửa smoke readiness giữ ở nhánh release, chưa triển khai lại.
+
 Bộ cập nhật được chia thành các bản bàn giao ngắn theo từng luồng/tính năng. Mỗi bản trình bày vấn đề, phần đã sửa/cập nhật, API/DB liên quan và việc FE cần điều chỉnh hoặc kiểm tra.
 
 `KIEM-TRA.md` là mục lục kiêm checklist tổng: tóm tắt từng nhóm cập nhật và liên kết tới file bàn giao chi tiết để dễ tra cứu, đối chiếu và bắt nhịp. Giữ cách tổ chức theo luồng Owner đã duyệt12/11; kết quả Session3 bổ sung đúng ngày13/11.
