@@ -46,6 +46,7 @@ class PrivateSessionServiceTest {
     @org.mockito.Mock com.sportscenter.session.SessionChangeRepository phaseChanges;
     @org.mockito.Mock com.sportscenter.session.SessionAbsenceService phaseAbsence;
     @org.mockito.Mock com.sportscenter.session.CenterIncidentService phaseIncidents;
+    @Mock private com.sportscenter.membership.AdvancedRegistrationRepository advancedRegistrations;
 
     @Mock
     private SessionRepository sessionRepository;
@@ -201,6 +202,11 @@ class PrivateSessionServiceTest {
         indoorRoom.setFacilityType("Indoor");
         indoorRoom.setCapacity(4);
         indoorRoom.setStatus("Available");
+        var registration=new com.sportscenter.membership.AdvancedRegistration();
+        registration.setMember(sampleMember);registration.setCoach(sampleCoach);registration.setSubject(badmintonSubject);
+        registration.setSubscription(activeSubscription);registration.setSportsClass(advancedClass);registration.setStatus("Invoiced");
+        advancedClass.setCoach(sampleCoach);
+        lenient().when(advancedRegistrations.findBySubscriptionSubscriptionId(50)).thenReturn(Optional.of(registration));
     }
 
     // =========================================================================
@@ -331,7 +337,6 @@ class PrivateSessionServiceTest {
         when(memberPackageRepository.findByIdForUpdate(50)).thenReturn(Optional.of(activeSubscription));
         when(userRepository.findById(10)).thenReturn(Optional.of(sampleCoach));
         when(roomRepository.findById(2)).thenReturn(Optional.of(indoorRoom));
-        when(sportsClassRepository.findById(200)).thenReturn(Optional.of(advancedClass));
         when(sessionRepository.findCoachConflicts(any(), any(), any(), any(), any())).thenReturn(Collections.emptyList());
         when(sessionRepository.findRoomConflicts(any(), any(), any(), any(), any())).thenReturn(Collections.emptyList());
         when(sessionRepository.findMemberConflicts(any(), any(), any(), any(), any())).thenReturn(Collections.emptyList());
@@ -362,7 +367,6 @@ class PrivateSessionServiceTest {
         when(memberPackageRepository.findByIdForUpdate(50)).thenReturn(Optional.of(activeSubscription));
         when(userRepository.findById(10)).thenReturn(Optional.of(sampleCoach));
         when(roomRepository.findById(2)).thenReturn(Optional.of(indoorRoom));
-        when(sportsClassRepository.findById(200)).thenReturn(Optional.of(advancedClass));
         assertTrue(assertThrows(BusinessException.class, () -> sessionService.bookPrivateSession(request, coachAuth))
                 .getMessage().startsWith("ROOM_SUBJECT_MISMATCH:"));
         assertEquals(12, activeSubscription.getRemainingCredit());
@@ -447,11 +451,10 @@ class PrivateSessionServiceTest {
         when(memberPackageRepository.findByIdForUpdate(50)).thenReturn(Optional.of(activeSubscription));
         when(userRepository.findById(10)).thenReturn(Optional.of(sampleCoach));
         when(roomRepository.findById(2)).thenReturn(Optional.of(indoorRoom));
-        when(sportsClassRepository.findById(300)).thenReturn(Optional.of(normalClass));
 
         BusinessException ex = assertThrows(BusinessException.class,
                 () -> sessionService.bookPrivateSession(request, coachAuth));
-        assertTrue(ex.getMessage().contains("không phải khóa học 1:1 Advanced"));
+        assertTrue(ex.getMessage().contains("ADVANCED_CLASS_MISMATCH"));
     }
 
     // =========================================================================

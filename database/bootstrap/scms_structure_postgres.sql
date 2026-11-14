@@ -147,8 +147,8 @@ CREATE TABLE IF NOT EXISTS members (
     CONSTRAINT fk_member_user
         FOREIGN KEY (user_id) REFERENCES users(user_id)
         ON DELETE CASCADE,
-    CONSTRAINT fk_member_receptionist
-        FOREIGN KEY (registered_by) REFERENCES receptionists(user_id)
+    CONSTRAINT fk_member_registered_by
+        FOREIGN KEY (registered_by) REFERENCES users(user_id)
 );
 
 -- Flow 4 rotating QR check-in secret and replay protection (run manually by database owner)

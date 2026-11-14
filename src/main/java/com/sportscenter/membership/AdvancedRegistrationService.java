@@ -31,6 +31,7 @@ public class AdvancedRegistrationService {
     private final InvoiceRepository invoices;
     private final AuditService audit;
     private final Clock clock;
+    private final com.sportscenter.sportclass.SportsClassRepository privateClasses;
 
     @Transactional
     public AdvancedRegistrationResponse request(Integer subjectId, Integer coachId, String key, Authentication auth) {
@@ -68,6 +69,15 @@ public class AdvancedRegistrationService {
             throw new BusinessConflictException("REGISTRATION_STATE_CONFLICT: Registration already processed");
         }
         if (accept) { requireMember(r.getMember()); capacity.requireCapacity(r.getCoach(), r.getSubject()); }
+        if (accept) {
+            var course=new com.sportscenter.sportclass.SportsClass();
+            String label=r.getSubject().getName();
+            course.setName(label.substring(0,Math.min(65,label.length()))+" - Advanced #"+r.getId());
+            course.setSubject(r.getSubject());course.setCoach(r.getCoach());course.setCenterId(r.getMember().getCenterId());
+            course.setClassType("Advanced");course.setMaxCapacity(1);course.setTotalSessions(12);
+            course.setTuitionFee(r.getSubject().getAdvancedPrice());course.setStatus("Closed");
+            r.setSportsClass(privateClasses.save(course));
+        }
         r.setStatus(accept ? "Accepted" : "Rejected"); r.setAcceptedBy(actor); r.setAcceptedAt(LocalDateTime.now(clock)); r.setReason(reason);
         audit.log(actor.getId(), "DECIDE_ADVANCED_REGISTRATION", "ADVANCED_REGISTRATION", id, r.getStatus() + "; reason=" + reason);
         return AdvancedRegistrationResponse.from(r);

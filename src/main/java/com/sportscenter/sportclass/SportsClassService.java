@@ -30,12 +30,17 @@ public class SportsClassService {
     private final java.time.Clock clock;
     private final com.sportscenter.session.SessionRepository sessionRepository;
     private final com.sportscenter.session.ScheduleWriteLock scheduleWriteLock;
+    private final com.sportscenter.membership.AdvancedRegistrationRepository advancedRegistrations;
 
     @Transactional(readOnly = true)
     public List<SportsClassResponse> findAll() {
         var counts = classEnrollmentRepository.countGroupedByClass(List.of("Registered", "Pending")).stream()
                 .collect(java.util.stream.Collectors.toMap(r -> (Integer) r[0], r -> ((Number) r[1]).intValue()));
-        return repository.findAll().stream().map(c -> {
+        User reader=reader();
+        var advanced=advancedRegistrations.findAll().stream().filter(r->r.getSportsClass()!=null&&visible(reader,r))
+                .collect(java.util.stream.Collectors.toMap(r->r.getSportsClass().getId(),r->r));
+        return repository.findAll().stream().filter(c->!c.isAdvanced()||advanced.containsKey(c.getId())).map(c -> {
+            if(c.isAdvanced())return SportsClassResponse.advanced(c,advanced.get(c.getId()),clock);
             int count = counts.getOrDefault(c.getId(), 0);
             return SportsClassResponse.from(c, count);
         }).toList();
@@ -44,6 +49,11 @@ public class SportsClassService {
     @Transactional(readOnly = true)
     public SportsClassResponse findById(Integer id) {
         SportsClass entity = getEntity(id);
+        if(entity.isAdvanced()) {
+            var r=advancedRegistrations.findBySportsClassId(id).filter(x->visible(reader(),x))
+                    .orElseThrow(()->new ResourceNotFoundException("Private class not found"));
+            return SportsClassResponse.advanced(entity,r,clock);
+        }
         int count = (int) classEnrollmentRepository.countBySportsClassIdAndStatusIn(entity.getId(), List.of("Registered", "Pending"));
         return SportsClassResponse.from(entity, count);
     }
@@ -51,6 +61,7 @@ public class SportsClassService {
     @Transactional
     public SportsClassResponse create(SportsClassRequest request) {
         User actor = publicationActor();
+        if("Advanced".equalsIgnoreCase(request.classType()))throw new BusinessException("USE_ADVANCED_REGISTRATION: Coach acceptance creates the private class");
         validateNewClassDate(request);
         validateDateRange(request);
         SportsClass sportsClass = new SportsClass();
@@ -71,6 +82,7 @@ public class SportsClassService {
         scheduleWriteLock.acquire(repository.findCenterIdById(id).orElseThrow(() -> new ResourceNotFoundException("Class center not found")));
         SportsClass sportsClass = repository.findByIdForUpdate(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Class not found: " + id));
+        if(sportsClass.isAdvanced())throw new BusinessException("ADVANCED_CLASS_WORKFLOW_REQUIRED: Use registration and private-session actions");
         if (request.classType()!=null && !request.classType().equalsIgnoreCase(sportsClass.getClassType()==null?"Normal":sportsClass.getClassType()))
             throw new BusinessException("CLASS_TYPE_IMMUTABLE: Normal and Advanced use separate creation workflows");
         Integer previousCapacity = sportsClass.getMaxCapacity();
@@ -135,6 +147,7 @@ public class SportsClassService {
     public SportsClassResponse assignCoach(Integer id, Integer coachId) {
         scheduleWriteLock.acquire(repository.findCenterIdById(id).orElseThrow(() -> new ResourceNotFoundException("Class center not found")));
         SportsClass sportsClass = repository.findByIdForUpdate(id).orElseThrow();
+        if(sportsClass.isAdvanced())throw new BusinessException("ADVANCED_CLASS_WORKFLOW_REQUIRED: Primary Coach follows the approved registration");
         if (sessionRepository.countBySportsClassIdAndStatusNot(id, "Cancelled") > 0||sessionRepository.existsBySportsClassId(id)) throw new BusinessException("CLASS_HAS_SCHEDULE: Use substitute-coach for individual scheduled sessions to preserve history");
         User coach = getCoach(coachId);
         sportsClass.setCoach(coach);
@@ -220,6 +233,18 @@ public class SportsClassService {
     private SportsClass getEntity(Integer id) {
         return repository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Class not found: " + id));
+    }
+
+    private User reader() {
+        var auth=org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        return auth==null?null:userRepository.findByEmailIgnoreCase(auth.getName()).orElse(null);
+    }
+    private boolean visible(User actor,com.sportscenter.membership.AdvancedRegistration r) {
+        if(actor==null||!"Active".equals(actor.getStatus())||!java.util.Objects.equals(actor.getCenterId(),r.getMember().getCenterId()))return false;
+        if(com.sportscenter.common.ActorPolicy.role(actor,"Member"))return actor.getId().equals(r.getMember().getId());
+        if(com.sportscenter.common.ActorPolicy.role(actor,"Coach"))return actor.getId().equals(r.getCoach().getId());
+        return com.sportscenter.common.ActorPolicy.role(actor,"Admin")||com.sportscenter.common.ActorPolicy.role(actor,"CenterManager")
+                ||com.sportscenter.common.ActorPolicy.role(actor,"Receptionist");
     }
 
     private User getCoach(Integer coachId) {

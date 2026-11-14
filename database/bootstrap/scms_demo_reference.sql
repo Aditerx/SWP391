@@ -66,10 +66,7 @@ SELECT u.user_id,sp.specialization_id FROM _scms_subjects x JOIN subjects s USIN
  JOIN users u ON u.email IN ('coach.'||x.coach_code||'1@gmail.com','coach.'||x.coach_code||'2@gmail.com');
 UPDATE coaches c SET specialization=x.name,bio='Huấn luyện viên demo môn '||x.name||'.'
  FROM users u,_scms_subjects x WHERE c.user_id=u.user_id AND u.email IN ('coach.'||x.coach_code||'1@gmail.com','coach.'||x.coach_code||'2@gmail.com');
--- Required by SessionService's subjectId lookup. These are unbooked templates, not purchased rights/classes.
-INSERT INTO classes(class_name,subject_id,max_capacity,tuition_fee,status,class_type,total_sessions,center_id,pricing_draft)
-SELECT x.name||' - Advanced (1:1)',s.subject_id,1,s.advanced_price,'Open','Advanced',12,1,FALSE
- FROM _scms_subjects x JOIN subjects s USING(slug) ORDER BY x.ordinal;
+-- No subject-level Advanced classes: Coach acceptance creates one private class per registration.
 -- Published demo availability only; actual heat/holiday/conflict/credit checks remain in BE.
 INSERT INTO coach_work_schedules(coach_id,accepting_new) SELECT user_id,TRUE FROM coaches;
 INSERT INTO coach_work_slots(coach_id,slot_key)

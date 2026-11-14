@@ -24,12 +24,13 @@ public record SportsClassResponse(
         int postponementCount,
         long lifecycleVersion,
         boolean pricingDraft,
-        boolean changePending) {
+        boolean changePending,
+        Integer advancedRegistrationId,Integer memberId,String memberName,Integer subscriptionId,String advancedState) {
 
     public SportsClassResponse(Integer id, String name, Integer subjectId, Integer coachId,
                                Integer maxCapacity, BigDecimal tuitionFee, LocalDate startDate,
                                LocalDate endDate, String status, Integer enrolledCount) {
-        this(id, name, subjectId, null, coachId, null, maxCapacity, tuitionFee, startDate, endDate, status, enrolledCount, "Normal", 12, null, null, null, 0, 0, false, false);
+        this(id, name, subjectId, null, coachId, null, maxCapacity, tuitionFee, startDate, endDate, status, enrolledCount, "Normal", 12, null, null, null, 0, 0, false, false,null,null,null,null,null);
     }
 
     public static SportsClassResponse from(SportsClass sportsClass) {
@@ -55,6 +56,16 @@ public record SportsClassResponse(
                 enrolledCount,
                 sportsClass.getClassType(),
                 sportsClass.getTotalSessions(), sportsClass.getMinCapacity(), sportsClass.getOpeningConfirmedAt(), sportsClass.getOpeningConfirmedBy(),
-                sportsClass.getPostponementCount(), sportsClass.getLifecycleVersion(), sportsClass.isPricingDraft(),sportsClass.isChangePending());
+                sportsClass.getPostponementCount(), sportsClass.getLifecycleVersion(), sportsClass.isPricingDraft(),sportsClass.isChangePending(),null,null,null,null,null);
+    }
+
+    public static SportsClassResponse advanced(SportsClass c,com.sportscenter.membership.AdvancedRegistration r,java.time.Clock clock) {
+        var sub=r.getSubscription();
+        String state=sub==null ? (r.getAcceptedAt()!=null&&!java.time.LocalDateTime.now(clock).isBefore(r.getAcceptedAt().plusHours(24))
+                ? "ConfirmationExpired":"AwaitingConfirmation") : "Pending".equals(sub.getStatus())?"AwaitingPayment":sub.getStatus();
+        String status="Active".equals(state)?"Ongoing":"Cancelled".equals(state)?"Cancelled":"Closed";
+        return new SportsClassResponse(c.getId(),c.getName(),c.getSubject().getId(),c.getSubject().getName(),r.getCoach().getId(),r.getCoach().getFullName(),
+                1,sub!=null&&sub.getPurchaseAmount()!=null?sub.getPurchaseAmount():c.getTuitionFee(),c.getStartDate(),c.getEndDate(),status,1,"Advanced",12,
+                null,null,null,0,c.getLifecycleVersion(),false,false,r.getId(),r.getMember().getId(),r.getMember().getFullName(),sub==null?null:sub.getSubscriptionId(),state);
     }
 }

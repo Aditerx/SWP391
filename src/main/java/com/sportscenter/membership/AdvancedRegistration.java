@@ -21,4 +21,6 @@ public class AdvancedRegistration {
     @Column(name = "accepted_at") private LocalDateTime acceptedAt;
     @Column(length = 2000) private String reason;
     @OneToOne(fetch = FetchType.LAZY) @JoinColumn(name = "subscription_id", unique = true) private MemberPackage subscription;
+    @OneToOne(fetch = FetchType.LAZY) @JoinColumn(name = "class_id", unique = true)
+    private com.sportscenter.sportclass.SportsClass sportsClass;
 }

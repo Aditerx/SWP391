@@ -25,7 +25,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 /** Opt-in acceptance on the unmodified new demo schema; inherits all Active demo account login checks. */
 @AutoConfigureMockMvc
-@EnabledIfSystemProperty(named="scms.demo.pg-url",matches="jdbc:postgresql://127\\.0\\.0\\.1:55440/scms_schema_demo_[a-z0-9_]+")
+@EnabledIfSystemProperty(named="scms.demo.pg-url",matches="jdbc:postgresql://127\\.0\\.0\\.1:(?:55440|54391)/scms_schema_demo_[a-z0-9_]+")
 class DemoRebuildPostgresTest extends DemoSchemaLoginPostgresTest {
     @DynamicPropertySource static void validateMappings(DynamicPropertyRegistry p) {
         p.add("spring.jpa.hibernate.ddl-auto", () -> "validate");
@@ -35,7 +35,7 @@ class DemoRebuildPostgresTest extends DemoSchemaLoginPostgresTest {
     @MockBean EmailService email;
 
     @Test void approvedDemoSupportsNormalAndAdvancedWorkflowsAfterCommit() throws Exception {
-        assertEquals(21,jdbc.queryForObject("SELECT count(*) FROM classes",Integer.class));
+        assertEquals(20,jdbc.queryForObject("SELECT count(*) FROM classes",Integer.class));
         assertEquals(7,jdbc.queryForObject("SELECT count(*) FROM normal_refunds",Integer.class));
         assertEquals(2,jdbc.queryForObject("SELECT count(*) FROM normal_refund_documents",Integer.class));
         int attendanceBefore=jdbc.queryForObject("SELECT count(*) FROM attendances",Integer.class);
@@ -93,10 +93,18 @@ class DemoRebuildPostgresTest extends DemoSchemaLoginPostgresTest {
         int proposal = write(coach, "/api/private-session-proposals", booking, 201).path("id").asInt();
         assertEquals(12,credit(subscription));
         assertEquals(proposal, write(coach, "/api/private-session-proposals", booking, 201).path("id").asInt());
-        int session=write(member,"/api/private-session-proposals/"+proposal+"/respond",Map.of("accepted",true),200).path("sessionId").asInt();
-        assertEquals(session,write(member,"/api/private-session-proposals/"+proposal+"/respond",Map.of("accepted",true),200).path("sessionId").asInt());
+        write(member,"/api/private-session-proposals/"+proposal+"/respond",Map.of("accepted",true),403);
+        assertEquals(12,credit(subscription));
+        assertEquals(0,jdbc.queryForObject("SELECT count(*) FROM sessions WHERE subscription_id=?",Integer.class,subscription));
+        int session=write(second,"/api/private-session-proposals/"+proposal+"/respond",Map.of("accepted",true),200).path("sessionId").asInt();
+        assertEquals(session,write(second,"/api/private-session-proposals/"+proposal+"/respond",Map.of("accepted",true),200).path("sessionId").asInt());
         assertEquals(11, credit(subscription));
         assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM sessions WHERE subscription_id=?", Integer.class, subscription));
+        assertEquals("Cancelled",write(second,"/api/sessions/"+session+"/cancel-private",Map.of(),200).path("status").asText());
+        assertEquals(12,credit(subscription));
+        assertTrue(jdbc.queryForObject("SELECT credit_returned FROM sessions WHERE session_id=?",Boolean.class,session));
+        assertEquals("SESSION_ALREADY_CANCELLED",write(second,"/api/sessions/"+session+"/cancel-private",Map.of(),400).path("code").asText());
+        assertEquals(12,credit(subscription));
         assertEquals(attendanceBefore, jdbc.queryForObject("SELECT count(*) FROM attendances", Integer.class));
         assertEquals(resultsBefore, jdbc.queryForObject("SELECT count(*) FROM training_results", Integer.class));
         assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM system_logs WHERE audit_category IS NULL OR scope_source IS NULL", Integer.class));

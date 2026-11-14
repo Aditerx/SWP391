@@ -8,6 +8,26 @@ VN = ZoneInfo(TIMEZONE)
 FIXTURE_VERSION = 'normal-phase1-v3'
 
 
+def holiday_catalog(sql):
+    """Read the approved inactive catalog; reject partial/unknown SQL shapes."""
+    start = 'WITH catalog(holiday_date, holiday_name, tag) AS ('
+    if sql.count(start) != 1 or sql.count('), inserted AS') != 1:
+        raise ValueError('DEMO_HOLIDAY_CATALOG_INVALID: expected one catalog block')
+    block = sql.split(start, 1)[1].split('), inserted AS', 1)[0].strip()
+    if not block.startswith('VALUES'):
+        raise ValueError('DEMO_HOLIDAY_CATALOG_INVALID: literal VALUES required')
+    block = block[len('VALUES'):]
+    pattern = r"\(\s*DATE '(\d{4}-\d{2}-\d{2})'\s*,\s*'((?:[^']|'')*)'\s*,\s*'([A-Z_]+)'\s*\)"
+    matches = re.findall(pattern, block)
+    if not matches or re.sub(pattern, '', block).strip(' \t\r\n,'):
+        raise ValueError('DEMO_HOLIDAY_CATALOG_INVALID: unparsed catalog rows')
+    rows = [{'date': date.fromisoformat(day).isoformat(), 'name': name.replace("''", "'"),
+             'tag': tag, 'is_active': False} for day, name, tag in matches]
+    if len({r['date'] for r in rows}) != len(rows):
+        raise ValueError('DEMO_HOLIDAY_CATALOG_INVALID: duplicate dates')
+    return rows
+
+
 def anchor_date(value):
     if not re.fullmatch(r'\d{4}-\d{2}-\d{2}', value):
         raise ValueError('Anchor must be an explicit YYYY-MM-DD Vietnam date')

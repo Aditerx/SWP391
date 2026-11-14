@@ -615,3 +615,24 @@ Khi AUTHENTICATION và Brevo bật chặn SMTP IP: mở **Brevo → Settings →
 Ghi nhận27/10: Render Free,dbUP/mailDOWN. [Render Free](https://render.com/docs/free) chặn SMTP25/465/587. Owner04/11 chọn thử Brevo SMTP2525 và báo đã xác minh sender/thêm env. Cấu hình `MAIL_HOST=smtp-relay.brevo.com`, `MAIL_PORT=2525`, `MAIL_USERNAME` là SMTP login Brevo cấp, `MAIL_APP_PASSWORD` là toàn bộ SMTP key (không phải API key), `MAIL_FROM_EMAIL` là sender đã xác minh; giữ STARTTLS đang bật và để trống `REGISTRATION_DEMO_OTP` khi kiểm OTP thật. Không chép credential vào Git. [Brevo hỗ trợ2525](https://help.brevo.com/hc/en-us/articles/10905415650322-Which-SMTP-port-should-I-use-Port-587-465-or-2525); vẫn phải kiểm kết nối/TLS và delivery từ Render, không suy thành công từ ảnh cấu hình. Nếu không kết nối được, phương án HTTPS email API vẫn cần adapter riêng. Các cổng SQLServer/browser/gateway/full authenticated business matrix ở docs00.
 
 FE nhận docs01 + `artifacts/fe-handoff/openapi.json`. QA ở `artifacts/qa/latest.json`; bundle ở artifacts/releases; raw mới ở artifacts/runs (ignored); private backup giữ nguyên. Lịch sử đầy đủ trước chuẩn hóa truy qua Git `a4f3cd0`, ví dụ `git show a4f3cd0:artifacts/fe-handoff/2026-10-27/render-get-checks.json`. Không phải mọi raw log đều từng commit; raw run cuối còn local như mục2. Không tạo lại inventory/schema MD/HTML trace để tăng số file bàn giao.
+
+<a id="advanced-class-model-20261114"></a>
+### Lớp Advanced theo đăng ký — bản sửa local14/11
+
+DB đang giữ dữ liệu dùng [migration25](../database/migrations/25_advanced_registration_classes_postgres.sql), rồi [cleanup template không còn tham chiếu](../database/cleanup_unused_advanced_templates_postgres.sql). Phải dừng writer/job của BE trong cửa chuyển đổi; sau SQL mới chạy bản BE có lớp riêng. Nếu gặp SCMS_ADVANCED_CLASS_AMBIGUOUS, INCOMPATIBLE hoặc PENDING_PROPOSAL thì dừng và đối chiếu bản ghi, không bỏ guard/xóa lịch sử. Pending đề xuất ghi class cũ cần Member từ chối và Coach gửi lại qua flow được phép trước nâng cấp; không sửa payload/hash consent bằng SQL. Tiền/credit/PK buổi không bị đổi; chỉ class_id của buổi được nối theo subscription đã xác định chắc chắn.
+
+Bundle dựng lại đã nhúng25, không chạy lại migration riêng sau bundle. Chưa có quyền chạy Supabase hoặc deploy trong lượt local này. Sau phát hành được duyệt: auth-me đúng actor, Requested/Rejected không có lớp; Coach Accepted có classId duy nhất; Member thấy đúng lớp của mình; Paid mới có credit; đề xuất/Accept vào đúng lớp và hủy sớm hoàn đúng1credit.
+
+Kiểm upgrade riêng: `python scripts/test-advanced-class-migration-postgres.py --database scms_schema_adv_class_<ma_moi> --legacy-schema <snapshot_bundle_truoc25> --output <proof_json>`. Chỉ dùng DB local mới trong container được ghim; có cùng tùy chọn container/port loopback của runner bundle. Snapshot cũ chỉ làm fixture nâng cấp, không dùng để reset cloud. Active/QA giữ kết quả và source fingerprint.
+
+### Advanced14/11 — SQL trước deploy và kiểm sau phát hành
+
+Agent không tự áp query/migration trên DB đang dùng; Owner thực hiện bước SQL trước phát hành. [Migration24](../database/migrations/24_advanced_session_proposals_postgres.sql) là nâng cấp cộng thêm bảng, không reset/seed và không thay quyền học/chứng từ cũ. Kết quả thực thi và kiểm runtime xem [Active/QA](00-MASTER-CHECKLIST.md#active); kiểm cú pháp ngoại tuyến/H2 không thay nghiệm thu replay PostgreSQL.
+
+Khi Owner mở bước SQL: review đúng file, chạy toàn bộ trên DB SCMS đích; kết quả mong đợi `result=PASS`, `migration_key=20261114_advanced_session_proposals_v1`. Nếu có SCMS_ADVANCED_PROPOSAL_DEPENDENCY/INCOMPATIBLE hoặc timeout thì dừng, giữ lỗi và kiểm hiện trạng, không bỏ guard. Owner gửi kết quả đã che thông tin riêng; agent chưa tự readback khi quyền query vẫn đang dừng. Chỉ tiếp tục deploy/kiểm live khi Owner xác nhận bước này và mở phạm vi tiếp theo.
+
+Sau SQL và phát hành đúng source: GET health/build, auth-me đúng actor rồi kiểm luồng [bàn giao Advanced](reference/SCMS-BAN-GIAO-FE-ADVANCED-2026-11-14.md). Chỉ kiểm ghi trong phạm vi được mở; không tự tạo giao dịch/email hoặc sửa quyền. Merge code và test local không là deploy hoặc FE/browser PASS.
+
+Checker offline giữ wire cũ POST `book-private`→201 sẽ báo REVIEW_REQUIRED vì route đó nay bị đóng. Giữ nguyên bằng chứng cũ; đối chiếu case mới đề xuất→Member Accept và OpenAPI hiện hành, không sửa response lịch sử hoặc gọi toàn checker là PASS.
+
+**Đề xuất bundle chờ duyệt:** thêm bảng mới vào bootstrap và whitelist dựng lại theo thứ tự FK; đưa migration24 vào compiler; thêm fixture đề xuất có nhãn minh họa, cập nhật gate/count và kiểm fresh/replay/rollback rồi sinh bundle cùng anchor. Chưa sửa hoặc sinh lại bundle hiện tại; không cần reset DB đang dùng sau migration24.

@@ -50,6 +50,7 @@ class SportsClassServiceTest {
     @Mock com.sportscenter.session.SessionRepository sessionRepository;
     @Mock com.sportscenter.session.ScheduleWriteLock scheduleWriteLock;
     @Mock com.sportscenter.invoice.InvoiceRepository invoiceRepository;
+    @Mock com.sportscenter.membership.AdvancedRegistrationRepository advancedRegistrations;
     @InjectMocks
     private SportsClassService sportsClassService;
 
@@ -128,43 +129,14 @@ class SportsClassServiceTest {
     }
 
     @Test
-    @DisplayName("Create Advanced class with capacity != 1 throws BusinessException")
-    void create_AdvancedClass_CapacityNotOne_ThrowsException() {
-        LocalDate startDate = LocalDate.now(clock).plusDays(5);
-        SportsClassRequest request = new SportsClassRequest(
-                "Tennis 1:1", 1, 10, 2, null, startDate, startDate.plusMonths(1), "Open", "Advanced", 12
-        );
-
-        when(subjectRepository.findById(1)).thenReturn(Optional.of(sampleSubject));
-        when(userRepository.findById(10)).thenReturn(Optional.of(sampleCoach));
-
-        BusinessException ex = assertThrows(BusinessException.class, () -> sportsClassService.create(request));
-        assertTrue(ex.getMessage().contains("sức chứa bằng 1"));
-        verify(repository, never()).save(any(SportsClass.class));
+    @DisplayName("Advanced cannot be created through general class CRUD, regardless of capacity")
+    void create_AdvancedClass_RequiresRegistration() {
+        for(int capacity: new int[]{1,2}) {
+            SportsClassRequest request = new SportsClassRequest("Private course",1,10,capacity,null,null,null,"Open","Advanced",12);
+            assertTrue(assertThrows(BusinessException.class,()->sportsClassService.create(request)).getMessage().startsWith("USE_ADVANCED_REGISTRATION:"));
+        }
+        verify(repository,never()).save(any());
     }
 
-    @Test
-    @DisplayName("Create Advanced class auto-assigns Subject.advanced_price")
-    void create_AdvancedClass_AutoAssignsAdvancedPrice() {
-        LocalDate startDate = LocalDate.now(clock).plusDays(5);
-        SportsClassRequest request = new SportsClassRequest(
-                "Tennis 1:1 VIP", 1, 10, 1, null, startDate, startDate.plusMonths(1), "Open", "Advanced", 12
-        );
-
-        when(subjectRepository.findById(1)).thenReturn(Optional.of(sampleSubject));
-        when(userRepository.findById(10)).thenReturn(Optional.of(sampleCoach));
-        when(repository.save(any(SportsClass.class))).thenAnswer(inv -> {
-            SportsClass c = inv.getArgument(0);
-            c.setId(102);
-            return c;
-        });
-
-        SportsClassResponse response = sportsClassService.create(request);
-
-        assertNotNull(response);
-        assertEquals(new BigDecimal("8000000.00"), response.tuitionFee(), "Must freeze advanced_price from Subject");
-        assertEquals(1, response.maxCapacity());
-        assertEquals("Advanced", response.classType());
-    }
 }
 

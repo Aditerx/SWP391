@@ -68,6 +68,7 @@ class ScheduleDatabaseTest {
     @Autowired CoachSpecializationRepository assignments;
     @Autowired MembershipPackageRepository packages;
     @Autowired MemberPackageRepository subscriptions;
+    @Autowired com.sportscenter.membership.AdvancedRegistrationRepository registrations;
     @Autowired NormalClassCreationRepository requests;
     @Autowired JdbcTemplate jdbc;
     @Autowired org.springframework.transaction.PlatformTransactionManager transactions;
@@ -75,7 +76,6 @@ class ScheduleDatabaseTest {
     User coach, manager, memberA, memberB;
     Room room;
     Subject subject;
-    SportsClass template;
     MemberPackage packageA, packageB;
     final LocalDate date = LocalDate.of(2026, 10, 26);
 
@@ -97,7 +97,6 @@ class ScheduleDatabaseTest {
         var spec = new Specialization(); spec.setName("Tennis"); spec.setSubject(subject); spec = specializations.save(spec);
         assignments.save(new CoachSpecialization(profile, spec));
         room = new Room(); room.setActivityType(com.sportscenter.room.RoomActivity.TENNIS); room.setName("Test court"); room.setStatus("Available"); room.setCapacity(15); room.setFacilityType("Outdoor"); room = rooms.save(room);
-        template = new SportsClass(); template.setName("Tennis private"); template.setSubject(subject); template.setClassType("Advanced"); template.setMaxCapacity(1); template.setStatus("Open"); template = classes.save(template);
         var pkg = new MembershipPackage(); pkg.setName("Test package"); pkg.setPackageType("Advanced"); pkg.setDurationDays(45); pkg.setPrice(java.math.BigDecimal.TEN); pkg.setStatus("Active"); pkg = packages.save(pkg);
         packageA = subscription(memberA, pkg); packageB = subscription(memberB, pkg);
     }
@@ -105,13 +104,19 @@ class ScheduleDatabaseTest {
         var u = new User(); u.setEmail(email); u.setFullName(email); u.setRole(role); u.setCenterId(1); u.setStatus("Active"); u.setPasswordHash("unused-test-only"); return users.save(u);
     }
     MemberPackage subscription(User user, MembershipPackage pkg) {
-        var p = new MemberPackage(); p.setMember(user); p.setMembershipPackage(pkg); p.setSubject(subject); p.setPrimaryCoach(coach); p.setActivatedAt(date.minusDays(3).atTime(8,0)); p.setExpiresAt(date.plusDays(40).atTime(8,0)); p.setStartDate(date.minusDays(3)); p.setEndDate(date.plusDays(40)); p.setRemainingCredit(12); p.setStatus("Active"); return subscriptions.save(p);
+        var p = new MemberPackage(); p.setMember(user); p.setMembershipPackage(pkg); p.setSubject(subject); p.setPrimaryCoach(coach); p.setActivatedAt(date.minusDays(3).atTime(8,0)); p.setExpiresAt(date.plusDays(40).atTime(8,0)); p.setStartDate(date.minusDays(3)); p.setEndDate(date.plusDays(40)); p.setRemainingCredit(12); p.setStatus("Active"); p=subscriptions.save(p);
+        var course=new SportsClass();course.setName("Private "+p.getSubscriptionId());course.setSubject(subject);course.setCoach(coach);course.setCenterId(1);
+        course.setClassType("Advanced");course.setMaxCapacity(1);course.setTuitionFee(java.math.BigDecimal.TEN);course.setStatus("Closed");course=classes.save(course);
+        var registration=new com.sportscenter.membership.AdvancedRegistration();registration.setMember(user);registration.setCoach(coach);registration.setSubject(subject);
+        registration.setCreatedAt(date.minusDays(5).atStartOfDay());registration.setAcceptedAt(date.minusDays(4).atStartOfDay());registration.setAcceptedBy(coach);
+        registration.setRequestKey(UUID.randomUUID().toString());registration.setStatus("Invoiced");registration.setSubscription(p);registration.setSportsClass(course);registrations.save(registration);
+        return p;
     }
     Authentication auth(User u, String authority) {
         return new UsernamePasswordAuthenticationToken(u.getEmail(), "", List.of(new SimpleGrantedAuthority(authority)));
     }
     PrivateBookingRequest booking(MemberPackage p) {
-        return new PrivateBookingRequest(p.getSubscriptionId(), coach.getId(), room.getId(), date, LocalTime.of(6,0), LocalTime.of(7,30), template.getId(), subject.getId(),true,UUID.randomUUID().toString(),null,null,null);
+        return new PrivateBookingRequest(p.getSubscriptionId(), coach.getId(), room.getId(), date, LocalTime.of(6,0), LocalTime.of(7,30), null, subject.getId(),true,UUID.randomUUID().toString(),null,null,null);
     }
     @AfterEach void clearAuth() { SecurityContextHolder.clearContext(); }
 
@@ -151,7 +156,7 @@ class ScheduleDatabaseTest {
                 LocalTime from = hour == 6 ? LocalTime.of(6,0) : LocalTime.of(16,30);
                 futures.add(pool.submit(() -> {
                     start.await();
-                    return sessions.bookPrivateSession(new PrivateBookingRequest(sub.getSubscriptionId(), coach.getId(), room.getId(), date.plusDays(1), from, from.plusMinutes(90), template.getId(), subject.getId(),true,UUID.randomUUID().toString(),null,null,null), auth(coach,"ROLE_COACH"));
+                    return sessions.bookPrivateSession(new PrivateBookingRequest(sub.getSubscriptionId(), coach.getId(), room.getId(), date.plusDays(1), from, from.plusMinutes(90), null, subject.getId(),true,UUID.randomUUID().toString(),null,null,null), auth(coach,"ROLE_COACH"));
                 }));
             }
             start.countDown();
