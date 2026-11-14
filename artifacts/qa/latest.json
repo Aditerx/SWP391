@@ -35887,5 +35887,100 @@
     ],
     "evidenceCommitScope": "Documentation/QA only; skip CI/deploy. Runtime/source release remains the recorded merge SHA."
   }
+},
+  "advancedConsentLiveAcceptance20261114": {
+  "status": "PASS_LIVE_PROPOSAL_ACCEPT_EARLY_CANCEL_CHECKED_SCOPE",
+  "environment": "https://scms-app-p1gy.onrender.com",
+  "releaseCommit": "0d7ee460a71eee49deb022d67fcd90c45a2cd5ae",
+  "databaseTargetFingerprint": "188f67654d48aa11c970703f2cdaefc79290f1173a7dedaf93547e74bc6b1048",
+  "startedAt": "2026-11-14T07:43:27.088691+07:00",
+  "finishedAt": "2026-11-14T07:44:32.724579+07:00",
+  "ownerAuthorization": "2026-11-14: proposal, Member Accept, early cancellation/refund approved; demo financial writes also permitted.",
+  "priorEvidence": "advancedConsentRelease20261114 retains the earlier deployment/read-negative result and its then-pending positive scope; this record resolves that positive scope.",
+  "fixture": {
+    "subscriptionId": 6,
+    "memberId": 8,
+    "primaryCoachId": 26,
+    "subjectId": 5,
+    "roomId": 3,
+    "sessionDate": "2026-11-16",
+    "startTime": "06:00:00",
+    "endTime": "07:30:00"
+  },
+  "observed": {
+    "pending": {
+      "proposalId": 1,
+      "status": "Pending",
+      "sessionId": null,
+      "remainingCredit": 12,
+      "noCalendarSession": true
+    },
+    "accepted": {
+      "proposalId": 1,
+      "status": "Accepted",
+      "sessionId": 174,
+      "sessionStatus": "Scheduled",
+      "remainingCredit": 11
+    },
+    "cancelled": {
+      "proposalStatus": "Accepted",
+      "sessionId": 174,
+      "sessionStatus": "Cancelled",
+      "creditReturned": true,
+      "remainingCredit": 12,
+      "activatedAt": "2026-11-12T08:00:00",
+      "expiresAt": "2026-12-27T08:00:00",
+      "historyRetained": true,
+      "resourceReleased": true
+    },
+    "readAfterCommit": true,
+    "retry": "Proposal creation retained one row; Accept retained session174 and one debit; repeat cancellation400 SESSION_ALREADY_CANCELLED; Accept after cancellation retained Cancelled session and12credit; opposite decision409 PROPOSAL_STATE_CONFLICT.",
+    "authorization": "Fresh auth/me for Coach26, owner Member8, another Member and same-center Manager; wrong Member get/respond/cancel403 and Coach respond403.",
+    "auditAndNotifications": "One proposal/accept/booking/cancellation audit with the correct actor/target; one relevant in-app notification per recipient/type after commit, including retries.",
+    "history": "Proposal/session retained; no physical deletion; original deadline, activation and purchase amount unchanged; selected resource became available again."
+  },
+  "checks": 102,
+  "setupFailurePreserved": {
+    "result": "FAIL",
+    "phase": "Fixture selection before any proposal/session write",
+    "reason": "Test selector initially used Active for rooms. Current API room contract uses Available; corrected selector and fresh login were used for the single subsequent business run.",
+    "businessWriteAttempted": false
+  },
+  "evidence": {
+    "artifacts/runs/advanced-release-20261114/new-flow-positive.json": "d2504c441ffb5abc6d18aafda090091b62de6536f5a21f78203471ae87924c6b",
+    "artifacts/runs/advanced-release-20261114/new-flow-positive-fixture-fail.json": "61296ccaf932caf6e905e080e699eed94dcd8a775d9fcc755819f6ac9823c304"
+  },
+  "notRun": [
+    "New registration/payment confirmation or provider transactions",
+    "Exact12hour/24hour/45usable-day boundaries live",
+    "Concurrent pending Accept race live",
+    "FE browser save acceptance",
+    "PostgreSQL queries/replay or bundle reset"
+  ],
+  "mutations": {
+    "newProposals": 1,
+    "newSessions": 1,
+    "retainedCancelledSessions": 1,
+    "newInvoices": 0,
+    "paymentsCollected": 0,
+    "emailSent": 0,
+    "roleChanges": false,
+    "rawSqlExecuted": false,
+    "reset": false,
+    "backendSourceChanges": false,
+    "feSourceChanges": false
+  },
+  "bundleProposal": {
+    "status": "WAITING_OWNER_APPROVAL",
+    "changed": false,
+    "staticFinding": "Compiler TABLES omits private_session_proposals and MIGRATIONS omits24. Existing new-table FKs to reset tables would prevent the old bundle DROP ... RESTRICT; inferred from SQL/source, no reset executed.",
+    "scope": [
+      "scripts/build-demo-schema.py: add new table to scoped reset/ACL/identity list; embed migration24 after its dependencies.",
+      "Regenerate database/schema_postgres.sql in staging with the anchor guard; proposal table initially empty; preserve approved accounts/catalog/business fixtures.",
+      "scripts/test-demo-schema-postgres.py: verify fresh/replay/constraints/ACL and scoped reset with proposal history in a new isolated local DB; retain unrelated objects and monotonic invoice references.",
+      "Update database/README.md, docs00/QA and generated metadata where affected; do not execute Supabase reset or seed without a separate Owner step."
+    ]
+  },
+  "next": "Owner reviews bundle proposal; FE integrates using the updated handoff. New registration/provider and live time-boundary/race scopes remain separate."
 }
 }

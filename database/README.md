@@ -21,6 +21,15 @@ Quyết định, contract, code và DB thực tế có thể lệch nhau; phải
 
 **Advanced14/11 — nâng cấp giữ dữ liệu:** [migration24](migrations/24_advanced_session_proposals_postgres.sql) thêm duy nhất `private_session_proposals`, FK/unique/index/guard replay, không sửa hóa đơn/credit/buổi cũ. Hạn xác nhận24giờ dùng `advanced_registrations.accepted_at`, không cần backfill timestamp. Script đã kiểm cú pháp ngoại tuyến; Owner chạy trước deploy BE mới. Kết quả thực thi do Owner báo và kết quả runtime xem Active/QA; agent không tự chạy query. `database/schema_postgres.sql`/bootstrap/compiler/fixture **chưa thêm bảng mới**; đề xuất cập nhật bundle cần Owner duyệt riêng. Không chạy reset để áp migration24.
 
+<a id="advanced-bundle-proposal"></a>
+**Đề xuất cập nhật bundle — chờ Owner duyệt:** bộ hiện tại chưa liệt kê `private_session_proposals` trong reset và chưa nhúng migration24. Bảng mới có FK tới dữ liệu bị dựng lại nên, theo rà tĩnh, `DROP ... RESTRICT` của bundle cũ sẽ bị chặn; chưa chạy reset để kiểm. Bundle là công cụ dựng lại demo, không phải khôi phục nguyên trạng dữ liệu phát sinh.
+
+1. Sửa `scripts/build-demo-schema.py`: thêm bảng mới vào phạm vi reset/ACL/identity và nhúng migration24 sau các dependency; dùng lại DDL migration, không chép thêm một định nghĩa bảng vào bootstrap.
+2. Sinh `database/schema_postgres.sql` qua staging, giữ guard ngày anchor, account/danh mục/fixture đã duyệt; bảng đề xuất khởi đầu rỗng, không bịa Accept cho buổi cũ.
+3. Bổ sung `scripts/test-demo-schema-postgres.py`: kiểm tạo mới/chạy lại, FK/CHECK/unique/quyền bảng-sequence và reset khi đã có đề xuất/buổi; giữ object ngoài phạm vi và bộ đếm mã hóa đơn. Kiểm SQL trên DB local mới, tách biệt; cập nhật mô tả/metadata liên quan.
+
+Chỉ chuẩn bị và kiểm local sau khi Owner duyệt; việc chạy Supabase vẫn là bước riêng. Bằng chứng nghiệm thu BE và trạng thái đề xuất xem [Active/QA](../docs/00-MASTER-CHECKLIST.md#active).
+
 Hai schema có mục đích khác nhau, không phải hai bản sao đồng bộ:
 
 | Script | Mục đích và hành vi chạy lại |

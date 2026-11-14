@@ -10,9 +10,7 @@
 
 Ngày học linh hoạt trong7ca90phút, theo lịch Coach và sân. Giữ hủy trước ít nhất12giờ, hạn45ngày sử dụng và quy tắc vắng hiện hành. Member xác nhận mua khóa khác với Accept từng buổi.
 
-**Kết quả BE:** đã phát hành; kiểm API có phiên đọc dữ liệu/quyền và các request bị từ chối đạt trong phạm vi [Active/QA](../00-MASTER-CHECKLIST.md#active). Accept ghi thật trên Render còn chờ phạm vi Owner; FE lưu/đọc lại trên website chưa nghiệm thu.
-
-**Dự toán FE/Codex:** 2–4giờ sửa và test đích; thêm45–90phút kiểm website khi BE/dữ liệu/cửa giờ sẵn. Chưa đo thực tế, không tính thời gian chờ SQL/phát hành hoặc giờ học.
+**Kết quả BE:** đã kiểm qua API trên Render: đề xuất → Member Accept → hủy sớm hoàn credit, có GET đọc lại và kiểm gửi lại không nhân buổi/credit. Sai Member/Coach bị chặn. Bằng chứng ở [Active/QA](../00-MASTER-CHECKLIST.md#active); FE lưu/đọc lại trên website chưa nghiệm thu.
 
 ## 2. Quá trình và quyết định giữ/bỏ
 
@@ -31,12 +29,13 @@ Ngày học linh hoạt trong7ca90phút, theo lịch Coach và sân. Giữ hủy
 | Coach đề xuất lịch | `POST /api/private-session-proposals` | 201, `id` đề xuất, `status:Pending`, `sessionId:null`, `respondBy` |
 | Đọc đề xuất | `GET /api/private-session-proposals` hoặc `/{id}` | Member chỉ thấy của mình; Coach thấy buổi mình dạy; staff đúng quyền/trung tâm |
 | Member phản hồi | `POST /api/private-session-proposals/{id}/respond`, `{"accepted":true}` hoặc false | 200; Accept có `status:Accepted,sessionId,session`; từ chối là Rejected |
+| Member hủy sớm | `POST /api/sessions/{id}/cancel-private`, còn ít nhất12giờ | 200 `Cancelled,creditReturned:true`; GET subscriptions xác nhận hoàn đúng1credit gốc |
 
 Ví dụ request đề xuất: `{"subscriptionId":42,"subjectId":3,"coachId":7,"roomId":5,"sessionDate":"2026-11-20","startTime":"06:00","endTime":"07:30","agreementConfirmed":true,"requestKey":"adv-42-20261120-1"}`. ID/ngày chỉ minh họa; lấy ID và điều kiện thật từ API. `agreementConfirmed` là Coach xác nhận đã trao đổi; vẫn bắt buộc Member Accept riêng.
 
 `advanced_registrations` → `member_packages` lưu quyền/credit/hạn; `invoices` liên kết quyền học. Bảng mới `private_session_proposals` lưu lịch chờ và phản hồi, liên kết `sessions` sau Accept. Đề xuất hết cửa trước12giờ hiển thị Expired; đúng mốc12giờ vẫn được Accept nếu các điều kiện khác đạt.
 
-**Ví dụ minh họa kết quả thành công:** trước Accept quyền học còn12credit và chưa có buổi. Sau Accept: đề xuất `Accepted`, `sessionId:101`, `session.status:Scheduled`, quyền học còn11credit. Gửi lại cùng phản hồi vẫn cùng buổi101 và11credit; phải GET đọc lại để xác nhận.
+**Kết quả đã quan sát:** quyền học6 còn12credit → đề xuất1 `Pending`, chưa có buổi/12credit → Accept tạo buổi174 `Scheduled`/11credit → hủy sớm: buổi `Cancelled`, `creditReturned:true`/12credit, hạn không đổi. Gửi lại không tạo buổi hoặc hoàn credit thêm. Đây là ID của ca kiểm, FE phải lấy ID từ API. Đề xuất vẫn `Accepted` sau khi hủy; trạng thái buổi lấy từ `session.status`.
 
 ## 4. FE cần làm
 
@@ -50,4 +49,4 @@ Ví dụ request đề xuất: `{"subscriptionId":42,"subjectId":3,"coachId":7,"
 
 FE/Codex xác định lại main và bản website trước sửa; xác nhận `/api/auth/me` và đúng actor. Kiểm tạo đơn trước/đúng/sau24giờ, hạn hóa đơn5phút; đề xuất không giảm credit; Accept rồi đọc lại; từ chối/hết hạn; sai Member/trung tâm; trùng tài nguyên khi Accept; retry không nhân buổi/credit. Kiểm tiếp hủy12giờ và điểm danh trên buổi đã xác nhận.
 
-BE mới đã có trên Render; FE chưa được sửa/push hoặc nghiệm thu lưu trong đợt này. Bàn giao lại file đã sửa, kết quả lưu/đọc lại từng bước và thời gian thực tế; ca Accept ghi thật còn chờ Owner mở phạm vi, không suy từ kiểm đọc/negative thành công.
+BE đã đạt ca đề xuất/Accept/hủy sớm nêu trên; chưa kiểm live toàn bộ biên thời gian, tranh chấp đồng thời hoặc tạo đơn/thanh toán mới. FE chưa được sửa/push hoặc nghiệm thu lưu trong đợt này. Bàn giao lại file FE đã sửa và kết quả lưu/đọc lại từng bước.
