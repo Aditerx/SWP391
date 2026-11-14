@@ -1,5 +1,15 @@
 ﻿# SCMS — Cấu trúc và vận hành database
 
+<a id="advanced-class-review"></a>
+**Đính chính14/11 — lớp Advanced theo đăng ký:** Owner phát hiện9lớp Advanced mẫu `Open`, chưa có Member/Coach, không đúng bước đăng ký → Coach nhận. Kiểm trước đó chưa kiểm mô hình này. Bản sửa local bỏ các template và cách BE tìm lớp chung theo môn; lớp riêng liên kết qua `advanced_registrations.class_id` unique/FK. Owner đã báo SQL25 PASS và cleanup xóa9template; phát hành BE theo Active/QA.
+
+- **SQL giữ dữ liệu:** [migration25](migrations/25_advanced_registration_classes_postgres.sql) tạo lớp riêng cho đăng ký đã nhận và chuyển `sessions.class_id` theo đúng subscription; giữ PK/buổi/Member/Coach/trạng thái/chứng từ/credit. Dữ liệu thiếu liên kết, tài liệu class-scope không phân được hoặc Pending offer ghi class cũ sẽ dừng, không đoán. Sau đó [SQL dọn](cleanup_unused_advanced_templates_postgres.sql) chỉ xóa template không còn tham chiếu, kể cả FK có CASCADE và audit/thông báo. Trước nâng cấp,2lớp chung đang có buổi không được xóa. **Owner đã báo thực thi PASS cho cả hai file; agent không chạy SQL cloud.**
+- **Dữ liệu sai khác đã sửa trong bundle:** thời điểm tạo/Coach nhận sau ngày thanh toán; Cash Advanced mẫu ngoài5phút; bản Accepted mẫu quá24giờ ngay ngày cài. Đã sửa timeline nguồn sinh; không sửa lại lịch sử live để làm kết quả đẹp. Ca cố ý thu Cash nhầm/tiền đến muộn và quyền0credit có buổi đang chờ vẫn giữ theo kịch bản, không tự xóa.
+- **BE local:** Coach nhận tạo lớp riêng, Requested/Rejected không tạo lớp; retry không nhân. Đặt buổi lấy lớp đúng đăng ký/quyền học, chặn classId khác và tạo/sửa Advanced qua CRUD chung. Danh sách dùng Member/Coach/state từ liên kết; `enrolledCount=1` là chủ lớp đã được Coach nhận, không cấp quyền trước Paid. Member/Coach chỉ thấy lớp riêng thuộc mình; staff cùng center. FE dùng `advancedState`, không gán nhãn mở đăng ký nhóm.
+- **Bundle hiện tại:** chỉ sinh8lớp Advanced của8đăng ký Accepted/Invoiced và12Normal; danh mục vẫn9môn. Số8là hệ quả fixture, không phải quota. Không seed consent giả cho buổi cũ; lịch cố định của lớp Advanced có thể null vì buổi được chốt riêng. FK/unique/CHECK/trigger bảo vệ liên kết và không cho đổi chủ lớp đã được nhận.
+
+Trạng thái/bằng chứng chuẩn ở [Active/QA](../docs/00-MASTER-CHECKLIST.md#active). Khi triển khai sau này: dừng writer/job của BE, Owner chạy SQL giữ dữ liệu hoặc chọn bundle dựng lại, rồi phát hành BE tương ứng; không để BE cũ tiếp tục đặt buổi trong cửa chuyển đổi. Owner đã cho phép merge và kiểm sau deploy; không tự chạy thêm SQL/reset Supabase.
+
 PostgreSQL/Supabase là môi trường đang dùng. README hướng dẫn chọn script và đọc mô hình dữ liệu trong repo; không chứng nhận DB đang chạy đã đồng bộ với script.
 
 **Phase1 Normal/Refund10/11:** bundle có47account/21Class và fixture nghiệp vụ tổng hợp/private PDF DEMO. SYSTEM-DATA giữ DATA DESIGN, xuất từ fixture local; không là reset Supabase/deploy. Trạng thái kiểm/checkpoint ở [Active](../docs/00-MASTER-CHECKLIST.md#active) và [docs03](../docs/03-TODO.md#normal-phase1-complete-20261110).

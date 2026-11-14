@@ -7,7 +7,7 @@ import hashlib
 import json
 import re
 import uuid
-from demo_anchor import anchor_date, TIMEZONE, FIXTURE_VERSION
+from demo_anchor import anchor_date, holiday_catalog, TIMEZONE, FIXTURE_VERSION
 from demo_handoff import render as render_handoff
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -17,6 +17,8 @@ parser.add_argument('--anchor', required=True, type=anchor_date, help='Explicit 
 parser.add_argument('--manifest', help='Write the same validated design as JSON for the SQL fixture compiler')
 parser.add_argument('--no-render',action='store_true',help='Compile source rows without overwriting the reviewed SYSTEM-DATA export')
 parser.add_argument('--from-local-pg',help='Export actual fixture rows from an explicitly disposable loopback database')
+parser.add_argument('--pg-container',default='scms-phases-20261027',help='Pinned local test container or task-specific scms-bundle-* container')
+parser.add_argument('--pg-port',type=int,choices=(55440,54391),default=55440)
 parser.add_argument('--output',default='SYSTEM-DATA.md',help='Markdown export path in workspace; staging is supported')
 args = parser.parse_args()
 if not args.no_render and not args.from_local_pg:
@@ -131,14 +133,11 @@ for user in tables['users']:
                 add('coach_work_slots', coach=user['key'], slot_key=f'{weekday}:{slot}')
 add('coach_days_off', coach='PICK-B', date=day(60))
 add('holidays', key='H01', date=day(50), name='DEMO trung tâm đóng cửa', tag='CENTER_EVENT', is_active=True)
+for index, holiday in enumerate(holiday_catalog((ROOT/'database/seed_holidays_catalog_2026.sql').read_text(encoding='utf-8')), 1):
+    add('holidays', key=f'HC{index:02}', **holiday)
 
 slots = {1: ('06:00', '07:30'), 2: ('07:45', '09:15'), 3: ('09:30', '11:00'),
          4: ('13:00', '14:30'), 5: ('14:45', '16:15'), 6: ('16:30', '18:00'), 7: ('18:15', '19:45')}
-for index, row in enumerate(subjects, 1):
-    subject = subject_keys[index]
-    add('classes', key=f'A{index:02}', name=row[1] + ' Advanced', subject=subject,
-        type='Advanced', coach=None, room=None, max_capacity=1, min_capacity=None,
-        price=row[4], status='Open', sessions=0, lifecycle='Template, không phải quyền đã mua')
 
 # key, subject, state, capacity, min, paid members, first offset, weekdays(ISO), slot, completed count
 normal = [
@@ -221,12 +220,24 @@ for key,member,subject,state in [('AR01','M14','SWIM','Requested'),('AR02','M15'
                                ('AR03','M16','ARC','Rejected')]:
     add('advanced_registrations', key=key, member=member, subject=subject, coach=subject+'-A',
         status=state, subscription=None, request_key='DEMO-'+key,
+        created_at=stamp(-2,'06:00'),
+        accepted_at=stamp(0,'00:00') if state=='Accepted' else stamp(-1,'07:00') if state=='Rejected' else None,
         reason='DEMO Coach từ chối yêu cầu' if state=='Rejected' else None)
 advanced=[('SUB01','M02','TEN','Active',12,-4),('SUB02','M03','TEN','Active',10,-5),
           ('SUB03','M04','BAD','Active',0,-6),('SUB04','M05','TEN','Completed',0,-40),
           ('SUB05','M06','TEN','Expired',0,-70),('SUB06','M07','BAD','Active',12,-2),
           ('SUB07','M08','SWIM','Cancelled',0,-3)]
-template_by_subject={r['subject']:r['key'] for r in tables['classes'] if r['type']=='Advanced'}
+def private_course(registration):
+    subject=registration['subject'];key='A-'+registration['key']
+    registration['sports_class']=key
+    add('classes',key=key,name=subject_data[subject][1]+' - Advanced #'+registration['key'],subject=subject,
+        type='Advanced',coach=registration['coach'],member=registration['member'],registration=registration['key'],room=None,
+        max_capacity=1,min_capacity=None,price=subject_data[subject][4],status='Closed',sessions=0,lifecycle='Coach đã nhận đăng ký; quyền học theo thanh toán')
+    return key
+
+for registration in tables['advanced_registrations']:
+    registration['sports_class']=None
+    if registration['status']=='Accepted':private_course(registration)
 for index,(key,member,subject,state,credit,paid_offset) in enumerate(advanced,4):
     coach=subject+'-A'
     amount=subject_data[subject][4]
@@ -238,11 +249,13 @@ for index,(key,member,subject,state,credit,paid_offset) in enumerate(advanced,4)
         validity_days=45, note='DEMO Cash đã ghi nhận nhầm nhưng chưa nhận tiền' if key=='SUB06' else None)
     add('invoices', key=invoice, member=member, sports_class=None, subscription=key,
         amount=amount, method='VNPay' if key=='SUB07' else 'Cash', status='Paid',
-        created_at=stamp(paid_offset,'07:50'), payment_date=stamp(paid_offset),
+        created_at=stamp(paid_offset,'07:50' if key=='SUB07' else '07:58'), payment_date=stamp(paid_offset),
         receptionist=None if key=='SUB07' else 'R1', reconciliation_required=key=='SUB07',
         cash_confirmation_reversed=False, gateway_ref='DEMO-LATE-RECEIPT' if key=='SUB07' else None)
     add('advanced_registrations', key=f'AR{index:02}', member=member, subject=subject, coach=coach,
-        status='Invoiced', subscription=key, request_key='DEMO-'+key, reason=None)
+        status='Invoiced', subscription=key, request_key='DEMO-'+key, reason=None,
+        created_at=stamp(paid_offset,'07:30'),accepted_at=stamp(paid_offset,'07:40' if key=='SUB07' else '07:55'))
+    private_class=private_course(tables['advanced_registrations'][-1])
     session_dates=[]
     if key=='SUB02':session_dates=dates_from(2,[4,6],2)
     if key=='SUB03':session_dates=dates_from(1,[2,4,6],12)
@@ -250,7 +263,7 @@ for index,(key,member,subject,state,credit,paid_offset) in enumerate(advanced,4)
     if key=='SUB05':session_dates=dates_from(-65,[2,4,6],2)
     for number,d in enumerate(session_dates,1):
         completed=state in ['Completed','Expired']
-        add('sessions', key=f'{key}-S{number:02}', sports_class=template_by_subject[subject],
+        add('sessions', key=f'{key}-S{number:02}', sports_class=private_class,
             date=d.isoformat(), start=slots[7][0], end=slots[7][1], coach=coach,
             room='C01-'+subject+'-01', member=member, status='Completed' if completed else 'Scheduled',
             finalized=completed, review_pending=False, center_invalidated=False,
@@ -367,7 +380,7 @@ notes.update({
  'roles':'GET roles/permissions/role detail chỉ Admin Active; quyền ghi không tự suy từ quyền đọc.',
  'role_permissions':'Baseline hiện hành; permission legacy có thể tồn tại nhưng không làm API legacy hoạt động trở lại. Không mở thêm Admin tài chính hoặc quyền Coach ngoài assignment.',
  'coach_work_slots':'Mỗi dòng là một slot thật của quan hệ. T2–T7 là lịch Coach demo, không phải định nghĩa ngày làm việc của TT; Chủ nhật trống để trình diễn cấu hình. Outdoor vẫn cấm ca3/4.',
- 'classes':'Migration21/BE đã có phần lõi minimum/confirmation/start-close; dời/chuyển/hủy/Refund và fixture vẫn chưa hoàn tất theo checkpoint Phase1. Các dòng này là thiết kế, không là dữ liệu đã thực thi. Status Class không có Completed;9Advanced là template chưa có buổi, không cấp quyền học.',
+ 'classes':'Normal có12buổi và quy trình minimum/confirmation/start-close. Advanced chỉ có lớp sau Coach nhận đăng ký, mỗi đăng ký một lớp riêng; lớp không tự cấp quyền học trước Paid và không tự tạo buổi trước Member Accept.',
  'sessions':f'Mốc fixture {ANCHOR} 00:00 VN. Đổi ngày phải tái sinh toàn bộ bundle và kiểm resource/Member conflict/cửa thời gian; không tự sửa Clock Render hoặc TTL. N10 có13record/12hợp lệ; makeup giữ buổi gốc.',
  'invoices':'key ở đây là mã manifest, không phải invoiceCode gửi gateway. InvoiceCode thật do sequence không tái dùng cấp. Tất cả khoản này là dữ liệu mô phỏng được duyệt, không có thu/chuyển tiền thật hoặc callback gateway thật.',
  'payment_resolutions':'Tên state/field ở đây diễn đạt giai đoạn nghiệp vụ để thống nhất dữ liệu, chưa là enum/DTO/API đã triển khai. Receiver DEMO không phải tài khoản ngân hàng có thể chuyển tiền. Contact phone tùy FE dùng, không thay xác minh tài khoản.',
@@ -399,7 +412,14 @@ for table in existing+new:
 
 def validate():
     assert len(accounts)==33 and len(tables['users'])==47
-    assert len(tables['classes'])==21 and len(tables['rooms'])==20
+    assert len(tables['rooms'])==20
+    accepted={r['key']:r for r in tables['advanced_registrations'] if r['status'] in {'Accepted','Invoiced'}}
+    private=[c for c in tables['classes'] if c['type']=='Advanced']
+    assert len(private)==len(accepted) and len(tables['classes'])==12+len(accepted)
+    assert {c['registration'] for c in private}==set(accepted)
+    for c in private:
+        owner=accepted[c['registration']]
+        assert c['coach']==owner['coach'] and c['member']==owner['member'] and c['subject']==owner['subject']
     assert len(existing)>=47 and set(tables)==set(existing+new)
     user_keys={r['key'] for r in tables['users']}
     class_keys={r['key'] for r in tables['classes']}
@@ -459,6 +479,17 @@ def validate():
             'do not infer Present from content or rely on the database default', row.get('key'))
         session=next(s for s in tables['sessions'] if s['key']==row['session'])
         assert session['status']=='Completed' and not session['center_invalidated']
+    for registration in tables['advanced_registrations']:
+        created=datetime.fromisoformat(registration['created_at'])
+        decided=datetime.fromisoformat(registration['accepted_at']) if registration['accepted_at'] else None
+        assert (decided is not None)==(registration['status'] in {'Accepted','Invoiced','Rejected'}), ('REGISTRATION_DECISION_TIME_REQUIRED',registration['key'])
+        if decided:assert created<=decided,('REGISTRATION_TIME_ORDER',registration['key'])
+        if registration['subscription']:
+            receipt=next(i for i in tables['invoices'] if i['subscription']==registration['subscription'])
+            ordered=datetime.fromisoformat(receipt['created_at']);paid=datetime.fromisoformat(receipt['payment_date'])
+            assert decided<=ordered<decided+timedelta(hours=24) and ordered<=paid, ('ADVANCED_ORDER_TIME',registration['key'])
+            if not receipt['reconciliation_required']:
+                assert paid<ordered+timedelta(minutes=5),('ADVANCED_PAID_OUTSIDE_WINDOW',registration['key'])
     holiday_dates={h['date'] for h in tables['holidays'] if h['is_active']}
     for row in tables['payment_resolutions']:
         if row['type']!='Refund' or not row.get('approved_at'):
@@ -485,13 +516,13 @@ parts=['''# SYSTEM DATA — Bộ dữ liệu gốc SCMS được duyệt10/11/20
 
 **Trạng thái: DATA DESIGN, CHƯA SEED/RESET SUPABASE.** File này ghi bộ tham chiếu và các dòng thiết kế cho FE/BE, không phải dump DB đang chạy hoặc bằng chứng API Normal/Refund mới đã có. Các bảng mới/field nghiệp vụ là dự kiến kỹ thuật, chưa là contract đã triển khai. ID DB được sinh khi seed; `key`, Nxx/Mxx/RFxx là mã đối chiếu manifest, FE phải lấy ID thật từ API.
 
-Nguồn: [Owner decisions](docs/04-DEBUG-NOTE.md), [review và phê duyệt](docs/03-TODO.md#system-data-review-20261109), [Normal Lifecycle](SCMS_BE_Normal_Lifecycle_DA_CHOT.md), [Refund Normal](SCMS_BE_Refund_Normal_DA_CHOT.md), reference seed đã đối chiếu33account PDF. [Active/QA](docs/00-MASTER-CHECKLIST.md#active) giữ trạng thái kiểm/phát hành; dữ liệu đã đọc trên cloud không được trộn vào bộ mới này.
+Nguồn: [Owner decisions](docs/04-DEBUG-NOTE.md), [review và phê duyệt](docs/archive/2026-11/03-TODO.md#system-data-review-20261109), [Normal Lifecycle](docs/reference/SCMS_BE_Normal_Lifecycle_DA_CHOT.md), [Refund Normal](docs/reference/SCMS_BE_Refund_Normal_DA_CHOT.md), reference seed đã đối chiếu33account PDF. [Active/QA](docs/00-MASTER-CHECKLIST.md#active) giữ trạng thái kiểm/phát hành; dữ liệu đã đọc trên cloud không được trộn vào bộ mới này.
 
 ## Quy ước
 
 - Anchor thiết kế:ANCHOR_DATE 00:00 Asia/Ho_Chi_Minh, không phải cấu hình Clock cho môi trường deploy. Fixture thực thi phải chọn lại ngày và kiểm conflict/ràng buộc trước commit.
 - Giữ33account PDF, thêm14account riêng. Mật khẩu demo theo quyết định Owner; không đưa hash/secret vào bảng. Chỉ account demo bỏ first-login; không đổi policy tạo account thực qua API.
-- 9môn/20room/9template Advanced/12Normal; N05→N11 Pickleball cùng1.800.000đ/center1, Member đồng ý rõ. Không tăng số lớp để bổ sung đích.
+- 9môn/20room/8lớp Advanced có đăng ký đã nhận/12Normal; N05→N11 Pickleball cùng1.800.000đ/center1, Member đồng ý rõ.
 - Ngày làm việc hoàn tiền = ngày TT mở theo Holiday, tính T7/CN nếu không đóng; giữ7ngày làm việc. Lịch nghỉ Coach không dừng SLA của trung tâm.
 - Contact phone của Member là dữ liệu liên hệ đúng quyền, FE quyết định dùng/hiển thị; không nằm trong chứng từ ngân hàng và không thay xác minh.
 - Mỗi bảng có mục riêng. Bảng rỗng nêu rõ vì sao; các scenario động/Advanced chưa cụ thể hóa nằm ở phần còn lại, không được xem là đã có đủ dòng để thực thi toàn bộ demo.
@@ -531,12 +562,13 @@ if args.from_local_pg:
     import subprocess
     database=args.from_local_pg
     assert re.fullmatch(r'scms_schema_demo_phase1_[a-z0-9_]+',database),'Disposable fixture DB only'
-    container='scms-phases-20261027'
+    container=args.pg_container
+    assert re.fullmatch(r'scms-(?:phases-20261027|bundle-[a-z0-9-]+)',container),'Local test container only'
     config=json.loads(subprocess.check_output(['docker','inspect',container],text=True))[0]
-    assert config['HostConfig']['PortBindings']['5432/tcp']==[{'HostIp':'127.0.0.1','HostPort':'55440'}]
+    assert config['HostConfig']['PortBindings']['5432/tcp']==[{'HostIp':'127.0.0.1','HostPort':str(args.pg_port)}]
     def sql(query):
         return subprocess.check_output(['docker','exec',container,'psql','-X','-At','-v','ON_ERROR_STOP=1','-U','postgres','-d',database,'-c',query],text=True,encoding='utf-8').strip()
-    assert sql('SELECT count(*) FROM users')=='47' and sql('SELECT count(*) FROM classes')=='21'
+    assert sql('SELECT count(*) FROM users')=='47' and sql('SELECT count(*) FROM classes')=='20'
     assert sql('SELECT count(*) FROM normal_refund_documents')=='2'
     metadata=json.loads(sql("SELECT after_data::jsonb FROM scms_data_migration_audit WHERE migration_key='20261110_demo_rebuild_v3'"))
     assert (metadata.get('anchor_date'),metadata.get('business_timezone'),metadata.get('fixture_version'))==(ANCHOR.isoformat(),TIMEZONE,FIXTURE_VERSION),'DB fixture anchor/version differs; regenerate or select the matching pristine local DB'
@@ -546,14 +578,14 @@ if args.from_local_pg:
     header='''# SYSTEM DATA — Bộ demo SCMS đã duyệt
 
 **DATA DESIGN — xuất từ fixture PostgreSQL local nguyên trạng; không là dump Supabase hoặc nghiệm thu cloud.**
-**Mục đích của SYSTEM-DATA:** giúp BE/FE tra cứu tài khoản, lớp, lịch và hồ sơ mẫu, nối các mã trong SCRIPT với ID và quan hệ dữ liệu cụ thể. Dùng file này để chuẩn bị đầu vào và đối chiếu kết quả demo; trình tự thao tác nằm ở [SCMS-SCRIPT-DEMO-BE](SCMS-SCRIPT-DEMO-BE.md), còn lệnh dựng lại bundle ở docs02.
+**Mục đích của SYSTEM-DATA:** giúp BE/FE tra cứu tài khoản, lớp, lịch và hồ sơ mẫu, nối các mã trong SCRIPT với ID và quan hệ dữ liệu cụ thể. Dùng file này để chuẩn bị đầu vào và đối chiếu kết quả demo; trình tự thao tác nằm ở [SCMS-SCRIPT-DEMO-BE](docs/reference/SCMS-SCRIPT-DEMO-BE.md), còn lệnh dựng lại bundle ở docs02.
 
 Đọc nhanh: [N01–N12](#normal-class-index) → [tài khoản demo](#demo-actor-index) → [proposal/Refund](#demo-financial-index) → [các bảng chi tiết](#table-data). Các gợi ý chuẩn bị/giao diện trong SCRIPT để FE duyệt, quyết định cuối thuộc FE.
 
 Đây là dữ liệu demo tổng hợp có nhãn DEMO, không phải dữ liệu/tiền/chứng từ ngân hàng thật hoặc bằng chứng nghiệp vụ cloud. Bảng bên dưới được xuất từ đúng fixture SQL đã chạy local, gồm các cột thực tế; không còn sáu tên bảng dự kiến đứng song song với schema.
 
-Nguồn: [Normal Lifecycle](SCMS_BE_Normal_Lifecycle_DA_CHOT.md), [Normal Refund](SCMS_BE_Refund_Normal_DA_CHOT.md), [schema/generator](database/README.md), [kết quả và giới hạn](docs/00-MASTER-CHECKLIST.md#active).
-Giữ 33 account PDF và thêm 14 account, 9 môn, 20 sân, 9 template Advanced và 12 lớp Normal. N05/N11 được nhận diện theo tên lớp; FE lấy ID thật từ API. Invoice lớp mua/amount giữ nguyên khi chuyển, entitlement_class_id chỉ lớp nhận quyền hiện tại.
+Nguồn: [Normal Lifecycle](docs/reference/SCMS_BE_Normal_Lifecycle_DA_CHOT.md), [Normal Refund](docs/reference/SCMS_BE_Refund_Normal_DA_CHOT.md), [schema/generator](database/README.md), [kết quả và giới hạn](docs/00-MASTER-CHECKLIST.md#active).
+Giữ 33 account PDF và thêm 14 account, 9 môn, 20 sân, 8 lớp Advanced theo đăng ký đã được Coach nhận và 12 lớp Normal. N05/N11 được nhận diện theo tên lớp; FE lấy ID thật từ API. Invoice lớp mua/amount giữ nguyên khi chuyển, entitlement_class_id chỉ lớp nhận quyền hiện tại.
 
 Mốc ngày VN của fixture: ANCHOR_DATE. Khi chuẩn bị chạy ở ngày khác, tái sinh cả fixture/schema và kiểm lại lịch trước khi dùng; không đổi Clock Render hoặc kéo dài TTL. Hạn hoàn là hết ngày TT mở thứ bảy tiếp theo; tính cả T7/CN trừ Holiday. Contact phone chỉ cho tài chính đúng quyền, FE quyết định hiển thị.
 
@@ -573,7 +605,8 @@ Mọi lịch sử học/thu/hoàn ở đây là ví dụ tổng hợp được d
               'normal_transfers':'Chuyển N05→N11 do Member xác nhận qua API trong demo; M01/M03 đang Waiting, preview không giữ chỗ.',
               'email_otps':'OTP chỉ tạo tại thời điểm đăng ký/reset demo, không seed secret.',
               'vnpay_payment_attempts':'Chỉ tạo khi phát hành link VNPay trong workflow local; không seed metadata provider.',
-              'membership_packages':'Mô hình legacy đã retire; không tái tạo catalog gói chung.'}
+              'membership_packages':'Mô hình legacy đã retire; không tái tạo catalog gói chung.',
+              'private_session_proposals':'Coach gửi đề xuất và Member Accept qua API khi demo; không backfill đồng ý cho các buổi nền.'}
             actual.append('Rỗng. '+reasons.get(table,'Không tạo lịch sử giả cho thao tác chưa có trong kịch bản nền.')+'\n');continue
         columns=list(rows[0]);actual.append('| '+' | '.join(columns)+' |\n| '+' | '.join(['---']*len(columns))+' |')
         for row in rows:actual.append('| '+' | '.join(cell(row.get(k)) for k in columns)+' |')

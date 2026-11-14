@@ -214,6 +214,8 @@ Lỗi:401 chưa đăng nhập;403 sai role/không Active/thiếu hồ sơ Member
 ## 6. Coach tạo Advanced — D04/D12
 
 <a id="advanced-member-acceptance-20261114"></a>
+**Lớp Advanced riêng — bản sửa14/11; trạng thái phát hành xem Active/QA:** Requested/Rejected không tạo lớp; Coach Accepted tạo đúng một lớp và trả `classId`. Retry không nhân lớp. `/api/classes` chỉ trả lớp Advanced có đăng ký đã nhận; Member thấy của mình, Coach thấy của mình, staff thấy cùng center. DTO thêm `advancedRegistrationId,memberId,memberName,subscriptionId,advancedState`; `enrolledCount=1` là chủ lớp được Coach nhận, không phải bằng chứng Paid. `advancedState` là AwaitingConfirmation/ConfirmationExpired/AwaitingPayment/Active/Completed/Expired/Cancelled; hiển thị nó thay nhãn Open của Normal. Ngày lớp có thể null vì lịch linh hoạt. CRUD tạo Advanced trả400 USE_ADVANCED_REGISTRATION; sửa/assign Coach chung bị chặn ADVANCED_CLASS_WORKFLOW_REQUIRED. Đặt buổi lấy lớp từ đăng ký của subscription; classId khác trả400 ADVANCED_CLASS_MISMATCH. Cấu trúc/migration và phạm vi hiện hành xem [database/README](../database/README.md#advanced-class-review).
+
 **Owner14/11 — đề xuất rồi Member Accept:**
 
 | API | Actor/input | Kết quả |

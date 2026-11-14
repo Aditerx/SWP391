@@ -119,7 +119,6 @@ public class AdvancedConsentHttpTest {
             Coach profile=new Coach();profile.setUser(c);coaches.save(profile);
             Subject s=subjects.findBySlug("cau-long").orElseGet(Subject::new);s.setName("Cầu lông");s.setSlug("cau-long");s.setOutdoor(false);s.setStatus("Active");s.setNormalPrice(new BigDecimal("900000"));s.setAdvancedPrice(new BigDecimal("3000000"));subjects.save(s);subjectId=s.getId();
             Specialization spec=new Specialization();spec.setName("phase-badminton");spec.setSubject(s);spec.setStatus("Active");specs.save(spec);assignments.save(new CoachSpecialization(profile,spec));
-            var template=new com.sportscenter.sportclass.SportsClass();template.setName("Phase Advanced template");template.setSubject(s);template.setCoach(c);template.setClassType("Advanced");template.setMaxCapacity(1);template.setTuitionFee(s.getAdvancedPrice());template.setStatus("Open");template.setCenterId(1);classes.save(template);
             Room r=new Room();r.setActivityType(com.sportscenter.room.RoomActivity.BADMINTON);r.setName("Phase test room");r.setCapacity(15);r.setStatus("Available");r.setCenterId(1);r.setFacilityType("Indoor");rooms.save(r);roomId=r.getId();
             if(holidays.findByHolidayDate(LocalDate.of(2026,10,30)).isEmpty()) holidays.save(new Holiday(LocalDate.of(2026,10,30),"Phase closure","CENTER_EVENT",true));
         });
@@ -227,6 +226,42 @@ public class AdvancedConsentHttpTest {
     int countSessions(int sub){return jdbc.queryForObject("SELECT count(*) FROM sessions WHERE subscription_id=?",Integer.class,sub);}
     JsonNode respond(HttpClient who,int id,boolean accepted,int expected)throws Exception{return call(who,"POST","/api/private-session-proposals/"+id+"/respond",Map.of("accepted",accepted),expected);}
 
+    @Test void privateClassAppearsOnlyAfterCoachAcceptanceAndIsScopedToItsOwner() throws Exception {
+        int before=jdbc.queryForObject("SELECT count(*) FROM classes WHERE class_type='Advanced'",Integer.class);
+        var requested=call(member,"POST","/api/advanced-registrations",Map.of("subjectId",subjectId,"primaryCoachId",coachId,"requestKey","class-owner-request"),200);
+        int registration=requested.path("id").asInt();assertTrue(requested.path("classId").isNull());
+        assertEquals(before,jdbc.queryForObject("SELECT count(*) FROM classes WHERE class_type='Advanced'",Integer.class));
+        var accepted=call(coach,"POST","/api/advanced-registrations/"+registration+"/decision",Map.of("accepted",true),200);
+        int course=accepted.path("classId").asInt();assertTrue(course>0);
+        assertEquals(before+1,jdbc.queryForObject("SELECT count(*) FROM classes WHERE class_type='Advanced'",Integer.class));
+        assertEquals(course,call(coach,"POST","/api/advanced-registrations/"+registration+"/decision",Map.of("accepted",true),200).path("classId").asInt());
+        var own=call(member,"GET","/api/classes/"+course,null,200);
+        assertEquals(memberId,own.path("memberId").asInt());assertEquals(coachId,own.path("coachId").asInt());
+        assertEquals("AwaitingConfirmation",own.path("advancedState").asText());assertNotEquals("Open",own.path("status").asText());
+        assertEquals(1,own.path("enrolledCount").asInt());assertNull(jdbc.queryForObject("SELECT subscription_id FROM advanced_registrations WHERE id=?",Integer.class,registration));
+        call(other,"GET","/api/classes/"+course,null,404);
+        for(var row:call(other,"GET","/api/classes",null,200))assertNotEquals(course,row.path("id").asInt());
+        var rejected=call(member,"POST","/api/advanced-registrations",Map.of("subjectId",subjectId,"primaryCoachId",coachId,"requestKey","class-owner-rejected"),200);
+        call(coach,"POST","/api/advanced-registrations/"+rejected.path("id").asInt()+"/decision",Map.of("accepted",false),200);
+        assertEquals(before+1,jdbc.queryForObject("SELECT count(*) FROM classes WHERE class_type='Advanced'",Integer.class));
+    }
+
+    @Test void subscriptionsOfTheSameSubjectNeverShareAClassOrAcceptAnotherClassId() throws Exception {
+        int first=paid("class-course-one"),second=paid("class-course-two");
+        int classOne=jdbc.queryForObject("SELECT class_id FROM advanced_registrations WHERE subscription_id=?",Integer.class,first);
+        int classTwo=jdbc.queryForObject("SELECT class_id FROM advanced_registrations WHERE subscription_id=?",Integer.class,second);
+        assertNotEquals(classOne,classTwo);
+        var body=new java.util.HashMap<String,Object>(offer(first,"class-cross-owner",28));body.put("classId",classTwo);
+        assertEquals("ADVANCED_CLASS_MISMATCH",call(coach,"POST","/api/private-session-proposals",body,400).path("code").asText());
+        assertEquals(12,balance(first));assertEquals(0,countSessions(first));
+        body.put("classId",classOne);
+        int proposal=call(coach,"POST","/api/private-session-proposals",body,201).path("id").asInt();
+        int session=respond(member,proposal,true,200).path("sessionId").asInt();
+        assertEquals(classOne,jdbc.queryForObject("SELECT class_id FROM sessions WHERE session_id=?",Integer.class,session));
+        assertEquals(11,balance(first));assertEquals(12,balance(second));
+        call(member,"POST","/api/sessions/"+session+"/cancel-private",null,200);assertEquals(12,balance(first));
+    }
+
     @Test void confirmationExpiresAtExactly24HoursWithoutIssuingInvoice() throws Exception {
         int id=registration("confirm-expired");
         int before=jdbc.queryForObject("SELECT count(*) FROM invoices",Integer.class);
@@ -319,6 +354,8 @@ public class AdvancedConsentHttpTest {
     }
     @Test void publishedContractExposesConfirmationAndClosesDirectBooking()throws Exception {
         var spec=call(member,"GET","/v3/api-docs",null,200);
+        String export=System.getProperty("scms.advanced.openapi");
+        if(export!=null)java.nio.file.Files.writeString(java.nio.file.Path.of(export),spec.toPrettyString());
         assertTrue(spec.path("paths").has("/api/private-session-proposals/{id}/respond"));
         assertTrue(spec.path("components").path("schemas").path("AdvancedRegistrationResponse").path("properties").has("confirmationDeadline"));
         var old=spec.path("paths").path("/api/sessions/book-private").path("post");

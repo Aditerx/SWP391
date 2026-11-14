@@ -8800,6 +8800,24 @@
           },
           "changePending": {
             "type": "boolean"
+          },
+          "advancedRegistrationId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "memberId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "memberName": {
+            "type": "string"
+          },
+          "subscriptionId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "advancedState": {
+            "type": "string"
           }
         }
       },
@@ -11024,6 +11042,10 @@
           "confirmationDeadline": {
             "type": "string",
             "format": "date-time"
+          },
+          "classId": {
+            "type": "integer",
+            "format": "int32"
           }
         }
       },

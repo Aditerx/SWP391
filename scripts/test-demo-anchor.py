@@ -11,7 +11,8 @@ import sys
 import unittest
 import uuid
 
-from demo_anchor import anchor_date, demo_time, scenario_plan, sql_anchor_guard, VN
+from demo_anchor import anchor_date, holiday_catalog, demo_time, scenario_plan, sql_anchor_guard, VN
+from release_catalog import load_requirements, PROFILE
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -31,6 +32,17 @@ def digest(path):
 
 
 class AnchorAcceptance(unittest.TestCase):
+    def test_annual_catalog_survives_reset_design_without_activating_closures(self):
+        rows=design(date(2026,11,14))['holidays']
+        self.assertEqual(load_requirements(ROOT,PROFILE)['holidayDates'],sorted(r['date'] for r in rows if not r['is_active']))
+        self.assertEqual(['2027-01-03'],[r['date'] for r in rows if r['is_active']])
+
+    def test_holiday_catalog_rejects_partial_rows_and_duplicates(self):
+        source=(ROOT/'database/seed_holidays_catalog_2026.sql').read_text(encoding='utf-8')
+        for broken in [source.replace("DATE '2026-01-01'", "DATE 'bad-date'"),
+                       source.replace("DATE '2026-01-01'", "DATE '2026-02-16'")]:
+            with self.assertRaises(ValueError): holiday_catalog(broken)
+
     def test_explicit_date_and_offset_validation(self):
         for value in ['2026-2-01','10/11/2026','2026-02-30','2026-11-10T00:00','2026-11-10\n']:
             with self.assertRaises(ValueError): anchor_date(value)

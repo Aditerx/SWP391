@@ -75,6 +75,8 @@ Owner11/11 đồng ý đồng bộ validation room name50/location100 với VARC
 <a id="d03"></a>
 ## D03 — Mua Advanced
 
+**Owner14/11 đính chính dữ liệu lớp:** không tạo sẵn các lớp Advanced mở đăng ký, chưa có Member/Coach. Mỗi đăng ký có lớp Advanced riêng, chỉ xuất hiện sau khi Member đăng ký và Coach đồng ý; việc này chưa cấp quyền học hoặc tạo buổi trước Paid và Member Accept lịch. Owner đã duyệt sửa đồng bộ BE/bundle và phát hành sau SQL25. Không dùng lớp mẫu theo môn làm bằng chứng nghiệp vụ đúng.
+
 **Owner14/11:** sau Coach Accepted, Member có24giờ từ `acceptedAt` để xác nhận mua qua order; chỉ lúc đó tạo hóa đơn và bắt đầu hạn thanh toán5phút riêng. Đúng/quá24giờ chưa tạo đơn thì chặn; retry không kéo hạn hoặc sinh thêm đơn. Giữ Paid hợp lệ mới cấp12credit/bắt đầu45ngày sử dụng. Quyết định này thêm hạn xác nhận, không đổi cutoff hủy12giờ.
 
 - **Thuật ngữ/phạm vi06/11:** hệ thống hiện tại bán khóa Normal và quyền học Advanced theo môn/Primary Coach, không dùng gói hội viên chung tháng/VIP làm sản phẩm hoặc điều kiện đăng ký. `member_packages` hiện lưu đăng ký/quyền học Advanced, không phải lý do giữ mô hình hội viên chung. Owner yêu cầu loại bỏ dữ liệu thực sự thuộc mô hình cũ sau kiểm kê/phân loại, không giữ để tương thích dự phòng. Phạm vi bản ghi/DB và phụ thuộc cần xác định trước migration; không suy tên bảng hoặc package_id khác NULL là dữ liệu bỏ được. Không tự xóa quyền học/chứng từ của mô hình hiện tại.

@@ -133,7 +133,6 @@ public class PhaseWorkflowHttpTest {
             Coach profile=new Coach();profile.setUser(c);coaches.save(profile);
             Subject s=subjects.findBySlug("cau-long").orElseGet(Subject::new);s.setName("Cầu lông");s.setSlug("cau-long");s.setOutdoor(false);s.setStatus("Active");s.setNormalPrice(new BigDecimal("900000"));s.setAdvancedPrice(new BigDecimal("3000000"));subjects.save(s);subjectId=s.getId();
             Specialization spec=new Specialization();spec.setName("phase-badminton");spec.setSubject(s);spec.setStatus("Active");specs.save(spec);assignments.save(new CoachSpecialization(profile,spec));
-            var template=new com.sportscenter.sportclass.SportsClass();template.setName("Phase Advanced template");template.setSubject(s);template.setCoach(c);template.setClassType("Advanced");template.setMaxCapacity(1);template.setTuitionFee(s.getAdvancedPrice());template.setStatus("Open");template.setCenterId(1);classes.save(template);
             Room r=new Room();r.setActivityType(com.sportscenter.room.RoomActivity.BADMINTON);r.setName("Phase test room");r.setCapacity(15);r.setStatus("Available");r.setCenterId(1);r.setFacilityType("Indoor");rooms.save(r);roomId=r.getId();
             if(holidays.findByHolidayDate(LocalDate.of(2026,10,30)).isEmpty()) holidays.save(new Holiday(LocalDate.of(2026,10,30),"Phase closure","CENTER_EVENT",true));
         });
@@ -686,8 +685,7 @@ public class PhaseWorkflowHttpTest {
             var indoor=specs.findAll().stream().filter(s->s.getSubject()!=null&&s.getSubject().getId().equals(subjectId)).findFirst().orElseThrow();assignments.save(new CoachSpecialization(cp,indoor));
             Specialization tennis=new Specialization();tennis.setName("Acceptance Tennis");tennis.setSubject(outdoor);tennis.setStatus("Active");specs.save(tennis);assignments.save(new CoachSpecialization(cp,tennis));
             Room r=new Room();r.setActivityType(com.sportscenter.room.RoomActivity.BADMINTON);r.setName("Acceptance outdoor court");r.setActivityType(com.sportscenter.room.RoomActivity.TENNIS);r.setCapacity(1);r.setStatus("Available");r.setFacilityType("Outdoor");r.setCenterId(1);rooms.save(r);
-            var template=new com.sportscenter.sportclass.SportsClass();template.setName("Acceptance Tennis template");template.setSubject(outdoor);template.setCoach(c);template.setClassType("Advanced");template.setMaxCapacity(1);template.setTuitionFee(outdoor.getAdvancedPrice());template.setStatus("Open");template.setCenterId(1);classes.save(template);
-            return new int[]{c.getId(),outdoor.getId(),r.getId(),template.getId()};
+            return new int[]{c.getId(),outdoor.getId(),r.getId()};
         });
         var capacityCoach=login("phase.multisubject");
         call(manager,"PUT","/api/coaches/"+fixture[0]+"/work-schedule",Map.of("weeklySlots",List.of("MONDAY:1","TUESDAY:1"),"daysOff",List.of(),"acceptingNew",true),200);
@@ -701,7 +699,8 @@ public class PhaseWorkflowHttpTest {
         call(manager,"PUT","/api/coaches/"+fixture[0]+"/work-schedule",Map.of("weeklySlots",allSlots(),"daysOff",List.of(),"acceptingNew",true),200);
         var tennis=requestOrder("outdoor-after-capacity-expanded","Cash",member,fixture[1],fixture[0],capacityCoach);int tennisSub=tennis.path("subscriptionId").asInt();
         call(cashier,"POST","/api/invoices/"+tennis.path("invoiceId").asInt()+"/confirm-cash",null,200);
-        var payload=booking("outdoor-hot-slot",LocalDate.of(2027,2,12),"09:30","11:00");payload.put("subscriptionId",tennisSub);payload.put("coachId",fixture[0]);payload.put("subjectId",fixture[1]);payload.put("roomId",fixture[2]);payload.put("classId",fixture[3]);
+        var payload=booking("outdoor-hot-slot",LocalDate.of(2027,2,12),"09:30","11:00");payload.put("subscriptionId",tennisSub);payload.put("coachId",fixture[0]);payload.put("subjectId",fixture[1]);payload.put("roomId",fixture[2]);
+        payload.put("classId",jdbc.queryForObject("SELECT class_id FROM advanced_registrations WHERE subscription_id=?",Integer.class,tennisSub));
         assertEquals("OUTDOOR_HEAT_BLOCK",call(capacityCoach,"POST","/api/private-session-proposals",payload,400).path("code").asText());
         payload.put("startTime","13:00");payload.put("endTime","14:30");
         assertEquals("OUTDOOR_HEAT_BLOCK",call(capacityCoach,"POST","/api/private-session-proposals",payload,400).path("code").asText());

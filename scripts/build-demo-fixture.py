@@ -67,7 +67,10 @@ statements.append("DELETE FROM coach_work_slots WHERE slot_key LIKE 'SUNDAY:%';"
 for r in t['holidays']:insert('holidays',holiday_date=r['date'],holiday_name=r['name'],tag=r['tag'],is_active=r['is_active'])
 for r in t['coach_days_off']:insert('coach_days_off',coach_id=user[r['coach']],day_off=r['date'])
 for r in t['classes']:
-    if r['type']=='Advanced':continue
+    if r['type']=='Advanced':
+        insert('classes',class_id=classes[r['key']],class_name=r['name'],subject_id=subject[r['subject']],coach_id=user[r['coach']],
+               max_capacity=1,tuition_fee=r['price'],status='Closed',class_type='Advanced',total_sessions=12,center_id=1,pricing_draft=False)
+        continue
     confirmed=r['status'] in ('Ongoing','Closed')
     first=datetime.fromisoformat(r['first_session']); confirmed_at=(first-timedelta(days=2)).isoformat()
     insert('classes',class_id=classes[r['key']],class_name=r['name'],subject_id=subject[r['subject']],coach_id=user[r['coach']],
@@ -92,7 +95,7 @@ for r in t['class_enrollments']:
            cancelled_at=obligation_created(r['invoice']).isoformat() if has_refund else None,cancelled_by=user['M02'] if r['sports_class']=='N05' and has_refund else user['CM1'] if has_refund else None,cancel_reason='DEMO center refund obligation' if has_refund else None)
 for r in t['advanced_registrations']:
     insert('advanced_registrations',member_id=user[r['member']],subject_id=subject[r['subject']],coach_id=user[r['coach']],request_key=r['request_key'],status=r['status'],
-           created_at=stamp(-5),accepted_by=user[r['coach']] if r['status'] in ('Accepted','Invoiced') else None,accepted_at=stamp(-4) if r['status'] in ('Accepted','Invoiced') else None,reason=r['reason'],subscription_id=subs.get(r['subscription']))
+           created_at=r['created_at'],accepted_by=user[r['coach']] if r['accepted_at'] else None,accepted_at=r['accepted_at'],reason=r['reason'],subscription_id=subs.get(r['subscription']),class_id=classes.get(r['sports_class']))
 for r in t['sessions']:
     insert('sessions',session_id=sessions[r['key']],class_id=classes[r['sports_class']],room_id=room[r['room']],session_date=r['date'],start_time=r['start'],end_time=r['end'],
            coach_id=user[r['coach']],booked_member_id=user.get(r['member']),subscription_id=subs.get(r.get('subscription')),status=r['status'],attendance_finalized=r['finalized'],attendance_review_pending=False,
@@ -171,7 +174,8 @@ for mid,r in enumerate(t['chat_messages'],1):
     insert('chat_messages',id=mid,conversation_id=1,sender_type='MEMBER' if r['sender']=='M08' else 'STAFF',sender_user_id=user[r['sender']],content=r['content'],content_type='TEXT',client_message_id='DEMO-MSG-'+str(mid),created_at=stamp())
 insert('chat_read_state',conversation_id=1,user_id=user['M08'],last_read_message_id=1,updated_at=stamp())
 insert('chat_read_state',conversation_id=1,user_id=user['R1'],last_read_message_id=2,updated_at=stamp())
-statements += ['ALTER TABLE classes ENABLE TRIGGER trg_classes_validate;','ALTER TABLE sessions ENABLE TRIGGER trg_sessions_validate;']
+statements += ['SET CONSTRAINTS ALL IMMEDIATE;',
+               'ALTER TABLE classes ENABLE TRIGGER trg_classes_validate;','ALTER TABLE sessions ENABLE TRIGGER trg_sessions_validate;']
 output.parent.mkdir(parents=True,exist_ok=True)
 output.write_text('\n'.join(statements)+'\n',encoding='utf-8',newline='\n')
-print(json.dumps({'output':str(output.relative_to(ROOT)),'anchor':str(anchor),'users':47,'classes':21,'privateDemoPdfs':2,'databaseAccess':False}))
+print(json.dumps({'output':str(output.relative_to(ROOT)),'anchor':str(anchor),'users':47,'classes':len(t['classes']),'privateDemoPdfs':2,'databaseAccess':False}))

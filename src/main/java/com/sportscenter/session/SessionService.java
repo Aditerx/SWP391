@@ -57,6 +57,7 @@ public class SessionService {
     private final SessionChangeRepository sessionChangeRepository;
     private final SessionAbsenceService sessionAbsenceService;
     private final CenterIncidentService centerIncidentService;
+    private final com.sportscenter.membership.AdvancedRegistrationRepository advancedRegistrations;
 
     @Transactional(readOnly = true)
     public List<SessionResponse> findAll(Integer classId, Integer coachId, Integer roomId, Integer memberId,
@@ -297,19 +298,18 @@ public class SessionService {
         Room room = roomRepository.findById(request.roomId())
                 .orElseThrow(() -> new ResourceNotFoundException("Room not found: " + request.roomId()));
 
-        SportsClass sportsClass;
-        if (request.classId() != null) {
-            sportsClass = sportsClassRepository.findById(request.classId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Class not found: " + request.classId()));
-            if (!sportsClass.isAdvanced()) {
-                throw new BusinessException("Lớp học đã chọn không phải khóa học 1:1 Advanced.");
-            }
-        } else if (request.subjectId() != null) {
-            sportsClass = sportsClassRepository.findFirstBySubjectIdAndClassType(request.subjectId(), "Advanced")
-                    .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy lớp học 1:1 mẫu cho bộ môn: " + request.subjectId()));
-        } else {
-            throw new BusinessException("Cần cung cấp classId hoặc subjectId của ca học 1:1.");
-        }
+        var registration=advancedRegistrations.findBySubscriptionSubscriptionId(subscription.getSubscriptionId())
+                .orElseThrow(()->new BusinessException("ADVANCED_CLASS_LINK_REQUIRED: Approved registration class is required"));
+        SportsClass sportsClass=registration.getSportsClass();
+        if(sportsClass==null || !sportsClass.isAdvanced() || !List.of("Accepted","Invoiced").contains(registration.getStatus())
+                || !registration.getMember().getId().equals(subscription.getMember().getId())
+                || !registration.getSubject().getId().equals(subscription.getSubject().getId())
+                || !registration.getCoach().getId().equals(subscription.getPrimaryCoach().getId()))
+            throw new BusinessException("ADVANCED_CLASS_LINK_REQUIRED: Registration, entitlement and private class must match");
+        if(request.classId()!=null&&!request.classId().equals(sportsClass.getId()))
+            throw new BusinessException("ADVANCED_CLASS_MISMATCH: Class belongs to a different registration");
+        if(request.subjectId()!=null&&!request.subjectId().equals(registration.getSubject().getId()))
+            throw new BusinessException("SUBSCRIPTION_SUBJECT_MISMATCH: Use the registered subject");
 
         sessionSlotValidator.validateSession(sportsClass, room, request.startTime(), request.endTime());
         validateRoomAndCapacity(room, sportsClass);
