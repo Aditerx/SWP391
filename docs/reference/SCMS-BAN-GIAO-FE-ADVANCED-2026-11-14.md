@@ -18,7 +18,7 @@ Ngày học linh hoạt trong7ca90phút, theo lịch Coach và sân. Giữ hủy
 2. Giữ hạn5phút của hóa đơn tính từ lúc tạo; retry không kéo dài hạn hoặc sinh thêm hóa đơn.
 3. Thay đặt buổi trực tiếp bằng đề xuất → Member Accept; bỏ cách Coach tự xác nhận thay Member.
 4. Giữ trao đổi ngoài SCMS và7ca hiện có; không thêm chat Member–Coach hoặc lịch giờ tự do.
-5. Đính chính lớp mẫu: bỏ9lớp Advanced mở sẵn; Coach nhận đăng ký mới tạo lớp riêng của đúng Member. Thay đổi này mới kiểm local, chưa deploy.
+5. Đính chính lớp mẫu: bỏ9lớp Advanced mở sẵn; Coach nhận đăng ký mới tạo lớp riêng của đúng Member. Đã phát hành BE và kiểm API; FE cần dùng thông tin chủ lớp/trạng thái mới.
 
 ## 3. API và DB liên quan
 
@@ -36,7 +36,7 @@ Ví dụ request đề xuất: `{"subscriptionId":42,"subjectId":3,"coachId":7,"
 
 `advanced_registrations.class_id` → `classes` là lớp riêng; `subscription_id` → `member_packages` lưu quyền/credit/hạn, `invoices` liên kết quyền đó. `private_session_proposals` lưu lịch chờ/phản hồi, liên kết `sessions` sau Accept; buổi thuộc đúng lớp của quyền học. Đề xuất hết cửa trước12giờ hiển thị Expired; đúng mốc12giờ vẫn được Accept nếu các điều kiện khác đạt.
 
-**Kết quả đã quan sát:** quyền học6 còn12credit → đề xuất1 `Pending`, chưa có buổi/12credit → Accept tạo buổi174 `Scheduled`/11credit → hủy sớm: buổi `Cancelled`, `creditReturned:true`/12credit, hạn không đổi. Gửi lại không tạo buổi hoặc hoàn credit thêm. Đây là ID của ca kiểm, FE phải lấy ID từ API. Đề xuất vẫn `Accepted` sau khi hủy; trạng thái buổi lấy từ `session.status`.
+**Kết quả đã quan sát:** quyền học6/lớp riêng29 còn12credit → đề xuất4 `Pending`, chưa có buổi/12credit → Accept tạo buổi189 đúng lớp29 `Scheduled`/11credit → hủy sớm: buổi `Cancelled`, `creditReturned:true`/12credit, hạn không đổi. Gửi lại không tạo buổi hoặc hoàn credit thêm. Đây là ID của ca kiểm, FE phải lấy ID từ API. Đề xuất vẫn `Accepted` sau khi hủy; trạng thái buổi lấy từ `session.status`.
 
 ## 4. FE cần làm
 
@@ -53,4 +53,4 @@ FE/Codex xác định lại main và bản website trước sửa; xác nhận `
 
 BE đã đạt ca đề xuất/Accept/hủy sớm nêu trên; chưa kiểm live toàn bộ biên thời gian, tranh chấp đồng thời hoặc tạo đơn/thanh toán mới. FE chưa được sửa/push hoặc nghiệm thu lưu trong đợt này. Bàn giao lại file FE đã sửa và kết quả lưu/đọc lại từng bước.
 
-Phần lớp riêng là bản sửa local bổ sung; Render hiện còn mô hình lớp chung. Chỉ tích hợp phần này sau khi BE mới được phát hành; xem trạng thái tại Active/QA.
+Đính chính sau phát hành14/11: BE lớp riêng đã chạy trên Render; Requested/Rejected không có lớp, lớp đã nhận trả đúng Member/Coach/quyền học. FE có thể tích hợp API; trạng thái nghiệm thu xem Active/QA.

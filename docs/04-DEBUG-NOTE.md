@@ -75,7 +75,7 @@ Owner11/11 đồng ý đồng bộ validation room name50/location100 với VARC
 <a id="d03"></a>
 ## D03 — Mua Advanced
 
-**Owner14/11 đính chính dữ liệu lớp:** không tạo sẵn các lớp Advanced mở đăng ký, chưa có Member/Coach. Mỗi đăng ký có lớp Advanced riêng, chỉ xuất hiện sau khi Member đăng ký và Coach đồng ý; việc này chưa cấp quyền học hoặc tạo buổi trước Paid và Member Accept lịch. Owner đã duyệt sửa đồng bộ BE/bundle và phát hành sau SQL25. Không dùng lớp mẫu theo môn làm bằng chứng nghiệp vụ đúng.
+**Owner14/11 đính chính dữ liệu lớp:** không tạo sẵn các lớp Advanced mở đăng ký, chưa có Member/Coach. Mỗi đăng ký có lớp Advanced riêng, chỉ xuất hiện sau khi Member đăng ký và Coach đồng ý; việc này chưa cấp quyền học hoặc tạo buổi trước Paid và Member Accept lịch. Owner đã duyệt sửa đồng bộ BE/bundle, sau đó chạy SQL25/cleanup và cho phép merge/deploy; trạng thái thực thi ở Active/QA. Không dùng lớp mẫu theo môn làm bằng chứng nghiệp vụ đúng.
 
 **Owner14/11:** sau Coach Accepted, Member có24giờ từ `acceptedAt` để xác nhận mua qua order; chỉ lúc đó tạo hóa đơn và bắt đầu hạn thanh toán5phút riêng. Đúng/quá24giờ chưa tạo đơn thì chặn; retry không kéo hạn hoặc sinh thêm đơn. Giữ Paid hợp lệ mới cấp12credit/bắt đầu45ngày sử dụng. Quyết định này thêm hạn xác nhận, không đổi cutoff hủy12giờ.
 

@@ -35984,7 +35984,7 @@
     "next": "Owner reviews bundle proposal; FE integrates using the updated handoff. New registration/provider and live time-boundary/race scopes remain separate."
   },
   "advancedRegistrationClassRelease20261114": {
-    "status": "IN_PROGRESS_PREMERGE",
+    "status": "PASS_RELEASE_SWAGGER_API_SCOPED",
     "openedAt": "2026-11-14T08:41:27.665445+00:00",
     "scope": "Owner-authorized tai -> main, Render deployment, Swagger via Playwright and scoped authenticated API checks; no FE source changes",
     "ownerSql": {
@@ -36015,6 +36015,225 @@
     "limits": [
       "Owner SQL results are reported execution evidence; agent has not executed cloud SQL",
       "Postdeploy verification pending; historical test results remain scoped to earlier source/environment"
-    ]
+    ],
+    "premergeLocal": {
+      "status": "PASS",
+      "scope": "scoped release candidate clean test; optional PostgreSQL cases skipped",
+      "reports": 88,
+      "counts": {
+        "tests": 763,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 34,
+        "passed": 729
+      }
+    },
+    "sourceEquivalence": {
+      "status": "PASS",
+      "normalizedSrcSha256": "6dbe762db1486f9b3d4ad9c673be80fb8befc583afe2ae3a8603d72daeeac99d",
+      "candidateEqualsEarlierPostgresTestedSource": true,
+      "lineEndingNormalizationOnly": true
+    },
+    "git": {
+      "number": 29,
+      "url": "https://github.com/Aditerx/SWP391/pull/29",
+      "candidate": "b6f5ca206bdd096a2038bd8136a8f29d6cd13092",
+      "base": "22cd66f5b9e01b83247ee0a7932cd20759f58b6e",
+      "releaseCommit": "9ef289b8a19c5143dc7ac848d2755cdef6a8537d",
+      "testedSrcTree": "5b1509ecddf36f1659ddcae292ebcb25f198d1c7",
+      "rootMainCheckoutChanged": false
+    },
+    "candidateCi": [
+      {
+        "id": 43577376913,
+        "event": "pull_request",
+        "status": "completed",
+        "conclusion": "success",
+        "html_url": "https://github.com/Aditerx/SWP391/actions/runs/43577376913",
+        "head_sha": "b6f5ca206bdd096a2038bd8136a8f29d6cd13092"
+      },
+      {
+        "id": 43577372344,
+        "event": "push",
+        "status": "completed",
+        "conclusion": "success",
+        "html_url": "https://github.com/Aditerx/SWP391/actions/runs/43577372344",
+        "head_sha": "b6f5ca206bdd096a2038bd8136a8f29d6cd13092"
+      }
+    ],
+    "closedAt": "2026-11-14T09:16:52.259098+00:00",
+    "mainCi": [
+      {
+        "id": 43577690100,
+        "status": "completed",
+        "conclusion": "success",
+        "html_url": "https://github.com/Aditerx/SWP391/actions/runs/43577690100",
+        "head_sha": "9ef289b8a19c5143dc7ac848d2755cdef6a8537d"
+      }
+    ],
+    "runtimeIdentity": {
+      "message": "pong",
+      "status": "UP",
+      "databaseTargetFingerprint": "188f67654d48aa11c970703f2cdaefc79290f1173a7dedaf93547e74bc6b1048",
+      "diagnosticsVersion": "1",
+      "buildCommit": "9ef289b8a19c5143dc7ac848d2755cdef6a8537d"
+    },
+    "postDeployRead": {
+      "status": "PASS_SCOPED_READ_SCHEMA",
+      "authenticatedSessions": 6,
+      "roles": [
+        "Admin",
+        "CenterManager",
+        "Receptionist",
+        "Coach",
+        "Member"
+      ],
+      "observed": {
+        "registrations": 20,
+        "approvedClasses": 11,
+        "noClassRequestedRejected": 9,
+        "normalClasses": 13,
+        "privateSessions": 31,
+        "member8ClassId": 29,
+        "subscription6Credit": 12,
+        "subscription6ExpiresAt": "2026-12-27T08:00:00",
+        "advancedStates": [
+          "Active",
+          "Cancelled",
+          "Completed",
+          "ConfirmationExpired",
+          "Expired"
+        ],
+        "previousSession174ClassId": 29
+      },
+      "businessWrites": false
+    },
+    "positiveCase": {
+      "status": "PASS_LIVE_PROPOSAL_ACCEPT_EARLY_CANCEL_CHECKED_SCOPE",
+      "proposalId": 4,
+      "sessionId": 189,
+      "classOwnership": {
+        "registrationId": 9,
+        "classId": 29,
+        "subscriptionId": 6,
+        "memberId": 8,
+        "primaryCoachId": 26,
+        "sessionId": 189
+      },
+      "finalState": {
+        "proposalStatus": "Accepted",
+        "sessionStatus": "Cancelled",
+        "creditReturned": true,
+        "remainingCredit": 12,
+        "activatedAt": "2026-11-12T08:00:00",
+        "expiresAt": "2026-12-27T08:00:00",
+        "historyRetained": true,
+        "resourceReleased": true
+      },
+      "scope": "one existing paid entitlement; no new invoice, payment, email or SQL",
+      "retryWrongActorAuditNotifications": "PASS"
+    },
+    "swagger": {
+      "status": "PASS_SWAGGER_UI_CHECKED_SCOPE",
+      "url": "https://scms-app-p1gy.onrender.com/swagger-ui/index.html",
+      "tool": "Playwright MCP",
+      "models": {
+        "AdvancedRegistrationResponse": [
+          "classId",
+          "confirmationDeadline"
+        ],
+        "SportsClassResponse": [
+          "advancedRegistrationId",
+          "memberId",
+          "memberName",
+          "subscriptionId",
+          "advancedState"
+        ]
+      },
+      "operationsVisible": [
+        "GET/POST /api/private-session-proposals",
+        "POST /api/private-session-proposals/{id}/respond",
+        "GET /api/private-session-proposals/{id}"
+      ],
+      "tryItOut": {
+        "method": "GET",
+        "path": "/api/health",
+        "httpStatus": 200,
+        "buildCommit": "9ef289b8a19c5143dc7ac848d2755cdef6a8537d",
+        "databaseTargetFingerprint": "188f67654d48aa11c970703f2cdaefc79290f1173a7dedaf93547e74bc6b1048"
+      },
+      "businessWritesInSwagger": false,
+      "authenticatedBusinessEvidence": "postdeploy-positive.json",
+      "files": [
+        "swagger-models.yml",
+        "swagger-health.yml",
+        "swagger-network.txt",
+        "swagger-advanced-registration.png"
+      ]
+    },
+    "failuresPreserved": [
+      {
+        "file": "postdeploy-api-attempt1.json",
+        "result": "transport RemoteDisconnected after login; session logout verified; no business write"
+      },
+      {
+        "file": "postdeploy-api-attempt2.json",
+        "result": "script incorrectly expected Admin1 without center to see same-center private classes; corrected against owner same-center rule and fixture center NULL; no BE/RBAC change"
+      }
+    ],
+    "adminScope": {
+      "actorId": 1,
+      "seedCenter": null,
+      "observedPrivateClasses": 0,
+      "evidence": "admin-scope-read.json",
+      "limitation": "UserResponse does not expose centerId; center NULL corroborated from current approved fixture, not live SQL"
+    },
+    "notRun": [
+      "New registration/payment confirmation or provider transactions",
+      "Exact12hour/24hour/45usable-day boundaries live",
+      "Concurrent pending Accept race live",
+      "FE browser save acceptance",
+      "PostgreSQL queries/replay or bundle reset"
+    ],
+    "next": "FE integrate class ownership/state and proposal/Accept flow, verify actual website SHA and saved-data readback; continue FLOW-01 separately",
+    "feSourceChanged": false,
+    "agentCloudSqlExecuted": false,
+    "evidence": {
+      "artifacts/runs/advanced-class-release-20261114/release-context.json": "c37e19b018d657717047f30d310b88f9241f41d5b33492243a52edcc12ca9189",
+      "artifacts/runs/advanced-class-release-20261114/merge-result.json": "132f902012802557121d1e31fd9da36837b5b9d7afa7f891f6267f2e86391847",
+      "artifacts/runs/advanced-class-release-20261114/candidate-ci.json": "259622094e53f77e9625daf469a4c530a9978c9b2b468e520ba7e69283f4fd96",
+      "artifacts/runs/advanced-class-release-20261114/main-ci.json": "0dae847422b1510d7f4b34f913d8fbd7c4b0c8e7ebc80d17bf7e946fab47c24d",
+      "artifacts/runs/advanced-class-release-20261114/runtime-confirmed.json": "7b2545450e7d14a36b504a34c9bad76ff072f7bf3f17a0d2b78a60f2110bb58a",
+      "artifacts/runs/advanced-class-release-20261114/premerge-test-summary.json": "db9503398592f6a054d4a25a2410b53503083b0197354951020272e9826ec10d",
+      "artifacts/runs/advanced-class-release-20261114/source-equivalence.json": "4de6529d872e35d33e9992e804240f60ed32a2864be7108fcc4ec09061c4f9b1",
+      "artifacts/runs/advanced-class-release-20261114/test-archive-proof.json": "8984ffbb549c2c56f3b9f6137b57f672284cc396e28b3b6d95c682ca4cb648aa",
+      "artifacts/runs/advanced-class-release-20261114/postdeploy-api.json": "dfeef3dc4f6cd05132b5a8d2ad9a5462944e3eb6eb6dbed059f90f42ff54cfdb",
+      "artifacts/runs/advanced-class-release-20261114/postdeploy-api-attempt1.json": "231016f079b392984533770d9ff79fbe4e909a8cd9fb81962dd20b9401e24a65",
+      "artifacts/runs/advanced-class-release-20261114/postdeploy-api-attempt2.json": "85b0e3b00921be1f821df2b943310c7b493da349add20a3b1ffbbf1550fde9a0",
+      "artifacts/runs/advanced-class-release-20261114/admin-scope-read.json": "3ac14e4e62e712a7d8f7e6138c05425b397a8b85c26137478782657b79df0daf",
+      "artifacts/runs/advanced-class-release-20261114/postdeploy-positive.json": "d10b63d17b109f895710d2f9fb7533de915b450d27674b7b103d3bac58be7b59",
+      "artifacts/runs/advanced-class-release-20261114/swagger-proof.json": "62af021f5898d7d5aff5ea36ffec46cc6c3c230aebf5b754d31f03ce613eb5e0",
+      "artifacts/runs/advanced-class-release-20261114/swagger-models.yml": "9bc92992bcee262c21374e48e34d2dfce03217d79fa1595e92b4edfd9c8c164a",
+      "artifacts/runs/advanced-class-release-20261114/swagger-health.yml": "862fa64499b7e77bef37b197cdc5ad0f90015254d0f5ff4abff592252818d6b2",
+      "artifacts/runs/advanced-class-release-20261114/swagger-network.txt": "b45235cd9d450f873696a57c152a3997fcd8f8a202f23a312c0186becd21b9a7",
+      "artifacts/runs/advanced-class-release-20261114/swagger-advanced-registration.png": "a2c0da3e0b8d947c995333eb249d2e3ed8a227bb00b55082f5da087d849de829",
+      "artifacts/runs/advanced-class-release-20261114/cleanup.json": "852649880b0992c82e4e6edbf60dcf790a304579b7c737f6c62675cac2b6015d"
+    },
+    "documentation": {
+      "handoff": "docs/reference/SCMS-BAN-GIAO-FE-ADVANCED-2026-11-14.md",
+      "sameFileUpdated": true,
+      "fiveSectionsRetained": true,
+      "estimatesRemoved": true
+    },
+    "cleanup": {
+      "status": "RETAINED_POLICY_BLOCK",
+      "attemptedAction": "Remove generated target in isolated release worktree after archiving test reports",
+      "reason": "exec_command rejected: blocked by policy",
+      "retainedPath": "C:\\Users\\Admin\\AppData\\Local\\Temp\\scms-advanced-classes-release-20261114\\target",
+      "retainedBytes": 20902779,
+      "bytesFreed": 0,
+      "sourceDeleted": false,
+      "testEvidenceArchive": "artifacts/runs/advanced-class-release-20261114/test-reports.zip"
+    }
   }
 }
