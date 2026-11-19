@@ -41570,7 +41570,7 @@
     }
   },
   "gitTaiIntegration20261119": {
-    "status": "CONFLICTS_RESOLVED_PENDING_TESTS",
+    "status": "PASS_LOCAL_AWAITING_TAI_PUSH",
     "scope": "Integrate remote history, resolve conflicts, test, push tai, merge into main. No cloud SQL/FE/provider/deploy added.",
     "baseline": "artifacts/runs/git-tai-integration-20261119/baseline.json",
     "refsBefore": {
@@ -41586,6 +41586,92 @@
     "productionSourcesScriptsDatabaseAndCiMatchOriginalSnapshot": true,
     "remoteQaHistoryStructurallyContained": true,
     "removedReintroducedObsoletePaths": 15,
-    "oldCommittedHistoryPreservedViaMergeParent": true
+    "oldCommittedHistoryPreservedViaMergeParent": true,
+    "baseSha": "545d919172621879836a28f4e8c40627c48c94ae",
+    "clean": {
+      "evidence": "artifacts/runs/be-demo-20261119/git-integration-clean/validation.json",
+      "counts": {
+        "tests": 787,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 36
+      },
+      "executed": 751
+    },
+    "postgres": {
+      "status": "PASS_ACCEPTED_SCOPES",
+      "acceptedTests": 53,
+      "skipped": 0,
+      "normal": {
+        "evidence": "artifacts/runs/be-demo-20261119/git-integration-normal-postgres/validation.json",
+        "counts": {
+          "tests": 25,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      },
+      "advancedAndDemo": {
+        "evidence": "artifacts/runs/be-demo-20261119/git-integration-postgres/validation.json",
+        "suites": [
+          {
+            "suite": "com.sportscenter.auth.DemoRebuildPostgresTest",
+            "tests": 5,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          {
+            "suite": "com.sportscenter.workflow.AdvancedConsentHttpTest",
+            "tests": 23,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          }
+        ],
+        "originalInvocationRemainsFail": true
+      },
+      "setupFailurePreserved": "Normal initial DB prefix rejected before fixture initialization; renamed own local DB, reran Normal only; guard and expectations unchanged"
+    },
+    "offline": [
+      {
+        "script": "test-release-smoke.py",
+        "exitCode": 0,
+        "status": "PASS"
+      },
+      {
+        "script": "test-release-catalog.py",
+        "exitCode": 0,
+        "status": "PASS"
+      },
+      {
+        "script": "test-demo-anchor.py",
+        "exitCode": 0,
+        "status": "PASS"
+      }
+    ],
+    "openapiComparison": "artifacts/runs/git-tai-integration-20261119/openapi-comparison.json",
+    "maintenanceChange": "audit-fe-contract accepts this integration acceptance record as well as prior BE record; same actual evidence checks",
+    "renderAutoDeploy": "Commit messages use [skip render]; cloud SQL26 not confirmed. No manual deploy.",
+    "githubReadiness": "artifacts/runs/git-tai-integration-20261119/github-readiness.json",
+    "finalAcceptance": {
+      "status": "PASS_LOCAL_COMBINED_SCOPES",
+      "sourceFingerprints": {
+        "src/main": "8d8116d90352c4b5b393efc2fb5d1c54d2bb6ee2d731721e2bb3c4ddaf2cda98",
+        "src/test": "90345b9bb196243c92d030838a8947e9dec538929d1b1672c03447bd0ca7d7ef",
+        "database": "eaeb2145c0f5d5b313f24a9fa07d219a820ec6cf43c6ace72bc271f20d5a3e1b",
+        "pom.xml": "050f3393d2ecdc350e8ac52acab26c052ba35a1ea0e509fffe45db122e882bf7",
+        "schema_postgres.sql": null,
+        "scripts/test-room-absence-postgres.py": "cbf51776a4e5238cc9afcf463133411d49c82a260cb506d97e236bc5f43b75f6",
+        "scripts/test-phases-postgres.py": "3261c0c71b4e6eebdee7ed8fb6998dde96ba25e6552c9ff379e15efc1fe027e7",
+        "scripts/prepare-phases-release.py": "e6c525b8a70562527d606b0017d72199865c838df31b6bbc995acb1405deb5a5"
+      },
+      "cleanEvidence": "artifacts/runs/be-demo-20261119/git-integration-clean/validation.json",
+      "postgresEvidence": [
+        "artifacts/runs/be-demo-20261119/git-integration-normal-postgres/validation.json"
+      ],
+      "openApiSha256": "20cb9905b6e7d951556dd3a5b93bd7200370ec8f6aa45a3518b8ecb3086b32de",
+      "scope": "Current integration clean + NormalPG, with Advanced/Demo successful suites retained separately from the first invocation containing a setup error; no history result rewritten"
+    }
   }
 }

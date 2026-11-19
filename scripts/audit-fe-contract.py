@@ -257,25 +257,26 @@ for release_key in ('session123Release20261113', 'session123ReRelease20261113'):
         hash_match=True
         reference=release.get('baseMain',reference)
         source_verification='Integrated Session1-3 and current main tested locally; retained wire examples remain historical; deployment and FE acceptance are recorded separately'
-current=qa.get('beDemoImplementation20261119',{}).get('finalAcceptance',{})
-if current.get('status')=='PASS_LOCAL_COMBINED_SCOPES':
-    paths=[current.get('cleanEvidence'),*current.get('postgresEvidence',[])]
-    records=[]
-    for name in paths:
-        path=(ROOT/name).resolve() if name else None
-        if path and path.is_relative_to(ROOT) and path.is_file():
-            records.append(json.loads(path.read_text(encoding='utf-8')))
-    if (len(records)==len(paths) and len(records)>1
-            and all(r.get('status')=='PASS_CHECKED_SCOPE' and r.get('sourceUnchangedDuringRun') is True
-                    and r.get('dotenvLoaded') is False and r.get('counts',{}).get('failures')==0
-                    and r.get('counts',{}).get('errors')==0 for r in records)
-            and all(r.get('counts',{}).get('skipped')==0 for r in records[1:])
-            and all(r.get('sourceFingerprints',{}).get('src/main')==current.get('sourceFingerprints',{}).get('src/main') for r in records)
-            and schema_hash==current.get('openApiSha256')
-            and source_fingerprints(ROOT)==current.get('sourceFingerprints')):
-        backend_match=True;hash_match=True
-        reference=qa['beDemoImplementation20261119']['baseSha']
-        source_verification='Current uncommitted BE: isolated clean suite plus explicit PostgreSQL business checks; retained wire rows remain historical; no cloud/provider/FE acceptance'
+for acceptance_key in ('beDemoImplementation20261119','gitTaiIntegration20261119'):
+    current=qa.get(acceptance_key,{}).get('finalAcceptance',{})
+    if current.get('status')=='PASS_LOCAL_COMBINED_SCOPES':
+        paths=[current.get('cleanEvidence'),*current.get('postgresEvidence',[])]
+        records=[]
+        for name in paths:
+            path=(ROOT/name).resolve() if name else None
+            if path and path.is_relative_to(ROOT) and path.is_file():
+                records.append(json.loads(path.read_text(encoding='utf-8')))
+        if (len(records)==len(paths) and len(records)>1
+                and all(r.get('status')=='PASS_CHECKED_SCOPE' and r.get('sourceUnchangedDuringRun') is True
+                        and r.get('dotenvLoaded') is False and r.get('counts',{}).get('failures')==0
+                        and r.get('counts',{}).get('errors')==0 for r in records)
+                and all(r.get('counts',{}).get('skipped')==0 for r in records[1:])
+                and all(r.get('sourceFingerprints',{}).get('src/main')==current.get('sourceFingerprints',{}).get('src/main') for r in records)
+                and schema_hash==current.get('openApiSha256')
+                and source_fingerprints(ROOT)==current.get('sourceFingerprints')):
+            backend_match=True;hash_match=True
+            reference=qa[acceptance_key].get('baseSha',reference)
+            source_verification='Current BE: isolated clean suite plus explicit PostgreSQL business checks; retained wire rows remain historical; no cloud/provider/FE acceptance'
 result={'result':'PASS' if not issues and not missing and not extra and hash_match and backend_match else 'REVIEW_REQUIRED',
         'mode':'OFFLINE_RETAINED_EVIDENCE_CHECK','checkedAtUtc':dt.datetime.now(dt.timezone.utc).isoformat(),
         'backendTestsExecuted':False,'liveProbePerformed':False,'evidenceSourceCommit':reference,
