@@ -41570,7 +41570,7 @@
     }
   },
   "gitTaiIntegration20261119": {
-    "status": "IN_PROGRESS",
+    "status": "CONFLICTS_RESOLVED_PENDING_TESTS",
     "scope": "Integrate remote history, resolve conflicts, test, push tai, merge into main. No cloud SQL/FE/provider/deploy added.",
     "baseline": "artifacts/runs/git-tai-integration-20261119/baseline.json",
     "refsBefore": {
@@ -41580,6 +41580,12 @@
       "tai": "7a57045e208266341c6a48e051a3b58b8ff3d783"
     },
     "plan": "Merge origin/main into isolated integration branch in existing workspace; preserves remote/tai ancestry; resolve with approved19Nov rules; no new clone/worktree; test in credential-free runner; push tai then merge main with skip-render commits",
-    "supabaseProviderFrontendDeployment": "NOT_RUN"
+    "supabaseProviderFrontendDeployment": "NOT_RUN",
+    "resolution": "artifacts/runs/git-tai-integration-20261119/resolution.json",
+    "resolvedPaths": 42,
+    "productionSourcesScriptsDatabaseAndCiMatchOriginalSnapshot": true,
+    "remoteQaHistoryStructurallyContained": true,
+    "removedReintroducedObsoletePaths": 15,
+    "oldCommittedHistoryPreservedViaMergeParent": true
   }
 }
