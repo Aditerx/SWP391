@@ -28,6 +28,8 @@ import java.util.List;
 @RequiredArgsConstructor
 public class AttendanceService {
     private static final java.util.concurrent.ConcurrentMap<Integer, ScanWindow> SCAN_ATTEMPTS = new java.util.concurrent.ConcurrentHashMap<>();
+    private static final int CHECKIN_CODE_TTL_SECONDS=300;
+    private static final java.security.SecureRandom CODE_RANDOM=new java.security.SecureRandom();
     private record ScanWindow(long startedAt, int count) { }
     private final AttendanceRepository attendanceRepository;
     private final TrainingResultRepository trainingResultRepository;
@@ -41,6 +43,7 @@ public class AttendanceService {
     private final com.sportscenter.session.ScheduleWriteLock scheduleWriteLock;
     private final com.sportscenter.invoice.InvoiceRepository invoiceRepository;
     @org.springframework.beans.factory.annotation.Value("${scms.lobby-checkin.enabled:false}") private boolean lobbyCheckinEnabled;
+    @org.springframework.beans.factory.annotation.Value("${scms.early-attendance.enabled:false}") private boolean earlyAttendanceEnabled;
 
     @Transactional(readOnly = true)
     public List<AttendanceResponse> searchAttendances(
@@ -220,16 +223,34 @@ public class AttendanceService {
     public CheckinCodeResponse createCheckinCode(String actorEmail) {
         User user = userRepository.findByEmailIgnoreCase(actorEmail)
                 .orElseThrow(() -> new ResourceNotFoundException("Authenticated member not found"));
-        if(!"Active".equalsIgnoreCase(user.getStatus()))throw new BusinessException("MEMBER_NOT_ACTIVE: Active Member required");
+        if(!"Active".equalsIgnoreCase(user.getStatus()) || !com.sportscenter.common.ActorPolicy.role(user,"Member"))throw new BusinessException("MEMBER_NOT_ACTIVE: Active Member required");
         Member member = memberRepository.findByIdForUpdate(user.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("Member profile not found"));
-        if (member.getCheckinSecret() == null) {
+        boolean newSecret=member.getCheckinSecret()==null;
+        if (newSecret) {
             member.setCheckinSecret(Totp.encodeSecret(Totp.randomSecret()));
+        }
+        LocalDateTime now=SessionAttendancePolicy.now(clock);
+        byte[] secret=java.util.Base64.getDecoder().decode(member.getCheckinSecret());
+        if (newSecret || !issuedCodeValid(member,now)) {
+            String previous=member.getCheckinCodeNonce()==null?null:Totp.code(secret,member.getCheckinCodeNonce());
+            long nonce;
+            do { nonce=CODE_RANDOM.nextLong() & Long.MAX_VALUE; }
+            while (nonce==0 || java.util.Objects.equals(member.getCheckinCodeNonce(),nonce)
+                    || java.util.Objects.equals(previous,Totp.code(secret,nonce)));
+            now=SessionAttendancePolicy.now(clock);
+            member.setCheckinCodeNonce(nonce);member.setCheckinCodeIssuedAt(now);
+            member.setCheckinCodeExpiresAt(now.plusSeconds(CHECKIN_CODE_TTL_SECONDS));member.setCheckinCodeUsedAt(null);
             memberRepository.save(member);
         }
-        long epoch = clock.instant().getEpochSecond();
-        String payload = Totp.code(java.util.Base64.getDecoder().decode(member.getCheckinSecret()), epoch / 30);
-        return new CheckinCodeResponse(payload, (int) (30 - epoch % 30));
+        long nanos=Duration.between(now,member.getCheckinCodeExpiresAt()).toNanos();
+        int remaining=(int)Math.min(CHECKIN_CODE_TTL_SECONDS,(nanos+999_999_999L)/1_000_000_000L);
+        return new CheckinCodeResponse(Totp.code(secret,member.getCheckinCodeNonce()),remaining,
+                member.getCheckinCodeExpiresAt().atZone(SessionAttendancePolicy.ZONE).toOffsetDateTime(),now.atZone(SessionAttendancePolicy.ZONE).toOffsetDateTime());
+    }
+    private boolean issuedCodeValid(Member member,LocalDateTime now) {
+        return member.getCheckinCodeNonce()!=null && member.getCheckinCodeIssuedAt()!=null && member.getCheckinCodeExpiresAt()!=null
+                && member.getCheckinCodeUsedAt()==null && !now.isBefore(member.getCheckinCodeIssuedAt()) && now.isBefore(member.getCheckinCodeExpiresAt());
     }
 
     @Transactional
@@ -241,7 +262,9 @@ public class AttendanceService {
         scheduleWriteLock.acquire(recorder.getCenterId());
         Session lockedSession=sessionRepository.findByIdForUpdate(sessionId).orElseThrow(()->new ResourceNotFoundException("Session not found"));
         com.sportscenter.common.ActorPolicy.center(recorder,lockedSession.getSportsClass().getCenterId());
-        SessionAttendancePolicy.requireWindow(lockedSession,LocalDateTime.now(clock));
+        try { com.sportscenter.session.SessionActionPolicy.requireRecorder(recorder,lockedSession); }
+        catch (BusinessException denied) { throw new AccessDeniedException(denied.getMessage()); }
+        SessionAttendancePolicy.requireWindow(lockedSession,SessionAttendancePolicy.now(clock),earlyAttendanceEnabled);
         Member member = memberRepository.findByIdForUpdate(memberId)
                 .orElseThrow(() -> new ResourceNotFoundException("Member not found: " + memberId));
         Integer memberCenterId = member.getUser() != null ? member.getUser().getCenterId() : null;
@@ -249,16 +272,19 @@ public class AttendanceService {
                 && !recorder.getCenterId().equals(memberCenterId)) {
             throw new AccessDeniedException("Staff may only scan members in their center");
         }
-        LocalDateTime now = LocalDateTime.now(clock);
+        LocalDateTime now = SessionAttendancePolicy.now(clock);
+        // Member issuance/scan may have held this lock across the session boundary.
+        SessionAttendancePolicy.requireWindow(lockedSession,now,earlyAttendanceEnabled);
         long epoch = clock.instant().getEpochSecond();
         ScanWindow attemptWindow = SCAN_ATTEMPTS.get(memberId);
         if (attemptWindow != null && epoch - attemptWindow.startedAt() < 60 && attemptWindow.count() >= 5) {
             throw new BusinessException("INVALID_CHECKIN_CODE: scan limit reached");
         }
         if (attemptWindow != null && epoch - attemptWindow.startedAt() >= 60) SCAN_ATTEMPTS.remove(memberId, attemptWindow);
-        Long step = member.getCheckinSecret() == null ? null : Totp.matchingStep(
-                java.util.Base64.getDecoder().decode(member.getCheckinSecret()), code, epoch / 30);
-        if (step == null || step != epoch / 30 || step.equals(member.getCheckinLastStep())) {
+        String expected=member.getCheckinSecret()==null || member.getCheckinCodeNonce()==null?null:
+                Totp.code(java.util.Base64.getDecoder().decode(member.getCheckinSecret()),member.getCheckinCodeNonce());
+        if (!issuedCodeValid(member,now) || code==null || !code.matches("[0-9]{6}") || expected==null
+                || !java.security.MessageDigest.isEqual(expected.getBytes(java.nio.charset.StandardCharsets.US_ASCII),code.getBytes(java.nio.charset.StandardCharsets.US_ASCII))) {
             SCAN_ATTEMPTS.compute(memberId, (id, current) -> current == null || epoch - current.startedAt() >= 60
                     ? new ScanWindow(epoch, 1) : new ScanWindow(current.startedAt(), current.count() + 1));
             throw new BusinessException("INVALID_CHECKIN_CODE: code is invalid, expired, or already used");
@@ -273,21 +299,9 @@ public class AttendanceService {
                 throw new AccessDeniedException("Coach may only check in assigned sessions");
             }
             Integer classId = session.getSportsClass().getId();
-            if (session.getBookedMember() != null) {
-                if (!session.getBookedMember().getId().equals(memberId)) {
-                    throw new BusinessException("NOT_YOUR_CLASS: member is not the booked member for this private session");
-                }
-                var entitlement=session.getMemberPackage();
-                if(entitlement==null||!"Active".equals(entitlement.getStatus())||!com.sportscenter.membership.EntitlementTimePolicy.validThrough(entitlement,session.getSessionDate().atTime(session.getEndTime())))throw new BusinessException("PACKAGE_EXPIRED: Original entitlement is not valid for this session");
-            } else if (!enrollmentRepository.existsByMemberIdAndSportsClassIdAndStatus(memberId, classId, "Registered")) {
-                throw new BusinessException("NOT_YOUR_CLASS: member is not Registered in the class");
-            }
-            LocalDateTime startsAt = LocalDateTime.of(session.getSessionDate(), session.getStartTime());
-            LocalDateTime endsAt = LocalDateTime.of(session.getSessionDate(), session.getEndTime());
-            if ("Cancelled".equalsIgnoreCase(session.getStatus()) || now.isBefore(startsAt) || !now.isBefore(endsAt)) {
-                throw new BusinessException("CHECKIN_WINDOW_CLOSED: check-in is outside the session window");
-            }
+            SessionAttendancePolicy.requireEligibility(session,member.getUser(),enrollmentRepository,invoiceRepository,SessionAttendancePolicy.now(clock));
             attendance = attendanceRepository.findBySessionIdAndMemberId(sessionId, memberId).orElseGet(Attendance::new);
+            SessionAttendancePolicy.requireInitialRetry(attendance.getAttendanceId()==null?null:attendance,"Present",null,null,null,session,now);
             if (attendance.getAttendanceId() == null) {
                 attendance.setSession(session);
                 attendance.setMember(member.getUser());
@@ -307,7 +321,7 @@ public class AttendanceService {
             attendance.setState("CheckedIn");
             attendance.setCheckInTime(now);
         }
-        member.setCheckinLastStep(step);
+        member.setCheckinCodeUsedAt(now);
         SCAN_ATTEMPTS.remove(memberId);
         memberRepository.save(member);
         Attendance saved = attendanceRepository.save(attendance);

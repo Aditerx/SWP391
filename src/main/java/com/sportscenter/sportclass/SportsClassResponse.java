@@ -25,12 +25,23 @@ public record SportsClassResponse(
         long lifecycleVersion,
         boolean pricingDraft,
         boolean changePending,
-        Integer advancedRegistrationId,Integer memberId,String memberName,Integer subscriptionId,String advancedState) {
+        Integer advancedRegistrationId,Integer memberId,String memberName,Integer subscriptionId,String advancedState,
+        java.time.OffsetDateTime firstSessionAt, java.time.OffsetDateTime registrationDeadline,
+        @io.swagger.v3.oas.annotations.media.Schema(nullable=true) Boolean registrationAllowed,String registrationBlockReason,
+        java.time.OffsetDateTime openingConfirmationDueAt,java.time.OffsetDateTime openingConfirmationDeadline,
+        @io.swagger.v3.oas.annotations.media.Schema(nullable=true) Boolean openingReasonRequired,
+        @io.swagger.v3.oas.annotations.media.Schema(nullable=true) Boolean openingConfirmationAllowed,String openingConfirmationBlockReason,
+        java.time.OffsetDateTime serverTime) {
+    public record Actions(java.time.OffsetDateTime firstSessionAt, java.time.OffsetDateTime registrationDeadline,
+            Boolean registrationAllowed,String registrationBlockReason,
+            java.time.OffsetDateTime openingConfirmationDueAt,java.time.OffsetDateTime openingConfirmationDeadline,
+            Boolean openingReasonRequired,Boolean openingConfirmationAllowed,String openingConfirmationBlockReason,
+            java.time.OffsetDateTime serverTime) { }
 
     public SportsClassResponse(Integer id, String name, Integer subjectId, Integer coachId,
                                Integer maxCapacity, BigDecimal tuitionFee, LocalDate startDate,
                                LocalDate endDate, String status, Integer enrolledCount) {
-        this(id, name, subjectId, null, coachId, null, maxCapacity, tuitionFee, startDate, endDate, status, enrolledCount, "Normal", 12, null, null, null, 0, 0, false, false,null,null,null,null,null);
+        this(id, name, subjectId, null, coachId, null, maxCapacity, tuitionFee, startDate, endDate, status, enrolledCount, "Normal", 12, null, null, null, 0, 0, false, false,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null);
     }
 
     public static SportsClassResponse from(SportsClass sportsClass) {
@@ -38,6 +49,9 @@ public record SportsClassResponse(
     }
 
     public static SportsClassResponse from(SportsClass sportsClass, Integer enrolledCount) {
+        return from(sportsClass,enrolledCount,null);
+    }
+    public static SportsClassResponse from(SportsClass sportsClass, Integer enrolledCount, Actions actions) {
         if (sportsClass == null) return null;
         String subjectName = sportsClass.getSubject() != null ? sportsClass.getSubject().getName() : null;
         String coachName = sportsClass.getCoach() != null ? sportsClass.getCoach().getFullName() : null;
@@ -56,7 +70,11 @@ public record SportsClassResponse(
                 enrolledCount,
                 sportsClass.getClassType(),
                 sportsClass.getTotalSessions(), sportsClass.getMinCapacity(), sportsClass.getOpeningConfirmedAt(), sportsClass.getOpeningConfirmedBy(),
-                sportsClass.getPostponementCount(), sportsClass.getLifecycleVersion(), sportsClass.isPricingDraft(),sportsClass.isChangePending(),null,null,null,null,null);
+                sportsClass.getPostponementCount(), sportsClass.getLifecycleVersion(), sportsClass.isPricingDraft(),sportsClass.isChangePending(),null,null,null,null,null,
+                actions==null?null:actions.firstSessionAt(),actions==null?null:actions.registrationDeadline(),
+                actions==null?null:actions.registrationAllowed(),actions==null?null:actions.registrationBlockReason(),
+                actions==null?null:actions.openingConfirmationDueAt(),actions==null?null:actions.openingConfirmationDeadline(),
+                actions==null?null:actions.openingReasonRequired(),actions==null?null:actions.openingConfirmationAllowed(),actions==null?null:actions.openingConfirmationBlockReason(),actions==null?null:actions.serverTime());
     }
 
     public static SportsClassResponse advanced(SportsClass c,com.sportscenter.membership.AdvancedRegistration r,java.time.Clock clock) {
@@ -66,6 +84,7 @@ public record SportsClassResponse(
         String status="Active".equals(state)?"Ongoing":"Cancelled".equals(state)?"Cancelled":"Closed";
         return new SportsClassResponse(c.getId(),c.getName(),c.getSubject().getId(),c.getSubject().getName(),r.getCoach().getId(),r.getCoach().getFullName(),
                 1,sub!=null&&sub.getPurchaseAmount()!=null?sub.getPurchaseAmount():c.getTuitionFee(),c.getStartDate(),c.getEndDate(),status,1,"Advanced",12,
-                null,null,null,0,c.getLifecycleVersion(),false,false,r.getId(),r.getMember().getId(),r.getMember().getFullName(),sub==null?null:sub.getSubscriptionId(),state);
+                null,null,null,0,c.getLifecycleVersion(),false,false,r.getId(),r.getMember().getId(),r.getMember().getFullName(),sub==null?null:sub.getSubscriptionId(),state,
+                null,null,null,null,null,null,null,null,null,com.sportscenter.training.SessionAttendancePolicy.now(clock).atZone(com.sportscenter.training.SessionAttendancePolicy.ZONE).toOffsetDateTime());
     }
 }

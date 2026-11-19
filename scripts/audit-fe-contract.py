@@ -77,7 +77,7 @@ for file in sorted((ROOT/'src/main/java').rglob('*Controller.java')):
                         'controller':cls.group(1),'method':method_name,'authorizationExpression':expression,'path':path,
                         'successStatusesExplicitInController':sorted(set(codes))}
 
-issues=[];nullable=set();positive=0;body_checks=0
+issues=[];nullable=set();positive=0;body_checks=0;retired_examples=[]
 def check(value,schema,where,operation):
     if '$ref' in schema:return check(value,spec['components']['schemas'][schema['$ref'].split('/')[-1]],where,operation)
     if value is None:nullable.add((operation,where));return
@@ -100,7 +100,16 @@ for e in exchanges:
     matches=[(p,item[method]) for p,item in spec['paths'].items() if method in item
              and re.fullmatch(re.sub(r'\{[^}]+\}',r'[^/]+',p),path)]
     if not matches:issues.append([e['method']+' '+path,'operation','missing','']);continue
-    template,operation=sorted(matches,key=lambda kv:kv[0].count('{'))[0];label=e['method']+' '+template;positive+=1
+    template,operation=sorted(matches,key=lambda kv:kv[0].count('{'))[0];label=e['method']+' '+template
+    # D04 replaced direct booking with proposal -> Member acceptance. Keep its old
+    # successful trace as history, never as a current positive acceptance example.
+    if (label=='POST /api/sessions/book-private' and e['actualStatus']==201
+            and operation.get('deprecated') is True and '400' in operation.get('responses',{})
+            and '201' not in operation.get('responses',{})):
+        retired_examples.append({'operation':label,'historicalStatus':201,
+                                 'reason':'Retired direct booking; current valid authenticated input returns400 USE_PRIVATE_SESSION_PROPOSAL'})
+        continue
+    positive+=1
     response=operation.get('responses',{}).get(str(e['actualStatus']))
     if response is None:issues.append([label,'status',e['actualStatus'],'not published']);continue
     for side,value,node in [('request',e['requestBody'],operation.get('requestBody',{})),('response',e['responseBody'],response)]:
@@ -248,6 +257,26 @@ for release_key in ('session123Release20261113', 'session123ReRelease20261113'):
         hash_match=True
         reference=release.get('baseMain',reference)
         source_verification='Integrated Session1-3 and current main tested locally; retained wire examples remain historical; deployment and FE acceptance are recorded separately'
+for acceptance_key in ('beDemoImplementation20261119','gitTaiIntegration20261119'):
+    current=qa.get(acceptance_key,{}).get('finalAcceptance',{})
+    if current.get('status')=='PASS_LOCAL_COMBINED_SCOPES':
+        paths=[current.get('cleanEvidence'),*current.get('postgresEvidence',[])]
+        records=[]
+        for name in paths:
+            path=(ROOT/name).resolve() if name else None
+            if path and path.is_relative_to(ROOT) and path.is_file():
+                records.append(json.loads(path.read_text(encoding='utf-8')))
+        if (len(records)==len(paths) and len(records)>1
+                and all(r.get('status')=='PASS_CHECKED_SCOPE' and r.get('sourceUnchangedDuringRun') is True
+                        and r.get('dotenvLoaded') is False and r.get('counts',{}).get('failures')==0
+                        and r.get('counts',{}).get('errors')==0 for r in records)
+                and all(r.get('counts',{}).get('skipped')==0 for r in records[1:])
+                and all(r.get('sourceFingerprints',{}).get('src/main')==current.get('sourceFingerprints',{}).get('src/main') for r in records)
+                and schema_hash==current.get('openApiSha256')
+                and source_fingerprints(ROOT)==current.get('sourceFingerprints')):
+            backend_match=True;hash_match=True
+            reference=qa[acceptance_key].get('baseSha',reference)
+            source_verification='Current BE: isolated clean suite plus explicit PostgreSQL business checks; retained wire rows remain historical; no cloud/provider/FE acceptance'
 result={'result':'PASS' if not issues and not missing and not extra and hash_match and backend_match else 'REVIEW_REQUIRED',
         'mode':'OFFLINE_RETAINED_EVIDENCE_CHECK','checkedAtUtc':dt.datetime.now(dt.timezone.utc).isoformat(),
         'backendTestsExecuted':False,'liveProbePerformed':False,'evidenceSourceCommit':reference,
@@ -257,6 +286,7 @@ result={'result':'PASS' if not issues and not missing and not extra and hash_mat
         'retainedBackendTreeMatchesSource':backend_match,'openApiHashMatchesRecord':hash_match,
         'operations':len(operations),'sourceRoutesMatched':len(operations)-len(missing),'missingSourceRoutes':missing,'extraSourceRoutes':extra,
         'positiveRecordedExchanges':positive,'bodyTypePropertyChecks':body_checks,'wireIssues':sorted(set(tuple(x) for x in issues)),
+        'retiredHistoricalExchangesExcluded':retired_examples,
         'limits':['Static route parser, not a complete Java or authorization analysis',
                   'Compatibility covers recorded positive status/basic types/properties; nullability/required/format/range/negative errors need separate tests',
                   'This does not rerun business tests or certify the current production state']}

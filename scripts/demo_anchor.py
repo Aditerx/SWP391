@@ -5,7 +5,38 @@ from zoneinfo import ZoneInfo
 
 TIMEZONE = 'Asia/Ho_Chi_Minh'
 VN = ZoneInfo(TIMEZONE)
-FIXTURE_VERSION = 'normal-phase1-v3'
+FIXTURE_VERSION = 'demo-20261119-v4'
+
+SLOTS = {1: ('06:00', '07:30'), 2: ('07:45', '09:15'), 3: ('09:30', '11:00'),
+         4: ('13:00', '14:30'), 5: ('14:45', '16:15'), 6: ('16:30', '18:00'), 7: ('18:15', '19:45')}
+
+
+def choose_session(tables, earliest, subject, coach, member, room, *, expires=None, weekday=None, reserved=()):
+    """Choose a valid future slot against the full design, without changing historical rows."""
+    work={(r['coach'],r['slot_key']) for r in tables['coach_work_slots']}
+    off={(r['coach'],r['date']) for r in tables['coach_days_off']}
+    holidays={r['date'] for r in tables['holidays'] if r['is_active']}
+    outdoor=next(r['outdoor'] for r in tables['subjects'] if r['key']==subject)
+    participants={c['key']:{e['member'] for e in tables['class_enrollments']
+                           if e['sports_class']==c['key'] and e['status']=='Registered'} for c in tables['classes']}
+    for delta in range(45):
+        day=earliest+timedelta(days=delta)
+        if weekday is not None and day.isoweekday()!=weekday:continue
+        if day.isoformat() in holidays or (coach,day.isoformat()) in off:continue
+        for number,(start,end) in SLOTS.items():
+            if outdoor and number in (3,4):continue
+            if (coach,day.strftime('%A').upper()+':'+str(number)) not in work:continue
+            if expires is not None and datetime.fromisoformat(day.isoformat()+'T'+end)>expires:continue
+            candidate={'date':day.isoformat(),'start':start,'end':end,'coach':coach,'member':member,'room':room}
+            conflict=False
+            for s in [*tables['sessions'],*reserved]:
+                if s.get('status')=='Cancelled' or s.get('center_invalidated'):continue
+                if s['date']!=candidate['date'] or s['start']>=end or s['end']<=start:continue
+                members={s['member']} if s.get('member') else participants.get(s.get('sports_class'),set())
+                if s['coach']==coach or s['room']==room or member in members:
+                    conflict=True;break
+            if not conflict:return candidate
+    raise ValueError('DEMO_NO_VALID_SLOT: '+subject+'/'+coach+'/'+member)
 
 
 def holiday_catalog(sql):
@@ -56,7 +87,7 @@ END $anchor$;
 """
 
 
-def scenario_plan(tables, anchor, at=None):
+def scenario_plan(tables, anchor, at=None, until=None):
     """Describe availability, never certify that a workflow was executed."""
     classes = {c['key']: c for c in tables['classes'] if c['type'] == 'Normal'}
     withdrawn = {r['enrollment'] for r in tables['payment_resolutions'] if r['type'] == 'Refund'}
@@ -113,8 +144,41 @@ def scenario_plan(tables, anchor, at=None):
     actors = [{'key': u['key'], 'name': u['name'], 'role': u['role'], 'status': u['status']}
               for u in tables['users'] if u['role'] == 'Admin' or u['key'] in
               {'CM1', 'R1', 'PICK-A', 'PICK-B', 'BAD-A', 'M01', 'M02', 'M03', 'M04', 'M14', 'M15'}]
+    # Fresh operations happen during the presentation; these dates are planned inputs, not seeded purchases.
+    reserved=[];normal=[];cursor=anchor+timedelta(days=7)
+    holidays={h['date'] for h in tables['holidays'] if h['is_active']}
+    while len(normal)<12:
+        if cursor.isoweekday() in (1,3,5) and cursor.isoformat() not in holidays:
+            s=choose_session(tables,cursor,'BAD','BAD-A','M14','C01-BAD-01',reserved=reserved)
+            if s['date']!=cursor.isoformat() or s['start']!='06:00':
+                raise ValueError('DEMO_MAIN_NORMAL_RESOURCE_CONFLICT: '+cursor.isoformat())
+            normal.append(s);reserved.append(s)
+        cursor+=timedelta(days=1)
+    advanced=choose_session(tables,anchor+timedelta(days=5),'SWIM','SWIM-A','M14','C01-SWIM-01',
+                            expires=datetime.combine(anchor+timedelta(days=45),datetime.min.time()),reserved=reserved)
+    sunday=choose_session(tables,anchor+timedelta(days=5),'SWIM','SWIM-A','M14','C01-SWIM-01',weekday=7,
+                         expires=datetime.combine(anchor+timedelta(days=45),datetime.min.time()),reserved=[*reserved,advanced])
+    refund=next(s for s in tables['sessions'] if s['key']=='SUB01-S01')
+    def start_of(s):return datetime.fromisoformat(s['date']+'T'+s['start']).replace(tzinfo=VN)
+    limits={'normalRegistration':start_of(normal[0])-timedelta(hours=48),
+            'normalOpening':start_of(normal[0]),'advancedAcceptInclusive':start_of(advanced)-timedelta(hours=12),
+            'refundCancellationInclusive':start_of(refund)-timedelta(hours=12)}
+    checks=[]
+    for moment in [x for x in [at,until] if x is not None]:
+        checks.append({'at':moment.isoformat(),'status':'PASS' if all(moment<d for d in limits.values()) else 'FAIL'})
+    main={'normal':{'operation':'Create Normal during demo; min=max=1, buy Cash, confirm, initial attendance',
+                    'subject':'BAD','coach':'BAD-A','member':'M14','room':'C01-BAD-01',
+                    'daysOfWeek':[1,3,5],'startDate':normal[0]['date'],'sessions':normal},
+          'advanced':{'operation':'AR01 Requested: Coach accepts during demo; Member orders, Cash Paid, proposal and Member Accept',
+                      'registration':'AR01','subject':'SWIM','session':advanced},
+          'refund':{'session':'SUB01-S01','subscription':'SUB01','proposal':'DEMO-CANCEL-SUB01',
+                    'beforeCredit':11,'afterCredit':12,'expiryUnchanged':True,'schedule':refund},
+          'sunday':{'operation':'Optional separate proposal/Accept on Sunday; check availability again', 'session':sunday},
+          'limits':{k:v.isoformat() for k,v in limits.items()},'windowChecks':checks,
+          'relativeDeadlines':'New invoice<=30min; issued attendance code300seconds; Advanced order<acceptedAt+24h; rights45days from valid Paid. Issue during demo; do not extend.'}
     return {'fixtureVersion': FIXTURE_VERSION, 'anchorDate': anchor.isoformat(),
             'timeZone': TIMEZONE, 'plannedDemoAt': at.isoformat() if at is not None else None,
+            'plannedDemoUntil':until.isoformat() if until else None,'mainPaths':main,
             'dataState': 'EXPECTED_FRESH_FIXTURE_NOT_CLOUD_STATE',
             'note': 'Availability describes time only; recheck runtime actor/state/version/seat before writing. FE suggestions require FE review.',
             'actors': actors, 'classes': courses, 'cases': cases}

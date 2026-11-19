@@ -30,8 +30,12 @@ public record SessionResponse(
         java.time.LocalDateTime agreementConfirmedAt,
         boolean correctionAllowed,
         java.time.OffsetDateTime correctionDeadline,
-        java.time.OffsetDateTime serverTime
+        java.time.OffsetDateTime serverTime,
+        Boolean attendanceAllowed, String attendanceBlockReason,
+        Boolean cancellationAllowed, java.time.OffsetDateTime cancellationDeadline, String cancellationBlockReason
 ) {
+    public record Actions(Boolean attendanceAllowed, String attendanceBlockReason, Boolean cancellationAllowed,
+                          java.time.OffsetDateTime cancellationDeadline, String cancellationBlockReason) { }
     public SessionResponse(
             Integer id,
             Integer classId,
@@ -52,7 +56,7 @@ public record SessionResponse(
     ) {
         this(id, classId, className, subjectId, subjectName, coachId, coachName,
                 roomId, roomName, roomLocation, sessionDate, startTime, endTime,
-                status, enrolledCount, maxCapacity, null, null, false,false,null,false,null,null,false,null,null);
+                status, enrolledCount, maxCapacity, null, null, false,false,null,false,null,null,false,null,null,null,null,null,null,null);
     }
 
     public static SessionResponse from(Session session) {
@@ -63,6 +67,9 @@ public record SessionResponse(
         return from(session, enrolledCount, null, null);
     }
     public static SessionResponse from(Session session, Integer enrolledCount, com.sportscenter.user.User actor, java.time.Clock clock) {
+        return from(session,enrolledCount,actor,clock,null);
+    }
+    public static SessionResponse from(Session session, Integer enrolledCount, com.sportscenter.user.User actor, java.time.Clock clock, Actions actions) {
         if (session == null) return null;
         var metadata = clock == null ? null : com.sportscenter.training.SessionAttendancePolicy.metadata(session, actor, clock);
         var sc = session.getSportsClass();
@@ -90,7 +97,9 @@ public record SessionResponse(
                 bookedMember != null ? bookedMember.getId() : null,
                 bookedMember != null ? bookedMember.getFullName() : null,
                 isPrivate,session.isCenterInvalidated(),session.getMakeupFor()==null?null:session.getMakeupFor().getId(),session.isCreditReturned(),session.getCreatedBy(),session.getAgreementConfirmedAt(),
-                metadata != null && metadata.correctionAllowed(), metadata == null ? null : metadata.correctionDeadline(), metadata == null ? null : metadata.serverTime()
+                metadata != null && metadata.correctionAllowed(), metadata == null ? null : metadata.correctionDeadline(), metadata == null ? null : metadata.serverTime(),
+                actions==null?null:actions.attendanceAllowed(),actions==null?null:actions.attendanceBlockReason(),
+                actions==null?null:actions.cancellationAllowed(),actions==null?null:actions.cancellationDeadline(),actions==null?null:actions.cancellationBlockReason()
         );
     }
 }

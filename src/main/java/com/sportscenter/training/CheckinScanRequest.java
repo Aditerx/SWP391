@@ -1,4 +1,6 @@
 package com.sportscenter.training;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
-public record CheckinScanRequest(@NotNull Integer memberId, @NotBlank String code, Integer sessionId) { }
+public record CheckinScanRequest(@NotNull Integer memberId, @NotBlank String code, Integer sessionId) {
+    @Override public String toString() { return "CheckinScanRequest[memberId="+memberId+", code=[redacted], sessionId="+sessionId+"]"; }
+}

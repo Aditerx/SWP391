@@ -6,6 +6,7 @@ import org.springframework.security.core.Authentication;
 import java.util.List;
 @RestController @RequiredArgsConstructor
 public class NormalChangeController {
+    private final com.sportscenter.sportclass.SportsClassService classes;
     private final NormalChangeService service;
     @GetMapping("/api/classes/{id}/normal-proposals") public List<NormalChangeService.ProposalView> list(@PathVariable Integer id,Authentication auth){return service.list(id,auth);}
     @PostMapping("/api/classes/{id}/normal-proposals")
@@ -49,5 +50,5 @@ public class NormalChangeController {
         @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode="404", description="Resource not found", content=@io.swagger.v3.oas.annotations.media.Content),
         @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode="409", description="Conflict: reload current resource; body status is409 when present", content=@io.swagger.v3.oas.annotations.media.Content)
     })
-    public SportsClassResponse cancel(@PathVariable Integer id,@RequestBody NormalChangeService.Decision body,Authentication auth){return service.cancel(id,body,auth);}
+    public SportsClassResponse cancel(@PathVariable Integer id,@RequestBody NormalChangeService.Decision body,Authentication auth){service.cancel(id,body,auth);return classes.findById(id);}
 }

@@ -325,7 +325,9 @@ public class PhaseWorkflowHttpTest {
         assertEquals(notice.path("id"),repeated.path("id"));assertEquals(11,credit());
         assertEquals(1,jdbc.queryForObject("SELECT count(*) FROM attendances WHERE session_id=?",Integer.class,scheduledId));
         call(other,"POST","/api/sessions/"+scheduledId+"/absence",Map.of("reason","Not mine"),403);
-        call(member,"POST","/api/sessions/"+scheduledId+"/cancel-private",null,400);
+        var beforeDeniedCancel=jdbc.queryForList("SELECT s.status,s.credit_returned,p.remaining_credit,p.expires_at,a.state,a.check_in_time FROM sessions s JOIN member_packages p ON p.subscription_id=s.subscription_id JOIN attendances a ON a.session_id=s.session_id WHERE s.session_id=? AND a.superseded_at IS NULL",scheduledId);
+        assertEquals("SESSION_ALREADY_ATTENDED",call(member,"POST","/api/sessions/"+scheduledId+"/cancel-private",null,409).path("code").asText());
+        assertEquals(beforeDeniedCancel,jdbc.queryForList("SELECT s.status,s.credit_returned,p.remaining_credit,p.expires_at,a.state,a.check_in_time FROM sessions s JOIN member_packages p ON p.subscription_id=s.subscription_id JOIN attendances a ON a.session_id=s.session_id WHERE s.session_id=? AND a.superseded_at IS NULL",scheduledId));
         proof("ABSENCE-UNDER-12H","D05,D15","Owner31/10 replaces notice-only; Member A reports 7h45 before session","Notice + one linked Absent committed; retry same notice/credit; wrong owner403; Scheduled, no refund",rightsSql(),subscriptionId);
         int secondRoom=tx.execute(t->{Room r=new Room();r.setActivityType(com.sportscenter.room.RoomActivity.BADMINTON);r.setName("Phase alternate room");r.setCapacity(15);r.setStatus("Available");r.setCenterId(1);r.setFacilityType("Indoor");return rooms.save(r).getId();});
         var incident=call(manager,"POST","/api/center-incidents",Map.of("sessionId",scheduledId,"startedAt","2026-10-28T00:00:00","reason","Room issue","evidence","Verified maintenance record","requestKey","room-incident"),200);
@@ -379,11 +381,12 @@ public class PhaseWorkflowHttpTest {
         at("2026-10-31T05:00:00");
         var absence=call(member,"POST","/api/sessions/"+scheduledId+"/absence",Map.of("reason","Plans changed; Member later attends"),200);
         at("2026-10-31T05:59:59");var oldCode=call(member,"GET","/api/attendances/me/checkin-code",null,200);
-        assertEquals(1,oldCode.get("expiresInSeconds").asInt());
+        assertEquals(300,oldCode.get("expiresInSeconds").asInt());
         call(coach,"POST","/api/attendances/scan",Map.of("memberId",memberId,"sessionId",scheduledId,"code",oldCode.get("payload").asText()),400);
         at("2026-10-31T06:00:00");
-        call(coach,"POST","/api/attendances/scan",Map.of("memberId",memberId,"sessionId",scheduledId,"code",oldCode.get("payload").asText()),400);
-        var code=call(member,"GET","/api/attendances/me/checkin-code",null,200);assertEquals(30,code.get("expiresInSeconds").asInt());
+        var code=call(member,"GET","/api/attendances/me/checkin-code",null,200);assertEquals(299,code.get("expiresInSeconds").asInt());
+        assertTrue(java.security.MessageDigest.isEqual(oldCode.path("payload").asText().getBytes(),code.path("payload").asText().getBytes()),"A TOTP step boundary must not replace an issued code");
+        assertEquals(oldCode.path("expiresAt"),code.path("expiresAt"));
         var attendance=call(coach,"POST","/api/attendances/scan",Map.of("memberId",memberId,"sessionId",scheduledId,"code",code.get("payload").asText()),200);
         assertEquals("Present",attendance.get("state").asText());int aid=attendance.get("attendanceId").asInt();
         assertEquals(absence.path("id"),attendance.path("absenceNoticeId"));assertEquals(coachId,attendance.path("recordedBy").asInt());
@@ -399,7 +402,7 @@ public class PhaseWorkflowHttpTest {
         call(manager,"POST","/api/attendances/correct",Map.of("attendanceId",aid,"newState","Present","reason","Manager verified actual attendance"),200);
         assertEquals(11,credit());assertEquals(1,jdbc.queryForObject("SELECT count(*) FROM attendances WHERE session_id=? AND superseded_at IS NULL",Integer.class,scheduledId));
         assertEquals(2,jdbc.queryForObject("SELECT count(*) FROM attendances WHERE session_id=?",Integer.class,scheduledId));
-        proof("QR-WINDOW-REPLAY-CORRECTION","D15,D17,D18","Assigned Coach and Member QR; start-1s/start/end; Coach correction before midnight and Manager correction after finalizer","TTL 1 then 30; early/old step/replay/end rejected; one Present attendance; assigned Coach and Manager correct Present/Absent; credit unchanged; Coach report 403","SELECT attendance_id,state FROM attendances WHERE session_id=?",scheduledId);
+        proof("QR-WINDOW-REPLAY-CORRECTION","D15,D17,D18","Assigned Coach and Member QR; start-1s/start/end; Coach correction before midnight and Manager correction after finalizer","Issued TTL300, refresh299 with same expiry; early/replay/end rejected; one Present attendance; assigned Coach and Manager correct Present/Absent; credit unchanged; Coach report 403","SELECT attendance_id,state FROM attendances WHERE session_id=?",scheduledId);
     }
     @Test @Order(7) void externalRefundAndNarrowCashCorrectionKeepOriginalReceiptsAndMoneyPeriods() throws Exception {
         at("2026-11-01T09:00:00");
@@ -961,6 +964,11 @@ public class PhaseWorkflowHttpTest {
         Mac mac=Mac.getInstance("HmacSHA512");mac.init(new SecretKeySpec("phase-workflow-test-secret".getBytes(StandardCharsets.UTF_8),"HmacSHA512"));return q+"&vnp_SecureHash="+HexFormat.of().formatHex(mac.doFinal(q.getBytes(StandardCharsets.UTF_8)));
     }
     @AfterAll void evidence() throws Exception {
+        String single=System.getProperty("scms.workflow.evidence","");
+        if(!single.isBlank()) {
+            var safe=json.valueToTree(exchanges);AdvancedConsentHttpTest.sanitizeEvidence(safe);
+            Files.writeString(Path.of(single),json.writerWithDefaultPrettyPrinter().writeValueAsString(Map.of("scope","Synthetic local HTTP and committed DB; no provider/FE acceptance","exchanges",safe,"acceptance",acceptance)));
+        }
         String dir=System.getProperty("scms.evidence-dir","");
         if(!dir.isBlank()) {Path p=Path.of(dir);Files.createDirectories(p);Files.write(p.resolve("http-workflow.txt"),trace,StandardCharsets.UTF_8);
             json.writerWithDefaultPrettyPrinter().writeValue(p.resolve("http-exchanges.json").toFile(),exchanges);}

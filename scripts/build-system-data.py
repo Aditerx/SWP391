@@ -7,7 +7,7 @@ import hashlib
 import json
 import re
 import uuid
-from demo_anchor import anchor_date, holiday_catalog, TIMEZONE, FIXTURE_VERSION
+from demo_anchor import anchor_date, holiday_catalog, TIMEZONE, FIXTURE_VERSION, choose_session
 from demo_handoff import render as render_handoff
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -16,13 +16,15 @@ parser.add_argument('--check', action='store_true')
 parser.add_argument('--anchor', required=True, type=anchor_date, help='Explicit YYYY-MM-DD installation anchor in Vietnam')
 parser.add_argument('--manifest', help='Write the same validated design as JSON for the SQL fixture compiler')
 parser.add_argument('--no-render',action='store_true',help='Compile source rows without overwriting the reviewed SYSTEM-DATA export')
+parser.add_argument('--preview-design',action='store_true',help='Export expected design only; SQL execution remains NOT_RUN, no actual DB IDs')
 parser.add_argument('--from-local-pg',help='Export actual fixture rows from an explicitly disposable loopback database')
 parser.add_argument('--pg-container',default='scms-phases-20261027',help='Pinned local test container or task-specific scms-bundle-* container')
 parser.add_argument('--pg-port',type=int,choices=(55440,54391),default=55440)
 parser.add_argument('--output',default='SYSTEM-DATA.md',help='Markdown export path in workspace; staging is supported')
 args = parser.parse_args()
-if not args.no_render and not args.from_local_pg:
-    parser.error("Use --from-local-pg scms_schema_demo_phase1_<new> to render/check verified fixture rows; --no-render compiles the design only")
+if args.preview_design and args.from_local_pg:parser.error('Choose design preview or actual local export')
+if not args.no_render and not args.from_local_pg and not args.preview_design:
+    parser.error("Use --from-local-pg for verified rows, --preview-design for explicitly NOT_RUN expected data, or --no-render")
 ANCHOR = args.anchor
 output=(ROOT/args.output).resolve()
 if not output.is_relative_to(ROOT) or output.suffix.lower()!='.md':
@@ -128,7 +130,7 @@ for code, name, location, kind, capacity in rooms:
 for user in tables['users']:
     if user['role'] == 'Coach' and user['status'] == 'Active':
         add('coach_work_schedules', coach=user['key'], accepting_new=True)
-        for weekday in ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY']:
+        for weekday in ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY']:
             for slot in range(1, 8):
                 add('coach_work_slots', coach=user['key'], slot_key=f'{weekday}:{slot}')
 add('coach_days_off', coach='PICK-B', date=day(60))
@@ -223,7 +225,7 @@ for key,member,subject,state in [('AR01','M14','SWIM','Requested'),('AR02','M15'
         created_at=stamp(-2,'06:00'),
         accepted_at=stamp(0,'00:00') if state=='Accepted' else stamp(-1,'07:00') if state=='Rejected' else None,
         reason='DEMO Coach từ chối yêu cầu' if state=='Rejected' else None)
-advanced=[('SUB01','M02','TEN','Active',12,-4),('SUB02','M03','TEN','Active',10,-5),
+advanced=[('SUB01','M02','TEN','Active',11,-4),('SUB02','M03','TEN','Active',10,-5),
           ('SUB03','M04','BAD','Active',0,-6),('SUB04','M05','TEN','Completed',0,-40),
           ('SUB05','M06','TEN','Expired',0,-70),('SUB06','M07','BAD','Active',12,-2),
           ('SUB07','M08','SWIM','Cancelled',0,-3)]
@@ -274,6 +276,16 @@ for index,(key,member,subject,state,credit,paid_offset) in enumerate(advanced,4)
                 absence_notice=None, superseded_at=None, recorded_by=coach)
             add('training_results', key=f'RESULT-{key}-{number:02}', session=f'{key}-S{number:02}',
                 member=member, coach=coach, attendance_status='Present', content='DEMO bài tập cá nhân đã thực hiện')
+# One newly approved synthetic cancellation fixture. Never invent consent for the legacy sessions.
+refund_slot=choose_session(tables,ANCHOR+timedelta(days=5),'TEN','TEN-A','M02','C01-TEN-01',
+                          expires=datetime.fromisoformat(next(s for s in tables['member_packages'] if s['key']=='SUB01')['expires_at']))
+add('sessions',key='SUB01-S01',sports_class='A-AR04',**refund_slot,status='Scheduled',finalized=False,
+    review_pending=False,center_invalidated=False,makeup_for=None,subscription='SUB01',
+    agreement_confirmed_at=stamp(0,'00:00'),created_by='TEN-A')
+add('private_session_proposals',key='DEMO-CANCEL-SUB01',subscription='SUB01',sports_class='A-AR04',
+    subject='TEN',proposed_by='TEN-A',**refund_slot,status='Accepted',created_at=stamp(0,'00:00'),
+    responded_at=stamp(0,'00:00'),respond_by=(datetime.fromisoformat(refund_slot['date']+'T'+refund_slot['start'])-timedelta(hours=12)).isoformat(),
+    session='SUB01-S01',note='DEMO newly approved cancellation fixture; synthetic Member acceptance, not historical consent')
 add('training_plans', key='PLAN-SUB02', sports_class=None, member='M03', coach='TEN-A',
     title='DEMO giáo án cá nhân Advanced',content='Thực hành kỹ thuật riêng cho Member M03')
 add('payment_resolutions', key='CC01', type='CashCorrection', scope='ADVANCED_UNUSED',
@@ -410,16 +422,57 @@ for table in existing+new:
     tables.setdefault(table,[])
 
 
+def validate_advanced_flow(data):
+    registrations={r['key']:r for r in data['advanced_registrations']}
+    classes={c['key']:c for c in data['classes']}
+    subscriptions={s['key']:s for s in data['member_packages']}
+    users={u['key']:u for u in data['users']}
+    accepted={key:r for key,r in registrations.items() if r['status'] in {'Accepted','Invoiced'}}
+    private=[c for c in classes.values() if c['type']=='Advanced']
+    assert len(private)==len(accepted), 'ADVANCED_CLASS_COUNT_FROM_REGISTRATIONS'
+    for c in private:
+        owner=accepted.get(c.get('registration'))
+        assert owner and owner.get('sports_class')==c['key'], ('ADVANCED_CLASS_REGISTRATION_LINK',c['key'])
+        assert (c['coach'],c['member'],c['subject'])==(owner['coach'],owner['member'],owner['subject']), ('ADVANCED_CLASS_OWNER',c['key'])
+        assert c['max_capacity']==1 and c['status']!='Open' and c.get('room') is None, ('ADVANCED_CLASS_NOT_GROUP_TEMPLATE',c['key'])
+    registered_subscriptions={}
+    for r in registrations.values():
+        if r['status'] not in {'Accepted','Invoiced'}:
+            assert r.get('sports_class') is None and r.get('subscription') is None, ('ADVANCED_UNACCEPTED_HAS_CLASS_OR_RIGHT',r['key'])
+            continue
+        c=classes.get(r.get('sports_class'))
+        assert c and c['type']=='Advanced' and c.get('registration')==r['key'], ('ADVANCED_REGISTRATION_CLASS_LINK',r['key'])
+        member,coach=users[r['member']],users[r['coach']]
+        assert member['role']=='Member' and coach['role']=='Coach' and member['center']==coach['center'], ('ADVANCED_ACTOR_SCOPE',r['key'])
+        if r['status']=='Accepted':
+            assert r.get('subscription') is None, ('ADVANCED_UNORDERED_HAS_RIGHT',r['key'])
+        else:
+            sub=subscriptions.get(r.get('subscription'))
+            assert sub and (sub['member'],sub['subject'],sub['primary_coach'])==(r['member'],r['subject'],r['coach']), ('ADVANCED_SUBSCRIPTION_OWNER',r['key'])
+            assert sub['key'] not in registered_subscriptions, ('ADVANCED_SUBSCRIPTION_SHARED',sub['key'])
+            registered_subscriptions[sub['key']]=r
+    assert set(registered_subscriptions)==set(subscriptions), 'ADVANCED_SUBSCRIPTION_WITHOUT_REGISTRATION'
+    for session in data['sessions']:
+        c=classes.get(session['sports_class'])
+        if c['type']!='Advanced' and not session.get('subscription'):
+            continue
+        owner=registered_subscriptions.get(session.get('subscription'))
+        assert owner and c['type']=='Advanced' and c['key']==owner['sports_class'] and session['member']==owner['member'], ('ADVANCED_SESSION_OWNER',session['key'])
+    proposals=data['private_session_proposals']
+    assert len(proposals)==1 and proposals[0].get('key')=='DEMO-CANCEL-SUB01', 'ADVANCED_NO_SYNTHETIC_MEMBER_CONSENT'
+    p=proposals[0];s=next(s for s in data['sessions'] if s['key']=='SUB01-S01');sub=subscriptions['SUB01']
+    assert (p['session'],p['subscription'],p['sports_class'],p['member'],p['subject'],p['coach'],p['proposed_by'],p['status'])==('SUB01-S01','SUB01','A-AR04','M02','TEN','TEN-A','TEN-A','Accepted'), 'ADVANCED_DEMO_CONSENT_OWNER'
+    assert all(p[f]==s[f] for f in ['date','start','end','room','coach','member','sports_class']), 'ADVANCED_DEMO_CONSENT_SCHEDULE'
+    assert s['agreement_confirmed_at']==p['created_at']==p['responded_at'] and p['responded_at']<=p['respond_by'], 'ADVANCED_DEMO_CONSENT_TIME'
+    assert s['status']=='Scheduled' and not s['finalized'] and not s['center_invalidated'] and not any(a['session']==s['key'] for a in data['attendances']), 'ADVANCED_DEMO_CANCELLATION_UNATTENDED'
+    assert sub['status']=='Active' and sub['remaining_credit']==11 and sub['member']==s['member'] and sub['primary_coach']==s['coach'], 'ADVANCED_DEMO_CANCELLATION_RIGHT'
+    assert all(not v.get('agreement_confirmed_at') for v in data['sessions'] if v['key']!='SUB01-S01'), 'ADVANCED_NO_SYNTHETIC_MEMBER_CONSENT'
+
+
 def validate():
     assert len(accounts)==33 and len(tables['users'])==47
     assert len(tables['rooms'])==20
-    accepted={r['key']:r for r in tables['advanced_registrations'] if r['status'] in {'Accepted','Invoiced'}}
-    private=[c for c in tables['classes'] if c['type']=='Advanced']
-    assert len(private)==len(accepted) and len(tables['classes'])==12+len(accepted)
-    assert {c['registration'] for c in private}==set(accepted)
-    for c in private:
-        owner=accepted[c['registration']]
-        assert c['coach']==owner['coach'] and c['member']==owner['member'] and c['subject']==owner['subject']
+    validate_advanced_flow(tables)
     assert len(existing)>=47 and set(tables)==set(existing+new)
     user_keys={r['key'] for r in tables['users']}
     class_keys={r['key'] for r in tables['classes']}
@@ -443,6 +496,15 @@ def validate():
         assert row['member'] in user_keys and row['subject'] in subject_keys_set and row['primary_coach'] in user_keys
     for row in tables['sessions']:
         assert row['sports_class'] in class_keys and row['room'] in room_keys and row['coach'] in user_keys
+        if row['status']!='Cancelled':
+            course=next(c for c in tables['classes'] if c['key']==row['sports_class'])
+            subject=next(s for s in tables['subjects'] if s['key']==course['subject'])
+            number=next(n for n,(start,end) in slots.items() if (start,end)==(row['start'],row['end']))
+            weekday=date.fromisoformat(row['date']).strftime('%A').upper()
+            assert any(w['coach']==row['coach'] and w['slot_key']==f'{weekday}:{number}' for w in tables['coach_work_slots']), 'SESSION_COACH_WORK_SLOT'
+            assert not any(h['date']==row['date'] and h['is_active'] for h in tables['holidays']), 'SESSION_HOLIDAY'
+            assert not any(o['coach']==row['coach'] and o['date']==row['date'] for o in tables['coach_days_off']), 'SESSION_COACH_DAY_OFF'
+            assert not (subject['outdoor'] and number in (3,4)), 'SESSION_OUTDOOR_SLOT'
         if row.get('subscription'):
             sub=next(s for s in tables['member_packages'] if s['key']==row['subscription'])
             ends=datetime.fromisoformat(row['date']+'T'+row['end'])
@@ -512,9 +574,9 @@ def cell(value):
 validate()
 if args.manifest:
     Path(args.manifest).write_text(json.dumps({'anchor':ANCHOR.isoformat(),'tables':tables},ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
-parts=['''# SYSTEM DATA — Bộ dữ liệu gốc SCMS được duyệt10/11/2026
+parts=['''# SYSTEM DATA — Bản xem trước theo anchor
 
-**Trạng thái: DATA DESIGN, CHƯA SEED/RESET SUPABASE.** File này ghi bộ tham chiếu và các dòng thiết kế cho FE/BE, không phải dump DB đang chạy hoặc bằng chứng API Normal/Refund mới đã có. Các bảng mới/field nghiệp vụ là dự kiến kỹ thuật, chưa là contract đã triển khai. ID DB được sinh khi seed; `key`, Nxx/Mxx/RFxx là mã đối chiếu manifest, FE phải lấy ID thật từ API.
+**Trạng thái: EXPECTED DESIGN; SQL execution NOT_RUN.** Đây là lịch và dữ liệu dự kiến từ nguồn sinh, chưa xuất từ PostgreSQL của anchor này. Kiểm ngoại tuyến không chứng nhận chạy SQL, HTTP hoặc Supabase. Khi đến đúng ngày, kiểm SQL local rồi xuất lại từ fixture nguyên trạng trước HTTP. ID DB được sinh khi seed; `key`, Nxx/Mxx/RFxx là mã đối chiếu, FE phải lấy ID thật từ API. Contract BE hiện hành ở docs01, trạng thái ở docs00/QA.
 
 Nguồn: [Owner decisions](docs/04-DEBUG-NOTE.md), [review và phê duyệt](docs/archive/2026-11/03-TODO.md#system-data-review-20261109), [Normal Lifecycle](docs/reference/SCMS_BE_Normal_Lifecycle_DA_CHOT.md), [Refund Normal](docs/reference/SCMS_BE_Refund_Normal_DA_CHOT.md), reference seed đã đối chiếu33account PDF. [Active/QA](docs/00-MASTER-CHECKLIST.md#active) giữ trạng thái kiểm/phát hành; dữ liệu đã đọc trên cloud không được trộn vào bộ mới này.
 
@@ -530,7 +592,7 @@ Nguồn: [Owner decisions](docs/04-DEBUG-NOTE.md), [review và phê duyệt](doc
 
 ## Các bảng dữ liệu
 '''.replace('ANCHOR_DATE',ANCHOR.isoformat())]
-for index,table in enumerate(existing+new,1):
+for index,table in enumerate(existing if args.preview_design else existing+new,1):
     rows=tables[table]
     parts.append(f'\n### {index}. `{table}`'+(' — bảng mới dự kiến' if table in new else '')+'\n')
     if table in notes:parts.append(notes[table]+'\n')
@@ -548,7 +610,7 @@ parts.append('''
 | Nhóm | Phần phải bổ sung/kiểm khi hiện thực fixture |
 |---|---|
 | Advanced | Các dòng Requested/Accepted/Rejected/Invoiced và quyền Active/Completed/Expired đã có ở bảng thiết kế; Pending0credit tạo tại bước demo để không seed hold hết hạn. Từng dòng phải được hiện thực/kiểm qua workflow, đúng45ngày và nguồn ngày nghỉ. |
-| Normal động | Pending5phút tạo lúc demo, waitlist/chỗ cuối/race, Expired/Failed/Cancelled, callback muộn và Paid cần đối soát; chưa seed các dòng này như thể đã có giao dịch thật. |
+| Normal động | Pending tối đa30phút tạo lúc demo, waitlist/chỗ cuối/race, Expired/Failed/Cancelled, callback muộn và Paid cần đối soát; không seed các dòng này như thể đã có giao dịch thật. |
 | Attendance động | Trong buổi/sau end/cutoff, note xóa/readback, Coach A/B và Manager sau hạn; QR/OTP chỉ tạo khi chạy. |
 | Incident/thay Coach | Session changes cho thao tác dời/thay Coach, notice Advanced/superseded và pause có nguồn; dùng API sau khi triển khai, không ghi lại lịch sử bằng phỏng đoán. |
 | Refund | Private asset thật mang chữ DEMO, version người nhận/approve/claim/verification và timestamp đủ thứ tự; trạng thái trong bảng hiện là giai đoạn nghiệp vụ, chưa có enum/API mới. |
@@ -558,6 +620,13 @@ parts.append('''
 Sau khi hoàn tất fixture: chạy kiểm local cô lập, xuất lại dữ liệu từ đúng manifest đã kiểm và thay phần DATA DESIGN bằng trạng thái đã seed tương ứng. Không chạy bản reset tham chiếu rỗng chỉ vì file này đã được tạo.
 ''')
 data=('\n'.join(parts)+'\n').encode('utf-8')
+if args.preview_design:
+    data=(data.decode('utf-8').split('## Phần cần hoàn thiện trước khi dùng như bộ dữ liệu thực thi')[0]+'''## Kiểm trước khi dùng bộ theo ngày
+
+Đây là các field thiết kế của bảng thực thi, không là dump hoặc ID DB đã kiểm. SQL execution NOT_RUN đến đúng anchor; kiểm bản SQL đã sinh trên PostgreSQL local mới, rồi xuất SYSTEM-DATA bằng --from-local-pg trước khi thử HTTP. Đối chiếu 12 buổi Normal, chủ đăng ký/lớp/quyền, ca hủy SUB01-S01 có proposal Accepted và11credit, bảy ngày làm việc/ca nghỉ, Holiday/Outdoor, trùng tài nguyên, chứng từ và reset guard.
+
+Invoice mới tối đa30phút và QR300giây được tạo lúc thao tác; không seed mã, nonce hoặc hold hết hạn. Không thay lịch sử để làm ca xanh. Kịch bản tương ứng nằm trong demo-plan.json cùng thư mục và SCRIPT; trạng thái chuẩn ở docs00/QA. Local BE/bộ19 đã đạt không chứng nhận SQL/bộ21, Supabase, FE hoặc provider thật.
+''').encode('utf-8')
 if args.from_local_pg:
     import subprocess
     database=args.from_local_pg
@@ -574,6 +643,14 @@ if args.from_local_pg:
     assert (metadata.get('anchor_date'),metadata.get('business_timezone'),metadata.get('fixture_version'))==(ANCHOR.isoformat(),TIMEZONE,FIXTURE_VERSION),'DB fixture anchor/version differs; regenerate or select the matching pristine local DB'
     assert sql('SELECT count(*) FROM invoices')==str(len(tables['invoices'])),'Fixture already consumed: invoice count changed'
     assert sql('SELECT count(*) FROM class_enrollments')==str(len(tables['class_enrollments'])),'Fixture already consumed: enrollment count changed'
+    assert sql('SELECT count(*) FROM sessions')==str(len(tables['sessions'])),'Fixture already consumed: session count changed'
+    assert sql("""SELECT (count(*)=1 AND bool_and(p.request_key='DEMO-CANCEL-SUB01' AND p.status='Accepted'
+      AND s.status='Scheduled' AND NOT s.credit_returned AND NOT s.attendance_finalized AND NOT s.center_invalidated
+      AND m.status='Active' AND m.remaining_credit=11 AND s.agreement_confirmed_at=p.responded_at
+      AND NOT EXISTS(SELECT 1 FROM attendances a WHERE a.session_id=s.session_id)))::text
+      FROM private_session_proposals p JOIN sessions s ON s.session_id=p.session_id
+      JOIN member_packages m ON m.subscription_id=s.subscription_id""")=='true','Fixture already consumed: cancellation/consent changed'
+    assert sql("SELECT count(*) FROM members WHERE checkin_code_nonce IS NOT NULL OR checkin_code_issued_at IS NOT NULL OR checkin_code_expires_at IS NOT NULL OR checkin_code_used_at IS NOT NULL")=='0','Fixture already consumed: attendance code issued'
     assert sql("SELECT (NOT EXISTS(SELECT 1 FROM normal_transfers) AND NOT EXISTS(SELECT 1 FROM normal_refunds WHERE version<>0) AND NOT EXISTS(SELECT 1 FROM classes WHERE status='Open' AND opening_confirmed_at IS NOT NULL))::text")=='true','Fixture already consumed: transfer/Refund/opening changed'
     header='''# SYSTEM DATA — Bộ demo SCMS đã duyệt
 
@@ -596,7 +673,7 @@ Mọi lịch sử học/thu/hoàn ở đây là ví dụ tổng hợp được d
     exported_rows={}
     for index,table in enumerate(existing,1):
         assert re.fullmatch(r'[a-z_]+',table)
-        query="SELECT coalesce(jsonb_agg(j ORDER BY j::text),'[]'::jsonb) FROM (SELECT to_jsonb(t)-ARRAY['password_hash','checkin_secret','checkin_last_step','google_sub','content']||CASE WHEN '"+table+"'='normal_refund_documents' THEN jsonb_build_object('private_content','OMITTED; authenticated download only') ELSE CASE WHEN to_jsonb(t) ? 'content' THEN jsonb_build_object('content',to_jsonb(t)->'content') ELSE '{}'::jsonb END END AS j FROM public."+table+" t) x"
+        query="SELECT coalesce(jsonb_agg(j ORDER BY j::text),'[]'::jsonb) FROM (SELECT to_jsonb(t)-ARRAY['password_hash','checkin_secret','checkin_last_step','checkin_code_nonce','checkin_code_issued_at','checkin_code_expires_at','checkin_code_used_at','google_sub','content']||CASE WHEN '"+table+"'='normal_refund_documents' THEN jsonb_build_object('private_content','OMITTED; authenticated download only') ELSE CASE WHEN to_jsonb(t) ? 'content' THEN jsonb_build_object('content',to_jsonb(t)->'content') ELSE '{}'::jsonb END END AS j FROM public."+table+" t) x"
         rows=json.loads(sql(query))
         exported_rows[table]=rows
         actual.append(f'\n<a id="table-{table}"></a>\n\n### {index}. `{table}`\n')
@@ -629,6 +706,6 @@ elif args.check:
 else:
     output.parent.mkdir(parents=True,exist_ok=True)
     output.write_bytes(data)
-print(json.dumps({'file':str(output.relative_to(ROOT)),'mode':'DATA_DESIGN_NOT_SEEDED','tables':len(existing) if args.from_local_pg else len(tables),
+print(json.dumps({'file':str(output.relative_to(ROOT)),'mode':'LOCAL_PRISTINE_FIXTURE_EXPORT' if args.from_local_pg else 'EXPECTED_DESIGN_SQL_NOT_RUN','tables':len(existing) if args.from_local_pg or args.preview_design else len(tables),
                   'users':len(tables['users']),'classes':len(tables['classes']),
                   'sha256':hashlib.sha256(data).hexdigest(),'databaseAccess':bool(args.from_local_pg),'cloudAccess':False}))

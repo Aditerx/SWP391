@@ -19,12 +19,15 @@ ROOT = Path(__file__).resolve().parents[1]
 p = argparse.ArgumentParser(description=__doc__)
 p.add_argument('--anchor', required=True, type=anchor_date)
 p.add_argument('--demo-at', help='Optional planned ISO timestamp with offset; omitted means time windows are not evaluated')
+p.add_argument('--demo-until', help='End of the presentation window; checked as well as --demo-at')
 p.add_argument('--output-dir', required=True, help='New/empty staging directory under artifacts/runs/')
 p.add_argument('--verify-local', action='store_true', help='Run fresh/replay/rollback checks on a NEW disposable local DB')
 p.add_argument('--database', help='Required with --verify-local: NEW scms_schema_demo_phase1_* database')
 args = p.parse_args()
 try:
     at = demo_time(args.demo_at, args.anchor) if args.demo_at else None
+    until=demo_time(args.demo_until,args.anchor) if args.demo_until else None
+    if until and (not at or until<at):raise ValueError('--demo-until requires --demo-at and must be after it')
 except ValueError as e:
     p.error(str(e))
 output = (ROOT/args.output_dir).resolve()
@@ -55,7 +58,9 @@ try:
         design = runpy.run_path(str(ROOT/'scripts/build-system-data.py'))
 finally:
     sys.argv = old
-plan = scenario_plan(design['tables'], args.anchor, at)
+plan = scenario_plan(design['tables'], args.anchor, at, until)
+if any(c['status']!='PASS' for c in plan['mainPaths']['windowChecks']):
+    p.error('Main workflow cutoff falls within/before the presentation window')
 output.mkdir(parents=True, exist_ok=True)
 relative = lambda path: str(path.relative_to(ROOT)).replace('\\', '/')
 generated = run('build-demo-schema.py', '--anchor', args.anchor.isoformat(),

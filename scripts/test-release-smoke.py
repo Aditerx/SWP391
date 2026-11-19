@@ -10,6 +10,7 @@ import unittest
 from unittest.mock import patch
 import urllib.error
 import urllib.request
+import urllib.parse
 
 spec = importlib.util.spec_from_file_location('release_smoke', Path(__file__).with_name('release-smoke.py'))
 smoke = importlib.util.module_from_spec(spec)
@@ -151,6 +152,55 @@ class StartupRetryTest(unittest.TestCase):
                 if expected == 'STARTUP_TRANSPORT_EXHAUSTED':
                     self.assertEqual('TimeoutError', report['firstStartupFailure']['reason'])
                     self.assertEqual(3, len(report['startupAttempts']))
+
+    def test_catalog_failure_retains_missing_keys_and_logs_out_before_any_negative_mutation(self):
+        calls = []
+        roles = ['Admin', 'CenterManager', 'Receptionist', 'Coach', 'Member']
+        def fetch(opener, request, *args, **kwargs):
+            method = request.get_method(); path = urllib.parse.urlsplit(request.full_url).path
+            calls.append((method, path))
+            value = []
+            headers = {'Access-Control-Allow-Origin': 'https://vibesports.pages.dev',
+                       'Access-Control-Allow-Credentials': 'true'}
+            status = 200
+            if path == '/api/health': value = dict(status='UP', buildCommit='candidate', databaseTargetFingerprint='db')
+            elif path == '/actuator/health': value = dict(status='UP')
+            elif path == '/v3/api-docs': value = dict(paths={'/api/auth/me': {'get': {}}})
+            elif method == 'POST' and path == '/api/auth/login':
+                opener.role = json.loads(request.data)['email'].split('@')[0]
+            elif path == '/api/auth/me':
+                if not getattr(opener, 'role', None): status = 401
+                else: value = dict(email=opener.role + '@test.invalid', role=opener.role,
+                                   isFirstLogin=False, userId=roles.index(opener.role) + 1,
+                                   authorities=['MANAGE_CLASSES'])
+            elif path in ('/api/roles', '/api/permissions'):
+                if opener.role != 'Admin': status = 403
+            elif path == '/api/members/me':
+                value = dict.fromkeys(['name', 'phone', 'address', 'dateOfBirth', 'gender', 'goal', 'healthNote'])
+            elif method == 'POST' and path == '/api/auth/logout':
+                opener.role = None; status = 204
+            return status, json.dumps(value).encode(), headers
+        with tempfile.TemporaryDirectory() as directory:
+            actor_file = Path(directory) / 'actors.json'
+            actor_file.write_text(json.dumps({'actors': [dict(alias=role, role=role,
+                email=role+'@test.invalid', password='local-placeholder') for role in roles]}))
+            output = Path(directory) / 'result.json'
+            args = SimpleNamespace(base_url='http://127.0.0.1:12345', phase='baseline',
+                expected_commit='candidate', expected_db_fingerprint='db', negative_mutations=True,
+                request_timeout=35, startup_deadline=110, output=str(output),
+                actors_file=str(actor_file), frontend_origin='https://vibesports.pages.dev')
+            missing = {'status': 'FAIL', 'missingRequiredKeys': {'holidays': ['2026-01-01']}}
+            with patch.object(smoke, 'fetch_with_startup_retry', side_effect=fetch), \
+                    patch.object(smoke, 'read_catalogs', return_value=missing), patch('builtins.print'):
+                self.assertEqual(1, smoke.run(args))
+            report = json.loads(output.read_text())
+            self.assertEqual('API_ASSERTION', report['failure']['category'])
+            self.assertEqual(missing, report['catalogCompleteness'])
+            self.assertEqual(5, len(report['authenticatedActors']))
+            self.assertEqual(5, calls.count(('POST', '/api/auth/login')))
+            self.assertEqual(5, calls.count(('POST', '/api/auth/logout')))
+            self.assertTrue(all(method in ('GET', 'OPTIONS') or path in
+                                ('/api/auth/login', '/api/auth/logout') for method, path in calls))
 
 
 if __name__ == '__main__': unittest.main()

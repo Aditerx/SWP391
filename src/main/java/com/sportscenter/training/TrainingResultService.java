@@ -32,6 +32,8 @@ public class TrainingResultService {
     private final com.sportscenter.invoice.InvoiceRepository invoiceRepository;
     private final Clock clock;
     private final com.sportscenter.session.ScheduleWriteLock scheduleWriteLock;
+    @org.springframework.beans.factory.annotation.Value("${scms.early-attendance.enabled:false}")
+    private boolean earlyAttendanceEnabled;
 
     @Transactional(readOnly = true)
     public List<TrainingResultResponse> searchResults(Integer sessionId, Integer memberId, Integer coachId,
@@ -80,7 +82,7 @@ public class TrainingResultService {
         scheduleWriteLock.acquire(sessionRepository.findCenterIdById(request.sessionId()).orElseThrow(()->new ResourceNotFoundException("Session center not found")));
         Session session = sessionRepository.findByIdForUpdate(request.sessionId())
                 .orElseThrow(() -> new ResourceNotFoundException("Session not found: " + request.sessionId()));
-        SessionAttendancePolicy.requireWindow(session,LocalDateTime.now(clock));
+        SessionAttendancePolicy.requireWindow(session,SessionAttendancePolicy.now(clock),earlyAttendanceEnabled);
 
         User member = userRepository.findById(request.memberId())
                 .orElseThrow(() -> new ResourceNotFoundException("Member not found: " + request.memberId()));
@@ -103,6 +105,7 @@ public class TrainingResultService {
                 .orElseGet(TrainingResult::new);
 
         Attendance previousAttendance = attendanceRepository.findBySessionIdAndMemberId(session.getId(), member.getId()).orElse(null);
+        SessionAttendancePolicy.requireInitialRetry(previousAttendance,status,request.note(),request.content(),result,session,SessionAttendancePolicy.now(clock));
         String previousStatus = previousAttendance != null ? previousAttendance.getState() : result.getAttendanceStatus();
         boolean correction = previousStatus != null && !previousStatus.equals(status);
         if (correction && session.getSessionDate() != null
@@ -140,7 +143,7 @@ public class TrainingResultService {
         scheduleWriteLock.acquire(sessionRepository.findCenterIdById(request.sessionId()).orElseThrow(()->new ResourceNotFoundException("Session center not found")));
         Session session = sessionRepository.findByIdForUpdate(request.sessionId())
                 .orElseThrow(() -> new ResourceNotFoundException("Session not found: " + request.sessionId()));
-        SessionAttendancePolicy.requireWindow(session,LocalDateTime.now(clock));
+        SessionAttendancePolicy.requireWindow(session,SessionAttendancePolicy.now(clock),earlyAttendanceEnabled);
 
         User actor = requireRecorder(authentication,session);
         boolean coachActor = com.sportscenter.common.ActorPolicy.role(actor, "Coach");
@@ -163,10 +166,9 @@ public class TrainingResultService {
         if (request.items() != null) {
             for (BulkTrainingResultRequest.Item item : request.items()) {
                 requireContentWriter(actor, authentication, item.content());
-                if (item.memberId() == null) continue;
+                if (item.memberId() == null) throw new BusinessException("MEMBER_REQUIRED: Supply every bulk Member");
 
-                User member = userRepository.findById(item.memberId()).orElse(null);
-                if (member == null) continue;
+                User member = userRepository.findById(item.memberId()).orElseThrow(() -> new ResourceNotFoundException("Member not found"));
                 if (coachActor) ensureCoachCanRecord(session, member, actor);
                 if (!coachActor) validateStaffAttendance(session, member);
 
@@ -175,6 +177,8 @@ public class TrainingResultService {
 
                 TrainingResult tr = trainingResultRepository.findBySessionIdAndMemberId(session.getId(), member.getId())
                         .orElseGet(TrainingResult::new);
+                SessionAttendancePolicy.requireInitialRetry(attendanceRepository.findBySessionIdAndMemberId(session.getId(),member.getId()).orElse(null),
+                        status,item.note(),item.content(),tr,session,SessionAttendancePolicy.now(clock));
 
                 tr.setSession(session);
                 tr.setMember(member);
@@ -310,11 +314,10 @@ public class TrainingResultService {
     private void ensureCoachCanRecord(Session session, User member, User coach) {
         User assigned = session.getCoach() != null ? session.getCoach()
                 : session.getSportsClass() != null ? session.getSportsClass().getCoach() : null;
-        boolean eligible = session.getBookedMember() != null ? member.getId().equals(session.getBookedMember().getId())
-                : session.getSportsClass() != null && enrollmentRepository.existsByMemberIdAndSportsClassIdAndStatus(member.getId(), session.getSportsClass().getId(), "Registered");
-        if (assigned == null || !coach.getId().equals(assigned.getId()) || !eligible) {
+        if (assigned == null || !coach.getId().equals(assigned.getId())) {
             throw new BusinessException("NOT_YOUR_CLASS: coach may only record results for registered members in their own class");
         }
+        validateStaffAttendance(session,member);
     }
 
     private String normalizeAttendanceStatus(String status) {
@@ -329,14 +332,13 @@ public class TrainingResultService {
     }
 
     private void validateStaffAttendance(Session session, User member) {
-        boolean eligible = session.getBookedMember() != null ? member.getId().equals(session.getBookedMember().getId())
-                : enrollmentRepository.existsByMemberIdAndSportsClassIdAndStatus(member.getId(), session.getSportsClass().getId(), "Registered");
-        if (!eligible) throw new BusinessException("NOT_YOUR_CLASS: Member does not belong to this session");
+        SessionAttendancePolicy.requireEligibility(session,member,enrollmentRepository,invoiceRepository,SessionAttendancePolicy.now(clock));
     }
     private User requireRecorder(Authentication auth,Session session){
         if(auth==null||!auth.isAuthenticated())throw new AccessDeniedException("Authentication required");
         User actor=userRepository.findByEmailIgnoreCase(auth.getName()).orElseThrow(()->new AccessDeniedException("Account not found"));
         if(!"Active".equals(actor.getStatus()))throw new AccessDeniedException("Active recorder required");
+        com.sportscenter.session.SessionActionPolicy.requireRecorder(actor,session);
         com.sportscenter.common.ActorPolicy.center(actor,session.getSportsClass().getCenterId());
         if(auth.getAuthorities().stream().noneMatch(a->java.util.Set.of("ROLE_COACH","RECORD_RESULT","MANAGE_CLASSES").contains(a.getAuthority())))throw new AccessDeniedException("Attendance permission required");
         return actor;

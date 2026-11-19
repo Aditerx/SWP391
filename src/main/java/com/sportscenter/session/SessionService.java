@@ -58,6 +58,8 @@ public class SessionService {
     private final SessionAbsenceService sessionAbsenceService;
     private final CenterIncidentService centerIncidentService;
     private final com.sportscenter.membership.AdvancedRegistrationRepository advancedRegistrations;
+    private final com.sportscenter.training.AttendanceRepository attendanceRepository;
+    private final SessionActionPolicy actionPolicy;
 
     @Transactional(readOnly = true)
     public List<SessionResponse> findAll(Integer classId, Integer coachId, Integer roomId, Integer memberId,
@@ -87,7 +89,7 @@ public class SessionService {
                 .filter(s -> effectiveCoach == null || effectiveCoach.equals(coachId(s)))
                 .map(s -> {
             int count = s.getBookedMember() != null ? ("Cancelled".equals(s.getStatus()) ? 0 : 1) : counts.getOrDefault(s.getSportsClass().getId(), 0);
-            return SessionResponse.from(s, count, actor, clock);
+            return response(s,count,actor);
         }).toList();
     }
 
@@ -106,7 +108,7 @@ public class SessionService {
         } else requireScheduleStaff(authentication);
         int count = session.getBookedMember() != null ? ("Cancelled".equals(session.getStatus()) ? 0 : 1)
                 : (int) classEnrollmentRepository.countBySportsClassIdAndStatus(session.getSportsClass().getId(), "Registered");
-        return SessionResponse.from(session, count, actor, clock);
+        return response(session,count,actor);
     }
 
     @Transactional(readOnly = true)
@@ -247,7 +249,7 @@ public class SessionService {
             Session old=previous.get();
             if(!java.util.Objects.equals(old.getBookingHash(),requestHash(request.toString())))
                 throw new com.sportscenter.common.exception.BusinessConflictException("IDEMPOTENCY_CONFLICT: Booking key already has a different schedule");
-            return SessionResponse.from(old,"Cancelled".equals(old.getStatus())?0:1);
+            return response(old,"Cancelled".equals(old.getStatus())?0:1);
         }
         boolean pendingRecovery=!persist&&request.incidentId()!=null;
         if(pendingRecovery)centerIncidentService.validateMakeupRequest(request.incidentId(),subscription,request.extraValidityReason(),currentUser);
@@ -375,7 +377,7 @@ public class SessionService {
                     "CREDIT_LOW:" + subscription.getSubscriptionId() + ":" + saved.getId());
         }
 
-        return SessionResponse.from(saved, 1);
+        return response(saved, 1);
     }
 
     @Transactional
@@ -387,55 +389,15 @@ public class SessionService {
         Session session = sessionRepository.findByIdForUpdate(sessionId)
                 .orElseThrow(() -> new ResourceNotFoundException("Session not found: " + sessionId));
 
-        if (!session.isPrivateSession() && session.getBookedMember() == null) {
-            throw new BusinessException("Chỉ có thể hủy lịch riêng cho ca học 1:1.");
-        }
-
-        if ("Cancelled".equalsIgnoreCase(session.getStatus())) {
-            if(session.getBookedMember()==null||!session.getBookedMember().getId().equals(currentUser.getId()))throw new AccessDeniedException("Booked Member required");
-            throw new BusinessException("SESSION_ALREADY_CANCELLED: Original credit has already been returned");
-        }
-        if ("Completed".equalsIgnoreCase(session.getStatus())) {
-            throw new BusinessException("Buổi học đã hoàn thành, không thể hủy.");
-        }
-
-        boolean isMemberRole = authentication.getAuthorities().stream()
-                .anyMatch(a -> "ROLE_MEMBER".equals(a.getAuthority()))
-                || (currentUser.getRole() != null && "Member".equalsIgnoreCase(currentUser.getRole().getName()));
-
-        if (isMemberRole && (session.getBookedMember() == null || !session.getBookedMember().getId().equals(currentUser.getId()))) {
-            throw new AccessDeniedException("Hội viên chỉ được hủy ca học của chính mình.");
-        }
-        if(!isMemberRole)throw new AccessDeniedException("Member cancellation only; staff use the center incident workflow");
-        com.sportscenter.common.ActorPolicy.center(currentUser,session.getSportsClass().getCenterId());
-        if(session.isAttendanceFinalized()||session.isCenterInvalidated())throw new BusinessException("SESSION_HISTORY_IMMUTABLE: Finalized sessions cannot be cancelled");
-
-        LocalDateTime now = LocalDateTime.now(clock);
-        LocalDateTime sessionStart = LocalDateTime.of(session.getSessionDate(), session.getStartTime());
-        if (sessionStart.isBefore(now.plusHours(12))) {
-            throw new BusinessException("CANCEL_TOO_LATE: Cancellation requires at least 12 hours notice");
-        }
-
-        session.setStatus("Cancelled");
-
-        // Refund 1 credit
         MemberPackage sub = session.getMemberPackage();
-        if (sub != null) {
-            sub = memberPackageRepository.findByIdForUpdate(sub.getSubscriptionId()).orElse(null);
-        }
-        if (sub == null || session.getBookedMember() == null || !sub.getMember().getId().equals(session.getBookedMember().getId())) {
-            throw new BusinessException("SUBSCRIPTION_LINK_REQUIRED: Cannot refund credit without the original subscription");
-        }
-        if (!"Active".equals(sub.getStatus()) || sub.getExpiresAt() == null || !sub.getExpiresAt().isAfter(now)) {
-            throw new BusinessException("ADVANCED_PACKAGE_EXPIRED: Expired entitlements cannot be refunded as new credit");
-        }
-        if (sub != null) {
-            int limit = 12;
-            if(session.isCreditReturned())throw new BusinessException("CREDIT_ALREADY_RETURNED: Original credit already returned");
-            if (sub.getRemainingCredit() != null && sub.getRemainingCredit() >= limit) throw new BusinessException("CREDIT_LIMIT_EXCEEDED: Credit refund exceeds the original entitlement");
-            sub.setRemainingCredit((sub.getRemainingCredit() != null ? sub.getRemainingCredit() : 0) + 1);
-            memberPackageRepository.save(sub);
-        }
+        if (sub != null) sub = memberPackageRepository.findByIdForUpdate(sub.getSubscriptionId()).orElse(null);
+        session.setMemberPackage(sub);
+        boolean attended = session.getBookedMember()!=null && attendanceRepository.findBySessionIdAndMemberId(sessionId,session.getBookedMember().getId())
+                .filter(a -> "Present".equals(a.getState()) || "Absent".equals(a.getState())).isPresent();
+        SessionCancellationPolicy.require(session,currentUser,com.sportscenter.training.SessionAttendancePolicy.now(clock),attended);
+        session.setStatus("Cancelled");
+        sub.setRemainingCredit((sub.getRemainingCredit()==null?0:sub.getRemainingCredit())+1);
+        memberPackageRepository.save(sub);
         session.setCreditReturned(true);
 
         Session saved = sessionRepository.save(session);
@@ -451,7 +413,7 @@ public class SessionService {
                         session.getEndTime(), sub != null),
                 "SESSION", saved.getId(), "PRIVATE_BOOKING_CANCELLED:" + saved.getId());
 
-        return SessionResponse.from(saved, 0);
+        return response(saved, 0);
     }
 
     @Transactional
@@ -489,7 +451,7 @@ public class SessionService {
                 "Created session for class '" + sportsClass.getName() + "' in room '" + room.getName() + "' on " + request.sessionDate());
 
         int count = (int) classEnrollmentRepository.countBySportsClassIdAndStatus(sportsClass.getId(), "Registered");
-        return SessionResponse.from(saved, count);
+        return response(saved, count);
     }
 
     @Transactional(readOnly = true)
@@ -637,7 +599,7 @@ public class SessionService {
                 "Generated " + savedList.size() + " static recurring sessions for class '" + sportsClass.getName() + "'");
 
         int count = (int) classEnrollmentRepository.countBySportsClassIdAndStatus(sportsClass.getId(), "Registered");
-        return savedList.stream().map(s -> SessionResponse.from(s, count)).toList();
+        return savedList.stream().map(s -> response(s, count)).toList();
     }
 
     @Transactional
@@ -679,7 +641,7 @@ public class SessionService {
                 "Updated session ID " + id + " to " + request.sessionDate() + " " + request.startTime() + "-" + request.endTime());
 
         int count = (int) classEnrollmentRepository.countBySportsClassIdAndStatus(sportsClass.getId(), "Registered");
-        return SessionResponse.from(saved, count);
+        return response(saved, count);
     }
 
     @Transactional
@@ -701,7 +663,7 @@ public class SessionService {
         auditService.log(null, "UPDATE_SESSION_STATUS", "SESSION", saved.getId(), "Status changed to " + status);
 
         int count = (int) classEnrollmentRepository.countBySportsClassIdAndStatus(session.getSportsClass().getId(), "Registered");
-        return SessionResponse.from(saved, count);
+        return response(saved, count);
     }
 
     @Transactional
@@ -734,7 +696,7 @@ public class SessionService {
             requirePrimaryCoachOrManager(actor,session.getMemberPackage(),request.reason());
             if(!request.memberAgreed())throw new BusinessException("AGREEMENT_REQUIRED: Confirm agreement to this specific new schedule");
         }else com.sportscenter.common.ActorPolicy.manager(actor);
-        if(replayedChange(session,request.requestKey(),request.toString()))return SessionResponse.from(session,session.isPrivateSession()?1:0);
+        if(replayedChange(session,request.requestKey(),request.toString()))return response(session,session.isPrivateSession()?1:0);
         String before=changeSnapshot(session);
         LocalDateTime now=LocalDateTime.now(clock),oldSessionStart=session.getSessionDate().atTime(session.getStartTime()),newStart=request.newDate().atTime(request.newStartTime());
         boolean centerCause="CENTER_INCIDENT".equals(request.cause());
@@ -850,7 +812,7 @@ public class SessionService {
 
         int count = session.isPrivateSession() ? 1 :
                 (int) classEnrollmentRepository.countBySportsClassIdAndStatus(sportsClass.getId(), "Registered");
-        return SessionResponse.from(saved, count);
+        return response(saved, count);
     }
 
     @Transactional
@@ -863,7 +825,7 @@ public class SessionService {
         com.sportscenter.common.ActorPolicy.reason(request.reason());com.sportscenter.membership.AdvancedRegistrationService.requireKey(request.requestKey());
         if(session.isPrivateSession()&&!request.memberAgreed())throw new BusinessException("AGREEMENT_REQUIRED: Confirm agreement to this specific substitute Coach");
         centerIncidentService.requireForSession(request.incidentId(),session);
-        if(replayedChange(session,request.requestKey(),request.toString()))return SessionResponse.from(session,session.isPrivateSession()?1:0);
+        if(replayedChange(session,request.requestKey(),request.toString()))return response(session,session.isPrivateSession()?1:0);
         String before=changeSnapshot(session);
         if(!session.getSessionDate().atTime(session.getStartTime()).isAfter(LocalDateTime.now(clock)))throw new BusinessException("SESSION_HISTORY_IMMUTABLE: A started session cannot change Coach");
 
@@ -915,7 +877,7 @@ public class SessionService {
 
         int count = session.isPrivateSession() ? 1 :
                 (int) classEnrollmentRepository.countBySportsClassIdAndStatus(session.getSportsClass().getId(), "Registered");
-        return SessionResponse.from(saved, count);
+        return response(saved, count);
     }
 
     private Integer getActorId(Authentication authentication) {
@@ -1149,4 +1111,13 @@ public class SessionService {
         if ("Cancelled".equalsIgnoreCase(status)) return "Cancelled";
         throw new BusinessException("Invalid session status: " + status + ". Must be Scheduled, Completed, or Cancelled");
     }
+    private SessionResponse response(Session session, Integer count) {
+        var auth=org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        User actor=auth==null?null:userRepository.findByEmailIgnoreCase(auth.getName()).orElse(null);
+        return response(session,count,actor);
+    }
+    private SessionResponse response(Session session, Integer count, User actor) {
+        return SessionResponse.from(session,count,actor,clock,actionPolicy.metadata(session,actor));
+    }
+
 }

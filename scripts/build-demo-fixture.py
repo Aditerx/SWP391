@@ -63,7 +63,6 @@ for r in t['users']:
            full_name=r['name'],email=r['email'],password_hash=raw("extensions.crypt('SWP391',extensions.gen_salt('bf',10))"),status=r['status'],center_id=1,is_first_login=False)
     insert('coaches' if r['role']=='Coach' else 'members',user_id=user[r['key']],**({} if r['role']=='Coach' else {'join_date':anchor.isoformat()}))
 statements.append("INSERT INTO coach_specializations(coach_id,specialization_id) SELECT "+str(user['CI'])+",specialization_id FROM specializations WHERE subject_id="+subject['BAD'][1]+";")
-statements.append("DELETE FROM coach_work_slots WHERE slot_key LIKE 'SUNDAY:%';")
 for r in t['holidays']:insert('holidays',holiday_date=r['date'],holiday_name=r['name'],tag=r['tag'],is_active=r['is_active'])
 for r in t['coach_days_off']:insert('coach_days_off',coach_id=user[r['coach']],day_off=r['date'])
 for r in t['classes']:
@@ -99,7 +98,12 @@ for r in t['advanced_registrations']:
 for r in t['sessions']:
     insert('sessions',session_id=sessions[r['key']],class_id=classes[r['sports_class']],room_id=room[r['room']],session_date=r['date'],start_time=r['start'],end_time=r['end'],
            coach_id=user[r['coach']],booked_member_id=user.get(r['member']),subscription_id=subs.get(r.get('subscription')),status=r['status'],attendance_finalized=r['finalized'],attendance_review_pending=False,
-           center_invalidated=r['center_invalidated'],makeup_for_session_id=sessions.get(r['makeup_for']),created_by=user['CM1'])
+           center_invalidated=r['center_invalidated'],makeup_for_session_id=sessions.get(r['makeup_for']),created_by=user[r.get('created_by','CM1')],agreement_confirmed_at=r.get('agreement_confirmed_at'))
+for r in t['private_session_proposals']:
+    insert('private_session_proposals',subscription_id=subs[r['subscription']],proposed_by=user[r['proposed_by']],coach_id=user[r['coach']],
+           room_id=room[r['room']],class_id=classes[r['sports_class']],subject_id=subject[r['subject']],session_date=r['date'],start_time=r['start'],end_time=r['end'],
+           request_key=r['key'],request_hash=hashlib.sha256(json.dumps(r,sort_keys=True).encode()).hexdigest(),status=r['status'],created_at=r['created_at'],
+           respond_by=r['respond_by'],responded_at=r['responded_at'],session_id=sessions[r['session']])
 for r in t['attendances']:
     insert('attendances',session_id=sessions[r['session']],member_id=user[r['member']],recorded_by=user[r['recorded_by']],state=r['state'],note=r['note'])
 for r in t['training_results']:

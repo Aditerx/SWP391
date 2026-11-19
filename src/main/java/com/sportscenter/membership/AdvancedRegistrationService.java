@@ -44,7 +44,7 @@ public class AdvancedRegistrationService {
         if (existing.isPresent()) {
             var r = existing.get();
             if (!r.getSubject().getId().equals(subjectId) || !r.getCoach().getId().equals(coachId)) throw new BusinessConflictException("IDEMPOTENCY_CONFLICT: Key already has a different request");
-            return AdvancedRegistrationResponse.from(r);
+            return view(r,member);
         }
         var subject = subjects.findById(subjectId).orElseThrow(() -> new ResourceNotFoundException("Subject not found"));
         if (!"Active".equalsIgnoreCase(subject.getStatus()) || subject.getAdvancedPrice() == null || subject.getAdvancedPrice().signum() <= 0)
@@ -54,7 +54,7 @@ public class AdvancedRegistrationService {
         capacity.requireCapacity(coach, subject);
         AdvancedRegistration r = new AdvancedRegistration();
         r.setMember(member); r.setCoach(coach); r.setSubject(subject); r.setRequestKey(key); r.setCreatedAt(LocalDateTime.now(clock));
-        return AdvancedRegistrationResponse.from(registrations.save(r));
+        return view(registrations.save(r),member);
     }
 
     @Transactional
@@ -65,7 +65,7 @@ public class AdvancedRegistrationService {
         ActorPolicy.center(actor, r.getMember().getCenterId());
         if (!actor.getId().equals(r.getCoach().getId())) { ActorPolicy.manager(actor); ActorPolicy.reason(reason); }
         if (!"Requested".equals(r.getStatus())) {
-            if ((accept ? "Accepted" : "Rejected").equals(r.getStatus())) return AdvancedRegistrationResponse.from(r);
+            if ((accept ? "Accepted" : "Rejected").equals(r.getStatus())) return view(r,actor);
             throw new BusinessConflictException("REGISTRATION_STATE_CONFLICT: Registration already processed");
         }
         if (accept) { requireMember(r.getMember()); capacity.requireCapacity(r.getCoach(), r.getSubject()); }
@@ -80,7 +80,7 @@ public class AdvancedRegistrationService {
         }
         r.setStatus(accept ? "Accepted" : "Rejected"); r.setAcceptedBy(actor); r.setAcceptedAt(LocalDateTime.now(clock)); r.setReason(reason);
         audit.log(actor.getId(), "DECIDE_ADVANCED_REGISTRATION", "ADVANCED_REGISTRATION", id, r.getStatus() + "; reason=" + reason);
-        return AdvancedRegistrationResponse.from(r);
+        return view(r,actor);
     }
 
     @Transactional
@@ -88,20 +88,14 @@ public class AdvancedRegistrationService {
         User actor = actors.actor(auth);
         mutex.acquire(actor.getCenterId());
         AdvancedRegistration r = entity(id);
-        if (!r.getMember().getId().equals(actor.getId())) throw new AccessDeniedException("Registration owner required");
+        requireOrderActor(r,actor);
         requireMember(actor);
         if (r.getSubscription() != null) {
-            Invoice invoice = invoices.findBySubscriptionSubscriptionId(r.getSubscription().getSubscriptionId()).stream().findFirst().orElseThrow();
+            Invoice invoice = invoices.findBySubscriptionSubscriptionId(r.getSubscription().getSubscriptionId()).stream().findFirst().orElseThrow(() -> new BusinessException("REGISTRATION_RECONCILIATION_REQUIRED: Missing original invoice"));
             if (!Objects.equals(invoice.getPaymentMethod(), method)) throw new BusinessConflictException("IDEMPOTENCY_CONFLICT: Payment method cannot change on retry");
             return response(r.getSubscription(), payments.existingOrder(invoice, clientIp));
         }
-        if (!"Accepted".equals(r.getStatus())) throw new BusinessException("COACH_ACCEPTANCE_REQUIRED: Coach must accept before an invoice can be issued");
-        if(r.getAcceptedAt()==null)throw new BusinessException("REGISTRATION_RECONCILIATION_REQUIRED: Coach acceptance timestamp is missing");
-        if(!LocalDateTime.now(clock).isBefore(r.getAcceptedAt().plusHours(24)))
-            throw new BusinessConflictException("REGISTRATION_CONFIRMATION_EXPIRED: Confirm enrollment within24hours of Coach acceptance");
-        capacity.requireCoach(r.getCoach(), r.getSubject(), actor.getCenterId());
-        capacity.requireCapacity(r.getCoach(), r.getSubject());
-        if (!"Active".equals(r.getSubject().getStatus())) throw new BusinessException("SUBJECT_UNAVAILABLE: Subject is inactive");
+        requireNewOrder(r,actor);
         MemberPackage sub = new MemberPackage(); sub.setMember(actor); sub.setSubject(r.getSubject()); sub.setPrimaryCoach(r.getCoach());
         sub.setPurchaseAmount(r.getSubject().getAdvancedPrice());
         sub.setRemainingCredit(0); sub.setValidityDays(45); sub.setStatus("Pending");
@@ -118,7 +112,7 @@ public class AdvancedRegistrationService {
                 .filter(r -> ActorPolicy.role(actor,"Member") ? r.getMember().getId().equals(actor.getId())
                         : ActorPolicy.role(actor,"Coach") ? r.getCoach().getId().equals(actor.getId())
                         : ActorPolicy.role(actor,"CenterManager") || ActorPolicy.role(actor,"Admin"))
-                .map(AdvancedRegistrationResponse::from).toList();
+                .map(r -> view(r,actor)).toList();
     }
 
     public record WorkResponse(Integer coachId, boolean acceptingNew, Set<String> weeklySlots, Set<LocalDate> daysOff) { }
@@ -157,6 +151,34 @@ public class AdvancedRegistrationService {
         audit.log(actor.getId(), "CONFIGURE_COACH_WORK", "USER", coachId, "slots=" + slots + ";daysOff=" + off + ";acceptingNew=" + accepting);
     }
 
+
+    private void requireOrderActor(AdvancedRegistration r,User actor) {
+        if (!ActorPolicy.role(actor,"Member") || !r.getMember().getId().equals(actor.getId()))
+            throw new AccessDeniedException("REGISTRATION_OWNER_REQUIRED: Registration owner required");
+    }
+    private void requireNewOrder(AdvancedRegistration r,User actor) {
+        if (!"Accepted".equals(r.getStatus())) throw new BusinessException("COACH_ACCEPTANCE_REQUIRED: Coach must accept before an invoice can be issued");
+        if(r.getAcceptedAt()==null)throw new BusinessException("REGISTRATION_RECONCILIATION_REQUIRED: Coach acceptance timestamp is missing");
+        if(!LocalDateTime.now(clock).isBefore(r.getAcceptedAt().plusHours(24)))
+            throw new BusinessConflictException("REGISTRATION_CONFIRMATION_EXPIRED: Confirm enrollment within24hours of Coach acceptance");
+        capacity.requireCoach(r.getCoach(), r.getSubject(), actor.getCenterId());
+        capacity.requireCapacity(r.getCoach(), r.getSubject());
+        if (!"Active".equals(r.getSubject().getStatus())) throw new BusinessException("SUBJECT_UNAVAILABLE: Subject is inactive");
+        if (r.getSubject().getAdvancedPrice()==null || r.getSubject().getAdvancedPrice().signum()<=0)
+            throw new BusinessException("INVALID_PRICE: A positive server catalog price is required");
+    }
+    private AdvancedRegistrationResponse view(AdvancedRegistration r,User actor) {
+        Invoice invoice=r.getSubscription()==null?null:invoices.findBySubscriptionSubscriptionId(r.getSubscription().getSubscriptionId()).stream().findFirst().orElse(null);
+        String blocked=null;
+        try {
+            requireOrderActor(r,actor); requireMember(actor);
+            if (r.getSubscription()==null) requireNewOrder(r,actor);
+            else if (invoice==null) throw new BusinessException("REGISTRATION_RECONCILIATION_REQUIRED: Missing original invoice");
+        } catch (BusinessException | AccessDeniedException error) {
+            blocked=SessionActionPolicy.code(error,"REGISTRATION_OWNER_REQUIRED");
+        }
+        return AdvancedRegistrationResponse.from(r,invoice,blocked==null,blocked,clock);
+    }
     private AdvancedRegistration entity(Integer id) { return registrations.findById(id).orElseThrow(() -> new ResourceNotFoundException("Registration not found")); }
     private void requireMember(User member) {
         if (!ActorPolicy.role(member,"Member") || !"Active".equals(member.getStatus())) throw new BusinessException("MEMBER_NOT_ACTIVE: Active Member required");

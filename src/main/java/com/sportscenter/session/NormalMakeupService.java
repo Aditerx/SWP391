@@ -31,6 +31,7 @@ public class NormalMakeupService {
     private final AuditService audit;
     private final Clock clock;
     private final ApplicationEventPublisher events;
+    private final SessionActionPolicy actionPolicy;
     @io.swagger.v3.oas.annotations.media.Schema(name="NormalMakeupRequest")
     public record Request(@jakarta.validation.constraints.NotNull LocalDate date,@jakarta.validation.constraints.NotNull LocalTime startTime,
             @jakarta.validation.constraints.NotNull LocalTime endTime,@jakarta.validation.constraints.NotNull Integer roomId,
@@ -46,7 +47,7 @@ public class NormalMakeupService {
             Session s=existing.get();
             if(!Objects.equals(r.date(),s.getSessionDate())||!Objects.equals(r.startTime(),s.getStartTime())||!Objects.equals(r.endTime(),s.getEndTime())||!Objects.equals(r.roomId(),s.getRoom().getId())||!Objects.equals(r.coachId(),s.getCoach().getId()))
                 throw new BusinessConflictException("MAKEUP_ALREADY_CREATED: Use the existing linked session");
-            return SessionResponse.from(s,incident.getAffectedMembers().size());
+            return SessionResponse.from(s,incident.getAffectedMembers().size(),actor,clock,actionPolicy.metadata(s,actor));
         }
         if(r.date()==null||r.startTime()==null||r.endTime()==null||!r.date().atTime(r.startTime()).isAfter(LocalDateTime.now(clock)))throw new BusinessException("MAKEUP_TIME_INVALID: Makeup must be a future standard session");
         if(holidays.existsByHolidayDateAndIsActiveTrue(r.date()))throw new BusinessException("HOLIDAY_BLOCKED: Center is closed");
@@ -64,6 +65,6 @@ public class NormalMakeupService {
         enrollments.findByClassIdWithDetails(c.getId()).stream().filter(e->incident.getAffectedMembers().contains(e.getMember().getId())&&"Completed".equals(e.getStatus())).forEach(e->e.setStatus("Registered"));
         audit.log(actor.getId(),"CREATE_LINKED_NORMAL_MAKEUP","SESSION",makeup.getId(),"original="+old.getId()+"; incident="+incidentId+"; reason="+r.reason());
         events.publishEvent(NotificationTemplates.event(NotificationType.SESSION_RESCHEDULED,List.copyOf(incident.getAffectedMembers()),"Buổi bù của lớp "+c.getName()+" đã được xếp: "+r.date()+" "+r.startTime(),"SESSION",makeup.getId(),"NORMAL_MAKEUP:"+old.getId()));
-        return SessionResponse.from(makeup,incident.getAffectedMembers().size());
+        return SessionResponse.from(makeup,incident.getAffectedMembers().size(),actor,clock,actionPolicy.metadata(makeup,actor));
     }
 }

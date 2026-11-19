@@ -28,6 +28,7 @@ import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class TrainingResultServiceTest {
+    @Mock com.sportscenter.invoice.InvoiceRepository invoiceRepository;
     @Mock com.sportscenter.session.ScheduleWriteLock scheduleWriteLock;
     private final Authentication coachAuth=new org.springframework.security.authentication.UsernamePasswordAuthenticationToken("coach@example.test","",List.of(new SimpleGrantedAuthority("ROLE_COACH"), new SimpleGrantedAuthority("RECORD_RESULT")));
 
@@ -68,6 +69,7 @@ class TrainingResultServiceTest {
         sampleCoach.setFullName("Trần Thị Hương");sampleCoach.setStatus("Active");sampleCoach.setEmail("coach@example.test");
         var coachRole = new com.sportscenter.user.Role();
         coachRole.setName("Coach");
+        var recordPermission=new com.sportscenter.user.Permission(); recordPermission.setName("RECORD_RESULT"); coachRole.getPermissions().add(recordPermission);
         sampleCoach.setRole(coachRole);
 
         sampleMember = new User();
@@ -84,9 +86,11 @@ class TrainingResultServiceTest {
         lenient().when(userRepository.findByEmailIgnoreCase("coach@example.test")).thenReturn(Optional.of(sampleCoach));
         var sportsClass = new com.sportscenter.sportclass.SportsClass();
         sportsClass.setId(3);
+        sportsClass.setCenterId(1);
         sportsClass.setCoach(sampleCoach);
         sampleSession.setSportsClass(sportsClass);
         lenient().when(enrollmentRepository.existsByMemberIdAndSportsClassIdAndStatus(7, 3, "Registered")).thenReturn(true);
+        lenient().when(invoiceRepository.existsByMemberIdAndSportsClassIdAndPaymentStatusAndReconciliationRequiredFalseAndCashConfirmationReversedFalse(7,3,"Paid")).thenReturn(true);
     }
 
     @Test
@@ -199,10 +203,8 @@ class TrainingResultServiceTest {
         Authentication authentication = org.mockito.Mockito.mock(Authentication.class);
         when(authentication.isAuthenticated()).thenReturn(true);
         when(authentication.getName()).thenReturn("coach@example.test");
-        when(authentication.getAuthorities()).thenAnswer(invocation -> java.util.List.of(new SimpleGrantedAuthority("ROLE_COACH"), new SimpleGrantedAuthority("RECORD_RESULT")));
         when(sessionRepository.findByIdForUpdate(1)).thenReturn(Optional.of(sampleSession));
         when(userRepository.findById(7)).thenReturn(Optional.of(sampleMember));
-        when(userRepository.findById(2)).thenReturn(Optional.of(sampleCoach));
         when(userRepository.findByEmailIgnoreCase("coach@example.test")).thenReturn(Optional.of(sampleCoach));
 
         TrainingResultRequest request = new TrainingResultRequest(1, 7, 9, "spoof", "Present");

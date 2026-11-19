@@ -7,8 +7,9 @@ import org.springframework.stereotype.Component;
 @Getter
 @Component
 public class PaymentProperties {
-    @Value("${payment.expire-minutes:5}")
-    private int expireMinutes;
+    @Value("${payment.expire-minutes:30}")
+    private int expireMinutes = 30;
+    public int getExpireMinutes() { return Math.max(1,Math.min(30,expireMinutes)); }
 
     @Value("${vnpay.tmn-code:}")
     private String vnpayTmnCode;

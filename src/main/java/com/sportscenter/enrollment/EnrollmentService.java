@@ -122,29 +122,7 @@ public class EnrollmentService {
         SportsClass sportsClass = classRepository.findByIdForUpdate(classId)
                 .orElseThrow(() -> new ResourceNotFoundException("Class not found: " + classId));
         if (!java.util.Objects.equals(member.getCenterId(), sportsClass.getCenterId())) throw new AccessDeniedException("Class belongs to another center");
-        if (!sportsClass.isNormal()) {
-            throw new BusinessException("USE_ADVANCED_REGISTRATION: Advanced requires subject selection and Coach acceptance before payment");
-        }
-        if (sportsClass.getSubject() != null && !"Active".equalsIgnoreCase(sportsClass.getSubject().getStatus())) {
-            throw new BusinessException("SUBJECT_INACTIVE: New registrations are closed for this subject");
-        }
-
-        if (!"Active".equalsIgnoreCase(member.getStatus())) {
-            throw new BusinessException("MEMBER_NOT_ACTIVE: member account is not active");
-        }
-        Member profile = memberRepository.findById(memberId).orElse(null);
-        if (profile != null && profile.getBookingBlockedUntil() != null && profile.getBookingBlockedUntil().isAfter(LocalDateTime.now(clock))) {
-            throw new BusinessException("BOOKING_BLOCKED: booking is blocked until " + profile.getBookingBlockedUntil());
-        }
-        if (!"Open".equalsIgnoreCase(sportsClass.getStatus()) && !"Ongoing".equalsIgnoreCase(sportsClass.getStatus())) {
-            throw new BusinessException("CLASS_NOT_OPEN: class status is '" + sportsClass.getStatus() + "'");
-        }
-        if (sportsClass.isNormal()) {
-            if (!"Open".equalsIgnoreCase(sportsClass.getStatus())) throw new BusinessException("CLASS_NOT_READY: Normal registration is closed");
-            requirePositiveNormalPrice(sportsClass);
-            com.sportscenter.session.NormalSchedulePolicy.requireReady(sportsClass, sessionRepository, clock);
-            com.sportscenter.sportclass.NormalClassPolicy.requireAdmission(sportsClass, sessionRepository, clock);
-        }
+        requireClassRegistration(sportsClass,member);
 
         String method = paymentMethod == null ? "VNPay" : paymentMethod;
         boolean cash = "Cash".equalsIgnoreCase(method);
@@ -360,12 +338,80 @@ public class EnrollmentService {
         }
     }
 
+
+    private void requireClassRegistration(SportsClass sportsClass,User member) {
+        if (!sportsClass.isNormal()) {
+            throw new BusinessException("USE_ADVANCED_REGISTRATION: Advanced requires subject selection and Coach acceptance before payment");
+        }
+        if (sportsClass.getSubject() != null && !"Active".equalsIgnoreCase(sportsClass.getSubject().getStatus())) {
+            throw new BusinessException("SUBJECT_INACTIVE: New registrations are closed for this subject");
+        }
+
+        if (member!=null && !ActorPolicy.role(member,"Member")) throw new BusinessException("MEMBER_REQUIRED: Selected account must be a Member");
+        if (member!=null && !"Active".equalsIgnoreCase(member.getStatus())) {
+            throw new BusinessException("MEMBER_NOT_ACTIVE: member account is not active");
+        }
+        Member profile = member==null?null:memberRepository.findById(member.getId()).orElse(null);
+        if (profile != null && profile.getBookingBlockedUntil() != null && profile.getBookingBlockedUntil().isAfter(LocalDateTime.now(clock))) {
+            throw new BusinessException("BOOKING_BLOCKED: booking is blocked until " + profile.getBookingBlockedUntil());
+        }
+        if (!"Open".equalsIgnoreCase(sportsClass.getStatus()) && !"Ongoing".equalsIgnoreCase(sportsClass.getStatus())) {
+            throw new BusinessException("CLASS_NOT_OPEN: class status is '" + sportsClass.getStatus() + "'");
+        }
+        if (sportsClass.isNormal()) {
+            if (!"Open".equalsIgnoreCase(sportsClass.getStatus())) throw new BusinessException("CLASS_NOT_READY: Normal registration is closed");
+            requirePositiveNormalPrice(sportsClass);
+            com.sportscenter.session.NormalSchedulePolicy.requireReady(sportsClass, sessionRepository, clock);
+            com.sportscenter.sportclass.NormalClassPolicy.requireAdmission(sportsClass, sessionRepository, clock);
+        }
+
+    }
+    public String registrationBlockReason(SportsClass course,User actor) {
+        try {
+            if (actor==null || !"Active".equalsIgnoreCase(actor.getStatus())
+                    || !java.util.Objects.equals(actor.getCenterId(),course.getCenterId()) || actor.getCenterId()==null
+                    || !(ActorPolicy.role(actor,"Member") || com.sportscenter.training.SessionAttendancePolicy.permission(actor,"REGISTER_MEMBER")
+                        || com.sportscenter.training.SessionAttendancePolicy.permission(actor,"MANAGE_CLASSES")))
+                throw new AccessDeniedException("REGISTRATION_FORBIDDEN: Registration actor in the same center required");
+            boolean own=ActorPolicy.role(actor,"Member"); requireClassRegistration(course,own?actor:null);
+            var now=LocalDateTime.now(clock);
+            record Preview(ClassEnrollment row,String status,LocalDateTime queueTime) { }
+            var rows=new java.util.ArrayList<Preview>();
+            for (var e:enrollmentRepository.findByClassIdWithDetails(course.getId())) {
+                String status=e.getStatus(); LocalDateTime time=e.getEnrolledAt();
+                boolean expires="Pending".equals(status) && invoiceService.classReservationWillExpire(e.getMember().getId(),course.getId());
+                if(expires)status="Cancelled";
+                if(e.getPromotedAt()!=null && (("Waitlisted".equals(status) && !e.getPromotedAt().plusMinutes(invitationMinutes).isAfter(now))
+                        || "Cancelled".equals(status) && (expires || invoiceService.hasExpiredClassOrder(e.getMember().getId(),course.getId())))) {
+                    status="Waitlisted";time=now;
+                }
+                rows.add(new Preview(e,status,time));
+            }
+            var mine=own?rows.stream().filter(e->actor.getId().equals(e.row().getMember().getId())).findFirst().orElse(null):null;
+            if(mine!=null && List.of("Registered","Pending").contains(mine.status()))
+                throw new BusinessException("ALREADY_ENROLLED: member is already enrolled in this class");
+            if(own && !sessionRepository.findFutureEnrollmentScheduleConflicts(actor.getId(),course.getId(),LocalDate.now(clock),LocalTime.now(clock)).isEmpty())
+                throw new BusinessException("SCHEDULE_CONFLICT: Member has another session");
+            long occupied=rows.stream().filter(e->List.of("Registered","Pending").contains(e.status())).count();
+            var queue=rows.stream().filter(e->"Waitlisted".equals(e.status()))
+                    .sorted(java.util.Comparator.comparing(Preview::queueTime,java.util.Comparator.nullsFirst(java.util.Comparator.naturalOrder()))
+                            .thenComparing(e->e.row().getId())).toList();
+            boolean claiming=mine!=null && "Waitlisted".equals(mine.status());
+            boolean turn=claiming && !queue.isEmpty() && queue.get(0).row().getId().equals(mine.row().getId());
+            boolean wait=(course.getMaxCapacity()!=null && occupied>=course.getMaxCapacity()) || !queue.isEmpty()&&!turn;
+            if(claiming && wait)throw new BusinessException("WAITLIST_NOT_READY: No available place for this queue entry");
+            if(wait && queue.size()>=10)throw new BusinessException("WAITLIST_FULL: class waitlist is full");
+            return null;
+        } catch (BusinessException | AccessDeniedException error) {
+            return com.sportscenter.session.SessionActionPolicy.code(error,"REGISTRATION_FORBIDDEN");
+        }
+    }
     private boolean hasAuthority(String name) {
         var auth = SecurityContextHolder.getContext().getAuthentication();
         return auth != null && auth.getAuthorities().stream().anyMatch(a -> name.equals(a.getAuthority()));
     }
 
-    @org.springframework.beans.factory.annotation.Value("${payment.expire-minutes:5}")
+    @org.springframework.beans.factory.annotation.Value("${scms.waitlist.invitation-minutes:5}")
     private int invitationMinutes=5;
 
     private void rotateExpiredInvitations(SportsClass c) {

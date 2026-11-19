@@ -76,6 +76,12 @@ class TrainingResultContentIntegrationTest {
     @Autowired ObjectMapper json;
     @Autowired PasswordEncoder passwords;
     @Autowired TestClock clock;
+    @Autowired TrainingResultService resultService;
+    @Autowired AttendanceService attendanceService;
+    @AfterEach void restoreEarlySwitch() {
+        org.springframework.test.util.ReflectionTestUtils.setField(resultService,"earlyAttendanceEnabled",false);
+        org.springframework.test.util.ReflectionTestUtils.setField(attendanceService,"earlyAttendanceEnabled",false);
+    }
     @MockBean PaymentExpirationJob paymentJob;
     @MockBean PackageExpirationJob packageJob;
     @MockBean AttendanceFinalizationJob attendanceJob;
@@ -282,5 +288,47 @@ class TrainingResultContentIntegrationTest {
         assertEquals(403,write(actor,true,item).statusCode()); assertEquals(before,snapshot());
         jdbc.update("UPDATE users SET center_id=1 WHERE user_id=?",coach.getId()); before=snapshot();
         var unknown = item(outsider); unknown.put("content","Denied"); assertEquals(400,write(actor,false,unknown).statusCode()); assertEquals(before,snapshot());
+    }
+    @ParameterizedTest @ValueSource(booleans={false,true})
+    void confirmedOpenNormalEarlyAttendanceKeepsPaidAndCorrectionGuards(boolean bulk) throws Exception {
+        jdbc.update("DELETE FROM training_results WHERE session_id=?",session.getId());
+        jdbc.update("DELETE FROM attendances WHERE session_id=?",session.getId());
+        jdbc.update("UPDATE classes SET status='Open',max_capacity=3,min_capacity=2,opening_confirmed_at=?,opening_confirmed_by=? WHERE class_id=?",java.sql.Timestamp.valueOf(DATE.minusDays(1).atTime(8,0)),actors.get("CenterManager").getId(),course.getId());
+        clock.at("05:59:59"); var actor=login(coach); var before=snapshot();
+        assertEquals(400,write(actor,bulk,item(member)).statusCode()); assertEquals(before,snapshot());
+        org.springframework.test.util.ReflectionTestUtils.setField(resultService,"earlyAttendanceEnabled",true);
+        jdbc.update("UPDATE invoices SET reconciliation_required=true WHERE class_id=?",course.getId()); before=snapshot();
+        assertEquals(400,write(actor,bulk,item(member)).statusCode()); assertEquals(before,snapshot());
+        jdbc.update("UPDATE invoices SET reconciliation_required=false WHERE class_id=?",course.getId());
+        jdbc.update("UPDATE classes SET opening_confirmed_at=NULL,opening_confirmed_by=NULL WHERE class_id=?",course.getId()); before=snapshot();
+        assertEquals(400,write(actor,bulk,item(member)).statusCode()); assertEquals(before,snapshot());
+        jdbc.update("UPDATE classes SET opening_confirmed_at=?,opening_confirmed_by=? WHERE class_id=?",java.sql.Timestamp.valueOf(DATE.minusDays(1).atTime(8,0)),actors.get("CenterManager").getId(),course.getId());
+        assertEquals(200,write(actor,bulk,item(member)).statusCode());
+        assertEquals(200,write(actor,bulk,item(member)).statusCode());
+        assertEquals(1,jdbc.queryForObject("SELECT count(*) FROM attendances WHERE session_id=?",Integer.class,session.getId()));
+        assertNull(jdbc.queryForObject("SELECT check_in_time FROM attendances WHERE session_id=?",java.sql.Timestamp.class,session.getId()));
+        var changed=item(member); changed.put("attendanceStatus","Present"); before=snapshot();
+        assertEquals(400,write(actor,bulk,changed).statusCode()); assertEquals(before,snapshot());
+        clock.at("07:30:00"); before=snapshot();
+        assertEquals(400,write(actor,bulk,item(memberB)).statusCode()); assertEquals(before,snapshot());
+    }
+    @Test void normalEarlyQrKeepsPaidOpeningActorAndEndGuards()throws Exception {
+        jdbc.update("DELETE FROM training_results WHERE session_id=?",session.getId());jdbc.update("DELETE FROM attendances WHERE session_id=?",session.getId());
+        jdbc.update("UPDATE classes SET status='Open',max_capacity=3,min_capacity=2,opening_confirmed_at=?,opening_confirmed_by=? WHERE class_id=?",java.sql.Timestamp.valueOf(DATE.minusDays(1).atTime(8,0)),actors.get("CenterManager").getId(),course.getId());
+        clock.at("05:59:59");var owner=login(member);var assigned=login(coach);var wrong=login(coachB);
+        String code=json.readTree(send(owner,"GET","/api/attendances/checkin-code",null).body()).path("payload").asText();
+        var body=Map.of("memberId",member.getId(),"sessionId",session.getId(),"code",code);
+        assertEquals(400,send(assigned,"POST","/api/attendances/scan",body).statusCode());
+        org.springframework.test.util.ReflectionTestUtils.setField(attendanceService,"earlyAttendanceEnabled",true);
+        assertEquals(403,send(wrong,"POST","/api/attendances/scan",body).statusCode());
+        jdbc.update("UPDATE invoices SET reconciliation_required=true WHERE class_id=?",course.getId());
+        assertEquals(400,send(assigned,"POST","/api/attendances/scan",body).statusCode());
+        assertNull(jdbc.queryForObject("SELECT checkin_last_step FROM members WHERE user_id=?",Long.class,member.getId()));
+        jdbc.update("UPDATE invoices SET reconciliation_required=false WHERE class_id=?",course.getId());
+        assertEquals(200,send(assigned,"POST","/api/attendances/scan",body).statusCode());
+        assertEquals(1,jdbc.queryForObject("SELECT count(*) FROM attendances WHERE session_id=? AND state='Present'",Integer.class,session.getId()));
+        assertEquals(DATE.atTime(5,59,59),jdbc.queryForObject("SELECT check_in_time FROM attendances WHERE session_id=?",java.sql.Timestamp.class,session.getId()).toLocalDateTime());
+        clock.at("07:30:00");assertEquals(400,send(assigned,"POST","/api/attendances/scan",body).statusCode());
+        assertEquals("Scheduled",jdbc.queryForObject("SELECT status FROM sessions WHERE session_id=?",String.class,session.getId()));
     }
 }

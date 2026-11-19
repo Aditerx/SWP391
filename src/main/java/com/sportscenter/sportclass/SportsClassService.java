@@ -31,6 +31,7 @@ public class SportsClassService {
     private final com.sportscenter.session.SessionRepository sessionRepository;
     private final com.sportscenter.session.ScheduleWriteLock scheduleWriteLock;
     private final com.sportscenter.membership.AdvancedRegistrationRepository advancedRegistrations;
+    private final NormalLifecycleService lifecycle;
 
     @Transactional(readOnly = true)
     public List<SportsClassResponse> findAll() {
@@ -42,7 +43,7 @@ public class SportsClassService {
         return repository.findAll().stream().filter(c->!c.isAdvanced()||advanced.containsKey(c.getId())).map(c -> {
             if(c.isAdvanced())return SportsClassResponse.advanced(c,advanced.get(c.getId()),clock);
             int count = counts.getOrDefault(c.getId(), 0);
-            return SportsClassResponse.from(c, count);
+            return SportsClassResponse.from(c,count,metadata(c,reader,false));
         }).toList();
     }
 
@@ -55,7 +56,7 @@ public class SportsClassService {
             return SportsClassResponse.advanced(entity,r,clock);
         }
         int count = (int) classEnrollmentRepository.countBySportsClassIdAndStatusIn(entity.getId(), List.of("Registered", "Pending"));
-        return SportsClassResponse.from(entity, count);
+        return normalResponse(entity,count);
     }
 
     @Transactional
@@ -72,7 +73,7 @@ public class SportsClassService {
         if (sportsClass.isNormal()) { sportsClass.setStatus("Closed"); sportsClass.setPricingDraft(true); }
         SportsClass saved = repository.save(sportsClass);
         auditService.log(actor.getId(), "CREATE_CLASS", "CLASS", saved.getId(), saved.getName() + "; tuitionFee=" + saved.getTuitionFee());
-        return SportsClassResponse.from(saved, 0);
+        return normalResponse(saved,0);
     }
 
     @Transactional
@@ -140,7 +141,7 @@ public class SportsClassService {
             enrollmentService.promoteWaitlist(saved.getId(), actorId);
         }
         int count = (int) classEnrollmentRepository.countBySportsClassIdAndStatusIn(saved.getId(), List.of("Registered", "Pending"));
-        return SportsClassResponse.from(saved, count);
+        return normalResponse(saved,count);
     }
 
     @Transactional
@@ -154,7 +155,7 @@ public class SportsClassService {
         SportsClass saved = repository.save(sportsClass);
         auditService.log(null, "ASSIGN_COACH", "CLASS", saved.getId(), "coachId=" + coachId);
         int count = (int) classEnrollmentRepository.countBySportsClassIdAndStatusIn(saved.getId(), List.of("Registered", "Pending"));
-        return SportsClassResponse.from(saved, count);
+        return normalResponse(saved,count);
     }
 
     private void apply(SportsClass sportsClass, SportsClassRequest request) {
@@ -238,6 +239,24 @@ public class SportsClassService {
     private User reader() {
         var auth=org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
         return auth==null?null:userRepository.findByEmailIgnoreCase(auth.getName()).orElse(null);
+    }
+    private SportsClassResponse normalResponse(SportsClass c,Integer count) {
+        return SportsClassResponse.from(c,count,metadata(c,reader(),true));
+    }
+    private SportsClassResponse.Actions metadata(SportsClass c,User actor,boolean detailed) {
+        var now=com.sportscenter.training.SessionAttendancePolicy.now(clock);
+        var zone=com.sportscenter.training.SessionAttendancePolicy.ZONE;
+        if (!detailed) return new SportsClassResponse.Actions(null,null,null,null,null,null,null,null,null,now.atZone(zone).toOffsetDateTime());
+        java.time.LocalDateTime first=null;
+        try { first=NormalClassPolicy.first(c,sessionRepository); } catch (BusinessException missing) { /* Draft/legacy readiness is reported by the action guard. */ }
+        String registration=enrollmentService.registrationBlockReason(c,actor);
+        String opening=null;
+        try { lifecycle.requireConfirmable(c,actor); }
+        catch (BusinessException | org.springframework.security.access.AccessDeniedException error) { opening=com.sportscenter.session.SessionActionPolicy.code(error,"NORMAL_OPENING_BLOCKED"); }
+        return new SportsClassResponse.Actions(first==null?null:first.atZone(zone).toOffsetDateTime(),
+                first==null?null:first.minusHours(48).atZone(zone).toOffsetDateTime(),registration==null,registration,
+                first==null?null:first.minusHours(24).atZone(zone).toOffsetDateTime(),first==null?null:first.atZone(zone).toOffsetDateTime(),
+                c.getOpeningConfirmedAt()==null && first!=null && !now.isBefore(first.minusHours(24)),opening==null,opening,now.atZone(zone).toOffsetDateTime());
     }
     private boolean visible(User actor,com.sportscenter.membership.AdvancedRegistration r) {
         if(actor==null||!"Active".equals(actor.getStatus())||!java.util.Objects.equals(actor.getCenterId(),r.getMember().getCenterId()))return false;

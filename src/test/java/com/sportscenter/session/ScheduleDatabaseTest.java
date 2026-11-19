@@ -35,7 +35,7 @@ import static org.junit.jupiter.api.Assertions.*;
     "spring.sql.init.mode=never", "logging.level.org.hibernate=WARN", "logging.level.org.hibernate.SQL=OFF", "debug=false", "spring.jpa.show-sql=false"
 })
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Import({SessionService.class, SessionSlotValidator.class, ScheduleWriteLock.class,
+@Import({SessionService.class, SessionActionPolicy.class, NormalLifecycleService.class, SessionSlotValidator.class, ScheduleWriteLock.class,
         com.sportscenter.common.ActorPolicy.class, SessionAbsenceService.class, CenterIncidentService.class, EntitlementTimePolicy.class, NormalClassCreationService.class, SportsClassService.class, CenterContext.class, EnrollmentService.class, com.sportscenter.invoice.InvoiceService.class, ScheduleDatabaseTest.Config.class})
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)

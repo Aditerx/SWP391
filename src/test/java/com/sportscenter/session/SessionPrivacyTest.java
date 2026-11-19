@@ -17,6 +17,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 @ExtendWith(MockitoExtension.class)
 class SessionPrivacyTest {
+    @Mock SessionActionPolicy actionPolicy;
     @org.mockito.Mock com.sportscenter.membership.CoachCapacityService phaseCapacity;
     @org.mockito.Mock com.sportscenter.session.SessionChangeRepository phaseChanges;
     @org.mockito.Mock com.sportscenter.session.SessionAbsenceService phaseAbsence;

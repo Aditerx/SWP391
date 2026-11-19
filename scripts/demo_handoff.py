@@ -89,13 +89,13 @@ def render(rows, design):
 
 Nxx là mã lớp Normal trong fixture, không phải classId hoặc thứ tự thao tác. Bảng này được sinh từ chính các dòng local bên dưới; đây là trạng thái **nguyên trạng trước demo**, không phải DB cloud sau smoke. Paid Registered/min/max nghĩa là số người Paid còn quyền / minimum / sức chứa. Các giới hạn này chưa chứng nhận lớp đủ mọi điều kiện khai giảng.
 
-Nguồn: [classes](#table-classes), [enrollments](#table-class_enrollments), [invoices](#table-invoices). Case thao tác dùng mã DEMO-xx trong [SCRIPT](SCMS-SCRIPT-DEMO-BE.md#normal-scenario-map); Dxx vẫn là mã quyết định trong docs04.
+Nguồn: [classes](#table-classes), [enrollments](#table-class_enrollments), [invoices](#table-invoices). Case thao tác dùng mã DEMO-xx trong [SCRIPT](docs/reference/SCMS-SCRIPT-DEMO-BE.md#normal-scenario-map); Dxx vẫn là mã quyết định trong docs04.
 
 | Mã | Tên lớp | classId | State | Paid Registered/min/max | Mục đích/case |
 |---|---|---:|---|---|---|''']
     for c in index['classes']:
         purpose,anchor=PURPOSES[c['key']]
-        out.append(line([c['key'],c['name'],c['classId'],c['state'],f"{c['paidRegistered']}/{c['minimum']}/{c['maximum']}",f'[{purpose}](SCMS-SCRIPT-DEMO-BE.md#{anchor})']))
+        out.append(line([c['key'],c['name'],c['classId'],c['state'],f"{c['paidRegistered']}/{c['minimum']}/{c['maximum']}",f'[{purpose}](docs/reference/SCMS-SCRIPT-DEMO-BE.md#{anchor})']))
     out+=['''
 ### Lịch và tài nguyên đối chiếu — toàn bộ giờ VN
 

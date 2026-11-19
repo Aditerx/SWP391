@@ -29,6 +29,7 @@ public class PrivateSessionProposalService {
     private final AuditService audit;
     private final ApplicationEventPublisher events;
     private final Clock clock;
+    private final SessionActionPolicy actionPolicy;
 
     @Transactional
     public PrivateSessionProposalResponse propose(PrivateBookingRequest r,Authentication auth) {
@@ -42,7 +43,7 @@ public class PrivateSessionProposalService {
         var previous=proposals.findBySubscriptionSubscriptionIdAndRequestKey(r.subscriptionId(),r.requestKey());
         if(previous.isPresent()) {
             if(!previous.get().getRequestHash().equals(hash))throw new BusinessConflictException("IDEMPOTENCY_CONFLICT: Proposal key has a different schedule");
-            return PrivateSessionProposalResponse.from(previous.get(),clock);
+            return PrivateSessionProposalResponse.from(previous.get(),clock,actor,actionPolicy);
         }
         bookings.validatePrivateProposal(r,auth);
         PrivateSessionProposal p=new PrivateSessionProposal();p.setSubscription(sub);p.setProposedBy(actor);
@@ -55,21 +56,21 @@ public class PrivateSessionProposalService {
         events.publishEvent(NotificationTemplates.event(NotificationType.PRIVATE_BOOKING_PROPOSED,List.of(sub.getMember().getId()),
                 "Coach proposed "+p.getSessionDate()+" "+p.getStartTime()+"; confirm the exact schedule before "+p.getRespondBy(),
                 "PRIVATE_SESSION_PROPOSAL",p.getId(),"PRIVATE_BOOKING_PROPOSED:"+p.getId()));
-        return PrivateSessionProposalResponse.from(p,clock);
+        return PrivateSessionProposalResponse.from(p,clock,actor,actionPolicy);
     }
 
     @Transactional(readOnly=true)
     public List<PrivateSessionProposalResponse> list(Authentication auth) {
         User actor=actors.actor(auth);requireReader(actor);
         return proposals.findBySubscriptionMemberCenterIdOrderByIdDesc(actor.getCenterId()).stream()
-                .filter(p->visible(actor,p)).map(p->PrivateSessionProposalResponse.from(p,clock)).toList();
+                .filter(p->visible(actor,p)).map(p->PrivateSessionProposalResponse.from(p,clock,actor,actionPolicy)).toList();
     }
     @Transactional(readOnly=true)
     public PrivateSessionProposalResponse get(Integer id,Authentication auth) {
         User actor=actors.actor(auth);requireReader(actor);PrivateSessionProposal p=entity(id);
         ActorPolicy.center(actor,p.getSubscription().getMember().getCenterId());
         if(!visible(actor,p))throw new AccessDeniedException("Proposal belongs to another account");
-        return PrivateSessionProposalResponse.from(p,clock);
+        return PrivateSessionProposalResponse.from(p,clock,actor,actionPolicy);
     }
 
     @Transactional
@@ -84,7 +85,7 @@ public class PrivateSessionProposalService {
         if(!sub.getMember().getId().equals(member.getId()))throw new AccessDeniedException("Proposal owner required");
         String decision=accepted?"Accepted":"Rejected";
         if(!"Pending".equals(p.getStatus())) {
-            if(decision.equals(p.getStatus()))return PrivateSessionProposalResponse.from(p,clock);
+            if(decision.equals(p.getStatus()))return PrivateSessionProposalResponse.from(p,clock,member,actionPolicy);
             throw new BusinessConflictException("PROPOSAL_STATE_CONFLICT: Proposal already processed");
         }
         if(LocalDateTime.now(clock).isAfter(p.getRespondBy()))throw new BusinessConflictException("PROPOSAL_EXPIRED: Schedule confirmation requires at least12hours notice");
@@ -99,7 +100,7 @@ public class PrivateSessionProposalService {
         audit.log(member.getId(),accepted?"ACCEPT_PRIVATE_SESSION":"REJECT_PRIVATE_SESSION","PRIVATE_SESSION_PROPOSAL",id,decision);
         if(!accepted)events.publishEvent(NotificationTemplates.event(NotificationType.PRIVATE_BOOKING_DECLINED,List.of(p.getCoachId()),
                 "Member declined the proposed schedule; no credit consumed","PRIVATE_SESSION_PROPOSAL",id,"PRIVATE_BOOKING_DECLINED:"+id));
-        return PrivateSessionProposalResponse.from(p,clock);
+        return PrivateSessionProposalResponse.from(p,clock,member,actionPolicy);
     }
     private PrivateSessionProposal entity(Integer id){return proposals.findById(id).orElseThrow(()->new ResourceNotFoundException("Proposal not found"));}
     private void requireProposer(User actor,MemberPackage sub,String reason){

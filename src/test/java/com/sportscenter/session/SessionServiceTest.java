@@ -40,6 +40,7 @@ import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class SessionServiceTest {
+    @Mock private SessionActionPolicy actionPolicy;
     @org.mockito.Mock com.sportscenter.membership.CoachCapacityService phaseCapacity;
     @org.mockito.Mock com.sportscenter.session.SessionChangeRepository phaseChanges;
     @org.mockito.Mock com.sportscenter.session.SessionAbsenceService phaseAbsence;

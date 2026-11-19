@@ -18,6 +18,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+from release_catalog import PROFILE, load_requirements, read_catalogs
 
 
 class StartupReadExhausted(Exception):
@@ -73,6 +74,7 @@ def run(args):
         raise ValueError('Only the project Render service or loopback is allowed')
     report = {'checkedAt': dt.datetime.now(dt.timezone(dt.timedelta(hours=7))).isoformat(),
               'smokeHarnessSha256': hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+              'catalogHarnessSha256': hashlib.sha256(Path(__file__).with_name('release_catalog.py').read_bytes()).hexdigest(),
               'phase': args.phase, 'baseUrl': base, 'expectedCommit': args.expected_commit,
               'cases': [], 'authenticatedActors': [], 'cloudSqlExecuted': False,
               'providersCalled': False, 'credentialsRecorded': False,
@@ -80,6 +82,7 @@ def run(args):
               'startupPolicy': {'attempts': 3, 'requestTimeoutSeconds': args.request_timeout,
                                 'deadlineSeconds': args.startup_deadline, 'delaySeconds': 2},
               'startupAttempts': [],
+              'catalogCompleteness': {'status': 'NOT_RUN', 'reason': 'Catalog read/profile not completed'},
               'limits': ['Bounded HTTP smoke, not every API/input/role combination',
                          'No FE browser, bank, mail inbox, AI or Google provider acceptance']}
     contexts = {}
@@ -123,6 +126,8 @@ def run(args):
         return status, value, response_headers
 
     try:
+        catalog_requirements = load_requirements(Path(__file__).resolve().parents[1],
+                                                getattr(args, 'catalog_profile', None))
         _, health, _ = request('public', 'GET', '/api/health', expected=(200,))
         check('runtime identity', health.get('status') == 'UP'
               and health.get('buildCommit') == args.expected_commit,
@@ -194,6 +199,11 @@ def run(args):
         admin = next(a for a in actor_data if a['role'] == 'Admin')
         manager = next(a for a in actor_data if a['role'] == 'CenterManager')
         member = next(a for a in actor_data if a['role'] == 'Member')
+        report['catalogCompleteness'] = read_catalogs(request, manager['alias'], catalog_requirements)
+        if report['catalogCompleteness']['status'] == 'FAIL':
+            check('reference catalog data matches explicit profile and all/active consistency', False)
+        elif catalog_requirements is not None:
+            check('reference catalog data matches explicit profile and all/active consistency', True)
         _, roles_before, _ = request(admin['alias'], 'GET', '/api/roles', expected=(200,))
         admin_role = next(r for r in roles_before if r['name'].lower() == 'admin')
         _, users, _ = request(admin['alias'], 'GET', '/api/users', expected=(200,))
@@ -274,6 +284,8 @@ if __name__ == '__main__':
     parser.add_argument('--output', required=True)
     parser.add_argument('--phase', choices=['baseline', 'post-deploy'], default='baseline')
     parser.add_argument('--negative-mutations', action='store_true')
+    parser.add_argument('--catalog-profile', choices=[PROFILE],
+                        help='Explicit approved demo catalog requirements; no profile leaves completeness NOT_RUN')
     parser.add_argument('--request-timeout', type=float, default=35)
     parser.add_argument('--startup-deadline', type=float, default=110)
     args = parser.parse_args()

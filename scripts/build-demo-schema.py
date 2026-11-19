@@ -34,7 +34,7 @@ MIGRATIONS = '''06_schedule_safety_postgres.sql 07_session_subscription_postgres
 12_payment_resolutions_postgres.sql 13_room_catalog_postgres.sql 14_absence_attendance_postgres.sql
 15_QueryDR.sql 13_google_login_postgres.sql 17_attendance_review_postgres.sql 18_audit_scope_postgres.sql
 19_room_activity_postgres.sql 20_class_publication_price_postgres.sql 21_normal_lifecycle_postgres.sql 22_normal_changes_refunds_postgres.sql
-24_advanced_session_proposals_postgres.sql 25_advanced_registration_classes_postgres.sql'''.split()
+24_advanced_session_proposals_postgres.sql 25_advanced_registration_classes_postgres.sql 26_issued_attendance_codes_postgres.sql'''.split()
 
 
 def literal(value):
@@ -49,12 +49,44 @@ chunks = ['''-- SCMS DEMO REBUILD — Owner09/11/2026. This file DELETES the lis
 -- External dependencies fail RESTRICT and roll back. This is a reset, not an upgrade preserving demo history.
 -- Fresh data: approved47 demo accounts,12 Normal classes and8 registration-owned Advanced classes; no provider calls.
 -- invoice_code_seq is NOT restarted: never reuse outward payment references after resetting demo rows.
+-- Suspend the SCMS backend/jobs and stop other SCMS DB clients before execution.
+-- Busy database/another reset fails immediately before reading/resetting SCMS rows; never kills connections.
 BEGIN;
 SET LOCAL search_path=public,extensions,pg_catalog;
 SET LOCAL TIME ZONE 'Asia/Ho_Chi_Minh';
 SET LOCAL lock_timeout='10s';
 SET LOCAL statement_timeout='180s';
-''', sql_anchor_guard(args.anchor), '''SELECT pg_advisory_xact_lock(391,20261109);
+''', sql_anchor_guard(args.anchor), f'''DO $reset_gate$
+BEGIN
+ IF NOT pg_try_advisory_xact_lock(391,20261109) THEN
+  RAISE EXCEPTION USING ERRCODE='55P03',
+   MESSAGE='SCMS_DEMO_RESET_BUSY: another SCMS demo reset is running',
+   HINT='Wait for the other reset to finish; do not run two bundles at once.';
+ END IF;
+END $reset_gate$;
+
+-- Acquire the final lock mode before any SCMS row read, avoiding a later lock upgrade.
+-- ONLY prevents implicitly locking descendant tables outside the reviewed reset scope.
+DO $reset_tables$
+DECLARE target RECORD;
+BEGIN
+ FOR target IN SELECT c.oid,c.relname,c.relkind FROM pg_class c
+  JOIN pg_namespace ns ON ns.oid=c.relnamespace
+  WHERE ns.nspname='public' AND c.relname=ANY(ARRAY[{scope}])
+  ORDER BY c.relname COLLATE "C" LOOP
+  IF target.relkind<>'r' OR EXISTS(SELECT 1 FROM pg_inherits WHERE inhparent=target.oid OR inhrelid=target.oid) THEN
+   RAISE EXCEPTION 'SCMS_DEMO_WRONG_TARGET: public.% must be an ordinary non-inherited SCMS table',target.relname;
+  END IF;
+  BEGIN
+   EXECUTE format('LOCK TABLE ONLY public.%I IN ACCESS EXCLUSIVE MODE NOWAIT',target.relname);
+  EXCEPTION WHEN lock_not_available THEN
+   RAISE EXCEPTION USING ERRCODE='55P03',
+    MESSAGE=format('SCMS_DEMO_DB_BUSY: public.%I is in use; no SCMS rows were reset',target.relname),
+    HINT='Suspend the SCMS backend/jobs and stop other SCMS SQL/app sessions, then run the whole bundle again.';
+  END;
+ END LOOP;
+END $reset_tables$;
+
 CREATE SCHEMA IF NOT EXISTS extensions;
 CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA extensions;
 CREATE TEMP TABLE _scms_reset_before(table_name TEXT PRIMARY KEY,row_count BIGINT) ON COMMIT DROP;
@@ -210,17 +242,43 @@ BEGIN
  IF EXISTS(SELECT 1 FROM classes WHERE class_type='Advanced' AND class_name LIKE '%(1:1)%') THEN
   RAISE EXCEPTION 'SCMS_DEMO_POSTFLIGHT: Advanced class name contains removed suffix';
  END IF;
- IF EXISTS(SELECT 1 FROM classes c LEFT JOIN advanced_registrations r ON r.class_id=c.class_id
-           WHERE c.class_type='Advanced' AND (r.id IS NULL OR r.status NOT IN ('Accepted','Invoiced') OR c.coach_id IS NULL))
- OR EXISTS(SELECT 1 FROM sessions s JOIN advanced_registrations r ON r.subscription_id=s.subscription_id WHERE s.class_id<>r.class_id) THEN
-  RAISE EXCEPTION 'SCMS_DEMO_POSTFLIGHT: unowned Advanced class or wrong session owner';
+ IF EXISTS(SELECT 1 FROM classes c LEFT JOIN advanced_registrations r ON r.class_id=c.class_id LEFT JOIN users m ON m.user_id=r.member_id
+           WHERE c.class_type='Advanced' AND (r.id IS NULL OR r.status NOT IN ('Accepted','Invoiced')
+             OR c.coach_id IS DISTINCT FROM r.coach_id OR c.subject_id IS DISTINCT FROM r.subject_id
+             OR c.center_id IS DISTINCT FROM m.center_id OR c.max_capacity<>1 OR c.status='Open'))
+ OR EXISTS(SELECT 1 FROM advanced_registrations r LEFT JOIN classes c ON c.class_id=r.class_id
+           WHERE (r.status IN ('Requested','Rejected') AND (r.class_id IS NOT NULL OR r.subscription_id IS NOT NULL))
+              OR (r.status IN ('Accepted','Invoiced') AND (c.class_id IS NULL OR c.class_type<>'Advanced')))
+ OR EXISTS(SELECT 1 FROM member_packages p LEFT JOIN advanced_registrations r ON r.subscription_id=p.subscription_id
+           WHERE r.id IS NULL OR r.status<>'Invoiced' OR r.member_id IS DISTINCT FROM p.member_id
+             OR r.subject_id IS DISTINCT FROM p.subject_id OR r.coach_id IS DISTINCT FROM p.primary_coach_id)
+ OR EXISTS(SELECT 1 FROM sessions s JOIN classes c ON c.class_id=s.class_id
+           LEFT JOIN advanced_registrations r ON r.subscription_id=s.subscription_id
+           WHERE (s.booked_member_id IS NOT NULL OR s.subscription_id IS NOT NULL OR c.class_type='Advanced') AND (r.id IS NULL OR c.class_type<>'Advanced'
+             OR s.class_id IS DISTINCT FROM r.class_id OR s.booked_member_id IS DISTINCT FROM r.member_id)) THEN
+  RAISE EXCEPTION 'SCMS_DEMO_POSTFLIGHT: Advanced registration/class/subscription/session owner mismatch';
  END IF;
  IF EXISTS(SELECT 1 FROM invoices i WHERE i.amount<=0 OR i.payment_status<>'Paid')
  OR EXISTS(SELECT 1 FROM normal_refunds f JOIN payment_resolutions r ON r.id=f.id JOIN invoices i ON i.invoice_id=r.invoice_id WHERE r.amount<>i.amount OR i.payment_status<>'Paid')
  OR EXISTS(SELECT 1 FROM normal_refunds f JOIN payment_resolutions r ON r.id=f.id JOIN invoices i ON i.invoice_id=r.invoice_id JOIN class_enrollments e ON e.member_id=i.member_id AND e.class_id=f.class_id WHERE e.status<>'Cancelled') THEN
   RAISE EXCEPTION 'SCMS_DEMO_POSTFLIGHT: receipt/refund/right mismatch';
  END IF;
- FOREACH n IN ARRAY ARRAY['email_otps','vnpay_payment_attempts','membership_packages','private_session_proposals'] LOOP
+ IF (SELECT count(*) FROM private_session_proposals)<>1 OR NOT EXISTS(
+  SELECT 1 FROM private_session_proposals p JOIN sessions s ON s.session_id=p.session_id
+  JOIN member_packages m ON m.subscription_id=s.subscription_id JOIN advanced_registrations r ON r.subscription_id=m.subscription_id
+  WHERE p.request_key='DEMO-CANCEL-SUB01' AND p.status='Accepted' AND s.status='Scheduled'
+   AND p.subscription_id=m.subscription_id AND p.class_id=s.class_id AND r.class_id=s.class_id
+   AND r.member_id=s.booked_member_id AND m.member_id=s.booked_member_id AND p.coach_id=s.coach_id AND m.primary_coach_id=s.coach_id
+   AND p.subject_id=m.subject_id AND p.room_id=s.room_id AND p.session_date=s.session_date AND p.start_time=s.start_time AND p.end_time=s.end_time
+   AND s.agreement_confirmed_at=p.responded_at AND p.responded_at<=p.respond_by AND p.respond_by=s.session_date+s.start_time-interval '12hours'
+   AND m.status='Active' AND m.remaining_credit=11 AND s.session_date+s.end_time<=m.expires_at
+   AND NOT s.attendance_finalized AND NOT s.credit_returned AND NOT s.center_invalidated
+   AND NOT EXISTS(SELECT 1 FROM attendances a WHERE a.session_id=s.session_id))
+ OR EXISTS(SELECT 1 FROM sessions s WHERE s.agreement_confirmed_at IS NOT NULL
+   AND NOT EXISTS(SELECT 1 FROM private_session_proposals p WHERE p.session_id=s.session_id AND p.request_key='DEMO-CANCEL-SUB01')) THEN
+  RAISE EXCEPTION 'SCMS_DEMO_POSTFLIGHT: approved cancellation fixture or historical consent mismatch';
+ END IF;
+ FOREACH n IN ARRAY ARRAY['email_otps','vnpay_payment_attempts','membership_packages'] LOOP
   EXECUTE format('SELECT count(*) FROM public.%I',n) INTO c;
   IF c<>0 THEN RAISE EXCEPTION 'SCMS_DEMO_POSTFLIGHT: dynamic/retired data in %',n; END IF;
  END LOOP;

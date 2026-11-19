@@ -2,6 +2,7 @@
 from pathlib import Path
 from datetime import date, datetime, timedelta
 import contextlib
+import copy
 import hashlib
 import io
 import json
@@ -32,10 +33,52 @@ def digest(path):
 
 
 class AnchorAcceptance(unittest.TestCase):
+    def test_advanced_flow_rejects_wrong_registration_class_and_session_owners(self):
+        old=sys.argv
+        try:
+            sys.argv=['build-system-data.py','--anchor','2026-11-14','--no-render']
+            with contextlib.redirect_stdout(io.StringIO()):
+                module=runpy.run_path(str(ROOT/'scripts/build-system-data.py'))
+        finally:
+            sys.argv=old
+        original=module['tables'];validate=module['validate_advanced_flow']
+        validate(original)
+        scenarios=[
+            ('requested_has_class',lambda d:d['advanced_registrations'][0].update(sports_class='A-AR02'), 'ADVANCED_UNACCEPTED_HAS_CLASS_OR_RIGHT'),
+            ('registration_points_elsewhere',lambda d:next(r for r in d['advanced_registrations'] if r['status']=='Invoiced').update(sports_class='A-AR02'), 'ADVANCED_CLASS_REGISTRATION_LINK'),
+            ('class_wrong_member',lambda d:next(c for c in d['classes'] if c['type']=='Advanced').update(member='M01'), 'ADVANCED_CLASS_OWNER'),
+            ('class_open_group',lambda d:next(c for c in d['classes'] if c['type']=='Advanced').update(status='Open'), 'ADVANCED_CLASS_NOT_GROUP_TEMPLATE'),
+            ('subscription_wrong_member',lambda d:d['member_packages'][0].update(member='M01'), 'ADVANCED_SUBSCRIPTION_OWNER'),
+            ('session_wrong_member',lambda d:next(s for s in d['sessions'] if s.get('subscription')).update(member='M01'), 'ADVANCED_SESSION_OWNER'),
+            ('session_wrong_class',lambda d:next(s for s in d['sessions'] if s.get('subscription')).update(sports_class='A-AR02'), 'ADVANCED_SESSION_OWNER'),
+            ('session_without_subscription',lambda d:next(s for s in d['sessions'] if s.get('subscription')).update(subscription=None), 'ADVANCED_SESSION_OWNER'),
+            ('invented_consent',lambda d:d['private_session_proposals'].append({'status':'Accepted'}), 'ADVANCED_NO_SYNTHETIC_MEMBER_CONSENT'),
+            ('legacy_consent',lambda d:next(s for s in d['sessions'] if s.get('subscription')=='SUB03').update(agreement_confirmed_at='2026-11-14T00:00'), 'ADVANCED_NO_SYNTHETIC_MEMBER_CONSENT'),
+            ('refund_wrong_credit',lambda d:d['member_packages'][0].update(remaining_credit=12), 'ADVANCED_DEMO_CANCELLATION_RIGHT'),
+            ('refund_wrong_proposal_room',lambda d:d['private_session_proposals'][0].update(room='C01-TEN-02'), 'ADVANCED_DEMO_CONSENT_SCHEDULE'),
+        ]
+        for name,mutate,error in scenarios:
+            with self.subTest(case=name):
+                broken=copy.deepcopy(original);mutate(broken)
+                with self.assertRaisesRegex(AssertionError,error):validate(broken)
+
     def test_annual_catalog_survives_reset_design_without_activating_closures(self):
         rows=design(date(2026,11,14))['holidays']
         self.assertEqual(load_requirements(ROOT,PROFILE)['holidayDates'],sorted(r['date'] for r in rows if not r['is_active']))
         self.assertEqual(['2027-01-03'],[r['date'] for r in rows if r['is_active']])
+
+    def test_both_approved_presentations_have_full_window_buffer_and_sunday(self):
+        for day,start,end in [('2026-11-19','20:00:00','23:59:59'),('2026-11-21','15:00:00','18:00:00')]:
+            anchor=date.fromisoformat(day);tables=design(anchor)
+            plan=scenario_plan(tables,anchor,demo_time(day+'T'+start+'+07:00',anchor),demo_time(day+'T'+end+'+07:00',anchor))
+            main=plan['mainPaths']
+            self.assertEqual(['PASS','PASS'],[c['status'] for c in main['windowChecks']])
+            self.assertEqual(12,len(main['normal']['sessions']))
+            self.assertGreaterEqual(date.fromisoformat(main['normal']['startDate']),anchor+timedelta(days=7))
+            for s in [main['advanced']['session'],main['refund']['schedule']]:
+                self.assertGreaterEqual(date.fromisoformat(s['date']),anchor+timedelta(days=5))
+            self.assertEqual(7,date.fromisoformat(main['sunday']['session']['date']).isoweekday())
+            self.assertTrue(all(any(w['coach']==u['key'] and w['slot_key']=='SUNDAY:1' for w in tables['coach_work_slots']) for u in tables['users'] if u['role']=='Coach' and u['status']=='Active'))
 
     def test_holiday_catalog_rejects_partial_rows_and_duplicates(self):
         source=(ROOT/'database/seed_holidays_catalog_2026.sql').read_text(encoding='utf-8')
