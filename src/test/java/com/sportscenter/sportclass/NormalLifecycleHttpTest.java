@@ -58,6 +58,7 @@ class NormalLifecycleHttpTest {
     @Autowired InvoiceRepository invoiceRepository;
     @Autowired com.sportscenter.enrollment.EnrollmentService enrollmentService;
     @Autowired InvoiceService invoiceService;
+    @Autowired com.sportscenter.invoice.PaymentProperties paymentProperties;
     @MockBean NormalLifecycleJob lifecycleJob; @MockBean PaymentExpirationJob paymentJob;
     @MockBean com.sportscenter.membership.PackageExpirationJob packageJob;
     @MockBean AttendanceFinalizationJob attendanceJob; @MockBean com.sportscenter.notification.NotificationScheduleJob notificationJob;
@@ -154,7 +155,8 @@ class NormalLifecycleHttpTest {
     }
     @Test void expiredHoldReleasesItsSeatInTheNextAdmissionTransaction()throws Exception{
         int id=create(1,null).path("id").asInt();var first=enroll(id,member,"VNPay");
-        clock.at(BASE.plusMinutes(5));var next=enroll(id,second,"VNPay");
+        assertEquals(BASE.plusMinutes(30),LocalDateTime.parse(first.path("expiresAt").asText()));
+        clock.at(LocalDateTime.parse(first.path("expiresAt").asText()));var next=enroll(id,second,"VNPay");
         assertEquals("Pending",next.path("status").asText());
         assertEquals("Expired",jdbc.queryForObject("SELECT payment_status FROM invoices WHERE invoice_id=?",String.class,first.path("invoiceId").asInt()));
         assertEquals("Cancelled",jdbc.queryForObject("SELECT status FROM class_enrollments WHERE class_id=? AND member_id=?",String.class,id,member.getId()));
@@ -185,6 +187,30 @@ class NormalLifecycleHttpTest {
         postAs("/api/normal-refunds/"+id+"/receiver",member,Map.of("version",0,"bank","DEMO BANK","accountNumber","DEMOACCOUNT123","accountName","DEMO Member"),200);
         postAs("/api/normal-refunds/"+id+"/verify-receiver",manager,Map.of("version",1,"source","DEMO Member ownership and account independently checked"),200);
         return postAs("/api/normal-refunds/"+id+"/approve",manager,Map.of("version",2),200);
+    }
+    @Test void refundApprovalRoleAuthorityCenterMatrixPreservesRejectedState()throws Exception {
+        int id=cancelledRefund();
+        postAs("/api/normal-refunds/"+id+"/receiver",member,Map.of("version",0,"bank","DEMO BANK","accountNumber","DEMOACCOUNT123","accountName","DEMO Member"),200);
+        postAs("/api/normal-refunds/"+id+"/verify-receiver",manager,Map.of("version",1,"source","DEMO independent verification"),200);
+        User admin= new org.springframework.transaction.support.TransactionTemplate(transactions).execute(t->user("admin-matrix",role("Admin","MANAGE_USERS","MANAGE_PERMISSIONS","MANAGE_INVOICES"),1));
+        tx(()->{var permission=em.createQuery("select p from Permission p where p.name='MANAGE_INVOICES'",Permission.class).getSingleResult();em.find(Role.class,memberRole.getId()).getPermissions().add(permission);em.find(Role.class,coachRole.getId()).getPermissions().add(permission);});
+        var before=List.of(jdbc.queryForList("SELECT * FROM normal_refunds"),jdbc.queryForList("SELECT * FROM payment_resolutions"),jdbc.queryForList("SELECT * FROM normal_refund_receivers"),jdbc.queryForList("SELECT * FROM invoices"),jdbc.queryForList("SELECT * FROM system_logs"));
+        try {
+            for(User actor:List.of(admin,coach,member,cashier,outsider)){
+                postAs("/api/normal-refunds/"+id+"/approve",actor,Map.of("version",2),403);
+                assertEquals(before,List.of(jdbc.queryForList("SELECT * FROM normal_refunds"),jdbc.queryForList("SELECT * FROM payment_resolutions"),jdbc.queryForList("SELECT * FROM normal_refund_receivers"),jdbc.queryForList("SELECT * FROM invoices"),jdbc.queryForList("SELECT * FROM system_logs")));
+            }
+            var session=login(manager);
+            tx(()->em.find(Role.class,managerRole.getId()).getPermissions().removeIf(p->"MANAGE_INVOICES".equals(p.getName())));
+            mvc.perform(get("/api/auth/me").session(session)).andExpect(status().isOk()).andExpect(jsonPath("$.authorities",org.hamcrest.Matchers.not(org.hamcrest.Matchers.hasItem("MANAGE_INVOICES"))));
+            mvc.perform(post("/api/normal-refunds/"+id+"/approve").session(session).contentType("application/json").content("{\"version\":2}")).andExpect(status().isForbidden());
+            assertEquals(before,List.of(jdbc.queryForList("SELECT * FROM normal_refunds"),jdbc.queryForList("SELECT * FROM payment_resolutions"),jdbc.queryForList("SELECT * FROM normal_refund_receivers"),jdbc.queryForList("SELECT * FROM invoices"),jdbc.queryForList("SELECT * FROM system_logs")));
+        } finally {
+            tx(()->{var permission=em.createQuery("select p from Permission p where p.name='MANAGE_INVOICES'",Permission.class).getSingleResult();em.find(Role.class,managerRole.getId()).getPermissions().add(permission);em.find(Role.class,memberRole.getId()).getPermissions().removeIf(p->"MANAGE_INVOICES".equals(p.getName()));em.find(Role.class,coachRole.getId()).getPermissions().removeIf(p->"MANAGE_INVOICES".equals(p.getName()));});
+        }
+        var approved=postAs("/api/normal-refunds/"+id+"/approve",manager,Map.of("version",2),200);assertEquals("Approved",approved.path("status").asText());assertEquals(3,approved.path("version").asLong());
+        assertEquals("Approved",jdbc.queryForObject("SELECT p.status FROM payment_resolutions p JOIN normal_refunds r ON r.id=p.id WHERE r.id=?",String.class,id));
+        var after=jdbc.queryForList("SELECT * FROM system_logs");postAs("/api/normal-refunds/"+id+"/approve",manager,Map.of("version",2),409);assertEquals(after,jdbc.queryForList("SELECT * FROM system_logs"));
     }
     @Test void cancellationCreatesEveryReceiptObligationAndRejectsOngoingAndRoleAliases()throws Exception {
         int c=create(4,null).path("id").asInt();var a=enroll(c,member,"Cash");enroll(c,second,"Cash");enroll(c,third,"VNPay");
@@ -296,9 +322,9 @@ class NormalLifecycleHttpTest {
     }
     @Test void expiredWaitlistOrderRotatesToTailAndInvitesTheNextMemberWithoutAutoCash()throws Exception {
         int c=create(1,null).path("id").asInt();int firstInvoice=enroll(c,member,"VNPay").path("invoiceId").asInt();
-        enroll(c,second,"VNPay");enroll(c,third,"VNPay");clock.at(BASE.plusMinutes(6));invoiceService.expireInvoice(firstInvoice);enrollmentService.promoteWaitlist(c,null);
+        enroll(c,second,"VNPay");enroll(c,third,"VNPay");clock.at(jdbc.queryForObject("SELECT expires_at FROM invoices WHERE invoice_id=?",LocalDateTime.class,firstInvoice));invoiceService.expireInvoice(firstInvoice);enrollmentService.promoteWaitlist(c,null);
         assertNotNull(jdbc.queryForObject("SELECT promoted_at FROM class_enrollments WHERE class_id=? AND member_id=?",LocalDateTime.class,c,second.getId()));
-        int next=enroll(c,second,"VNPay").path("invoiceId").asInt();clock.at(BASE.plusMinutes(12));invoiceService.expireInvoice(next);enrollmentService.promoteWaitlist(c,null);
+        int next=enroll(c,second,"VNPay").path("invoiceId").asInt();clock.at(jdbc.queryForObject("SELECT expires_at FROM invoices WHERE invoice_id=?",LocalDateTime.class,next));invoiceService.expireInvoice(next);enrollmentService.promoteWaitlist(c,null);
         assertEquals("Waitlisted",jdbc.queryForObject("SELECT status FROM class_enrollments WHERE class_id=? AND member_id=?",String.class,c,second.getId()));
         assertNotNull(jdbc.queryForObject("SELECT promoted_at FROM class_enrollments WHERE class_id=? AND member_id=?",LocalDateTime.class,c,third.getId()));
         assertEquals(0,jdbc.queryForObject("SELECT count(*) FROM invoices WHERE class_id=? AND payment_method='Cash'",Integer.class,c));
@@ -333,6 +359,15 @@ class NormalLifecycleHttpTest {
         assertEquals(1,jdbc.queryForObject("SELECT count(*) FROM normal_refunds f JOIN payment_resolutions r ON r.id=f.id WHERE r.invoice_id=?",Integer.class,invoice));
         assertEquals("Cancelled",jdbc.queryForObject("SELECT status FROM class_enrollments WHERE class_id=?",String.class,c));
     }
+    @Test void staleClassVersionUsesConsistent409AndLeavesCommittedStateUntouched()throws Exception {
+        int id=create(4,null).path("id").asInt();var session=login(manager);
+        var before=List.of(jdbc.queryForList("SELECT * FROM classes WHERE class_id=?",id),jdbc.queryForList("SELECT * FROM sessions WHERE class_id=?",id),jdbc.queryForList("SELECT * FROM normal_proposals"),jdbc.queryForList("SELECT * FROM invoices"),jdbc.queryForList("SELECT * FROM system_logs"));
+        for(int retry=0;retry<2;retry++){
+            mvc.perform(post("/api/classes/"+id+"/normal-proposals").session(session).contentType("application/json").content(json.writeValueAsString(Map.of("kind","Postpone","shiftDays",7,"version",999,"reason","DEMO stale version"))))
+                    .andExpect(status().isConflict()).andExpect(jsonPath("$.status").value(409)).andExpect(jsonPath("$.error").value("Conflict")).andExpect(jsonPath("$.message").value("NORMAL_VERSION_STALE")).andExpect(jsonPath("$.code").doesNotExist());
+            assertEquals(before,List.of(jdbc.queryForList("SELECT * FROM classes WHERE class_id=?",id),jdbc.queryForList("SELECT * FROM sessions WHERE class_id=?",id),jdbc.queryForList("SELECT * FROM normal_proposals"),jdbc.queryForList("SELECT * FROM invoices"),jdbc.queryForList("SELECT * FROM system_logs")));
+        }
+    }
     @Test void staleTransferScheduleCannotApplyOldConsentButMemberStillCanChooseRefund()throws Exception {
         int source=create(4,null).path("id").asInt();enroll(source,member,"Cash");
         var payload=new HashMap<>(creation(1,null));var details=details(1,null);details.put("startDate",BASE.toLocalDate().plusDays(49).toString());payload.put("sportsClass",details);int target=postAs("/api/classes/normal-with-sessions",manager,payload,201).path("id").asInt();
@@ -345,5 +380,85 @@ class NormalLifecycleHttpTest {
         postAs("/api/normal-proposals/"+proposal+"/respond",member,Map.of("version",1,"fingerprint",p.path("fingerprint").asText(),"choice","Refund"),200);
         assertEquals(1,jdbc.queryForObject("SELECT count(*) FROM normal_refunds WHERE class_id=?",Integer.class,source));
         assertEquals(0,jdbc.queryForObject("SELECT count(*) FROM normal_transfers WHERE proposal_id=?",Integer.class,proposal));
+    }
+    JsonNode classView(int id,User actor)throws Exception {
+        return json.readTree(mvc.perform(get("/api/classes/"+id).session(login(actor))).andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+    }
+    List<Object> classSnapshot(int id) {
+        return List.of(jdbc.queryForList("SELECT * FROM classes WHERE class_id=?",id),
+                jdbc.queryForList("SELECT * FROM invoices WHERE class_id=? ORDER BY invoice_id",id),
+                jdbc.queryForList("SELECT * FROM class_enrollments WHERE class_id=? ORDER BY enrollment_id",id),
+                jdbc.queryForList("SELECT * FROM system_logs ORDER BY log_id"));
+    }
+    @Test void metadataUsesActorWaitlistAndPersistedTimeWithoutWriting()throws Exception {
+        int id=create(1,null).path("id").asInt();var time=first(id);
+        var before=classSnapshot(id);var fresh=classView(id,member);
+        assertTrue(fresh.path("registrationAllowed").asBoolean());
+        assertEquals("OPENING_CONFIRMATION_FORBIDDEN",fresh.path("openingConfirmationBlockReason").asText());
+        assertTrue(fresh.path("serverTime").asText().endsWith("+07:00"));
+        assertEquals(time,java.time.OffsetDateTime.parse(fresh.path("firstSessionAt").asText()).toLocalDateTime());
+        assertEquals(time.minusHours(48),java.time.OffsetDateTime.parse(fresh.path("registrationDeadline").asText()).toLocalDateTime());
+        assertEquals(before,classSnapshot(id));
+        assertEquals("OPENING_CONFIRMATION_FORBIDDEN",postAs("/api/classes/"+id+"/confirm-opening",member,Map.of(),403).path("code").asText());
+        enroll(id,member,"Cash");
+        assertEquals("ALREADY_ENROLLED",classView(id,member).path("registrationBlockReason").asText());
+        assertTrue(classView(id,second).path("registrationAllowed").asBoolean(),"Full class still admits a waitlist request");
+        assertEquals("Waitlisted",enroll(id,second,"VNPay").path("status").asText());
+        assertEquals("WAITLIST_NOT_READY",classView(id,second).path("registrationBlockReason").asText());
+        assertEquals("WAITLIST_NOT_READY",postAs("/api/classes/"+id+"/enroll",second,Map.of("paymentMethod","VNPay"),400).path("code").asText());
+        var outside=classView(id,outsider);assertFalse(outside.path("openingConfirmationAllowed").asBoolean());
+        assertEquals("OPENING_CONFIRMATION_FORBIDDEN",outside.path("openingConfirmationBlockReason").asText());
+        assertEquals("OPENING_CONFIRMATION_FORBIDDEN",postAs("/api/classes/"+id+"/confirm-opening",outsider,Map.of(),403).path("code").asText());
+        clock.at(time.minusHours(48));
+        assertEquals("NORMAL_REGISTRATION_CLOSED",classView(id,third).path("registrationBlockReason").asText());
+        assertEquals("NORMAL_REGISTRATION_CLOSED",postAs("/api/classes/"+id+"/enroll",third,Map.of("paymentMethod","VNPay"),400).path("code").asText());
+        clock.at(time.minusHours(24));before=classSnapshot(id);var late=classView(id,manager);
+        assertTrue(late.path("openingReasonRequired").asBoolean());assertTrue(late.path("openingConfirmationAllowed").asBoolean());
+        assertTrue(late.path("openingConfirmationBlockReason").isNull());assertEquals(before,classSnapshot(id));
+        assertEquals("REASON_REQUIRED",postAs("/api/classes/"+id+"/confirm-opening",manager,Map.of(),400).path("code").asText());
+        clock.at(time);
+        assertEquals("NORMAL_OPENING_TOO_LATE",classView(id,manager).path("openingConfirmationBlockReason").asText());
+        assertEquals("NORMAL_OPENING_TOO_LATE",postAs("/api/classes/"+id+"/confirm-opening",manager,Map.of("reason","Too late"),400).path("code").asText());
+    }
+    @Test void selectedCounterAccountMustBeAMemberAndNormalCancellationHasCode()throws Exception {
+        int id=create(1,null).path("id").asInt();var before=classSnapshot(id);
+        assertEquals("MEMBER_REQUIRED",postAs("/api/classes/"+id+"/enroll",cashier,Map.of("memberId",coach.getId(),"paymentMethod","Cash"),400).path("code").asText());
+        assertEquals(before,classSnapshot(id));enroll(id,member,"Cash");
+        int session=jdbc.queryForObject("SELECT session_id FROM sessions WHERE class_id=? ORDER BY session_date,start_time LIMIT 1",Integer.class,id);
+        var view=json.readTree(mvc.perform(get("/api/sessions/"+session).session(login(member))).andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+        assertFalse(view.path("cancellationAllowed").asBoolean());assertEquals("PRIVATE_SESSION_REQUIRED",view.path("cancellationBlockReason").asText());
+        assertTrue(view.path("cancellationDeadline").isNull());
+        assertEquals("PRIVATE_SESSION_REQUIRED",postAs("/api/sessions/"+session+"/cancel-private",member,Map.of(),400).path("code").asText());
+    }
+    @Test void expiredPendingReservationPreviewIsReadOnlyAndMatchesNextPost()throws Exception {
+        int id=create(1,null).path("id").asInt();int original=enroll(id,member,"VNPay").path("invoiceId").asInt();
+        clock.at(jdbc.queryForObject("SELECT expires_at FROM invoices WHERE invoice_id=?",LocalDateTime.class,original));var before=classSnapshot(id);
+        assertTrue(classView(id,member).path("registrationAllowed").asBoolean());assertEquals(before,classSnapshot(id));
+        var next=enroll(id,member,"VNPay");assertNotEquals(original,next.path("invoiceId").asInt());
+        assertEquals("Expired",jdbc.queryForObject("SELECT payment_status FROM invoices WHERE invoice_id=?",String.class,original));
+    }
+    @Test void thirtyMinuteInvoiceIsClippedToThePersistedNormalCutoff()throws Exception {
+        Object previous=org.springframework.test.util.ReflectionTestUtils.getField(paymentProperties,"expireMinutes");
+        org.springframework.test.util.ReflectionTestUtils.setField(paymentProperties,"expireMinutes",30);
+        try {
+            var body=new HashMap<String,Object>(creation(1,null));body.put("startTime","18:15");body.put("endTime","19:45");
+            int id=postAs("/api/classes/normal-with-sessions",manager,body,201).path("id").asInt();
+            var cutoff=first(id).minusHours(48);clock.at(cutoff.minusMinutes(10));
+            var order=enroll(id,member,"VNPay");assertEquals(LocalTime.of(18,5),LocalDateTime.now(clock).toLocalTime());
+            assertEquals(cutoff,LocalDateTime.parse(order.path("expiresAt").asText()));
+            assertEquals(cutoff,jdbc.queryForObject("SELECT expires_at FROM invoices WHERE invoice_id=?",LocalDateTime.class,order.path("invoiceId").asInt()));
+            assertEquals(1,jdbc.queryForObject("SELECT count(*) FROM invoices WHERE class_id=?",Integer.class,id));
+        } finally {org.springframework.test.util.ReflectionTestUtils.setField(paymentProperties,"expireMinutes",previous);}
+    }
+    @Test void unpaidWaitlistInvitationKeepsItsFiveMinuteWindowWithoutIssuingAnInvoice()throws Exception {
+        int id=create(1,null).path("id").asInt();int invoice=enroll(id,member,"VNPay").path("invoiceId").asInt();
+        enroll(id,second,"VNPay");enroll(id,third,"VNPay");
+        clock.at(jdbc.queryForObject("SELECT expires_at FROM invoices WHERE invoice_id=?",LocalDateTime.class,invoice));
+        invoiceService.expireInvoice(invoice);enrollmentService.promoteWaitlist(id,null);
+        var invited=jdbc.queryForObject("SELECT promoted_at FROM class_enrollments WHERE class_id=? AND member_id=?",LocalDateTime.class,id,second.getId());assertNotNull(invited);
+        clock.at(invited.plusMinutes(5));enrollmentService.promoteWaitlist(id,null);
+        assertNull(jdbc.queryForObject("SELECT promoted_at FROM class_enrollments WHERE class_id=? AND member_id=?",LocalDateTime.class,id,second.getId()));
+        assertNotNull(jdbc.queryForObject("SELECT promoted_at FROM class_enrollments WHERE class_id=? AND member_id=?",LocalDateTime.class,id,third.getId()));
+        assertEquals(1,jdbc.queryForObject("SELECT count(*) FROM invoices WHERE class_id=?",Integer.class,id));
     }
 }

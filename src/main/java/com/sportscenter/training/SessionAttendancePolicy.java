@@ -72,10 +72,62 @@ public final class SessionAttendancePolicy {
         return " | Note: " + com.fasterxml.jackson.databind.node.JsonNodeFactory.instance.objectNode().put("before", before).put("after", after);
     }
     public static void requireWindow(Session s,LocalDateTime now){
-        requireNormalStarted(s);
+        requireWindow(s, now, false);
+    }
+    public static void requireWindow(Session s, LocalDateTime now, boolean early) {
+        if (early && s.getSportsClass()!=null && s.getSportsClass().isNormal()) {
+            if (s.getSportsClass().getOpeningConfirmedAt()==null
+                    || !java.util.Set.of("Open","Ongoing","Closed").contains(s.getSportsClass().getStatus()))
+                throw new BusinessException("NORMAL_NOT_STARTED: Manager-confirmed opening is required before attendance");
+        } else requireNormalStarted(s);
         if(s.getSessionDate()==null||s.getStartTime()==null||s.getEndTime()==null)throw new BusinessException("SESSION_TIME_REQUIRED: Reconcile the legacy session time");
-        if(!"Scheduled".equals(s.getStatus())||s.isAttendanceFinalized()||s.isCenterInvalidated()||now.isBefore(s.getSessionDate().atTime(s.getStartTime()))||!now.isBefore(s.getSessionDate().atTime(s.getEndTime())))
+        if(!"Scheduled".equals(s.getStatus())||s.isAttendanceFinalized()||s.isCenterInvalidated()||(!early && now.isBefore(s.getSessionDate().atTime(s.getStartTime())))||!now.isBefore(s.getSessionDate().atTime(s.getEndTime())))
             throw new BusinessException("ATTENDANCE_WINDOW_CLOSED: Attendance is allowed from session start until before session end");
+    }
+    public static void requireEligibility(Session s, User member,
+            com.sportscenter.enrollment.ClassEnrollmentRepository enrollments,
+            com.sportscenter.invoice.InvoiceRepository invoices, LocalDateTime now) {
+        if (member==null || !ActorPolicy.role(member,"Member") || !"Active".equalsIgnoreCase(member.getStatus()))
+            throw new BusinessException("MEMBER_NOT_ACTIVE: Active Member required");
+        if (!java.util.Objects.equals(member.getCenterId(),s.getSportsClass().getCenterId()))
+            throw new BusinessException("NOT_YOUR_CLASS: Member belongs to another center");
+        boolean eligible;
+        if (s.getBookedMember()!=null) {
+            var sub=s.getMemberPackage();
+            eligible=member.getId().equals(s.getBookedMember().getId()) && sub!=null && sub.isAdvanced()
+                    && sub.getMember()!=null && member.getId().equals(sub.getMember().getId())
+                    && s.getSportsClass().getSubject()!=null && sub.getSubject()!=null
+                    && java.util.Objects.equals(s.getSportsClass().getSubject().getId(),sub.getSubject().getId())
+                    && "Active".equals(sub.getStatus()) && s.getAgreementConfirmedAt()!=null
+                    && com.sportscenter.membership.EntitlementTimePolicy.validThrough(sub,now)
+                    && com.sportscenter.membership.EntitlementTimePolicy.validThrough(sub,s.getSessionDate().atTime(s.getEndTime()))
+                    && invoices.existsBySubscriptionSubscriptionIdAndPaymentStatusAndReconciliationRequiredFalseAndCashConfirmationReversedFalse(sub.getSubscriptionId(),"Paid");
+        } else {
+            eligible=s.getSportsClass().isNormal()
+                    && enrollments.existsByMemberIdAndSportsClassIdAndStatus(member.getId(),s.getSportsClass().getId(),"Registered")
+                    && invoices.existsByMemberIdAndSportsClassIdAndPaymentStatusAndReconciliationRequiredFalseAndCashConfirmationReversedFalse(member.getId(),s.getSportsClass().getId(),"Paid");
+            if (eligible && now.isBefore(s.getSessionDate().atTime(s.getStartTime())) && s.getSportsClass().getMinCapacity()!=null) {
+                long paid=paidCount(s.getSportsClass(),enrollments,invoices);
+                if (paid<s.getSportsClass().getMinCapacity()) throw new BusinessException("NORMAL_INSUFFICIENT_PAID: Paid Registered members are below minimum");
+            }
+        }
+        if (!eligible) throw new BusinessException("NOT_YOUR_CLASS: No paid eligibility for this session");
+    }
+    public static long paidCount(com.sportscenter.sportclass.SportsClass course,
+            com.sportscenter.enrollment.ClassEnrollmentRepository enrollments, com.sportscenter.invoice.InvoiceRepository invoices) {
+        return enrollments.findByClassIdWithDetails(course.getId()).stream()
+                .filter(e -> "Registered".equals(e.getStatus()) && "Active".equalsIgnoreCase(e.getMember().getStatus()))
+                .filter(e -> ActorPolicy.role(e.getMember(),"Member"))
+                .filter(e -> java.util.Objects.equals(e.getMember().getCenterId(),course.getCenterId()))
+                .filter(e -> invoices.existsByMemberIdAndSportsClassIdAndPaymentStatusAndReconciliationRequiredFalseAndCashConfirmationReversedFalse(e.getMember().getId(),course.getId(),"Paid")).count();
+    }
+    public static void requireInitialRetry(Attendance previous, String state, String note, String content,
+            TrainingResult result, Session s, LocalDateTime now) {
+        if (previous!=null && now.isBefore(s.getSessionDate().atTime(s.getStartTime()))
+                && (!java.util.Objects.equals(previous.getState(),state)
+                || (note!=null && !java.util.Objects.equals(previous.getNote(),note(note)))
+                || (content!=null && (result==null || !java.util.Objects.equals(result.getContent(),content)))))
+            throw new BusinessException("USE_ATTENDANCE_CORRECTION: Early recording cannot change existing attendance or assessment");
     }
     private static void requireNormalStarted(Session s) {
         if (s.getSportsClass()!=null && s.getSportsClass().isNormal() && s.getSportsClass().getMinCapacity()!=null

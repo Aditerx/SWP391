@@ -36,20 +36,31 @@ public class NormalLifecycleService {
     @Transactional
     public SportsClassResponse confirm(Integer id, String reason, org.springframework.security.core.Authentication auth) {
         User actor = actors.actor(auth);
-        if (!ActorPolicy.role(actor,"CenterManager")) throw new org.springframework.security.access.AccessDeniedException("CenterManager required");
-        if (auth.getAuthorities().stream().noneMatch(a -> "MANAGE_CLASSES".equals(a.getAuthority()))) throw new org.springframework.security.access.AccessDeniedException("MANAGE_CLASSES required");
+        requireOpeningActor(actor);
         SportsClass c = locked(id, actor);
-        if(c.isChangePending()) throw new BusinessException("NORMAL_CHANGE_PENDING: Member choices must be resolved first");
+        requireConfirmable(c,actor);
         if (c.getOpeningConfirmedAt() != null) return SportsClassResponse.from(c);
-        if (!c.isNormal() || !"Open".equals(c.getStatus()) || c.isPricingDraft()) throw new BusinessException("NORMAL_NOT_AWAITING_OPENING: Published Open Normal required");
         LocalDateTime first = NormalClassPolicy.first(c,sessions), now = LocalDateTime.now(clock);
-        if (!now.isBefore(first)) throw new BusinessException("NORMAL_OPENING_TOO_LATE: Decide before the first session");
         if (!now.isBefore(first.minusHours(24))) ActorPolicy.reason(reason);
-        requireOpeningConditions(c);
         c.setOpeningConfirmedBy(actor.getId()); c.setOpeningConfirmedAt(now); c.setOpeningReason(reason); c.setLifecycleVersion(c.getLifecycleVersion()+1);
         audit.log(actor.getId(),"CONFIRM_NORMAL_OPENING","CLASS",id,"late="+!now.isBefore(first.minusHours(24))+"; reason="+reason);
         notify(c,"Manager confirmed opening", "CONFIRMED:"+c.getLifecycleVersion());
         return SportsClassResponse.from(c);
+    }
+    private void requireOpeningActor(User actor) {
+        if (actor==null || !"Active".equalsIgnoreCase(actor.getStatus()) || !ActorPolicy.role(actor,"CenterManager")
+                || !com.sportscenter.training.SessionAttendancePolicy.permission(actor,"MANAGE_CLASSES"))
+            throw new org.springframework.security.access.AccessDeniedException("OPENING_CONFIRMATION_FORBIDDEN: Active CenterManager with MANAGE_CLASSES required");
+    }
+    public void requireConfirmable(SportsClass c,User actor) {
+        requireOpeningActor(actor);
+        if (!java.util.Objects.equals(actor.getCenterId(),c.getCenterId()) || actor.getCenterId()==null)
+            throw new org.springframework.security.access.AccessDeniedException("OPENING_CONFIRMATION_FORBIDDEN: Same-center CenterManager required");
+        if(c.isChangePending()) throw new BusinessException("NORMAL_CHANGE_PENDING: Member choices must be resolved first");
+        if(c.getOpeningConfirmedAt()!=null) return; // Confirmation retry remains idempotent.
+        if (!c.isNormal() || !"Open".equals(c.getStatus()) || c.isPricingDraft()) throw new BusinessException("NORMAL_NOT_AWAITING_OPENING: Published Open Normal required");
+        if (!LocalDateTime.now(clock).isBefore(NormalClassPolicy.first(c,sessions))) throw new BusinessException("NORMAL_OPENING_TOO_LATE: Decide before the first session");
+        requireOpeningConditions(c);
     }
 
     SportsClass locked(Integer id, User actor) {
@@ -59,11 +70,7 @@ public class NormalLifecycleService {
     }
 
     public long paidCount(SportsClass c) {
-        return enrollments.findByClassIdWithDetails(c.getId()).stream()
-            .filter(e -> "Registered".equals(e.getStatus()) && "Active".equalsIgnoreCase(e.getMember().getStatus()))
-            .filter(e -> Objects.equals(e.getMember().getCenterId(),c.getCenterId()))
-            .filter(e -> invoices.existsByMemberIdAndSportsClassIdAndPaymentStatusAndReconciliationRequiredFalseAndCashConfirmationReversedFalse(e.getMember().getId(),c.getId(),"Paid"))
-            .count();
+        return com.sportscenter.training.SessionAttendancePolicy.paidCount(c,enrollments,invoices);
     }
 
     public void requireOpeningConditions(SportsClass c) {

@@ -20,7 +20,8 @@ import org.springframework.test.context.DynamicPropertySource;
         matches = "jdbc:postgresql://127\\.0\\.0\\.1:[0-9]+/scms_ai_tools_[a-z0-9_]+")
 @DataJpaTest(properties = {"spring.config.import=", "spring.jpa.hibernate.ddl-auto=none", "spring.sql.init.mode=never", "debug=false"})
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Import({ScmsReadOnlyAiTools.class, ChatAiProperties.class, ClockConfig.class})
+@Import({ScmsReadOnlyAiTools.class, ChatAiProperties.class, ClockConfig.class,
+        org.springframework.boot.autoconfigure.jackson.JacksonAutoConfiguration.class})
 class ScmsReadOnlyAiToolsPostgresTest {
     @Autowired ScmsReadOnlyAiTools tools;
 

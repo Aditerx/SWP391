@@ -22,7 +22,7 @@ import java.util.Map;
 public class GlobalExceptionHandler {
     @ExceptionHandler(BusinessConflictException.class)
     ResponseEntity<Map<String, Object>> conflict(BusinessConflictException ex) {
-        return ResponseEntity.status(HttpStatus.CONFLICT).body(business(ex).getBody());
+        return business(HttpStatus.CONFLICT, ex);
     }
 
     @ExceptionHandler(ResourceNotFoundException.class)
@@ -61,14 +61,18 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(BusinessException.class)
     ResponseEntity<Map<String, Object>> business(BusinessException ex) {
+        return business(HttpStatus.BAD_REQUEST, ex);
+    }
+
+    private ResponseEntity<Map<String, Object>> business(HttpStatus status, BusinessException ex) {
         int separator = ex.getMessage() == null ? -1 : ex.getMessage().indexOf(":");
         if (separator > 0 && ex.getMessage().substring(0, separator).matches("[A-Z_]+")) {
             Map<String, Object> body = new LinkedHashMap<>();
             body.put("code", ex.getMessage().substring(0, separator));
             body.put("message", ex.getMessage().substring(separator + 1).trim());
-            return ResponseEntity.badRequest().body(body);
+            return ResponseEntity.status(status).body(body);
         }
-        return error(HttpStatus.BAD_REQUEST, ex.getMessage());
+        return error(status, ex.getMessage());
     }
 
     @ExceptionHandler(AuthenticationException.class)
@@ -77,17 +81,27 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(AccessDeniedException.class)
-    ResponseEntity<Map<String, Object>> forbidden(AccessDeniedException ex) {
-        if (ex.getMessage() != null && ex.getMessage().startsWith("ATTENDANCE_CORRECTION_")) {
+    ResponseEntity<Map<String, Object>> forbidden(AccessDeniedException ex, jakarta.servlet.http.HttpServletRequest request) {
+        String actionCode=null;
+        if ("POST".equals(request.getMethod())) {
+            String path=request.getRequestURI();
+            if (path.matches("/api/classes/[^/]+/confirm-opening")) actionCode="OPENING_CONFIRMATION_FORBIDDEN";
+            else if (path.matches("/api/classes/[^/]+/enroll") || path.equals("/api/enrollments")) actionCode="REGISTRATION_FORBIDDEN";
+            else if (path.matches("/api/advanced-registrations/[^/]+/order")) actionCode="REGISTRATION_OWNER_REQUIRED";
+            else if (path.matches("/api/sessions/[^/]+/cancel-private")) actionCode="CANCELLATION_FORBIDDEN";
+            else if (path.matches("/api/training-results(?:/bulk)?") || path.matches("/api/attendances?/scan")) actionCode="ATTENDANCE_FORBIDDEN";
+        }
+        if (ex.getMessage() != null && (ex.getMessage().startsWith("ATTENDANCE_CORRECTION_") || actionCode!=null)) {
             int separator = ex.getMessage().indexOf(':');
-            if (separator > 0) return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of(
+            if (separator > 0 && ex.getMessage().substring(0,separator).matches("[A-Z_]+")) return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of(
                     "code", ex.getMessage().substring(0, separator), "message", ex.getMessage().substring(separator + 1).trim()));
         }
+        if (actionCode!=null) return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("code",actionCode,"message",ex.getMessage()==null?"Access denied":ex.getMessage()));
         return error(HttpStatus.FORBIDDEN, ex.getMessage());
     }
 
-    @ExceptionHandler(DataIntegrityViolationException.class)
-    ResponseEntity<Map<String, Object>> integrity(DataIntegrityViolationException ex) {
+    @ExceptionHandler({DataIntegrityViolationException.class, org.hibernate.exception.ConstraintViolationException.class})
+    ResponseEntity<Map<String, Object>> integrity(RuntimeException ex) {
         return error(HttpStatus.CONFLICT, "Operation violates a database constraint");
     }
 

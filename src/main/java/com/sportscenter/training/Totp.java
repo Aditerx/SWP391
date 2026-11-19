@@ -22,7 +22,7 @@ final class Totp {
             int offset = hash[hash.length - 1] & 0x0f;
             int binary = ((hash[offset] & 0x7f) << 24) | ((hash[offset + 1] & 0xff) << 16)
                     | ((hash[offset + 2] & 0xff) << 8) | (hash[offset + 3] & 0xff);
-            return String.format("%06d", binary % 1_000_000);
+            return String.format(java.util.Locale.ROOT,"%06d", binary % 1_000_000);
         } catch (Exception e) { throw new IllegalStateException("Unable to generate check-in code", e); }
     }
     static Long matchingStep(byte[] secret, String supplied, long currentStep) {

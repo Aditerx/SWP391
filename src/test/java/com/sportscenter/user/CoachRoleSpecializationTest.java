@@ -77,6 +77,15 @@ class CoachRoleSpecializationTest {
             coachRole = role("Coach");
             memberRole = role("Member");
             User manager = account("manager@coach-role.test", role("CenterManager"));
+            // D01 now requires a capable Admin to exist before account-role mutations.
+            // This fixture has no production seed; keep the Coach expectations unchanged.
+            Role adminRole = new Role(); adminRole.setName("Admin");
+            Permission manageUsers = new Permission();
+            manageUsers.setId(jdbc.queryForObject("SELECT permission_id FROM permissions WHERE permission_name='MANAGE_USERS'", Integer.class));
+            manageUsers.setName("MANAGE_USERS");
+            Permission managePermissions = new Permission(); managePermissions.setName("MANAGE_PERMISSIONS"); emPersistPermission(managePermissions);
+            adminRole.getPermissions().addAll(List.of(manageUsers, managePermissions));
+            account("admin@coach-role.test", roles.saveAndFlush(adminRole));
             User member = account("member@coach-role.test", memberRole);
             jdbc.update("INSERT INTO members(user_id,join_date) VALUES(?,?)", member.getId(), LocalDate.now(clock));
             badminton = subject("Cầu lông", "cau-long");

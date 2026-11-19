@@ -25,6 +25,8 @@ public final class NotificationTemplates {
             case CHAT_MEMBER_MESSAGE -> "New member support message";
             case CHAT_STAFF_REPLY -> "New support reply";
             case ENROLLMENT_CONFIRMED -> "Ghi danh lớp học thành công";
+            case PRIVATE_BOOKING_PROPOSED -> "Lịch học đang chờ xác nhận";
+            case PRIVATE_BOOKING_DECLINED -> "Học viên từ chối lịch đề xuất";
             case PRIVATE_BOOKING_CONFIRMED -> "Đặt buổi học thành công";
             case PRIVATE_BOOKING_CANCELLED -> "Buổi học đã được hủy";
             case SESSION_RESCHEDULED -> "Buổi học được dời lịch";

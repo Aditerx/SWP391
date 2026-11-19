@@ -15,8 +15,10 @@ import java.util.List;
 @RequiredArgsConstructor
 public class TrainingPlanController {
     private final TrainingPlanService trainingPlanService;
+    private static final String READ_SCOPE = "Members read own private plans and shared Normal class plans with Registered or Completed enrollment and valid Paid effective-class entitlement. Reconciliation, reversed cash confirmation or Completed Refund excludes shared access. Cancelled/Pending/Waitlisted do not grant shared access. Existing Coach own-author and center scopes remain; stored plan content is not a historical version snapshot.";
 
     @GetMapping
+    @io.swagger.v3.oas.annotations.Operation(summary = "List training plans in the current account scope", description = READ_SCOPE)
     @PreAuthorize("hasAnyAuthority('MANAGE_TRAINING_PLAN', 'MANAGE_CLASSES', 'MANAGE_USERS') or hasRole('MEMBER')")
     public ResponseEntity<List<TrainingPlanResponse>> searchPlans(
             @RequestParam(required = false) Integer coachId,
@@ -28,6 +30,7 @@ public class TrainingPlanController {
     }
 
     @GetMapping("/{id}")
+    @io.swagger.v3.oas.annotations.Operation(summary = "Read one training plan in the current account scope", description = READ_SCOPE)
     @PreAuthorize("hasAnyAuthority('MANAGE_TRAINING_PLAN', 'MANAGE_CLASSES', 'MANAGE_USERS') or hasRole('MEMBER')")
     public ResponseEntity<TrainingPlanResponse> findById(@PathVariable Integer id, Authentication authentication) {
         return ResponseEntity.ok(trainingPlanService.findById(id, authentication));

@@ -26,10 +26,10 @@ public class Room {
         }
     }
 
-    @Column(name = "room_name")
+    @Column(name = "room_name", nullable = false, length = 50)
     private String name;
 
-    @Column(name = "location")
+    @Column(name = "location", length = 100)
     private String location;
 
     @Column(name = "capacity")

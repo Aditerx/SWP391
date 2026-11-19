@@ -28,6 +28,8 @@ Bản rút gọn từ lịch sử chốt25–27/10/2026. D12 về45ngày sử d�
 | [D18](#d18) | Quyền report quản trị | [Báo cáo](01-API-CONTRACT-FE-BE.md#reports) |
 | [D19](#d19) | Evidence theo điều kiện nghiệm thu | [Kiểm thử](02-DEPLOYMENT-GUIDE.md#testing) |
 
+**Đính chính17/11 cho ghi chú16/11:** chưa thay thế Dxx bằng toàn bộ nội dung V2. Lần gom ghi chú đã diễn giải quá mức trạng thái duyệt; nguồn cũ và QA được giữ để truy lại, prompt cũ không dùng triển khai nguyên trạng. Các bổ sung Owner17/11 tại D05/D10/D15/D17 là quyết định nghiệp vụ; lượt19/11 đã mở implementation/test local theo phạm vi mới. Trạng thái thực hiện và bằng chứng chỉ ghi ở docs00/QA. Thiết kế/phạm vi cụ thể ở [docs05](05-DEMO-RULE.md); không suy ý định thành API đã hỗ trợ hoặc mở quyền thực thi.
+
 <a id="d01"></a>
 ## D01 — Hồ sơ Member
 
@@ -38,6 +40,8 @@ Owner29/10 chốt riêng bộ33account demo theo `System Account.pdf`: mật kh�
 Ranh giới quản trị theo RP-04/RP-05 của thiết kế gốc, đã đối chiếu lại07/11: chỉ Admin quản lý tài khoản Admin/CenterManager; CenterManager vận hành Coach/Receptionist/Member trong center. Áp dụng cho cả target hiện tại và role được gán, không lách qua alias users/staff, PUT, đổi trạng thái hoặc cấp lại mật khẩu. Quyền endpoint vẫn phải đạt; Admin không mặc nhiên có mọi authority. Đây không thay luồng tự đổi mật khẩu/avatar của chính tài khoản và không mở phạm vi tài chính/report cho Admin.
 
 Owner10/11 chốt GET `/api/roles` và GET `/api/permissions` chỉ dành Admin; các role khác bị chặn kể cả được gán thêm authority quản trị. GET `/api/roles/{id}` trả cùng dữ liệu permissions nên phải cùng gate để không lách qua ID. Đây là quyền đọc danh mục/quyền, không tự thay gate PUT phân quyền hoặc chốt guard quản trị cuối cùng; trạng thái triển khai ở docs00.
+
+Owner11/11 đồng ý hướng P2.2/P2.3: PUT `/api/roles/{id}/permissions` cần Admin Active AND MANAGE_PERMISSIONS; giữ ít nhất một Admin Active có MANAGE_USERS và MANAGE_PERMISSIONS để còn khả năng quản trị. Invariant áp dụng các mutation permission/role/status/PUT user liên quan và phải chống thao tác đồng thời; permission trên role tác động mọi account dùng role đó. Không cấm tập rỗng cho mọi role và không tự đổi seed/quyền cloud. GET RBAC Admin-only đã chốt giữ nguyên. Trạng thái triển khai và kiểm theo docs00/QA.
 
 <a id="d02"></a>
 ## D02 — Danh mục và giá
@@ -63,13 +67,19 @@ Chỉ9môn, giá VND cho trọn12buổi Normal hoặc12credit Advanced:
 - Owner29/10 chốt hai biến thể SQL: schema root nâng cấp/bảo toàn ID và chứng từ; `database/schema_postgres.sql` được phép dựng lại dữ liệu SCMS tham chiếu cùng ID số độc lập từ1. PK subtype vẫn bằng `users.user_id`; không đổi UUID/khóa ghép sang số. Danh sách8phòng giữ Bóng rổ/Bóng chuyền chung một tài nguyên. Giữ `ai_consultations`/`support_requests` cho tương lai. Quyết định này không là quyền cho agent chạy reset Supabase.
 - Owner02/11 thay danh mục8phòng bằng20tài nguyên theo `room.jpg`: tách Bóng rổ/Bóng chuyền, giữ `room_id` số và thêm `room_code` C01; không thêm `subject_id`. Migration giữ phòng/lịch sử cũ, đối soát lịch và sức chứa trước chuyển; danh mục duy nhất xem database/README.
 - Owner09/11 xác nhận toàn bộ dữ liệu SCMS là demo của project học tập; yêu cầu rà DB Supabase hiện tại và chuẩn bị lại `database/schema_postgres.sql` để làm sạch. Yêu cầu này thay phương án hòa giải riêng ca164: bộ dựng lại bỏ lịch sử demo cũ, giữ danh mục/account đã duyệt và mô hình hiện hành; không tự thay các rule quyền/tiền/lịch trong Dxx. Các nguồn thiết kế, code và dữ liệu phải được double-check, nêu mâu thuẫn và hỏi khi phát sinh lựa chọn nghiệp vụ mới. Chuẩn bị/kiểm local không đồng nghĩa đã thực thi reset cloud.
-- Owner09/11 bổ sung: đồng ý bỏ dữ liệu legacy/thử/tồn/audit/backup, nhưng bộ dựng lại cần dữ liệu demo có kịch bản cho giao dịch/quyền học, lịch/attendance, chuyên môn và vận hành. Account/lớp/Coach phải được Owner duyệt lại; sau duyệt mới xuất `SYSTEM-DATA.md` theo từng bảng và thống nhất với FE. [Normal Lifecycle](../SCMS_BE_Normal_Lifecycle_DA_CHOT.md) và [Refund Normal](../SCMS_BE_Refund_Normal_DA_CHOT.md) là yêu cầu để rà trước triển khai, ưu tiên tái sử dụng phần đúng; chưa tự sửa code hoặc tự chốt ngoại lệ chưa rõ. Đề xuất và điều còn cần duyệt ở docs03; không coi bộ rỗng đã kiểm là bộ demo cuối cùng.
+- Owner09–10/11 chốt bộ dựng lại phải có dữ liệu demo theo kịch bản giao dịch/quyền học, lịch/attendance, chuyên môn và vận hành; giữ33account PDF và bổ sung14account, tổng21Class. `SYSTEM-DATA.md` mô tả dữ liệu được duyệt, không thay readback môi trường đang chạy. [Normal Lifecycle](reference/SCMS_BE_Normal_Lifecycle_DA_CHOT.md) và [Refund Normal](reference/SCMS_BE_Refund_Normal_DA_CHOT.md) giữ yêu cầu chi tiết; không coi bộ rỗng cũ là bộ demo cuối cùng hoặc tự mở ngoại lệ mới. Trạng thái chuẩn bị/thực thi/nghiệm thu theo docs00/QA.
 - Owner10/11 đồng ý bộ đề xuất dữ liệu chung, yêu cầu giữ nguyên bộ account trong `System Account.pdf`; account demo mới chỉ bổ sung, không thay danh tính gốc. Đồng ý ràng buộc chuyển lớp cùng giá/cùng center. Các câu hỏi về Cash/waitlist, ngoại lệ xác nhận sau mốc24h, xác minh người nhận, cách đếm7ngày làm việc và log center đang được giải thích trong docs03; không tự coi là đã duyệt mọi phương án kỹ thuật/ngoại lệ hoặc mở quyền mới.
 - Owner10/11 chốt tiếp phần3–5: duyệt kiểm lớp tương thích/fallback và điều chỉnh N11 sang Pickleball làm đích N05, không tăng tổng lớp; BE chuẩn bị dữ liệu liên hệ Member, FE quyết định có dùng/hiển thị; ngày làm việc Refund là ngày TT mở theo lịch nghỉ, kể cả T7/CN nếu không đóng. Giữ07ngày làm việc và tài khoản PDF; không áp giả định T2–T6 hoặc tự đổi thành07ngày lịch. Quyết định dữ liệu khác với việc seed/triển khai, trạng thái theo docs00.
 - Owner02/11 đã duyệt riêng bảng max_capacity cũ→mới của7lớp Normal center1 trong DB đang đối soát (ID11/12/13/14/16/17/18; bảng tại docs02). Cho phép điều chỉnh đúng7giới hạn trong cùng transaction chuyển phòng, kiểm lại danh tính lớp và Registered+Pending không vượt mức mới, lưu audit trước/sau; không đổi đăng ký, giá/chứng từ/attendance hoặc tự chia/hủy lớp. Đây là phạm vi theo ID đã được Owner xác nhận, không là quy tắc áp dụng các ID này cho mọi DB. Replay không ghi đè thay đổi có chủ đích về sau.
 
+Owner11/11 đồng ý đồng bộ validation room name50/location100 với VARCHAR(50)/VARCHAR(100) của schema project đang có. Name vẫn bắt buộc, location optional/nullable; quá dài báo400 trước DB, không tự truncate/đổi trim hoặc mở rộng cột. Đây là đồng bộ constraint kỹ thuật hiện có, không là giới hạn lấy từ tiêu chuẩn ngành; implementation/kiểm theo Active.
+
 <a id="d03"></a>
 ## D03 — Mua Advanced
+
+**Owner14/11, làm rõ18/11:** sau Coach Accepted, Member có24giờ từ `acceptedAt` để xác nhận mua qua order; chỉ lúc đó tạo hóa đơn và bắt đầu hạn thanh toán riêng theo D10 (hóa đơn mới tối đa30phút, chứng từ cũ giữ expiresAt). Đúng/quá24giờ chưa tạo đơn thì chặn; retry không kéo hạn hoặc sinh thêm đơn. Giữ Paid hợp lệ mới cấp12credit/bắt đầu45ngày sử dụng. Đây là hạn tối đa xác nhận mua, không phải bắt chờ24giờ và không đổi cutoff hủy12giờ.
+
+**Owner14/11 đính chính dữ liệu lớp:** không tạo sẵn các lớp Advanced mở đăng ký, chưa có Member/Coach. Mỗi đăng ký có lớp Advanced riêng, chỉ xuất hiện sau khi Member đăng ký và Coach đồng ý; việc này chưa cấp quyền học hoặc tạo buổi trước Paid và Member Accept lịch. Owner đã duyệt sửa đồng bộ BE/bundle, sau đó chạy SQL25/cleanup và cho phép merge/deploy; trạng thái thực thi ở Active/QA. Không dùng lớp mẫu theo môn làm bằng chứng nghiệp vụ đúng.
 
 - **Thuật ngữ/phạm vi06/11:** hệ thống hiện tại bán khóa Normal và quyền học Advanced theo môn/Primary Coach, không dùng gói hội viên chung tháng/VIP làm sản phẩm hoặc điều kiện đăng ký. `member_packages` hiện lưu đăng ký/quyền học Advanced, không phải lý do giữ mô hình hội viên chung. Owner yêu cầu loại bỏ dữ liệu thực sự thuộc mô hình cũ sau kiểm kê/phân loại, không giữ để tương thích dự phòng. Phạm vi bản ghi/DB và phụ thuộc cần xác định trước migration; không suy tên bảng hoặc package_id khác NULL là dữ liệu bỏ được. Không tự xóa quyền học/chứng từ của mô hình hiện tại.
 - Chọn môn và Primary Coach trước thu tiền; từng đăng ký có môn/Coach/credit/hạn riêng.12 credit chỉ đúng môn và Coach chính/Coach thay hợp lệ.
@@ -77,18 +87,24 @@ Chỉ9môn, giá VND cho trọn12buổi Normal hoặc12credit Advanced:
 - Owner06/11 duyệt bỏ mô hình chung: đóng bán/gia hạn/đổi trạng thái gói chung và tạo danh mục mới; tạo Member không mua kèm gói bằng packageId. Migration16 chỉ xóa subgraph gói chung cũ xác định chắc chắn; bảo toàn quyền/chứng từ Normal/Advanced hiện hành, gặp liên kết hoặc hình dạng chưa rõ thì rollback. A đã duyệt nhưng phải chờ Owner chạy migration Supabase thành công mới triển khai.
 - Kiểm lịch làm việc, tải cam kết đa môn, phòng và năng lực dự kiến; Coach nhận trước Invoice. Kiểm lại dưới transaction/lock khi order.
 - Không yêu cầu Member khai lịch rảnh trong MVP, kể cả optional. Không có bộ ghép lịch Member–Coach; năng lực dự kiến không bảo đảm Member rảnh mọi ca hoặc giữ sẵn12ca.
-- Chờ duyệt chưa chạy5phút/45 ngày. Chọn Coach không giữ tài nguyên. Invoice lấy Subject.advancedPrice và đóng băng; Paid hợp lệ mới Active/12 credit.
+- Chờ duyệt chưa bắt đầu hạn hóa đơn hoặc45ngày sử dụng. Chọn Coach không giữ tài nguyên. Invoice lấy Subject.advancedPrice và đóng băng; Paid hợp lệ mới Active/12 credit cho đúng quyền học của Member/môn/Primary Coach, không là ví credit chung đổi môn.
 - Hạn theo D12. Legacy thiếu môn/Coach/thời điểm phải đối soát, không đoán hoặc cấp lại12credit.
 
 <a id="d04"></a>
 ## D04 — Người tạo Advanced
 
-Primary Coach tạo sau trao đổi; Manager cùng center hỗ trợ có lý do/audit. Actor/time từ BE và xác nhận đã thống nhất đúng lịch; đây là lời xác nhận của người tạo, không thêm vòng Member bấm duyệt. Coach thay một buổi không tự được tạo mọi ca của gói.
+**Owner14/11 thay bước xác nhận khi tạo buổi:** hai người trao đổi ngoài SCMS; Primary Coach hoặc Manager cùng center có quyền/lý do gửi đề xuất lịch bất biến. Đề xuất không giữ sân/Coach/credit. Chỉ Member sở hữu Accept đúng đề xuất mới tạo Scheduled/trừ1credit sau kiểm lại nguyên khối; từ chối/quá cửa12giờ không tạo buổi/không trừ. Retry không nhân buổi/credit, đề xuất chưa chấp nhận không được tính là đã lên lịch. Giữ7ca90phút, ngày linh hoạt theo lịch hai người và tài nguyên; không thêm chat trực tiếp hoặc giờ tự do. Coach thay một buổi không tự được tạo mọi ca của gói. Các buổi đã tồn tại và workflow dời/thay/bù hiện hành giữ nguyên; không backfill đồng ý của Member.
+
+**Làm rõ18/11:** Coach nhận đăng ký là quyết định mua khóa; gửi đề xuất là Coach đồng ý với lịch cụ thể. Member Accept đúng đề xuất đó không cần Coach duyệt lại lần hai, nhưng không phải Member tự đặt ca hoặc bỏ Coach. Còn>=12h là một điều kiện ở cả gửi/Accept, không thay role/owner/Paid/tài nguyên. HTTP/error/metadata đang có và phần đề xuất cho FE được tách tại [thỏa thuận Owner](update261118.md#contract-da-thong-nhat).
 
 Kiểm Paid/Active, member active/block, đúng môn/Coach, credit, notice>=12h, lịch làm, phòng/Coach/Member không trùng, Holiday/Outdoor và sessionEnd<=deadline. Tạo ca/giữ tài nguyên/trừ1credit/audit cùng commit, thông báo sau commit. Retry cùng key/body cùng kết quả; khác body conflict; không tạo/thay trạng thái Advanced qua CRUD chung để bỏ workflow.
 
 <a id="d05"></a>
 ## D05 — Hủy và báo vắng
+
+**Owner17/11 — bổ sung đã chốt:** buổi đã có điểm danh hiện hành Present/Absent không được hủy hoàn credit thường, kể cả nếu cho điểm danh sớm trong demo và còn hơn12h. Không đổi kết quả để mở lại hoàn; attendance superseded không phải kết quả hiện hành, ngoại lệ sự cố TT giữ workflow riêng. Demo có một ca Scheduled chưa điểm danh để Member hủy và đọc lại credit11→12; không dùng ca vừa điểm danh. Cutoff12h và cách FE hiển thị đang được giải thích/đề xuất ở [docs05 mục5](05-DEMO-RULE.md#5-hủy-advanced-và-hoàn-credit-khi-đã-có-điểm-danh-sớm).
+
+**Owner18/11 xác nhận:** trừ1 mỗi buổi mới Accept, hoàn1 mỗi hủy hợp lệ trước ít nhất12giờ; quyền gốc còn hiệu lực, buổi chưa có điểm danh và cùng buổi không hoàn hai lần. Giữ12credit/45ngày sử dụng, không kéo dài hạn khi hoàn. Owner đồng ý BE trả điều kiện/hạn/lý do hủy cho FE, field cụ thể theo docs01, trạng thái theo docs00; hoàn credit không phải hoàn tiền Cash/VNPay. Chi tiết ở docs05, không hỏi lại cơ chế này như một lựa chọn còn mở.
 
 - Member hủy ca Advanced của mình khi còn **>=12h**, gồm đúng12h: giải phóng tài nguyên, hoàn đúng1credit gói gốc. Không gia hạn; retry/race không hoàn thêm. Dưới12h không hủy hoàn thường, không trừ thêm credit đã book.
 - Báo vắng riêng khi **0<notice<12h**; giữ Scheduled/tài nguyên/credit, lưu actor/time/reason. Theo Owner31/10 và xác nhận02/11, **notice và attendance Absent của đúng Member phải cùng commit**, không hoàn tiền/credit. Đây là ngoại lệ ghi trước buổi của D15, thay rule notice-only cũ; test cũ expected0attendance cần thay theo quyết định này. Đúng/sau start không báo trước hồi tố.
@@ -129,7 +145,9 @@ Coach mới hoặc mới chuyển role không tự gán chuyên môn. Gán môn 
 <a id="d10"></a>
 ## D10 — Thanh toán và đối soát
 
-- Holding **5 phút**. Pending thiếu method/deadline hoặc dữ kiện legacy phải đối soát, không mở lại đơn hoặc thu thêm khi khoản cũ chưa xử lý.
+**Owner17/11 — giá trị mới đã chốt:** hóa đơn mới tối đa30phút liên tục, không dừng qua giờ nghỉ. Giải thích trần hạn đăng ký Normal/phạm vi cấu hình ở [docs05 mục6](05-DEMO-RULE.md#6-hóa-đơn-giữ-chỗ-qua-giờ-nghỉ-và-qr); giữ cutoff và expiresAt của hóa đơn cũ. Quyết định/source local không là bằng chứng Render đã đổi cấu hình.
+
+- Hóa đơn mới giữ suất **tối đa30phút từ lúc tạo**; Normal không vượt T−48h. Pending thiếu method/deadline hoặc dữ kiện legacy phải đối soát, không mở lại đơn hoặc thu thêm khi khoản cũ chưa xử lý.
 - Return kiểm chữ ký/hiển thị, không ghi Paid. IPN hợp lệ kiểm merchant/reference/amount/chữ ký/idempotency rồi ghi. Owner04/11 duyệt thêm QueryDR: BE tự truy vấn VNPay bằng dữ liệu pay gốc đã lưu, xác minh chữ ký phản hồi và merchant/reference/amount/loại01/response00/status00 trước khi dùng chung nhánh ghi Paid. Không tin trạng thái/amount do FE gửi; lỗi hoặc thiếu chứng cứ không xác nhận chưa trả tiền.
 - FE tự POST xác minh hóa đơn VNPay khi quay về, rồi GET ownInvoice; tái sử dụng Tải lại để kiểm tra có giới hạn, không bắt Member tự xác nhận đã trả. GET danh sách chỉ đọc. Đơn cũ thiếu metadata pay không được đoán/backfill thời điểm.
 - Owner04/11 chốt giữ nguyên toàn bộ QueryDR đã triển khai: code/endpoint, bảng pay attempt, migration15 và các env đã thêm; không áp dụng đề xuất tắt/gỡ sau khi IPN hoạt động. Lý do: giữ kênh xác minh chủ động dự phòng và metadata gốc; code tạo link hiện vẫn dùng bảng attempt. Giữ không có nghĩa QueryDR live đã nghiệm thu; chưa tự thêm relay hoặc đổi env.
@@ -145,7 +163,8 @@ PostgreSQL local riêng/fixture riêng để kiểm mutation, không đọc.env 
 <a id="d12"></a>
 ## D12 — Hạn sử dụng, ngày nghỉ và ca chuẩn
 
-- Advanced **45 ngày sử dụng từ Paid**, skip hợp thời gian TT đóng/nghỉ; đây là quyết định thay1080giờ liên tục. BE trả timestamp chính xác, end ca không vượt deadline; Invoice vẫn5phút.
+- Advanced **45 ngày sử dụng từ Paid**, skip hợp thời gian TT đóng/nghỉ; đây là quyết định thay1080giờ liên tục. BE trả timestamp chính xác, end ca không vượt deadline; hạn hóa đơn là mốc riêng theo D10, không phải45ngày.
+- **Owner18/11 — trung tâm mở đủ7ngày:** không nghỉ cuối tuần mặc định; từng Coach vẫn có lịch làm/ngày nghỉ riêng, Holiday/đóng TT hợp lệ giữ quy trình. Nguồn sinh và test phải hỗ trợ Sunday, giữ ngày nghỉ riêng của Coach; kiểm local không chứng nhận website/cloud đã đạt. Trạng thái tại DEMO-SUNDAY-01/docs00, thiết kế ở [docs05 mục7](05-DEMO-RULE.md#7-dữ-liệu-rehearsal-và-khôi-phục).
 - Thêm/tắt Holiday tính lại hạn quyền đang dùng, không cộng trùng incident. Phần nghỉ TT đã thực sự xảy ra được giữ; tắt nghỉ tương lai không xóa phần quá khứ.
 - Không tạo nghỉ quá khứ để tự bù; dùng incident có chứng cứ. Thay đổi làm lịch đã đặt không hợp lệ phải preview/xử lý trước, không tự hủy/dời hoặc tự kéo hạn.
 - 7ca 90phút:06:00–07:30;07:45–09:15;09:30–11:00;13:00–14:30;14:45–16:15;16:30–18:00;18:15–19:45. Nghỉ11:00–13:00.
@@ -166,9 +185,13 @@ Manager xem preview ảnh hưởng, xử lý từng lịch riêng qua workflow p
 <a id="d15"></a>
 ## D15 — Attendance và bù Normal
 
-- Owner10/11 duyệt thiết kế [Normal Lifecycle](../SCMS_BE_Normal_Lifecycle_DA_CHOT.md) và [Refund Normal](../SCMS_BE_Refund_Normal_DA_CHOT.md): min=ceil(2×max/3), Manager chỉ tăng lúc tạo và khóa sau đăng ký/công bố; dời khai giảng thiếu sĩ số tối đa1lần với consent. Chuyển cùng môn/giá/center, recheck lịch/chỗ và giữ Invoice gốc/liên kết quyền; im lặng không đồng ý. TT hủy trước buổi đầu chủ động tạo nghĩa vụ hoàn100% khoản thực nhận; Manager duyệt→Receptionist chuyển ngoài SCMS/nộp chứng từ riêng tư→Manager đối soát nguồn ngân hàng độc lập mới Completed. Receiver đổi phải xác minh/duyệt lại, không hoàn trùng/vượt, không mở policy sau Ongoing hoặc Member tự hủy lớp vẫn vận hành. SLA07ngày TT mở từ ngày mở tiếp theo, kể cảT7/CN trừHoliday; thiếu thông tin/sự cố không xóa nghĩa vụ. Contact hồ sơ Member chỉ đúng quyền, FE quyết định hiển thị; không thay xác minh ngân hàng. Trạng thái implementation/nghiệm thu theo docs00.
+**Owner17/11 — thiết kế demo đã chốt:** cho điểm danh trước ngày/giờ học. Normal phải Paid/Registered, đủ sĩ số và có Manager xác nhận khai giảng; lớp demo tối đa1/tối thiểu1 đúng công thức. Advanced phải Paid/Active, Coach gửi đề xuất và đúng Member Accept tạo Scheduled/trừ1credit; chỉ Coach nhận đăng ký chưa đủ. Vẫn kiểm quyền/phân công/center và trạng thái buổi; không tự Completed/trừ lần hai. Phạm vi cấu hình và nghiệm thu ở [docs05 mục3–4](05-DEMO-RULE.md#3-điểm-danh-ai-xác-nhận-điều-gì); không coi ngoại lệ demo đã thay cửa giờ thường bên dưới trên runtime.
 
-- Owner10/11 duyệt hướng Cash Normal tại quầy và xử lý waitlist không tự tạo Cash online; Advanced giữ nguyên. Về lifecycle trong file Normal mới:48h chốt đăng ký,24h là hạn chuẩn xác nhận khai giảng; quá24h cảnh báo, Manager được xác nhận trễ trước buổi đầu nếu đủ điều kiện và có reason/actor/time. Đến buổi đầu chưa xác nhận thì không tự Ongoing hoặc tự hủy. Đã duyệt hướng log center hiện hành; phần tương thích lớp/contact tùyFE/ngàyTTmở đã được chốt sau cùng10/11 trong docs03 và fileRefund. Không mở ngoại lệ khác hoặc đổi7ngày làm việc thành ngày lịch.
+**Làm rõ18/11, FE đã đồng ý:** `SCMS_EARLY_ATTENDANCE_ENABLED` chỉ điều khiển ghi ban đầu trước giờ học của đơn/bulk/QR Normal và Advanced; correction/nhận xét giữ cửa riêng. Sau triển khai BE phục vụ demo duy trì true, FE không cần nút bật/tắt. Hóa đơn tối đa30phút và mã300giây độc lập với cờ này; [ghi chú vận hành Owner](update261118.md), [kế hoạch nội bộ BE](update261118.md#ke-hoach-be). Chưa triển khai.
+
+- Owner10/11 duyệt thiết kế [Normal Lifecycle](reference/SCMS_BE_Normal_Lifecycle_DA_CHOT.md) và [Refund Normal](reference/SCMS_BE_Refund_Normal_DA_CHOT.md): min=ceil(2×max/3), Manager chỉ tăng lúc tạo và khóa sau đăng ký/công bố; dời khai giảng thiếu sĩ số tối đa1lần với consent. Chuyển cùng môn/giá/center, recheck lịch/chỗ và giữ Invoice gốc/liên kết quyền; im lặng không đồng ý. TT hủy trước buổi đầu chủ động tạo nghĩa vụ hoàn100% khoản thực nhận; Manager duyệt→Receptionist chuyển ngoài SCMS/nộp chứng từ riêng tư→Manager đối soát nguồn ngân hàng độc lập mới Completed. Receiver đổi phải xác minh/duyệt lại, không hoàn trùng/vượt, không mở policy sau Ongoing hoặc Member tự hủy lớp vẫn vận hành. SLA07ngày TT mở từ ngày mở tiếp theo, kể cảT7/CN trừHoliday; thiếu thông tin/sự cố không xóa nghĩa vụ. Contact hồ sơ Member chỉ đúng quyền, FE quyết định hiển thị; không thay xác minh ngân hàng. Trạng thái implementation/nghiệm thu theo docs00.
+
+- Owner10/11 duyệt hướng Cash Normal tại quầy và xử lý waitlist không tự tạo Cash online; Advanced giữ nguyên. Về lifecycle trong file Normal mới:48h chốt đăng ký,24h là hạn chuẩn xác nhận khai giảng; quá24h cảnh báo, Manager được xác nhận trễ trước buổi đầu nếu đủ điều kiện và có reason/actor/time. Đến buổi đầu chưa xác nhận thì không tự Ongoing hoặc tự hủy. Đã duyệt hướng log center hiện hành; phần tương thích lớp/contact tùyFE/ngàyTTmở theo hai bản yêu cầu chi tiết được dẫn ở trên. Không mở ngoại lệ khác hoặc đổi7ngày làm việc thành ngày lịch.
 - Owner06/11 chốt đăng ký và xét danh sách chờ Normal không yêu cầu có gói hội viên chung/Advanced Active trước đó. Quyền học theo hóa đơn của chính lớp; giữ kiểm tài khoản/owner/center/lịch/sĩ số và Paid mới Registered. Không cấp gói giả hoặc dùng credit Advanced làm điều kiện Normal; không xóa liên kết/lịch sử eligibility cũ.
 - Owner06/11 duyệt0.1-C: học phí Normal phải dương; thiếu/≤0 thì chặn đăng ký và không thăng Waitlisted thành Registered. Học phí hợp lệ vẫn tạo Pending trước Paid. Không tự sửa giá/chứng từ/ghi danh lịch sử để hợp thức hóa dữ liệu legacy.
 - Owner05/11 chốt Member Active được đọc lịch sử kết quả tập của chính mình qua GET `/api/training-results`. BE xác định Member từ phiên, ép phạm vi kể cả khi bỏ filter hoặc có thêm authority quản trị; truyền Member khác bị403. Quyền đọc này không cấp quyền ghi/sửa kết quả của Coach.
@@ -181,6 +204,15 @@ Manager xem preview ảnh hưởng, xử lý từng lịch riêng qua workflow p
 - Sự cố TT thật có thể báo sau khi đã finalise nhưng phải xác minh buổi **thực sự không tổ chức**, có evidence, không dùng để sửa vắng cá nhân. Giữ buổi gốc không hợp lệ, liên kết đúng1makeup, chống bù lặp;13 record vật lý có thể chỉ12buổi hợp lệ.
 - Check-in cửa là nâng cấp sau, default toggle tắt; không dùng check-in/out thay attendance buổi. Giữ code chế tài booking-block nhưng default tắt.
 
+**Owner11–12/11 — phạm vi đã duyệt cho TrainingResult và shared plan:**
+
+- GET training-results: staff thường theo center actor phía BE, kết hợp sessionId/memberId/coachId bằng AND; Member/Coach giữ own/author. Admin Active có center NULL và đạt authority đọc được đọc toàn hệ thống theo mẫu AccountScope/TrainingAccessPolicy hiện có; Admin có center theo center được gán. Không suy ngoại lệ này sang tài chính/report, log BUSINESS hoặc các thao tác chỉ CenterManager; D18/RP-43 và quyền từng route giữ nguyên.
+- Content sau buổi: Owner đồng ý Coach được giao, có RECORD_RESULT theo RP-36 sửa content của TrainingResult **đã tồn tại** từ end tới trước00:00 ngày kế tiếp ngày Session, giờ VN; chỉ sửa content, giữ attendance/check-in/note/credit/lịch/quyền. Có audit bằng cơ chế hiện có để truy actor/thời điểm/record, không đòi bảng hoặc màn hình mới. Không tự tạo result/attendance thiếu, không dùng default Present như bằng chứng đã học; Hình dạng API được chốt ở mục Owner12/11 bên dưới. Quyền correction attendance/note và manual/QR [start,end) ở trên không đổi.
+- Owner12/11 duyệt hình dạng R2 content-only theo resultId: content bắt buộc/non-null, chuỗi rỗng xóa và giữ nguyên khoảng trắng; giữ tác giả/recordedAt gốc. Coach phải vừa đúng phân công buổi vừa là tác giả result, không cấp Coach mới sửa record Coach cũ. Audit cùng transaction, no-op không log thừa; thiếu result không tạo mới. Handoff phải giải thích ảnh hưởng flow POST/correction/PATCH và cách FE đọc lại để bắt nhịp; Trạng thái nghiệm thu theo docs00/QA.
+- Owner12/11 chốt sau ví dụ Cancelled legacy/demo: chỉ Registered hoặc Completed với Paid/effective entitlement hợp lệ được shared Normal plan; Cancelled không được shared read dù từng Paid/có kết quả. Giữ own private plan/result/attendance/evaluation history theo scope hiện có, list/detail cùng quyền và không thêm policy hủy/hoàn sau Ongoing. Không thêm bảng, nhân bản plan hoặc snapshot/versioning giáo án.
+
+**Owner12/11 — đã chọn R1 sau giải thích tác động API/FE:** startDate/endDate của GET attendance dùng ngày Session đối với record gắn buổi; lobby lịch sử không có Session dùng ngày checkInTime. Hai đầu ngày đều tính, giờ nghiệp vụ Asia/Ho_Chi_Minh. Bỏ filter ngày giữ tập/phạm vi hiện hành; không giả timestamp cho Absent/null hoặc sửa dữ liệu lịch sử. Giữ endpoint/query/response hiện có, quyền và các luồng ghi; FE cần đối chiếu client filter/grouping và cách xử lý checkInTime:null, chưa suy FE deployed đã tương thích. Triển khai/kiểm theo Active/QA, không tự mở quyền reset/deploy hoặc chuyển2.2.
+
 <a id="d16"></a>
 ## D16 — CashCorrection hẹp
 
@@ -191,7 +223,9 @@ Owner06/11 duyệt A: một đăng ký Normal có hóa đơn riêng, không liê
 <a id="d17"></a>
 ## D17 — QR
 
-Response đúng payload/expiresInSeconds; TTL còn lại1–30 giây, không cố định30. FE refresh khi hết hạn/foreground, không log token/secret. Scan cần session/Member/Coach được giao/quyền Paid, chỉ bước QR hiện tại trong[start,end), chống replay/rate. Không dùng QR test/hết hạn để chứng nhận browser tích hợp.
+**Owner17/11, làm rõ18/11 — đã chốt:** mã điểm danh Normal/Advanced dùng đủ300giây từ lúc cấp, độc lập công tắc điểm danh sớm; đã dùng/hết hạn không quét lại hoặc kéo hạn bằng refresh. Không đổi OTP hoặc QR thanh toán. Phải đồng bộ sinh/scan/replay và FE, không chỉ tăng bộ đếm hoặc đổi bước TOTP thành300. [Phạm vi](05-DEMO-RULE.md#4-demo-trọn-luồng-vào-bất-kỳ-giờ-nào), [kế hoạch lưu lượt cấp](update261118.md#qr-300). Quy tắc TOTP30giây cũ được thay bằng lượt cấp300giây; trạng thái thực hiện theo docs00 và contract theo docs01.
+
+Response giữ payload/expiresInSeconds, thêm expiresAt/serverTime có offset; lượt mới đủ300giây. Refresh lượt còn hạn/chưa dùng giữ deadline; đúng expiresAt hoặc đã dùng thì chặn. Scan cần đúng session/Member/Coach/quyền Paid và cửa giờ ghi ban đầu theo D15, chống replay/rate. Không xuất mã/nonce/secret hoặc dùng QR test để chứng nhận browser tích hợp.
 
 <a id="d18"></a>
 ## D18 — Quyền report

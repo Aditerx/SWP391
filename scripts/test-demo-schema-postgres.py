@@ -5,29 +5,44 @@ import json
 from pathlib import Path
 import re
 import subprocess
+import time
+import uuid
+from contextlib import contextmanager
+from datetime import date,timedelta
+from release_catalog import load_requirements, PROFILE
+from demo_anchor import FIXTURE_VERSION
 
 p = argparse.ArgumentParser(description=__doc__)
 p.add_argument('--database', required=True)
 p.add_argument('--schema', default='database/schema_postgres.sql')
 p.add_argument('--output', required=True)
+p.add_argument('--container', default='scms-phases-20261027')
+p.add_argument('--port', type=int, choices=(55440, 54391), default=55440)
 args = p.parse_args()
 if not re.fullmatch(r'scms_schema_demo_[a-z0-9_]+', args.database):
     p.error('A NEW scms_schema_demo_* local database is required')
 root = Path(__file__).resolve().parents[1]
-container = 'scms-phases-20261027'
+if not re.fullmatch(r'scms-(?:phases-20261027|bundle-[a-z0-9-]+)',args.container):
+    p.error('Use the existing local test container or a task-specific scms-bundle-* container')
+container = args.container
 inspection = json.loads(subprocess.check_output(['docker', 'inspect', container], text=True))[0]
-assert inspection['HostConfig']['PortBindings']['5432/tcp'] == [{'HostIp': '127.0.0.1', 'HostPort': '55440'}]
+assert inspection['HostConfig']['PortBindings']['5432/tcp'] == [{'HostIp': '127.0.0.1', 'HostPort': str(args.port)}]
 schema_path = (root / args.schema).resolve()
 assert schema_path.is_relative_to(root)
 schema = schema_path.read_text(encoding='utf-8')
-proof = {'database': args.database, 'localOnly': True, 'envLoaded': False,
-         'schemaSha256': hashlib.sha256(schema_path.read_bytes()).hexdigest(), 'checks': []}
+anchor_match=re.search(r"business_date<>DATE '(\d{4}-\d{2}-\d{2})'",schema)
+if not anchor_match:p.error('Regenerate bundle with the early anchor preflight')
+anchor=date.fromisoformat(anchor_match.group(1))
+assert schema.index('SCMS_DEMO_STALE_ANCHOR')<schema.index('CREATE SCHEMA')<schema.index('DROP TABLE')
+proof = {'database': args.database, 'container':container, 'port':args.port, 'localOnly': True, 'envLoaded': False,
+         'schemaSha256': hashlib.sha256(schema_path.read_bytes()).hexdigest(),
+         'anchorDate':anchor.isoformat(),'timeZone':'Asia/Ho_Chi_Minh','checks': []}
 
 
-def sql(statement, database=None, error=None):
+def sql(statement, database=None, error=None, timeout=180):
     result = subprocess.run(['docker', 'exec', '-i', container, 'psql', '-X', '-At', '-v', 'ON_ERROR_STOP=1',
                              '-U', 'postgres', '-d', database or args.database],
-                            input=statement, text=True, encoding='utf-8', capture_output=True)
+                            input=statement, text=True, encoding='utf-8', capture_output=True, timeout=timeout)
     if error:
         assert result.returncode != 0 and error in result.stderr, result.stderr[-1400:]
     else:
@@ -41,6 +56,31 @@ def check(name, statement=None, expected=None):
     proof['checks'].append({'name': name, 'status': 'PASS'})
 
 
+@contextmanager
+def hold_transaction(statement):
+    """Hold only this test's local transaction; always cancel it by its unique app label."""
+    app = 'scms_bundle_guard_' + uuid.uuid4().hex[:12]
+    process = subprocess.Popen(
+        ['docker', 'exec', '-e', 'PGAPPNAME=' + app, container,
+         'psql', '-X', '-At', '-v', 'ON_ERROR_STOP=1', '-U', 'postgres', '-d', args.database,
+         '-c', 'BEGIN; ' + statement + '; SELECT pg_sleep(40); ROLLBACK;'],
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding='utf-8')
+    try:
+        deadline = time.monotonic() + 10
+        while not sql("SELECT pid FROM pg_stat_activity WHERE application_name='" + app + "' AND wait_event='PgSleep'"):
+            if process.poll() is not None:
+                raise AssertionError('Lock fixture exited early: ' + process.communicate()[1][-1000:])
+            if time.monotonic() >= deadline:
+                raise AssertionError('Local lock fixture did not become ready')
+            time.sleep(0.05)
+        yield
+    finally:
+        sql("SELECT pg_cancel_backend(pid) FROM pg_stat_activity WHERE application_name='" + app + "' AND datname=current_database()")
+        process.communicate(timeout=10)
+
+
+actual_date=sql("SELECT (clock_timestamp() AT TIME ZONE 'Asia/Ho_Chi_Minh')::date",'postgres')
+if actual_date!=anchor.isoformat():p.error('Anchor differs from current VN date; no database created, no Clock override')
 sql('CREATE DATABASE ' + args.database, 'postgres')  # fails if it exists; never reset an arbitrary DB
 sql("""DO $$ BEGIN
  IF NOT EXISTS(SELECT 1 FROM pg_roles WHERE rolname='anon') THEN CREATE ROLE anon NOLOGIN; END IF;
@@ -54,7 +94,88 @@ CREATE FUNCTION public.demo_external_function() RETURNS INT LANGUAGE SQL AS 'SEL
 CREATE SEQUENCE public.demo_external_sequence START 391;
 """)
 sql(schema)
-check('fresh_install_reference_counts', "SELECT concat_ws(',',(SELECT count(*) FROM users),(SELECT count(*) FROM subjects),(SELECT count(*) FROM rooms),(SELECT count(*) FROM classes),(SELECT count(*) FROM coach_work_slots))", '47,9,20,21,756')
+check('anchor_metadata_matches_bundle',"SELECT (after_data::jsonb->>'anchor_date')||','||(after_data::jsonb->>'business_timezone')||','||(after_data::jsonb->>'fixture_version') FROM scms_data_migration_audit WHERE migration_key='20261110_demo_rebuild_v3'",anchor.isoformat()+',Asia/Ho_Chi_Minh,'+FIXTURE_VERSION)
+before_anchor=sql("SELECT md5(string_agg(to_jsonb(u)::text,',' ORDER BY user_id)) FROM users u")
+previous=(anchor-timedelta(days=1)).isoformat();future=(anchor+timedelta(days=1)).isoformat()
+for invalid in [previous,future]:
+    # Negative fixture only: deliberately stale date; the canonical bundle/guard is unchanged.
+    sql(schema.replace("DATE '"+anchor.isoformat()+"'","DATE '"+invalid+"'"),error='SCMS_DEMO_STALE_ANCHOR')
+    assert before_anchor==sql("SELECT md5(string_agg(to_jsonb(u)::text,',' ORDER BY user_id)) FROM users u")
+check('past_and_future_anchor_rejected_before_ddl_with_rows_preserved')
+
+# Reproduce real readers/writers and another reset without relying on mocked lock errors.
+# Compare every public fixture table and the persistent payment counter after each refusal.
+table_names = sql("SELECT c.relname FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relkind IN ('r','p') ORDER BY c.relname").splitlines()
+snapshot = '\n'.join('SELECT md5(coalesce(jsonb_agg(to_jsonb(t) ORDER BY to_jsonb(t)::text)::text,\'[]\')) FROM public."' + n.replace('"', '""') + '" t;' for n in table_names)
+snapshot_before = sql(snapshot)
+counter_before = sql('SELECT last_value,is_called FROM public.invoice_code_seq')
+for name, held, expected in [
+    ('writer', 'LOCK TABLE ONLY public.users IN ROW EXCLUSIVE MODE', 'SCMS_DEMO_DB_BUSY'),
+    ('reader', 'LOCK TABLE ONLY public.sessions IN ACCESS SHARE MODE', 'SCMS_DEMO_DB_BUSY'),
+    ('another_reset', 'SELECT pg_advisory_xact_lock(391,20261109)', 'SCMS_DEMO_RESET_BUSY'),
+]:
+    with hold_transaction(held):
+        started = time.monotonic()
+        sql(schema, error=expected, timeout=5)
+        elapsed = time.monotonic() - started
+        assert elapsed < 5, (name, elapsed)
+        assert sql(snapshot) == snapshot_before, name + ': rows changed during refused reset'
+        assert sql('SELECT last_value,is_called FROM public.invoice_code_seq') == counter_before, name + ': payment counter changed'
+    check('reset_' + name + '_refused_immediately_all_rows_and_counter_preserved')
+    proof['checks'][-1]['elapsedSeconds'] = round(elapsed, 3)
+sql('CREATE TABLE public.demo_external_child () INHERITS (public.users); INSERT INTO public.demo_external_child SELECT * FROM ONLY public.users LIMIT 1;')
+inherited_before = sql(snapshot)
+sql(schema, error='SCMS_DEMO_WRONG_TARGET')
+assert sql(snapshot) == inherited_before
+assert sql('SELECT count(*) FROM public.demo_external_child') == '1'
+assert sql('SELECT last_value,is_called FROM public.invoice_code_seq') == counter_before
+sql('DROP TABLE public.demo_external_child RESTRICT;')
+assert sql(snapshot) == snapshot_before
+check('unexpected_inheritance_refused_before_reset_and_external_child_preserved')
+sql(schema)
+check('reset_succeeds_after_competing_transactions_end',
+      "SELECT concat_ws(',',(SELECT count(*) FROM users),(SELECT count(*) FROM classes),(SELECT count(*) FROM private_session_proposals))", '47,20,1')
+check('fresh_install_reference_counts', "SELECT concat_ws(',',(SELECT count(*) FROM users),(SELECT count(*) FROM subjects),(SELECT count(*) FROM rooms),(SELECT count(*) FROM classes),(SELECT count(*) FROM coach_work_slots))", '47,9,20,20,882')
+check('sunday_slots_preserve_all_seven_slots_for_each_active_coach', "SELECT count(*) FROM coach_work_slots WHERE slot_key LIKE 'SUNDAY:%'", '126')
+check('issued_attendance_codes_not_fabricated', 'SELECT count(*) FROM members WHERE checkin_code_nonce IS NOT NULL OR checkin_code_issued_at IS NOT NULL OR checkin_code_expires_at IS NOT NULL OR checkin_code_used_at IS NOT NULL', '0')
+requirements=load_requirements(root,PROFILE)
+expected_dates=','.join(requirements['holidayDates'])
+check('annual_holidays_present_inactive_and_demo_closure_active',
+      "SELECT string_agg(holiday_date::text,',' ORDER BY holiday_date) FROM holidays WHERE NOT is_active",expected_dates)
+check('only_expected_demo_closure_active',
+      "SELECT string_agg(holiday_date::text,',' ORDER BY holiday_date) FROM holidays WHERE is_active",(anchor+timedelta(days=50)).isoformat())
+check('advanced_classes_have_accepted_registration_and_exact_owner',"""SELECT count(*) FROM classes c LEFT JOIN advanced_registrations r ON r.class_id=c.class_id
+ WHERE c.class_type='Advanced' AND (r.id IS NULL OR r.status NOT IN ('Accepted','Invoiced') OR c.coach_id IS DISTINCT FROM r.coach_id OR c.subject_id IS DISTINCT FROM r.subject_id)""",'0')
+check('advanced_sessions_use_exact_subscription_private_class',"""SELECT count(*) FROM sessions s JOIN advanced_registrations r ON r.subscription_id=s.subscription_id WHERE s.class_id IS DISTINCT FROM r.class_id""",'0')
+check('requested_rejected_have_no_class_or_subscription',"""SELECT count(*) FROM advanced_registrations WHERE status IN ('Requested','Rejected') AND (class_id IS NOT NULL OR subscription_id IS NOT NULL)""",'0')
+check('accepted_class_count_follows_registrations_not_subjects',"""SELECT ((SELECT count(*) FROM classes WHERE class_type='Advanced')=(SELECT count(*) FROM advanced_registrations WHERE status IN ('Accepted','Invoiced')))::text""",'true')
+check('advanced_rights_keep_registration_member_subject_and_coach',"""SELECT count(*) FROM member_packages p LEFT JOIN advanced_registrations r ON r.subscription_id=p.subscription_id
+ WHERE r.id IS NULL OR r.status<>'Invoiced' OR r.member_id IS DISTINCT FROM p.member_id OR r.subject_id IS DISTINCT FROM p.subject_id OR r.coach_id IS DISTINCT FROM p.primary_coach_id""",'0')
+check('private_sessions_have_registration_class_and_member',"""SELECT count(*) FROM sessions s JOIN classes c ON c.class_id=s.class_id LEFT JOIN advanced_registrations r ON r.subscription_id=s.subscription_id
+ WHERE (s.booked_member_id IS NOT NULL OR s.subscription_id IS NOT NULL OR c.class_type='Advanced') AND (r.id IS NULL OR c.class_type<>'Advanced' OR s.class_id IS DISTINCT FROM r.class_id OR s.booked_member_id IS DISTINCT FROM r.member_id)""",'0')
+check('private_classes_are_single_member_and_same_center',"""SELECT count(*) FROM classes c JOIN advanced_registrations r ON r.class_id=c.class_id JOIN users m ON m.user_id=r.member_id
+ WHERE c.class_type='Advanced' AND (c.max_capacity<>1 OR c.status='Open' OR c.center_id IS DISTINCT FROM m.center_id)""",'0')
+check('coach_acceptance_alone_does_not_create_right_or_session',"""SELECT count(*) FROM advanced_registrations r
+ WHERE r.status='Accepted' AND (r.subscription_id IS NOT NULL OR EXISTS(SELECT 1 FROM sessions s WHERE s.class_id=r.class_id)
+ OR EXISTS(SELECT 1 FROM invoices i WHERE i.class_id=r.class_id))""",'0')
+check('advanced_names_without_one_to_one_suffix',
+      "SELECT count(*) FROM classes WHERE class_type='Advanced' AND class_name LIKE '%(1:1)%'",'0')
+check('no_live_session_on_active_closure',
+      "SELECT count(*) FROM sessions s JOIN holidays h ON h.holiday_date=s.session_date AND h.is_active WHERE s.status<>'Cancelled' AND NOT s.center_invalidated",'0')
+check('member_creator_fk_matches_user_entity',
+      "SELECT confrelid::regclass::text FROM pg_constraint WHERE conrelid='members'::regclass AND conname='fk_member_registered_by'",'users')
+member_id=sql('SELECT min(user_id) FROM members')
+creator_before=sql('SELECT coalesce(registered_by::text,\'NULL\') FROM members WHERE user_id='+member_id)
+members_before=sql("SELECT md5(string_agg(to_jsonb(m)::text,',' ORDER BY user_id)) FROM members m")
+for creator_role in ['CenterManager','Receptionist']:
+    creator=sql("SELECT min(u.user_id) FROM users u JOIN roles r USING(role_id) WHERE r.role_name='"+creator_role+"' AND u.status='Active'")
+    sql('BEGIN; UPDATE members SET registered_by='+creator+' WHERE user_id='+member_id+'; COMMIT;')
+    check('member_creator_'+creator_role+'_persists_after_commit',
+          'SELECT registered_by FROM members WHERE user_id='+member_id,creator)
+sql('UPDATE members SET registered_by='+creator_before+' WHERE user_id='+member_id)
+sql('BEGIN; UPDATE members SET registered_by=-391 WHERE user_id='+member_id+'; COMMIT;',error='fk_member_registered_by')
+assert members_before==sql("SELECT md5(string_agg(to_jsonb(m)::text,',' ORDER BY user_id)) FROM members m")
+check('member_creator_unknown_user_rejected_and_fixture_restored')
 check('unlisted_objects_and_grants_preserved', "SELECT concat_ws(',',(SELECT id FROM demo_external_sentinel),demo_external_function(),nextval('demo_external_sequence'),has_table_privilege('anon','demo_external_sentinel','SELECT'))", '391,391,391,t')
 check('scms_direct_browser_grants_revoked', """SELECT count(*) FROM information_schema.role_table_grants
  WHERE table_schema='public' AND table_name<>'demo_external_sentinel' AND grantee IN ('PUBLIC','anon','authenticated')""", '0')
@@ -64,6 +185,11 @@ check('scms_sequence_browser_grants_revoked', """SELECT count(*) FROM pg_sequenc
  OR has_sequence_privilege('authenticated',quote_ident(schemaname)||'.'||quote_ident(sequencename),'USAGE,SELECT,UPDATE'))""", '0')
 check('approved_accounts_passwords_and_first_login', "SELECT count(*) FROM users WHERE NOT is_first_login AND password_hash=extensions.crypt('SWP391',password_hash)", '47')
 check('approved_synthetic_history_and_dynamic_secrets_empty', "SELECT (EXISTS(SELECT 1 FROM invoices) AND EXISTS(SELECT 1 FROM attendances) AND EXISTS(SELECT 1 FROM training_results) AND NOT EXISTS(SELECT 1 FROM email_otps) AND NOT EXISTS(SELECT 1 FROM vnpay_payment_attempts) AND NOT EXISTS(SELECT 1 FROM invoices WHERE payment_status<>'Paid'))::text", 'true')
+check('advanced_registration_decision_order_and_receipt_chronology', """SELECT count(*) FROM advanced_registrations r
+ LEFT JOIN invoices i ON i.subscription_id=r.subscription_id
+ WHERE (r.status IN ('Accepted','Invoiced','Rejected') AND (r.accepted_by IS NULL OR r.accepted_at IS NULL OR r.accepted_at<r.created_at))
+ OR (i.invoice_id IS NOT NULL AND (r.accepted_at>i.created_at OR i.created_at>=r.accepted_at+interval '24hours'
+     OR i.payment_date<i.created_at OR (i.payment_status='Paid' AND NOT i.reconciliation_required AND i.payment_date>=i.created_at+interval '5minutes')))""", '0')
 check('current_guard_columns_and_validated_constraints', """SELECT concat_ws(',',
  (SELECT count(*) FROM information_schema.columns WHERE table_schema='public' AND
  ((table_name='sessions' AND column_name='attendance_review_pending') OR (table_name='classes' AND column_name='pricing_draft') OR
@@ -88,6 +214,49 @@ assert before == sql("SELECT md5(string_agg(user_id||':'||password_hash,',' ORDE
 sql('DROP VIEW public.demo_external_view RESTRICT;')
 check('external_view_blocks_reset_and_preserves_rows')
 
+# Proposal rows are disposable SQL constraint fixtures, not evidence of Member consent.
+# Keep the one approved cancellation fixture; constraint probes use separate request keys.
+check('approved_cancellation_fixture_only', 'SELECT count(*) FROM private_session_proposals', '1')
+proposal_columns = ('subscription_id,proposed_by,coach_id,room_id,class_id,subject_id,'
+                    'session_date,start_time,end_time,request_key,request_hash,created_at,respond_by')
+proposal_select = """SELECT s.subscription_id,s.coach_id,s.coach_id,s.room_id,s.class_id,c.subject_id,
+ s.session_date,s.start_time,s.end_time,'bundle24-pending',repeat('a',64),
+ clock_timestamp() AT TIME ZONE 'Asia/Ho_Chi_Minh',s.session_date+s.start_time-interval '12hours'
+ FROM sessions s JOIN classes c ON c.class_id=s.class_id
+ WHERE s.subscription_id IS NOT NULL AND s.status='Scheduled' AND NOT EXISTS(SELECT 1 FROM private_session_proposals p WHERE p.session_id=s.session_id) ORDER BY s.session_id LIMIT 1"""
+sql('INSERT INTO private_session_proposals('+proposal_columns+') '+proposal_select)
+check('advanced24_pending_has_no_session',
+      "SELECT status||','||(session_id IS NULL)::text FROM private_session_proposals WHERE request_key='bundle24-pending'", 'Pending,true')
+sql('INSERT INTO private_session_proposals('+proposal_columns+') '+proposal_select, error='uq_private_proposal_request')
+sql("UPDATE private_session_proposals SET subscription_id=-391 WHERE request_key='bundle24-pending'", error='foreign key')
+sql("UPDATE private_session_proposals SET status='Expired',responded_at=created_at WHERE request_key='bundle24-pending'", error='ck_private_proposal_status')
+sql("UPDATE private_session_proposals SET status='Accepted',responded_at=created_at WHERE request_key='bundle24-pending'", error='ck_private_proposal_session')
+sql("UPDATE private_session_proposals SET responded_at=created_at WHERE request_key='bundle24-pending'", error='ck_private_proposal_response')
+sql("UPDATE private_session_proposals SET end_time=start_time WHERE request_key='bundle24-pending'", error='ck_private_proposal_time')
+sql("UPDATE private_session_proposals SET class_id=NULL,subject_id=NULL WHERE request_key='bundle24-pending'", error='ck_private_proposal_target')
+sql("""INSERT INTO private_session_proposals("""+proposal_columns+""",status,responded_at,session_id)
+ SELECT p.subscription_id,p.proposed_by,p.coach_id,p.room_id,p.class_id,p.subject_id,
+ p.session_date,p.start_time,p.end_time,'bundle24-accepted',p.request_hash,p.created_at,p.respond_by,
+ 'Accepted',p.created_at,(SELECT min(session_id) FROM sessions WHERE subscription_id=p.subscription_id AND status='Scheduled')
+ FROM private_session_proposals p WHERE p.request_key='bundle24-pending' LIMIT 1""")
+sql("""INSERT INTO private_session_proposals("""+proposal_columns+""",status,responded_at,session_id)
+ SELECT subscription_id,proposed_by,coach_id,room_id,class_id,subject_id,
+ session_date,start_time,end_time,'bundle24-duplicate-session',request_hash,created_at,respond_by,
+ status,responded_at,session_id FROM private_session_proposals WHERE request_key='bundle24-accepted'""",error='unique constraint')
+check('advanced24_fk_status_response_time_target_and_idempotency_constraints')
+advanced_snapshot = "\n".join("SELECT md5(string_agg(to_jsonb(t)::text,',' ORDER BY "+key+")) FROM "+table+" t;"
+                              for table,key in [('private_session_proposals','id'),('member_packages','subscription_id'),
+                                                ('sessions','session_id'),('invoices','invoice_id')])
+advanced_before = sql(advanced_snapshot)
+advanced_migration=(root/'database/migrations/24_advanced_session_proposals_postgres.sql').read_text(encoding='utf-8')
+sql(advanced_migration);sql(advanced_migration)
+assert advanced_before == sql(advanced_snapshot)
+check('advanced24_replay_preserves_proposals_sessions_credits_and_receipts')
+sql('BEGIN; ALTER TABLE private_session_proposals ALTER COLUMN request_hash TYPE TEXT;'+
+    advanced_migration.replace('BEGIN;','',1),error='SCMS_ADVANCED_PROPOSAL_INCOMPATIBLE')
+assert advanced_before == sql(advanced_snapshot)
+check('advanced24_incompatible_shape_rolls_back')
+
 # Dirty replay: historical backup debris and business data must actually disappear.
 old_ref = int(sql("SELECT nextval('public.invoice_code_seq')"))
 sql("""CREATE TABLE attendances_backup_flow4(id INT); INSERT INTO attendances_backup_flow4 VALUES(164);
@@ -99,6 +268,8 @@ INSERT INTO invoices(invoice_code,member_id,class_id,amount,payment_status,payme
 UPDATE users SET full_name='Local dirty fixture' WHERE user_id=2;
 """)
 sql(schema)
+check('advanced24_reset_recreates_only_approved_cancellation_fixture',
+      'SELECT count(*) FROM private_session_proposals', '1')
 assert sql("SELECT count(*) FROM invoices WHERE invoice_code='INV-2026-9000000000000'") == '0'
 assert sql('SELECT count(*) FROM users') == '47'
 assert sql("SELECT count(*) FROM information_schema.tables WHERE table_schema='public' AND table_name IN ('attendances_backup_flow4','class_enrollments_backup_flow4','role_permissions_backup_n06','training_results_backup_flow4')") == '0'

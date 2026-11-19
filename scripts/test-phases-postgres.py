@@ -58,7 +58,9 @@ for filename in ['06_schedule_safety_postgres.sql','07_session_subscription_post
                  '10_session_incidents_postgres.sql','11_holiday_history_postgres.sql','12_payment_resolutions_postgres.sql',
                  '13_room_catalog_postgres.sql','14_absence_attendance_postgres.sql',
                  '13_google_login_postgres.sql','17_attendance_review_postgres.sql','18_audit_scope_postgres.sql',
-                 '19_room_activity_postgres.sql','20_class_publication_price_postgres.sql','21_normal_lifecycle_postgres.sql','22_normal_changes_refunds_postgres.sql']:
+                 '19_room_activity_postgres.sql','20_class_publication_price_postgres.sql','21_normal_lifecycle_postgres.sql','22_normal_changes_refunds_postgres.sql',
+                 '23_member_registered_by_postgres.sql','24_advanced_session_proposals_postgres.sql','25_advanced_registration_classes_postgres.sql',
+                 '26_issued_attendance_codes_postgres.sql']:
     migration=(root/'database/migrations'/filename).read_text(encoding='utf-8')
     sql(migration)
     sql(migration)
