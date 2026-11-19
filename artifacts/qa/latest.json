@@ -41535,5 +41535,51 @@
       "scripts/test-issued-attendance-codes-postgres.py": "aeaaed2cef42e6308530647fe85b0d8eb0f326b5547cc29fdf1b181c8897f181",
       "scripts/test-phases-postgres.py": "3261c0c71b4e6eebdee7ed8fb6998dde96ba25e6552c9ff379e15efc1fe027e7"
     }
+  },
+  "gitTaiPushConflictReview20261119": {
+    "status": "DIAGNOSED_INTEGRATION_NOT_PERFORMED",
+    "checkedAtUtc": "2026-11-19T01:17:30.664829+00:00",
+    "scope": "Fetch + dry-run push + merge-tree simulations; no checkout/index mutation/merge/rebase/commit/actual push or BE tests",
+    "refs": {
+      "HEAD": "f056f5077c0244e82119d54e9341f3041f2f580b",
+      "main": "f056f5077c0244e82119d54e9341f3041f2f580b",
+      "tai": "7a57045e208266341c6a48e051a3b58b8ff3d783",
+      "origin/main": "42984f458f029bbe4de700f4b4170632fa5f53d6",
+      "origin/tai": "b6f5ca206bdd096a2038bd8136a8f29d6cd13092"
+    },
+    "rootInitiallyClean": true,
+    "defaultPushTarget": "origin/main",
+    "taiPushRejected": "non-fast-forward",
+    "localOnlyAgainstTai": 1,
+    "remoteOnlyAgainstTai": 15,
+    "conflictPathsTai": 43,
+    "conflictPathsMain": 42,
+    "conflictCategoriesTai": {
+      "productionJava": 9,
+      "testJava": 4,
+      "database": 6,
+      "scripts": 10,
+      "otherDocsQaCi": 14
+    },
+    "evidence": "artifacts/runs/git-tai-review-20261119/merge-review.json",
+    "next": "Integrate origin/tai in an isolated preparation branch, resolve code/contracts/history, regenerate derived artifacts as needed, test before normal push; no force push",
+    "cleanup": {
+      "bytesDeleted": 0,
+      "temporaryWorktreeBuildDatabaseCreated": false,
+      "evidenceRetained": true
+    }
+  },
+  "gitTaiIntegration20261119": {
+    "status": "IN_PROGRESS",
+    "scope": "Integrate remote history, resolve conflicts, test, push tai, merge into main. No cloud SQL/FE/provider/deploy added.",
+    "baseline": "artifacts/runs/git-tai-integration-20261119/baseline.json",
+    "refsBefore": {
+      "HEAD": "f056f5077c0244e82119d54e9341f3041f2f580b",
+      "origin/main": "42984f458f029bbe4de700f4b4170632fa5f53d6",
+      "origin/tai": "b6f5ca206bdd096a2038bd8136a8f29d6cd13092",
+      "tai": "7a57045e208266341c6a48e051a3b58b8ff3d783"
+    },
+    "plan": "Merge origin/main into isolated integration branch in existing workspace; preserves remote/tai ancestry; resolve with approved19Nov rules; no new clone/worktree; test in credential-free runner; push tai then merge main with skip-render commits",
+    "supabaseProviderFrontendDeployment": "NOT_RUN"
   }
 }
