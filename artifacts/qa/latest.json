@@ -41570,7 +41570,7 @@
     }
   },
   "gitTaiIntegration20261119": {
-    "status": "TAI_PUSHED_CI_PASS_MAIN_MERGE_PENDING_PUBLICATION",
+    "status": "COMPLETE_GIT_CI_FILESYSTEM_CLEANUP_POLICY_BLOCKED",
     "scope": "Integrate remote history, resolve conflicts, test, push tai, merge into main. No cloud SQL/FE/provider/deploy added.",
     "baseline": "artifacts/runs/git-tai-integration-20261119/baseline.json",
     "refsBefore": {
@@ -41689,8 +41689,37 @@
     "mainMerge": {
       "firstParent": "42984f458f029bbe4de700f4b4170632fa5f53d6",
       "secondParent": "f73da03a638588489efeb6a59bd890452e12aa78",
-      "status": "PREPARED_FOR_PUSH",
-      "ci": "NOT_RUN_YET"
-    }
+      "status": "PUSHED_CI_PASS",
+      "ci": "PASS",
+      "sha": "4b96fc9165c299c596825c23456daa7bd5df66af",
+      "ciRunId": 44440377925,
+      "ciUrl": "https://github.com/Aditerx/SWP391/actions/runs/44440377925",
+      "forceUsed": false
+    },
+    "rootWorkspace": {
+      "branch": "main",
+      "synchronizedWithOrigin": true,
+      "remoteAndOriginalLocalHistoryPreserved": true,
+      "applicationSourceMatchesTaiCandidate": true,
+      "mainMergeFirstParent": "42984f458f029bbe4de700f4b4170632fa5f53d6"
+    },
+    "contractAudit": {
+      "status": "PASS_OFFLINE",
+      "evidence": "artifacts/runs/git-tai-integration-20261119/contract-audit.json",
+      "sourceRoutesMatched": 215,
+      "wireIssues": 0
+    },
+    "cleanup": {
+      "status": "PARTIAL_FILESYSTEM_POLICY_BLOCK",
+      "filesystemBytesDeleted": 0,
+      "filesystemRetainedBytes": 61425014,
+      "filesystemEvidence": "artifacts/runs/git-tai-integration-20261119/cleanup-filesystem-policy-block.json",
+      "reason": "Automatic approval review rejected the temporary build/staging/worktree removal command: blocked by policy. Command never executed; no alternate deletion attempted.",
+      "databasesDeleted": 5,
+      "databaseBytesDeleted": 55431551,
+      "databaseEvidence": "artifacts/runs/git-tai-integration-20261119/cleanup-database.json",
+      "retained": "Owner source/dirty tai cache, root target, shared Maven/npm caches, parent pristine19 DB, evidence and all blocked temporary filesystem targets"
+    },
+    "publicationScope": "Git history integration and CI complete. All pushed tips use skip-render; no Supabase SQL, provider/email/FE testing or manual deploy performed. Final evidence-only commit may skip CI; application source remains the tested merge tree."
   }
 }
