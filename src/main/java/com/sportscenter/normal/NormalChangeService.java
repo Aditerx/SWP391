@@ -112,8 +112,8 @@ public class NormalChangeService {
         prestart(c);version(c,input.version());
         c.setStatus("Cancelled");c.setChangePending(false);c.setLifecycleVersion(c.getLifecycleVersion()+1);cancelUnpaid(c);
         // Include reconciled late receipts: money received is never silently discarded.
-        for(Invoice i:invoices.findEffectiveClassInvoices(classId))if("Paid".equals(i.getPaymentStatus())&&!i.isCashConfirmationReversed())refunds.obligation(invoices.findByIdForUpdate(i.getInvoiceId()).orElseThrow(),c,"CenterCancellation",input.reason(),actor.getId());
-        for(ClassEnrollment e:enrollments.findByClassIdWithDetails(classId)){e.setStatus("Cancelled");e.setCancelledAt(now());e.setCancelReason(input.reason());notify(e.getMember().getId(),"Center cancelled the class; genuine receipts have refund obligations",classId,"CANCEL:"+classId);}
+        for(Invoice i:invoices.findEffectiveClassInvoices(classId))if("Paid".equals(i.getPaymentStatus())&&!i.isCashConfirmationReversed())refunds.cancellationObligation(invoices.findByIdForUpdate(i.getInvoiceId()).orElseThrow(),c,input.reason(),actor.getId());
+        for(ClassEnrollment e:enrollments.findByClassIdWithDetails(classId)){e.setStatus("Cancelled");e.setCancelledAt(now());e.setCancelReason(input.reason());notify(e.getMember().getId(),"Center cancelled the class. Completed refunds remain recorded; pending refunds continue through their existing process.",classId,"CANCEL:"+classId);}
         for(Session s:sessions.findBySportsClassId(classId))if("Scheduled".equals(s.getStatus()))s.setStatus("Cancelled");
         for(NormalProposal p:proposals.findByClassIdOrderByIdDesc(classId))if("Pending".equals(p.getStatus()))p.setStatus("Cancelled");
         audit.log(actor.getId(),"CANCEL_NORMAL_PRESTART","CLASS",classId,"reason="+input.reason());return SportsClassResponse.from(c);

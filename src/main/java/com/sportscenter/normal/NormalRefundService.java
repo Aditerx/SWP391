@@ -87,6 +87,26 @@ public class NormalRefundService {
         return f;
     }
 
+    /** Cancellation keeps an existing D10 financial case on its original workflow. Caller holds center/class/invoice locks. */
+    @Transactional
+    public void cancellationObligation(Invoice invoice,SportsClass c,String reason,Integer actorId) {
+        var existing=resolutions.findByInvoiceInvoiceIdAndType(invoice.getInvoiceId(),"Refund");
+        if(existing.isPresent() && !refunds.existsById(existing.get().getId())) {
+            PaymentResolution r=existing.get();
+            if(!c.isNormal() || !"Paid".equals(invoice.getPaymentStatus()) || invoice.isCashConfirmationReversed()
+                    || !invoice.isReconciliationRequired() || invoice.effectiveClass()==null
+                    || !Objects.equals(c.getId(),invoice.effectiveClass().getId())
+                    || !Objects.equals(c.getCenterId(),invoice.getMember().getCenterId())
+                    || r.getAmount()==null || r.getAmount().signum()<=0 || r.getAmount().compareTo(invoice.getAmount())!=0
+                    || !Set.of("Open","Approved","Blocked","Completed").contains(r.getStatus()))
+                throw new BusinessConflictException("REFUND_ALREADY_EXISTS: Reconcile the existing refund; it is not a matching D10 case");
+            audit.log(actorId,"REUSE_REFUND_ON_NORMAL_CANCELLATION","INVOICE",invoice.getInvoiceId(),
+                    "class="+c.getId()+"; resolution="+r.getId()+"; workflow=D10; status="+r.getStatus()+"; no new refund created");
+            return;
+        }
+        obligation(invoice,c,"CenterCancellation",reason,actorId);
+    }
+
     @Transactional
     public void lateCancelledReceipt(Invoice invoice) {
         SportsClass c=invoice.effectiveClass();

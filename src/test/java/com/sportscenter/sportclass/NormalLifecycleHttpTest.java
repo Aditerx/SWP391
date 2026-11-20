@@ -7,6 +7,8 @@ import com.sportscenter.invoice.*;
 import com.sportscenter.training.*;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.*;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.*;
@@ -449,6 +451,119 @@ class NormalLifecycleHttpTest {
             assertEquals(cutoff,jdbc.queryForObject("SELECT expires_at FROM invoices WHERE invoice_id=?",LocalDateTime.class,order.path("invoiceId").asInt()));
             assertEquals(1,jdbc.queryForObject("SELECT count(*) FROM invoices WHERE class_id=?",Integer.class,id));
         } finally {org.springframework.test.util.ReflectionTestUtils.setField(paymentProperties,"expireMinutes",previous);}
+    }
+    void existingD10LateReceipt(JsonNode order)throws Exception {
+        clock.at(LocalDateTime.parse(order.path("expiresAt").asText()));
+        var params=new TreeMap<String,String>(Map.of("vnp_TmnCode","LOCALTEST","vnp_TxnRef",order.path("invoiceCode").asText(),"vnp_Amount","90000000","vnp_ResponseCode","00","vnp_TransactionStatus","00","vnp_TransactionNo","D10-CANCEL-"+fixture));
+        String data=params.entrySet().stream().map(e->java.net.URLEncoder.encode(e.getKey(),java.nio.charset.StandardCharsets.UTF_8)+"="+java.net.URLEncoder.encode(e.getValue(),java.nio.charset.StandardCharsets.UTF_8)).collect(java.util.stream.Collectors.joining("&"));
+        var mac=javax.crypto.Mac.getInstance("HmacSHA512");mac.init(new javax.crypto.spec.SecretKeySpec("local-normal-test-key".getBytes(java.nio.charset.StandardCharsets.UTF_8),"HmacSHA512"));
+        String query=data+"&vnp_SecureHash="+HexFormat.of().formatHex(mac.doFinal(data.getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+        mvc.perform(get("/api/payments/vnpay/ipn?"+query)).andExpect(status().isOk()).andExpect(jsonPath("$.RspCode").value("00"));
+        assertTrue(jdbc.queryForObject("SELECT reconciliation_required FROM invoices WHERE invoice_id=?",Boolean.class,order.path("invoiceId").asInt()));
+    }
+    JsonNode existingD10Open(int invoice)throws Exception {
+        return postAs("/api/payment-resolutions",cashier,Map.of("invoiceId",invoice,"type","Refund","reason","DEMO money recorded without granting an entitlement"),200);
+    }
+    JsonNode existingD10Report()throws Exception {
+        return json.readTree(mvc.perform(get("/api/reports/dashboard").session(login(manager))).andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+    }
+    @ParameterizedTest @ValueSource(strings={"Open","Approved","Blocked","Completed"})
+    void existingD10RefundSurvivesMixedClassCancellationAndContinuesItsOriginalWorkflow(String status)throws Exception {
+        int c=create(4,null).path("id").asInt();var order=enroll(c,member,"VNPay");int invoice=order.path("invoiceId").asInt();
+        int normalInvoice=enroll(c,second,"Cash").path("invoiceId").asInt();int pendingInvoice=enroll(c,third,"VNPay").path("invoiceId").asInt();
+        existingD10LateReceipt(order);int r=existingD10Open(invoice).path("id").asInt();
+        if(Set.of("Approved","Completed").contains(status))postAs("/api/payment-resolutions/"+r+"/approve",manager,Map.of(),200);
+        Map<String,Object> completion=Map.of("evidence","DEMO independent external refund record; no real transfer","performedAt",LocalDateTime.now(clock).toString(),"moneyNotReceived",false);
+        if("Completed".equals(status))postAs("/api/payment-resolutions/"+r+"/complete",manager,completion,200);
+        if("Blocked".equals(status))jdbc.update("UPDATE payment_resolutions SET status='Blocked',outcome_note='DEMO existing review needs follow-up' WHERE id=?",r);
+        var financialBefore=jdbc.queryForMap("SELECT * FROM payment_resolutions WHERE id=?",r);var invoiceBefore=jdbc.queryForMap("SELECT * FROM invoices WHERE invoice_id=?",invoice);var reportBefore=existingD10Report();
+        long v=classView(c,manager).path("lifecycleVersion").asLong();
+        postAs("/api/classes/"+c+"/cancel-before-opening",cashier,Map.of("version",v,"reason","Wrong role"),403);
+        postAs("/api/classes/"+c+"/cancel-before-opening",outsider,Map.of("version",v,"reason","Wrong center"),403);
+        var cancelled=postAs("/api/classes/"+c+"/cancel-before-opening",manager,Map.of("version",v,"reason","Center cannot provide class"),200);
+        assertEquals(c,cancelled.path("id").asInt());assertEquals("Cancelled",cancelled.path("status").asText());assertEquals(v+1,cancelled.path("lifecycleVersion").asLong());
+        var after=classSnapshot(c);
+        postAs("/api/classes/"+c+"/cancel-before-opening",manager,Map.of("version",v,"reason","Retry same cancellation"),200);assertEquals(after,classSnapshot(c));
+        assertEquals("Cancelled",state(c));assertEquals(12,jdbc.queryForObject("SELECT count(*) FROM sessions WHERE class_id=? AND status='Cancelled'",Integer.class,c));
+        assertEquals(0,jdbc.queryForObject("SELECT count(*) FROM class_enrollments WHERE class_id=? AND status<>'Cancelled'",Integer.class,c));
+        assertEquals("Cancelled",jdbc.queryForObject("SELECT payment_status FROM invoices WHERE invoice_id=?",String.class,pendingInvoice));
+        assertEquals(financialBefore,jdbc.queryForMap("SELECT * FROM payment_resolutions WHERE id=?",r));assertEquals(invoiceBefore,jdbc.queryForMap("SELECT * FROM invoices WHERE invoice_id=?",invoice));
+        assertEquals(1,jdbc.queryForObject("SELECT count(*) FROM payment_resolutions WHERE invoice_id=?",Integer.class,invoice));assertEquals(0,jdbc.queryForObject("SELECT count(*) FROM normal_refunds WHERE id=?",Integer.class,r));
+        assertEquals(1,jdbc.queryForObject("SELECT count(*) FROM normal_refunds n JOIN payment_resolutions p ON p.id=n.id WHERE n.class_id=? AND p.invoice_id=?",Integer.class,c,normalInvoice));
+        assertEquals(1,jdbc.queryForObject("SELECT count(*) FROM system_logs WHERE action='REUSE_REFUND_ON_NORMAL_CANCELLATION' AND target_id=?",Integer.class,invoice));
+        var reportAfter=existingD10Report();for(String field:List.of("totalRevenue","moneyReceived","moneyRefunded","netReceived"))assertEquals(reportBefore.path(field),reportAfter.path(field));
+        JsonNode common=json.readTree(mvc.perform(get("/api/payment-resolutions").session(login(manager))).andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+        assertTrue(java.util.stream.StreamSupport.stream(common.spliterator(),false).anyMatch(x->x.path("id").asInt()==r&&status.equals(x.path("status").asText())));
+        assertEquals(0,json.readTree(mvc.perform(get("/api/normal-refunds").session(login(member))).andExpect(status().isOk()).andReturn().getResponse().getContentAsString()).size());
+        mvc.perform(get("/api/payment-resolutions").session(login(member))).andExpect(status().isForbidden());
+        if(!"Completed".equals(status))postAs("/api/payment-resolutions/"+r+"/approve",manager,Map.of(),200);
+        var completed=postAs("/api/payment-resolutions/"+r+"/complete",manager,completion,200);assertEquals("Completed",completed.path("status").asText());
+        assertEquals(completed,postAs("/api/payment-resolutions/"+r+"/complete",manager,completion,200));
+        assertEquals(0,existingD10Report().path("moneyRefunded").decimalValue().subtract(reportAfter.path("moneyRefunded").decimalValue()).compareTo("Completed".equals(status)?BigDecimal.ZERO:new BigDecimal("900000")));
+    }
+    @ParameterizedTest @ValueSource(strings={"Amount","Reconciliation","Status"})
+    void existingD10InvalidFinancialCaseRollsBackWholeCancellation(String invalid)throws Exception {
+        int c=create(4,null).path("id").asInt();enroll(c,second,"Cash");var order=enroll(c,member,"VNPay");int invoice=order.path("invoiceId").asInt();
+        existingD10LateReceipt(order);int r=existingD10Open(invoice).path("id").asInt();
+        if("Amount".equals(invalid))jdbc.update("UPDATE payment_resolutions SET amount=amount-1 WHERE id=?",r);
+        if("Reconciliation".equals(invalid))jdbc.update("UPDATE invoices SET reconciliation_required=false WHERE invoice_id=?",invoice);
+        if("Status".equals(invalid))jdbc.update("UPDATE payment_resolutions SET status='AwaitingReceiver' WHERE id=?",r);
+        var before=classSnapshot(c);var financial=jdbc.queryForMap("SELECT * FROM payment_resolutions WHERE id=?",r);
+        assertEquals("REFUND_ALREADY_EXISTS",postAs("/api/classes/"+c+"/cancel-before-opening",manager,Map.of("version",0,"reason","Do not discard a conflicting financial case"),409).path("code").asText());
+        assertEquals(before,classSnapshot(c));assertEquals(financial,jdbc.queryForMap("SELECT * FROM payment_resolutions WHERE id=?",r));
+        assertEquals(0,jdbc.queryForObject("SELECT count(*) FROM normal_refunds WHERE class_id=?",Integer.class,c));
+    }
+    @ParameterizedTest @ValueSource(strings={"Open","Complete","Cancel"})
+    void existingD10ConcurrentFinancialActionAndCancellationKeepOneFinancialCase(String action)throws Exception {
+        int c=create(1,null).path("id").asInt();var order=enroll(c,member,"VNPay");int invoice=order.path("invoiceId").asInt();existingD10LateReceipt(order);
+        int resolution="Open".equals(action)?0:existingD10Open(invoice).path("id").asInt();
+        if(resolution!=0)postAs("/api/payment-resolutions/"+resolution+"/approve",manager,Map.of(),200);
+        var a=login(manager);var b=login(manager);var start=new java.util.concurrent.CountDownLatch(1);var ready=new java.util.concurrent.CountDownLatch(2);var pool=java.util.concurrent.Executors.newFixedThreadPool(2);
+        String cancelPath="/api/classes/"+c+"/cancel-before-opening";String cancelBody=json.writeValueAsString(Map.of("version",0,"reason","Concurrent center cancellation"));
+        String otherPath="Open".equals(action)?"/api/payment-resolutions":"Complete".equals(action)?"/api/payment-resolutions/"+resolution+"/complete":cancelPath;
+        String otherBody="Open".equals(action)?json.writeValueAsString(Map.of("invoiceId",invoice,"type","Refund","reason","Concurrent D10 review")):"Complete".equals(action)?json.writeValueAsString(Map.of("evidence","DEMO independent refund evidence","performedAt",LocalDateTime.now(clock).toString(),"moneyNotReceived",false)):cancelBody;
+        try(var blocker=jdbc.getDataSource().getConnection()) {
+            blocker.setAutoCommit(false);try(var s=blocker.createStatement()){s.executeQuery("SELECT center_id FROM centers WHERE center_id=1 FOR UPDATE").close();}
+            var first=pool.submit(()->{ready.countDown();assertTrue(start.await(10,java.util.concurrent.TimeUnit.SECONDS));return mvc.perform(post(cancelPath).session(a).contentType("application/json").content(cancelBody)).andReturn().getResponse().getStatus();});
+            var other=pool.submit(()->{ready.countDown();assertTrue(start.await(10,java.util.concurrent.TimeUnit.SECONDS));return mvc.perform(post(otherPath).session(b).contentType("application/json").content(otherBody)).andReturn().getResponse().getStatus();});
+            assertTrue(ready.await(10,java.util.concurrent.TimeUnit.SECONDS));start.countDown();
+            if(!System.getProperty("scms.normal.pg-url","").isBlank()) {
+                long until=System.nanoTime()+java.util.concurrent.TimeUnit.SECONDS.toNanos(10);int waiters=0;
+                while(System.nanoTime()<until) {waiters=jdbc.queryForObject("SELECT count(*) FROM pg_stat_activity WHERE datname=current_database() AND pid<>pg_backend_pid() AND wait_event_type='Lock' AND cardinality(pg_blocking_pids(pid))>0 AND query ILIKE '%centers%'",Integer.class);if(waiters>=2)break;Thread.sleep(20);}
+                assertTrue(waiters>=2,"Both writers must actually wait on the center lock before release");
+            }
+            blocker.commit();assertEquals(200,first.get(30,java.util.concurrent.TimeUnit.SECONDS));assertEquals(200,other.get(30,java.util.concurrent.TimeUnit.SECONDS));
+        } finally {start.countDown();pool.shutdownNow();}
+        assertEquals("Cancelled",state(c));assertEquals(1,jdbc.queryForObject("SELECT count(*) FROM payment_resolutions WHERE invoice_id=? AND resolution_type='Refund'",Integer.class,invoice));
+        assertEquals(1,jdbc.queryForObject("SELECT count(*) FROM system_logs WHERE action='CANCEL_NORMAL_PRESTART' AND target_id=?",Integer.class,c));
+        int actual=jdbc.queryForObject("SELECT id FROM payment_resolutions WHERE invoice_id=?",Integer.class,invoice);int normal=jdbc.queryForObject("SELECT count(*) FROM normal_refunds WHERE id=?",Integer.class,actual);
+        if(!"Open".equals(action)){assertEquals(resolution,actual);assertEquals(0,normal);assertEquals("Complete".equals(action)?"Completed":"Approved",jdbc.queryForObject("SELECT status FROM payment_resolutions WHERE id=?",String.class,actual));}
+        else {
+            assertEquals(normal==1?"AwaitingReceiver":"Open",jdbc.queryForObject("SELECT status FROM payment_resolutions WHERE id=?",String.class,actual));
+            if(normal==1)assertEquals(c,jdbc.queryForObject("SELECT class_id FROM normal_refunds WHERE id=?",Integer.class,actual));
+        }
+    }
+    JsonNode existingD10Month(String month)throws Exception {
+        LocalDate from=LocalDate.parse(month+"-01");
+        return json.readTree(mvc.perform(get("/api/reports/revenue").session(login(manager)).param("startDate",from.toString()).param("endDate",from.plusMonths(1).minusDays(1).toString()).param("groupBy","month")).andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+    }
+    @Test void existingD10CompletionAfterCancellationPreservesReceiptMonthAndCountsRefundOnce()throws Exception {
+        var novemberBefore=existingD10Month("2026-11");var decemberBefore=existingD10Month("2026-12");
+        int c=create(1,null).path("id").asInt();var order=enroll(c,member,"VNPay");int invoice=order.path("invoiceId").asInt();existingD10LateReceipt(order);
+        int r=existingD10Open(invoice).path("id").asInt();postAs("/api/payment-resolutions/"+r+"/approve",manager,Map.of(),200);
+        var original=jdbc.queryForMap("SELECT payment_status,amount,payment_date FROM invoices WHERE invoice_id=?",invoice);
+        postAs("/api/classes/"+c+"/cancel-before-opening",manager,Map.of("version",0,"reason","Center cancels before first session"),200);
+        clock.at(LocalDateTime.of(2026,12,1,10,0));
+        Map<String,Object> body=Map.of("evidence","DEMO independently matched December refund","performedAt",LocalDateTime.now(clock).toString(),"moneyNotReceived",false);
+        var completed=postAs("/api/payment-resolutions/"+r+"/complete",manager,body,200);assertEquals("Completed",completed.path("status").asText());
+        var november=existingD10Month("2026-11");var december=existingD10Month("2026-12");
+        assertEquals(0,november.path("moneyReceived").decimalValue().subtract(novemberBefore.path("moneyReceived").decimalValue()).compareTo(new BigDecimal("900000")));
+        assertEquals(novemberBefore.path("moneyRefunded"),november.path("moneyRefunded"));
+        assertEquals(decemberBefore.path("moneyReceived"),december.path("moneyReceived"));
+        assertEquals(0,december.path("moneyRefunded").decimalValue().subtract(decemberBefore.path("moneyRefunded").decimalValue()).compareTo(new BigDecimal("900000")));
+        assertEquals(0,december.path("netReceived").decimalValue().subtract(decemberBefore.path("netReceived").decimalValue()).compareTo(new BigDecimal("-900000")));
+        assertEquals(completed,postAs("/api/payment-resolutions/"+r+"/complete",manager,body,200));assertEquals(december,existingD10Month("2026-12"));
+        assertEquals(original,jdbc.queryForMap("SELECT payment_status,amount,payment_date FROM invoices WHERE invoice_id=?",invoice));
     }
     @Test void unpaidWaitlistInvitationKeepsItsFiveMinuteWindowWithoutIssuingAnInvoice()throws Exception {
         int id=create(1,null).path("id").asInt();int invoice=enroll(id,member,"VNPay").path("invoiceId").asInt();
