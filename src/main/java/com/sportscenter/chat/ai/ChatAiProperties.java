@@ -18,12 +18,12 @@ public class ChatAiProperties {
     private String apiKey = "";
     private String baseUrl = "https://api.anthropic.com";
     private String apiVersion = "2026-10-21";
-    private int timeoutSeconds = 12;
-    private int maxTokens = 400;
-    private int maxInputCharacters = 8000;
-    private int maxKnowledgeBaseCharacters = 12000;
+    private int timeoutSeconds = 30;
+    private int maxTokens = 1000;
+    private int maxInputCharacters = 16000;
+    private int maxKnowledgeBaseCharacters = 24000;
     private double temperature = 0.2;
-    private int dailyLimitPerMember = 30;
+    private int dailyLimitPerMember = 100;
     private int faqMatchThreshold = 2;
     private int faqMaxAnswerCharacters = 1200;
     private int faqFallbackEscalationThreshold = 2;
@@ -31,8 +31,8 @@ public class ChatAiProperties {
     private String deepseekBaseUrl = "https://api.deepseek.com";
     private String deepseekModel = "deepseek-flash";
     private String deepseekApiKey = "";
-    private int deepseekTimeoutSeconds = 12;
-    private int deepseekMaxTokens = 400;
+    private int deepseekTimeoutSeconds = 30;
+    private int deepseekMaxTokens = 1000;
     private boolean dbToolsEnabled;
     private boolean markdownEnabled;
     private int toolMaxRounds = 3;

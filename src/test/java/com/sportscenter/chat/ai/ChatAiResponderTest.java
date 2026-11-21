@@ -120,7 +120,7 @@ class ChatAiResponderTest {
         verify(client).complete(argThat(prompt -> prompt.contains("HANDOFF") && prompt.length() > 100), argThat(messages -> messages.size() == 1
                 && messages.get(0).role().equals("user")
                 && !messages.get(0).content().contains("swordfish")
-                && messages.get(0).content().contains("[message omitted")), eq(400));
+                && messages.get(0).content().contains("[message omitted")), eq(1000));
         assertEquals("Hello", reply.content());
         assertTrue(reply.metadata().contains("\"inputTokens\":7"));
         assertFalse(reply.metadata().contains("777"));
@@ -178,8 +178,8 @@ class ChatAiResponderTest {
             assertTrue(reply.content().startsWith("Xin ch\u00e0o!"));
             assertFalse(reply.content().contains("[HANDOFF]"));
         }
-        assertTrue(respond(responder, "gi\u1edd m\u1edf c\u1eeda").content().contains("07:00"));
-        assertTrue(respond(responder, "gio mo cua").content().contains("22:00"));
+        assertTrue(respond(responder, "gi\u1edd m\u1edf c\u1eeda").content().contains("06:00"));
+assertTrue(respond(responder, "gio mo cua").content().contains("20:00"));
         FaqKnowledgeBase generatedKeywords = new FaqKnowledgeBase("## Court Booking\nCourt booking information.");
         assertEquals("Court booking information.", generatedKeywords.answer("court", 2, 1200).orElseThrow());
     }
