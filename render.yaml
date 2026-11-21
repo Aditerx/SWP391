@@ -43,9 +43,15 @@ services:
       - key: SCMS_AI_CHAT_DEEPSEEK_MODEL
         value: deepseek-flash
       - key: SCMS_AI_CHAT_DEEPSEEK_TIMEOUT_SECONDS
-        value: "12"
+        value: "30"
       - key: SCMS_AI_CHAT_DEEPSEEK_MAX_TOKENS
-        value: "400"
+        value: "1000"
+      - key: SCMS_AI_CHAT_TIMEOUT_SECONDS
+        value: "30"
+      - key: SCMS_AI_CHAT_MAX_TOKENS
+        value: "1000"
+      - key: SCMS_AI_CHAT_MAX_INPUT_CHARACTERS
+        value: "16000"
       - key: SCMS_AI_CHAT_DB_TOOLS_ENABLED
         value: "false"
       - key: SCMS_AI_CHAT_MARKDOWN_ENABLED
@@ -55,11 +61,11 @@ services:
       - key: SCMS_AI_CHAT_TOOL_MAX_ROWS
         value: "10"
       - key: SCMS_AI_CHAT_MAX_KNOWLEDGE_BASE_CHARACTERS
-        value: "12000"
+        value: "24000"
       - key: SCMS_AI_CHAT_TEMPERATURE
         value: "0.2"
       - key: SCMS_AI_CHAT_DAILY_LIMIT_PER_MEMBER
-        value: "30"
+        value: "100"
       - key: DEEPSEEK_API_KEY
         sync: false
       - key: SCMS_AI_CHAT_NEW_CONVERSATION_HANDLER

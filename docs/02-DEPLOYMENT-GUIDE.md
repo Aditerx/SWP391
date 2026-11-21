@@ -96,7 +96,14 @@ Nhãn Try it out/Execute kiểm từ bundle Swagger runtime; tag/route lấy t�
 | SCMS_AI_CHAT_PROVIDER | mock mặc định để dev FE không cần key; Anthropic chỉ khi chọn rõ |
 | SCMS_AI_CHAT_NEW_CONVERSATION_HANDLER | STAFF mặc định; chọn AI riêng cho local mock khi muốn kiểm UI trợ lý |
 | ANTHROPIC_API_KEY,SCMS_AI_CHAT_MODEL | Chỉ cần cho provider Anthropic; key lưu secret store, model là model ID đang khả dụng trong Anthropic Console |
-| SCMS_AI_CHAT_TIMEOUT_SECONDS,SCMS_AI_CHAT_MAX_TOKENS,SCMS_AI_CHAT_MAX_INPUT_CHARACTERS | timeout12s, đầu ra tối đa400 token, lịch sử tối đa8000 ký tự gửi provider |
+| SCMS_AI_CHAT_TIMEOUT_SECONDS,SCMS_AI_CHAT_MAX_TOKENS,SCMS_AI_CHAT_MAX_INPUT_CHARACTERS | timeout30s, đầu ra tối đa1000 token (Anthropic), lịch sử tối đa16000 ký tự gửi provider |
+| SCMS_AI_CHAT_DEEPSEEK_TIMEOUT_SECONDS,SCMS_AI_CHAT_DEEPSEEK_MAX_TOKENS | timeout30s, đầu ra tối đa1000 token cho mỗi phản hồi DeepSeek |
+| SCMS_AI_CHAT_MAX_KNOWLEDGE_BASE_CHARACTERS,SCMS_AI_CHAT_DAILY_LIMIT_PER_MEMBER | Knowledge base tối đa24000 ký tự; tối đa100 lượt hỏi AI/member/ngày |
+
+Các giá trị trong `render.yaml` là cấu hình cho Blueprint; nếu sửa environment variable thủ công trên Render Dashboard thì thay đổi trong file này không tự cập nhật service đã tạo. Cần đồng bộ biến trên Dashboard riêng khi muốn áp dụng cho service hiện hữu.
+| SCMS_AI_COACH_DAILY_LIMIT,SCMS_AI_COACH_MAX_INPUT_CHARACTERS,SCMS_AI_COACH_HEALTH_NOTE_ENABLED | 30 tin/ngày, 4.000 ký tự/tin, true; health note chỉ hiện trong tool hồ sơ một học viên, tối đa300 ký tự |
+
+Coach AI dùng bảng riêng. Với DB hiện có, đối chiếu trạng thái rồi chạy nguyên [migration23](../database/migrations/23_coach_ai_conversations_postgres.sql); đây là migration cộng thêm, không chạy lại reset/seed. Bản dựng lại demo có sẵn hai bảng trong `database/schema_postgres.sql`, schema root cũng có cấu trúc tương ứng. DDL auto vẫn none. `SCMS_AI_CHAT_DB_TOOLS_ENABLED` điều khiển read-only tools cho cả hai ngữ cảnh; registry chọn danh sách riêng theo context authenticated.
 
 Đây là default/source, không chứng nhận dashboard đã đặt đúng; external Spring configuration có thể override. Cùng host/password chưa chứng minh cùng Supabase project. HikariCP là pool JDBC của ứng dụng, khác Supabase pooler; source default5connection/timeout30000ms. Fingerprint chỉ đối chiếu target hiệu lực, không là chứng nhận toàn API.
 
@@ -113,7 +120,7 @@ $env:SCMS_AI_CHAT_NEW_CONVERSATION_HANDLER = 'AI'
 
 Khi tắt feature flag, hội thoại mới luôn là STAFF như trước. Nếu bật mock nhưng để handler STAFF thì chat vẫn chuyển đến nhân viên; lựa chọn handler mặc định hiện được giữ STAFF cho đến khi Owner chốt. Mock không gọi mạng. Provider Anthropic dùng `POST /v1/messages`, `x-api-key`, `anthropic-version`, `model`, `max_tokens`, `system` và `messages` theo [Messages API chính thức](https://platform.claude.com/docs/en/api/go/messages/create); chọn model ID có hiệu lực trong Console và chỉ đặt key qua `.env` ignored hoặc secret store. Không cần dependency SDK riêng.
 
-Mỗi request chỉ nhận tối đa20 tin mới nhất, giữ lịch sử trong giới hạn ký tự và loại tin SYSTEM. Tin có dấu hiệu password/OTP/token hoặc số thẻ được bỏ toàn bộ trước khi gửi. Không gửi member ID hoặc dữ liệu hội thoại khác. Timeout tối đa cấu hình12giây, thử lại một lần với timeout/lỗi HTTP5xx; lỗi cuối chuyển hội thoại sang STAFF bằng SYSTEM message. Log chỉ ghi loại exception và conversation ID, không ghi nội dung prompt, response hoặc key. Bộ lọc theo mẫu là lớp giảm thiểu, không thay thế rà soát dữ liệu; chatbot vẫn chưa được phép xử lý dữ liệu tài khoản/thanh toán.
+Mỗi request chỉ nhận tối đa20 tin mới nhất, giữ lịch sử trong giới hạn16.000 ký tự và loại tin SYSTEM. Tin có dấu hiệu password/OTP/token hoặc số thẻ được bỏ toàn bộ trước khi gửi. Không gửi member ID hoặc dữ liệu hội thoại khác. Timeout tối đa cấu hình30giây, thử lại một lần với timeout/lỗi HTTP5xx; lỗi cuối chuyển hội thoại sang STAFF bằng SYSTEM message. Log chỉ ghi loại exception và conversation ID, không ghi nội dung prompt, response hoặc key. Bộ lọc theo mẫu là lớp giảm thiểu, không thay thế rà soát dữ liệu; chatbot vẫn chưa được phép xử lý dữ liệu tài khoản/thanh toán.
 
 <a id="testing"></a>
 ## 2. Kiểm thử
