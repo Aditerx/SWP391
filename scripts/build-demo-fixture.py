@@ -7,17 +7,20 @@ from pathlib import Path
 from datetime import date, datetime, timedelta
 from io import BytesIO
 import argparse, contextlib, hashlib, json, runpy, sys, uuid
+from demo_anchor import anchor_date, sql_anchor_guard
 
 ROOT=Path(__file__).resolve().parents[1]
 p=argparse.ArgumentParser(description=__doc__)
-p.add_argument('--anchor',required=True)
+p.add_argument('--anchor',required=True,type=anchor_date)
 p.add_argument('--output',default='database/bootstrap/scms_demo_scenarios.sql')
 p.add_argument('--preview-dir',help='Optional local PDF preview directory; assets themselves are private BYTEA rows')
 a=p.parse_args()
-anchor=date.fromisoformat(a.anchor)
+anchor=a.anchor
+output=(ROOT/a.output).resolve()
+if not output.is_relative_to(ROOT) or output.suffix.lower()!='.sql':p.error('SQL output must remain in the workspace')
 old=sys.argv
 try:
-    sys.argv=['build-system-data.py','--anchor',a.anchor,'--no-render']
+    sys.argv=['build-system-data.py','--anchor',anchor.isoformat(),'--no-render']
     with contextlib.redirect_stdout(BytesIOText:=__import__('io').StringIO()):
         design=runpy.run_path(str(ROOT/'scripts/build-system-data.py'))
 finally:sys.argv=old
@@ -49,7 +52,7 @@ def obligation_created(key):
     return max(datetime.fromisoformat(inv['payment_date'])+timedelta(hours=1),min(first-timedelta(days=2),datetime.fromisoformat(stamp(-3,'00:00'))))
 
 statements += [f"-- Approved synthetic demo fixture. Anchor {anchor} Asia/Ho_Chi_Minh. No real bank/payment events.",
- f"DO $anchor$ BEGIN IF CURRENT_DATE<>DATE '{anchor}' THEN RAISE EXCEPTION 'SCMS_DEMO_STALE_ANCHOR: regenerate the bundle for the intended VN date'; END IF; END $anchor$;",
+ sql_anchor_guard(anchor),
  # These two named time guards use wall-clock CURRENT_DATE. All FK/CHECK/unique constraints stay active.
  "ALTER TABLE classes DISABLE TRIGGER trg_classes_validate;",
  "ALTER TABLE sessions DISABLE TRIGGER trg_sessions_validate;",
@@ -60,11 +63,13 @@ for r in t['users']:
            full_name=r['name'],email=r['email'],password_hash=raw("extensions.crypt('SWP391',extensions.gen_salt('bf',10))"),status=r['status'],center_id=1,is_first_login=False)
     insert('coaches' if r['role']=='Coach' else 'members',user_id=user[r['key']],**({} if r['role']=='Coach' else {'join_date':anchor.isoformat()}))
 statements.append("INSERT INTO coach_specializations(coach_id,specialization_id) SELECT "+str(user['CI'])+",specialization_id FROM specializations WHERE subject_id="+subject['BAD'][1]+";")
-statements.append("DELETE FROM coach_work_slots WHERE slot_key LIKE 'SUNDAY:%';")
 for r in t['holidays']:insert('holidays',holiday_date=r['date'],holiday_name=r['name'],tag=r['tag'],is_active=r['is_active'])
 for r in t['coach_days_off']:insert('coach_days_off',coach_id=user[r['coach']],day_off=r['date'])
 for r in t['classes']:
-    if r['type']=='Advanced':continue
+    if r['type']=='Advanced':
+        insert('classes',class_id=classes[r['key']],class_name=r['name'],subject_id=subject[r['subject']],coach_id=user[r['coach']],
+               max_capacity=1,tuition_fee=r['price'],status='Closed',class_type='Advanced',total_sessions=12,center_id=1,pricing_draft=False)
+        continue
     confirmed=r['status'] in ('Ongoing','Closed')
     first=datetime.fromisoformat(r['first_session']); confirmed_at=(first-timedelta(days=2)).isoformat()
     insert('classes',class_id=classes[r['key']],class_name=r['name'],subject_id=subject[r['subject']],coach_id=user[r['coach']],
@@ -89,11 +94,16 @@ for r in t['class_enrollments']:
            cancelled_at=obligation_created(r['invoice']).isoformat() if has_refund else None,cancelled_by=user['M02'] if r['sports_class']=='N05' and has_refund else user['CM1'] if has_refund else None,cancel_reason='DEMO center refund obligation' if has_refund else None)
 for r in t['advanced_registrations']:
     insert('advanced_registrations',member_id=user[r['member']],subject_id=subject[r['subject']],coach_id=user[r['coach']],request_key=r['request_key'],status=r['status'],
-           created_at=stamp(-5),accepted_by=user[r['coach']] if r['status'] in ('Accepted','Invoiced') else None,accepted_at=stamp(-4) if r['status'] in ('Accepted','Invoiced') else None,reason=r['reason'],subscription_id=subs.get(r['subscription']))
+           created_at=r['created_at'],accepted_by=user[r['coach']] if r['accepted_at'] else None,accepted_at=r['accepted_at'],reason=r['reason'],subscription_id=subs.get(r['subscription']),class_id=classes.get(r['sports_class']))
 for r in t['sessions']:
     insert('sessions',session_id=sessions[r['key']],class_id=classes[r['sports_class']],room_id=room[r['room']],session_date=r['date'],start_time=r['start'],end_time=r['end'],
            coach_id=user[r['coach']],booked_member_id=user.get(r['member']),subscription_id=subs.get(r.get('subscription')),status=r['status'],attendance_finalized=r['finalized'],attendance_review_pending=False,
-           center_invalidated=r['center_invalidated'],makeup_for_session_id=sessions.get(r['makeup_for']),created_by=user['CM1'])
+           center_invalidated=r['center_invalidated'],makeup_for_session_id=sessions.get(r['makeup_for']),created_by=user[r.get('created_by','CM1')],agreement_confirmed_at=r.get('agreement_confirmed_at'))
+for r in t['private_session_proposals']:
+    insert('private_session_proposals',subscription_id=subs[r['subscription']],proposed_by=user[r['proposed_by']],coach_id=user[r['coach']],
+           room_id=room[r['room']],class_id=classes[r['sports_class']],subject_id=subject[r['subject']],session_date=r['date'],start_time=r['start'],end_time=r['end'],
+           request_key=r['key'],request_hash=hashlib.sha256(json.dumps(r,sort_keys=True).encode()).hexdigest(),status=r['status'],created_at=r['created_at'],
+           respond_by=r['respond_by'],responded_at=r['responded_at'],session_id=sessions[r['session']])
 for r in t['attendances']:
     insert('attendances',session_id=sessions[r['session']],member_id=user[r['member']],recorded_by=user[r['recorded_by']],state=r['state'],note=r['note'])
 for r in t['training_results']:
@@ -168,7 +178,8 @@ for mid,r in enumerate(t['chat_messages'],1):
     insert('chat_messages',id=mid,conversation_id=1,sender_type='MEMBER' if r['sender']=='M08' else 'STAFF',sender_user_id=user[r['sender']],content=r['content'],content_type='TEXT',client_message_id='DEMO-MSG-'+str(mid),created_at=stamp())
 insert('chat_read_state',conversation_id=1,user_id=user['M08'],last_read_message_id=1,updated_at=stamp())
 insert('chat_read_state',conversation_id=1,user_id=user['R1'],last_read_message_id=2,updated_at=stamp())
-statements += ['ALTER TABLE classes ENABLE TRIGGER trg_classes_validate;','ALTER TABLE sessions ENABLE TRIGGER trg_sessions_validate;']
-output=(ROOT/a.output).resolve();assert output.is_relative_to(ROOT)
-output.write_text('\n'.join(statements)+'\n',encoding='utf-8')
-print(json.dumps({'output':str(output.relative_to(ROOT)),'anchor':str(anchor),'users':47,'classes':21,'privateDemoPdfs':2,'databaseAccess':False}))
+statements += ['SET CONSTRAINTS ALL IMMEDIATE;',
+               'ALTER TABLE classes ENABLE TRIGGER trg_classes_validate;','ALTER TABLE sessions ENABLE TRIGGER trg_sessions_validate;']
+output.parent.mkdir(parents=True,exist_ok=True)
+output.write_text('\n'.join(statements)+'\n',encoding='utf-8',newline='\n')
+print(json.dumps({'output':str(output.relative_to(ROOT)),'anchor':str(anchor),'users':47,'classes':len(t['classes']),'privateDemoPdfs':2,'databaseAccess':False}))

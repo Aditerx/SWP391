@@ -1,5 +1,6 @@
 package com.sportscenter.training;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
@@ -7,15 +8,15 @@ public record TrainingPlanResponse(
         Integer planId,
         Integer coachId,
         String coachName,
-        Integer classId,
-        String className,
-        Integer memberId,
-        String memberName,
+        @Schema(nullable = true) Integer classId,
+        @Schema(nullable = true) String className,
+        @Schema(nullable = true) Integer memberId,
+        @Schema(nullable = true) String memberName,
         String title,
-        String content,
-        String goal,
-        LocalDate startDate,
-        LocalDate endDate,
+        @Schema(nullable = true) String content,
+        @Schema(nullable = true) String goal,
+        @Schema(nullable = true) LocalDate startDate,
+        @Schema(nullable = true) LocalDate endDate,
         LocalDateTime createdAt
 ) {
     public static TrainingPlanResponse from(TrainingPlan plan) {

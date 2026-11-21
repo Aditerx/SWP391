@@ -493,6 +493,7 @@ class EnrollmentServiceTest {
         User member = new User();
         member.setId(id);
         member.setStatus("Active");
+        Role role=new Role(); role.setName("Member"); member.setRole(role);
         return member;
     }
 

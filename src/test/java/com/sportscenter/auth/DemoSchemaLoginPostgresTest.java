@@ -27,7 +27,7 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.*;
 
 /** Opt-in HTTP acceptance against a NEW local DB provisioned from the approved SQL. */
-@EnabledIfSystemProperty(named="scms.demo.pg-url",matches="jdbc:postgresql://127\\.0\\.0\\.1:55440/scms_schema_[a-z0-9_]+")
+@EnabledIfSystemProperty(named="scms.demo.pg-url",matches="jdbc:postgresql://127\\.0\\.0\\.1:(?:55440|54391)/scms_schema_[a-z0-9_]+")
 @SpringBootTest(webEnvironment=SpringBootTest.WebEnvironment.RANDOM_PORT,properties={
         "spring.config.import=", "spring.jpa.hibernate.ddl-auto=none", "spring.jpa.open-in-view=false",
         "spring.sql.init.mode=never", "logging.level.root=WARN", "debug=false"
@@ -36,7 +36,7 @@ class DemoSchemaLoginPostgresTest {
     @DynamicPropertySource
     static void localDatabase(DynamicPropertyRegistry registry) {
         String url=System.getProperty("scms.demo.pg-url", "");
-        if (!url.matches("jdbc:postgresql://127\\.0\\.0\\.1:55440/scms_schema_[a-z0-9_]+")) throw new IllegalArgumentException("Disposable local schema DB required");
+        if (!url.matches("jdbc:postgresql://127\\.0\\.0\\.1:(?:55440|54391)/scms_schema_[a-z0-9_]+")) throw new IllegalArgumentException("Disposable local schema DB required");
         registry.add("spring.datasource.url",()->url);
         registry.add("spring.datasource.username",()->"postgres");
         registry.add("spring.datasource.password",()->"scms-local-only");

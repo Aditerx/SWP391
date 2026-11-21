@@ -89,13 +89,13 @@ public class InvoiceService {
         User actor = currentUser(authentication);
         List<Invoice> list = invoiceRepository.searchInvoices(scopedMemberId, packageId, receptionistId,
                 blankToNull(status), blankToNull(method), blankToNull(keyword), startDate, endDate);
-        return list.stream().filter(i -> java.util.Objects.equals(actor.getCenterId(), i.getMember().getCenterId())).map(InvoiceResponse::from).toList();
+        return list.stream().filter(i -> java.util.Objects.equals(actor.getCenterId(), i.getMember().getCenterId())).map(i -> InvoiceResponse.from(i,clock)).toList();
     }
 
     @Transactional(readOnly = true)
     public List<InvoiceResponse> findOwn(Authentication authentication) {
         Integer memberId = currentUser(authentication).getId();
-        return invoiceRepository.findByMemberIdOrderByInvoiceIdDesc(memberId).stream().map(InvoiceResponse::from).toList();
+        return invoiceRepository.findByMemberIdOrderByInvoiceIdDesc(memberId).stream().map(i -> InvoiceResponse.from(i,clock)).toList();
     }
 
     @Transactional(readOnly = true)
@@ -105,7 +105,7 @@ public class InvoiceService {
         if (!invoice.getMember().getId().equals(currentUser(authentication).getId())) {
             throw new ResourceNotFoundException("Invoice not found: " + id);
         }
-        return InvoiceResponse.from(invoice);
+        return InvoiceResponse.from(invoice,clock);
     }
 
     @Transactional(readOnly = true)
@@ -118,7 +118,7 @@ public class InvoiceService {
         if (scopedMemberId != null && !scopedMemberId.equals(invoice.getMember().getId())) {
             throw new ResourceNotFoundException("Invoice not found: " + id);
         }
-        return InvoiceResponse.from(invoice);
+        return InvoiceResponse.from(invoice,clock);
     }
     @Transactional(readOnly=true)
     public InvoiceResponse receipt(Integer id,Authentication auth){
@@ -176,6 +176,12 @@ public class InvoiceService {
     public boolean hasExpiredClassOrder(Integer member,Integer classId) {
         return invoiceRepository.findByMemberId(member).stream().anyMatch(i -> i.getSportsClass()!=null && classId.equals(i.getSportsClass().getId()) && "Expired".equals(i.getPaymentStatus()));
     }
+    public boolean classReservationWillExpire(Integer member,Integer classId) {
+        var pending=invoiceRepository.findByMemberId(member).stream()
+                .filter(i -> i.getSportsClass()!=null && classId.equals(i.getSportsClass().getId()) && "Pending".equals(i.getPaymentStatus())).toList();
+        return pending.stream().anyMatch(i -> i.getExpiresAt()!=null && expired(i))
+                && pending.stream().noneMatch(i -> i.getExpiresAt()==null || !expired(i));
+    }
 
     private Invoice newInvoice(User member, BigDecimal amount, String method) {
         if (amount == null || amount.signum() <= 0) throw new BusinessException("INVALID_PRICE: A positive server catalog price is required");
@@ -189,7 +195,7 @@ public class InvoiceService {
         invoice.setPaymentStatus("Pending");
         LocalDateTime now = LocalDateTime.now(clock);
         invoice.setCreatedAt(now);
-        invoice.setExpiresAt(now.plusMinutes(paymentProperties.getExpireMinutes()));
+        invoice.setExpiresAt(now.plusMinutes(Math.max(1,Math.min(30,paymentProperties.getExpireMinutes()))));
         long code = invoiceRepository.nextInvoiceCodeValue();
         invoice.setInvoiceCode(String.format("INV-%d-%06d", LocalDate.now(clock).getYear(), code));
         return invoice;
@@ -235,7 +241,7 @@ public class InvoiceService {
         if(expired(invoice))throw new InvoiceConflictException("Invoice expired before Cash confirmation completed");
         invoice.setCashNote(note);
         markPaidAndActivate(invoice, receptionist, false);
-        return InvoiceResponse.from(invoice);
+        return InvoiceResponse.from(invoice,clock);
     }
 
     @Transactional
@@ -250,7 +256,7 @@ public class InvoiceService {
         invoice.setPaymentStatus("Cancelled");
         cancelLinked(invoice);
         auditService.log(actor.getId(), "CANCEL_INVOICE", "invoices", invoiceId, "Invoice cancelled by user");
-        return InvoiceResponse.from(invoice);
+        return InvoiceResponse.from(invoice,clock);
     }
 
     @Transactional
@@ -408,7 +414,7 @@ public class InvoiceService {
     }
 
     private VnPayVerificationResponse queryResponse(Invoice invoice, String status, String message, int retry) {
-        return new VnPayVerificationResponse(status, message, retry, InvoiceResponse.from(invoice));
+        return new VnPayVerificationResponse(status, message, retry, InvoiceResponse.from(invoice,clock));
     }
 
     @Transactional(readOnly = true)

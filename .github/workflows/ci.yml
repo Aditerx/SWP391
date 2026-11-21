@@ -32,3 +32,7 @@ jobs:
           cache: maven
       - name: Clean test and package
         run: bash ./mvnw --batch-mode --no-transfer-progress clean verify
+      - name: Smoke transport regression tests (offline)
+        run: python3 scripts/test-release-smoke.py
+      - name: Reference catalog smoke regressions (offline)
+        run: python3 scripts/test-release-catalog.py

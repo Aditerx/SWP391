@@ -4,14 +4,21 @@ import argparse
 import hashlib
 import json
 import re
+from demo_anchor import anchor_date, holiday_catalog, sql_anchor_guard, TIMEZONE, FIXTURE_VERSION
 
 ROOT = Path(__file__).resolve().parents[1]
 p = argparse.ArgumentParser(description=__doc__)
 p.add_argument('--output', default='database/schema_postgres.sql')
-p.add_argument('--anchor',default='2026-11-10',help='VN business date of the approved demo fixture')
+p.add_argument('--anchor',required=True,type=anchor_date,help='Explicit YYYY-MM-DD installation date in Asia/Ho_Chi_Minh')
+p.add_argument('--fixture-output',default='database/bootstrap/scms_demo_scenarios.sql',help='Generated fixture path; use a staging path when --output is staged')
 args = p.parse_args()
+for value in [args.output, args.fixture_output]:
+    if not (ROOT/value).resolve().is_relative_to(ROOT) or (ROOT/value).suffix.lower()!='.sql':
+        p.error('Generated SQL output must remain in the workspace')
+if (ROOT/args.output).resolve() == (ROOT/args.fixture_output).resolve():
+    p.error('Bundle and fixture must use different files')
 
-TABLES = '''normal_refund_verifications normal_refund_documents normal_refund_attempts normal_refund_receivers normal_refunds normal_transfers normal_responses normal_proposals scms_data_migration_audit payment_resolutions incident_affected_members center_incidents session_changes
+TABLES = '''private_session_proposals normal_refund_verifications normal_refund_documents normal_refund_attempts normal_refund_receivers normal_refunds normal_transfers normal_responses normal_proposals scms_data_migration_audit payment_resolutions incident_affected_members center_incidents session_changes
 session_absence_notices advanced_registrations coach_days_off coach_work_slots coach_work_schedules subscription_pauses
 normal_class_requests system_logs ai_consultations chat_read_state chat_messages chat_conversations
 notification_recipients notifications support_requests vnpay_payment_attempts invoices holidays class_enrollments
@@ -21,12 +28,13 @@ users centers role_permissions permissions roles attendances_backup_flow4 class_
 role_permissions_backup_n06 training_results_backup_flow4'''.split()
 FUNCTIONS = '''enforce_user_center_assignment fn_classes_validate fn_member_packages_validate fn_room_code_default
 fn_rooms_protect fn_scms_current_advanced_only fn_scms_no_legacy_invoice fn_scms_retired_membership_catalog
-fn_sessions_validate fn_users_center_guard'''.split()
+fn_sessions_validate fn_users_center_guard fn_scms_advanced_registration_class fn_scms_advanced_class_identity fn_scms_private_session_class fn_scms_advanced_class_has_owner'''.split()
 MIGRATIONS = '''06_schedule_safety_postgres.sql 07_session_subscription_postgres.sql 08_advanced_entitlements_postgres.sql
 09_approved_catalog_postgres.sql 10_session_incidents_postgres.sql 11_holiday_history_postgres.sql
 12_payment_resolutions_postgres.sql 13_room_catalog_postgres.sql 14_absence_attendance_postgres.sql
 15_QueryDR.sql 13_google_login_postgres.sql 17_attendance_review_postgres.sql 18_audit_scope_postgres.sql
-19_room_activity_postgres.sql 20_class_publication_price_postgres.sql 21_normal_lifecycle_postgres.sql 22_normal_changes_refunds_postgres.sql'''.split()
+19_room_activity_postgres.sql 20_class_publication_price_postgres.sql 21_normal_lifecycle_postgres.sql 22_normal_changes_refunds_postgres.sql
+24_advanced_session_proposals_postgres.sql 25_advanced_registration_classes_postgres.sql 26_issued_attendance_codes_postgres.sql'''.split()
 
 
 def literal(value):
@@ -36,17 +44,49 @@ def literal(value):
 scope = ','.join(map(literal, TABLES))
 chunks = ['''-- SCMS DEMO REBUILD — Owner09/11/2026. This file DELETES the listed SCMS demo tables/data.
 -- Execute this WHOLE file once, only on the intended SCMS demo DB. Do not run the root additive variant afterwards.
--- Scope: 55 SCMS tables + 4 obsolete SCMS backup tables observed on the current Supabase.
+-- Scope: 56 SCMS tables + 4 obsolete SCMS backup tables observed on the current Supabase.
 -- auth/storage/realtime/extensions, unlisted tables and unrelated functions are not dropped.
 -- External dependencies fail RESTRICT and roll back. This is a reset, not an upgrade preserving demo history.
--- Fresh data: approved 47 demo accounts, 21 classes and explicitly synthetic Normal/Advanced/refund scenarios; no provider calls.
+-- Fresh data: approved47 demo accounts,12 Normal classes and8 registration-owned Advanced classes; no provider calls.
 -- invoice_code_seq is NOT restarted: never reuse outward payment references after resetting demo rows.
+-- Suspend the SCMS backend/jobs and stop other SCMS DB clients before execution.
+-- Busy database/another reset fails immediately before reading/resetting SCMS rows; never kills connections.
 BEGIN;
 SET LOCAL search_path=public,extensions,pg_catalog;
 SET LOCAL TIME ZONE 'Asia/Ho_Chi_Minh';
 SET LOCAL lock_timeout='10s';
 SET LOCAL statement_timeout='180s';
-SELECT pg_advisory_xact_lock(391,20261109);
+''', sql_anchor_guard(args.anchor), f'''DO $reset_gate$
+BEGIN
+ IF NOT pg_try_advisory_xact_lock(391,20261109) THEN
+  RAISE EXCEPTION USING ERRCODE='55P03',
+   MESSAGE='SCMS_DEMO_RESET_BUSY: another SCMS demo reset is running',
+   HINT='Wait for the other reset to finish; do not run two bundles at once.';
+ END IF;
+END $reset_gate$;
+
+-- Acquire the final lock mode before any SCMS row read, avoiding a later lock upgrade.
+-- ONLY prevents implicitly locking descendant tables outside the reviewed reset scope.
+DO $reset_tables$
+DECLARE target RECORD;
+BEGIN
+ FOR target IN SELECT c.oid,c.relname,c.relkind FROM pg_class c
+  JOIN pg_namespace ns ON ns.oid=c.relnamespace
+  WHERE ns.nspname='public' AND c.relname=ANY(ARRAY[{scope}])
+  ORDER BY c.relname COLLATE "C" LOOP
+  IF target.relkind<>'r' OR EXISTS(SELECT 1 FROM pg_inherits WHERE inhparent=target.oid OR inhrelid=target.oid) THEN
+   RAISE EXCEPTION 'SCMS_DEMO_WRONG_TARGET: public.% must be an ordinary non-inherited SCMS table',target.relname;
+  END IF;
+  BEGIN
+   EXECUTE format('LOCK TABLE ONLY public.%I IN ACCESS EXCLUSIVE MODE NOWAIT',target.relname);
+  EXCEPTION WHEN lock_not_available THEN
+   RAISE EXCEPTION USING ERRCODE='55P03',
+    MESSAGE=format('SCMS_DEMO_DB_BUSY: public.%I is in use; no SCMS rows were reset',target.relname),
+    HINT='Suspend the SCMS backend/jobs and stop other SCMS SQL/app sessions, then run the whole bundle again.';
+  END;
+ END LOOP;
+END $reset_tables$;
+
 CREATE SCHEMA IF NOT EXISTS extensions;
 CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA extensions;
 CREATE TEMP TABLE _scms_reset_before(table_name TEXT PRIMARY KEY,row_count BIGINT) ON COMMIT DROP;
@@ -86,8 +126,8 @@ END $preflight$;
 manifest = []
 
 
-def append_source(name, body=None):
-    path = ROOT / name
+def append_source(name, body=None, source_path=None):
+    path = source_path or ROOT / name
     data = path.read_bytes()
     if body is None:
         body = data.decode('utf-8-sig')
@@ -120,9 +160,25 @@ ALTER TABLE public.sessions ADD CONSTRAINT ck_demo_standard_session_slot CHECK((
   (TIME '13:00',TIME '14:30'),(TIME '14:45',TIME '16:15'),(TIME '16:30',TIME '18:00'),(TIME '18:15',TIME '19:45')));
 ''')
 append_source('database/bootstrap/scms_demo_reference.sql')
+append_source('database/seed_holidays_catalog_2026.sql',
+              '-- Annual catalog compiled into inactive literal fixture rows below; standalone DML is not run here.')
 import subprocess
-subprocess.run([__import__('sys').executable,str(ROOT/'scripts/build-demo-fixture.py'),'--anchor',args.anchor],check=True,capture_output=True)
-append_source('database/bootstrap/scms_demo_scenarios.sql')
+subprocess.run([__import__('sys').executable,str(ROOT/'scripts/build-demo-fixture.py'),'--anchor',args.anchor.isoformat(),
+                '--output',args.fixture_output],check=True,capture_output=True)
+append_source('database/bootstrap/scms_demo_scenarios.sql',source_path=(ROOT/args.fixture_output).resolve())
+catalog_dates = ','.join("(DATE '"+r['date']+"')" for r in holiday_catalog(
+    (ROOT/'database/seed_holidays_catalog_2026.sql').read_text(encoding='utf-8')))
+chunks.append(f'''DO $catalog$
+BEGIN
+ IF EXISTS(SELECT 1 FROM (VALUES {catalog_dates}) AS expected(day)
+   LEFT JOIN public.holidays h ON h.holiday_date=expected.day
+   WHERE h.holiday_id IS NULL OR h.is_active IS DISTINCT FROM FALSE)
+ OR (SELECT count(*) FROM public.holidays WHERE is_active)<>1
+ OR NOT EXISTS(SELECT 1 FROM public.holidays WHERE holiday_date=DATE '{args.anchor.isoformat()}'+50 AND is_active) THEN
+  RAISE EXCEPTION 'SCMS_DEMO_POSTFLIGHT: holiday catalog or demo closure mismatch';
+ END IF;
+END $catalog$;
+''')
 chunks.append(f'''-- Revoke direct browser/Data API access to SCMS data; backend owner/explicit service grants remain.
 DO $acl$
 DECLARE n TEXT; grantee_name TEXT; seq RECORD;
@@ -163,15 +219,17 @@ END $ids$;
 INSERT INTO public.scms_data_migration_audit(migration_key,captured_at,before_data,after_data)
 VALUES('20261110_demo_rebuild_v3',clock_timestamp() AT TIME ZONE 'Asia/Ho_Chi_Minh',
  (SELECT coalesce(jsonb_object_agg(table_name,row_count),'{{}}'::jsonb)::text FROM _scms_reset_before),
- jsonb_build_object('mode','approved-synthetic-demo','accounts',47,'subjects',9,'rooms',20,'advanced_templates',9,
-  'normal_classes',12,'synthetic_fixture',true,'invoice_code_floor',(SELECT value FROM _scms_code_floor))::text);
+ jsonb_build_object('mode','approved-synthetic-demo','accounts',47,'subjects',9,'rooms',20,'advanced_templates',0,'advanced_private_classes',8,
+  'normal_classes',12,'synthetic_fixture',true,'anchor_date','{args.anchor.isoformat()}',
+  'business_timezone','{TIMEZONE}','fixture_version','{FIXTURE_VERSION}',
+  'invoice_code_floor',(SELECT value FROM _scms_code_floor))::text);
 INSERT INTO public.scms_data_migration_audit VALUES('20261106_retire_legacy_memberships_v1',clock_timestamp() AT TIME ZONE 'Asia/Ho_Chi_Minh',
  '{{"mode":"fresh-demo"}}','{{"mode":"fresh-demo","model_retired":true}}');
 DO $postflight$
 DECLARE n TEXT; c BIGINT;
 BEGIN
  IF (SELECT count(*) FROM users)<>47 OR (SELECT count(*) FROM subjects)<>9 OR (SELECT count(*) FROM rooms)<>20
-   OR (SELECT count(*) FROM classes)<>21 OR (SELECT count(*) FROM classes WHERE class_type='Normal')<>12
+   OR (SELECT count(*) FROM classes)<>20 OR (SELECT count(*) FROM classes WHERE class_type='Normal')<>12
    OR (SELECT count(*) FROM normal_refunds)<>7 OR (SELECT count(*) FROM normal_refund_documents)<>2
    OR EXISTS(SELECT 1 FROM rooms WHERE activity_type IS NULL) THEN
   RAISE EXCEPTION 'SCMS_DEMO_POSTFLIGHT: approved fixture counts mismatch';
@@ -181,10 +239,44 @@ BEGIN
     (SELECT count(*) FROM sessions s WHERE s.class_id=c.class_id AND NOT s.center_invalidated)<>12)) THEN
   RAISE EXCEPTION 'SCMS_DEMO_POSTFLIGHT: Normal minimum or twelve valid sessions mismatch';
  END IF;
+ IF EXISTS(SELECT 1 FROM classes WHERE class_type='Advanced' AND class_name LIKE '%(1:1)%') THEN
+  RAISE EXCEPTION 'SCMS_DEMO_POSTFLIGHT: Advanced class name contains removed suffix';
+ END IF;
+ IF EXISTS(SELECT 1 FROM classes c LEFT JOIN advanced_registrations r ON r.class_id=c.class_id LEFT JOIN users m ON m.user_id=r.member_id
+           WHERE c.class_type='Advanced' AND (r.id IS NULL OR r.status NOT IN ('Accepted','Invoiced')
+             OR c.coach_id IS DISTINCT FROM r.coach_id OR c.subject_id IS DISTINCT FROM r.subject_id
+             OR c.center_id IS DISTINCT FROM m.center_id OR c.max_capacity<>1 OR c.status='Open'))
+ OR EXISTS(SELECT 1 FROM advanced_registrations r LEFT JOIN classes c ON c.class_id=r.class_id
+           WHERE (r.status IN ('Requested','Rejected') AND (r.class_id IS NOT NULL OR r.subscription_id IS NOT NULL))
+              OR (r.status IN ('Accepted','Invoiced') AND (c.class_id IS NULL OR c.class_type<>'Advanced')))
+ OR EXISTS(SELECT 1 FROM member_packages p LEFT JOIN advanced_registrations r ON r.subscription_id=p.subscription_id
+           WHERE r.id IS NULL OR r.status<>'Invoiced' OR r.member_id IS DISTINCT FROM p.member_id
+             OR r.subject_id IS DISTINCT FROM p.subject_id OR r.coach_id IS DISTINCT FROM p.primary_coach_id)
+ OR EXISTS(SELECT 1 FROM sessions s JOIN classes c ON c.class_id=s.class_id
+           LEFT JOIN advanced_registrations r ON r.subscription_id=s.subscription_id
+           WHERE (s.booked_member_id IS NOT NULL OR s.subscription_id IS NOT NULL OR c.class_type='Advanced') AND (r.id IS NULL OR c.class_type<>'Advanced'
+             OR s.class_id IS DISTINCT FROM r.class_id OR s.booked_member_id IS DISTINCT FROM r.member_id)) THEN
+  RAISE EXCEPTION 'SCMS_DEMO_POSTFLIGHT: Advanced registration/class/subscription/session owner mismatch';
+ END IF;
  IF EXISTS(SELECT 1 FROM invoices i WHERE i.amount<=0 OR i.payment_status<>'Paid')
  OR EXISTS(SELECT 1 FROM normal_refunds f JOIN payment_resolutions r ON r.id=f.id JOIN invoices i ON i.invoice_id=r.invoice_id WHERE r.amount<>i.amount OR i.payment_status<>'Paid')
  OR EXISTS(SELECT 1 FROM normal_refunds f JOIN payment_resolutions r ON r.id=f.id JOIN invoices i ON i.invoice_id=r.invoice_id JOIN class_enrollments e ON e.member_id=i.member_id AND e.class_id=f.class_id WHERE e.status<>'Cancelled') THEN
   RAISE EXCEPTION 'SCMS_DEMO_POSTFLIGHT: receipt/refund/right mismatch';
+ END IF;
+ IF (SELECT count(*) FROM private_session_proposals)<>1 OR NOT EXISTS(
+  SELECT 1 FROM private_session_proposals p JOIN sessions s ON s.session_id=p.session_id
+  JOIN member_packages m ON m.subscription_id=s.subscription_id JOIN advanced_registrations r ON r.subscription_id=m.subscription_id
+  WHERE p.request_key='DEMO-CANCEL-SUB01' AND p.status='Accepted' AND s.status='Scheduled'
+   AND p.subscription_id=m.subscription_id AND p.class_id=s.class_id AND r.class_id=s.class_id
+   AND r.member_id=s.booked_member_id AND m.member_id=s.booked_member_id AND p.coach_id=s.coach_id AND m.primary_coach_id=s.coach_id
+   AND p.subject_id=m.subject_id AND p.room_id=s.room_id AND p.session_date=s.session_date AND p.start_time=s.start_time AND p.end_time=s.end_time
+   AND s.agreement_confirmed_at=p.responded_at AND p.responded_at<=p.respond_by AND p.respond_by=s.session_date+s.start_time-interval '12hours'
+   AND m.status='Active' AND m.remaining_credit=11 AND s.session_date+s.end_time<=m.expires_at
+   AND NOT s.attendance_finalized AND NOT s.credit_returned AND NOT s.center_invalidated
+   AND NOT EXISTS(SELECT 1 FROM attendances a WHERE a.session_id=s.session_id))
+ OR EXISTS(SELECT 1 FROM sessions s WHERE s.agreement_confirmed_at IS NOT NULL
+   AND NOT EXISTS(SELECT 1 FROM private_session_proposals p WHERE p.session_id=s.session_id AND p.request_key='DEMO-CANCEL-SUB01')) THEN
+  RAISE EXCEPTION 'SCMS_DEMO_POSTFLIGHT: approved cancellation fixture or historical consent mismatch';
  END IF;
  FOREACH n IN ARRAY ARRAY['email_otps','vnpay_payment_attempts','membership_packages'] LOOP
   EXECUTE format('SELECT count(*) FROM public.%I',n) INTO c;
@@ -205,4 +297,5 @@ output.parent.mkdir(parents=True, exist_ok=True)
 data=('\n'.join(chunks)+'\n').encode('utf-8')
 output.write_bytes(data)
 print(json.dumps({'output':str(output.relative_to(ROOT)), 'sha256':hashlib.sha256(data).hexdigest(),
+                  'anchorDate':args.anchor.isoformat(),'timeZone':TIMEZONE,'fixtureVersion':FIXTURE_VERSION,
                   'dropTables':len(TABLES), 'sources':len(manifest), 'databaseAccess':False}))

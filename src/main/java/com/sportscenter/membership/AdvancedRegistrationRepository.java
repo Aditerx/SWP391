@@ -5,4 +5,6 @@ import java.util.List;
 public interface AdvancedRegistrationRepository extends JpaRepository<AdvancedRegistration, Integer> {
     Optional<AdvancedRegistration> findByMemberIdAndRequestKey(Integer memberId, String key);
     List<AdvancedRegistration> findByMemberCenterId(Integer centerId);
+    Optional<AdvancedRegistration> findBySubscriptionSubscriptionId(Integer subscriptionId);
+    Optional<AdvancedRegistration> findBySportsClassId(Integer classId);
 }

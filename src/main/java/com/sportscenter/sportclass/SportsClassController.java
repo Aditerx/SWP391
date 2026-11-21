@@ -22,7 +22,8 @@ public class SportsClassController {
     @PostMapping("/{id}/confirm-opening")
     @PreAuthorize("hasRole('CENTERMANAGER') and hasAuthority('MANAGE_CLASSES')")
     public SportsClassResponse confirmOpening(@PathVariable Integer id, @RequestBody(required=false) OpeningConfirmation body, Authentication auth) {
-        return lifecycle.confirm(id,body==null?null:body.reason(),auth);
+        lifecycle.confirm(id,body==null?null:body.reason(),auth);
+        return service.findById(id);
     }
 
     @org.springframework.web.bind.annotation.ResponseStatus(org.springframework.http.HttpStatus.CREATED)

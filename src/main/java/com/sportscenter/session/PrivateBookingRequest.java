@@ -27,9 +27,9 @@ public record PrivateBookingRequest(
         Integer subjectId,
         boolean agreementConfirmed,
         String requestKey,
-        String supportReason,
+        @jakarta.validation.constraints.Size(max=2000) String supportReason,
         Integer incidentId,
-        String extraValidityReason
+        @jakarta.validation.constraints.Size(max=2000) String extraValidityReason
 ) {
     public PrivateBookingRequest(Integer subscriptionId,Integer coachId,Integer roomId,LocalDate sessionDate,LocalTime startTime,
                                  LocalTime endTime,Integer classId,Integer subjectId) {

@@ -143,12 +143,16 @@ CREATE TABLE IF NOT EXISTS members (
     registered_by INT NULL,
     checkin_secret VARCHAR(64) NULL,
     checkin_last_step BIGINT NULL,
+    checkin_code_nonce BIGINT NULL,
+    checkin_code_issued_at TIMESTAMP NULL,
+    checkin_code_expires_at TIMESTAMP NULL,
+    checkin_code_used_at TIMESTAMP NULL,
     booking_blocked_until TIMESTAMP NULL,
     CONSTRAINT fk_member_user
         FOREIGN KEY (user_id) REFERENCES users(user_id)
         ON DELETE CASCADE,
-    CONSTRAINT fk_member_receptionist
-        FOREIGN KEY (registered_by) REFERENCES receptionists(user_id)
+    CONSTRAINT fk_member_registered_by
+        FOREIGN KEY (registered_by) REFERENCES users(user_id)
 );
 
 -- Flow 4 rotating QR check-in secret and replay protection (run manually by database owner)

@@ -6,11 +6,83 @@
 
 Java 17/Spring Boot 3.3.5, Maven wrapper, PostgreSQL/Supabase; Dockerfile ở root là cách build hiện tại. SQLServer có scripts nhưng runtime chưa nghiệm thu. Secret/.env/backup riêng tư ngoài Git, runner nghiệp vụ không nạp .env cloud. Giữ ddl-auto=none và OSIV=false.
 
+<a id="current-frontend"></a>
+**FE hiện hành — Owner cập nhật12/11/2026:** <https://vibesports.pages.dev> là site demo mới; <https://scms-demo-04nov.pages.dev> được giữ đến hết buổi demo. Theo ghi chú FE local `gui-backend-doi-link-vibesports.md` (không thuộc bộ phát hành), Owner đã đặt `FRONTEND_URL=https://scms-demo-04nov.pages.dev,https://vibesports.pages.dev` và đổi `FRONTEND_PAYMENT_RESULT_URL` từ `https://scms-demo-04nov.pages.dev/member/invoices` sang `https://vibesports.pages.dev/payment-result`. Source đọc danh sách origin bằng dấu phẩy; cookie cross-site tiếp tục cần SameSite=None/Secure và FE gửi credentials. Không đổi env/deploy thay Owner trong lượt này.
+
+Kiểm public HTTP12/11: OPTIONS GET auth-me và POST login từ cả hai origin trả200, Allow-Origin đúng origin/Allow-Credentials:true; health200/UP. GET auth-me không phiên401 chỉ chứng minh cổng đăng nhập. GET Return không tham số, không theo redirect, trả302 tới site mới `/payment-result?invoiceCode=&status=97`: xác nhận đích redirect cấu hình, **không phải thanh toán thành công**; source Return chỉ đọc/kiểm chữ ký, không ghi Paid. Runtime OpenAPI có Google `isNewAccount` và chat close, không có PATCH content sau buổi của Session2; không suy working tree local đã deploy. `/actuator/info`404 nên SHA deploy chưa xác định; FE build/repo/API origin browser thật vẫn cần đối chiếu.
+
+Dùng Playwright MCP qua extension để đọc tab hiện có; kết quả/giới hạn hiện hành ở Active/QA. Đọc màn login không thay kiểm cookie phiên, Google/OTP, giao dịch sandbox, AI/mail hoặc nghiệp vụ sau login. Kịch bản chuẩn bị demo15phút tại [SCRIPT](reference/SCMS-SCRIPT-DEMO-BE.md#demo-fe-15min-20261112); `FE_Project-main` vẫn là tham khảo cũ.
+
+<a id="demo-tech-check-20261112"></a>
+### Kiểm dữ liệu thực tế trước rehearsal — dành cho agent/BE
+
+“Runtime” là dữ liệu/phiên/bản ứng dụng đang chạy lúc kiểm, có thể khác fixture trong repo. Phiếu này dành cho agent/BE chọn đúng case trước demo; Owner không phải tự điền ID, version, build SHA vào tờ copy/paste. Note của người trình diễn chỉ giữ tài khoản, tên lớp/hồ sơ dễ tìm trên FE, văn bản mẫu và phương án dự phòng.
+
+| Nhóm cần kiểm | Agent/BE tự đối chiếu |
+|---|---|
+| Nguồn và phiên | FE build/API origin thực, BE build nếu công bố; auth-me đúng actor/role/center/authority. Không ghi cookie/token/password vào tài liệu công khai. |
+| Thanh toán | Lớp còn chỗ/cutoff, Member đủ điều kiện; lấy ID/amount từ BE, tạo Pending lúc demo; có Invoice Paid/Enrollment dự phòng đã đọc lại. |
+| Lifecycle/Refund | Lớp/lần dời/cutoff đúng, chọn hồ sơ có state phù hợp; lấy version/receiver/attempt hiện tại qua GET, giữ chứng từ và nguồn đối soát DEMO độc lập. Không bắt Owner tự tăng version. |
+| Attendance | Buổi đúng giờ/phân công/quyền học, chọn Member riêng để tránh ghi đè; ca6 kết thúc18:00, ca7 bắt đầu18:15; chuẩn bị lịch sử nếu rơi vào khoảng trống. |
+| Chat | Đúng Member và staff DEMO, đúng hội thoại/handler/state; các ID nội bộ do agent/BE lấy, Owner chỉ cần nhận ra cuộc trò chuyện trên UI. |
+
+<a id="playwright-vscode-demo-20261112"></a>
+### Browser cho Codex VS Code — Playwright MCP qua extension
+
+Owner đã chọn cấu hình Playwright MCP để **chỉ đọc/chụp site**. Server `playwright` trong cấu hình Codex người dùng dùng Node/npx sẵn có và pin `@playwright/mcp@0.0.85` với `--extension`; output về raw runs bị Git bỏ qua. Các cấu hình MCP khác được bảo toàn. Kiểm package startup/MCP initialize/tools-list là kiểm cài đặt; sau đó phải list tab → snapshot → screenshot để xác nhận đúng surface. Kết quả kết nối mới nhất ở Active/QA, không suy thành nghiệm thu nghiệp vụ FE.
+
+Client chỉ bật `browser_tabs`, `browser_snapshot`, `browser_take_screenshot`, `browser_navigate`, `browser_console_messages`, `browser_network_requests`. Chưa bật tool điền/click/submit/evaluate. Nội dung phiên, cookie/token và request nhạy cảm không đưa vào QA công khai. Owner đã cài extension; không cần cài lại khi tab đang kết nối được.
+
+Owner cài [Playwright Extension của Microsoft](https://chromewebstore.google.com/detail/playwright-extension/mmlmfjhmonkocbjadbfplnigmagldckm), mở tab VibeSports trong Chrome/Edge, rồi chọn tab khi extension hỏi kết nối. Codex VS Code phải nạp được server mới trong phiên; sau khi nạp mới kiểm list tab/snapshot/screenshot, không nhận cài đặt thành PASS browser. Nếu cần prompt tiếp tục, gửi trong chat theo yêu cầu Owner.
+
+Nguồn: [Microsoft — extension dùng tab/phiên đang mở](https://github.com/microsoft/playwright/blob/main/packages/extension/README.md), [OpenAI — MCP dùng chung cấu hình Codex CLI/IDE](https://learn.chatgpt.com/docs/extend/mcp?surface=cli). Chrome DevTools MCP cũng hỗ trợ browser đang chạy qua autoConnect/CDP, nhưng chưa cấu hình trong lượt này. TinyFish có trong kho plugin nhưng chưa được cài/kết nối; không coi nó là Chrome local của Owner. Các thảo luận cộng đồng chỉ là tham khảo, không dùng mẹo sao chép identity/pipe của phiên khác để vượt thiếu kết nối browser.
+
+<a id="local-scope-demo-login"></a>
+### Đăng nhập demo scope training-results bằng Swagger local
+
+`login.manager1` trong kịch bản nghĩa là object `manager1` bên trong mục `login` của file payload. Nó không phải username hoặc endpoint. Body gửi POST `/api/auth/login` chỉ gồm hai field `email` và `password` lấy từ object đó. Tài khoản synthetic này nằm trong DB demo local riêng, dùng với BE `http://127.0.0.1:18082`; chưa có căn cứ dùng nó trên trang `/login` của FE online.
+
+1. Mở JSON đăng nhập local `artifacts/runs/training-scope/2026-11-11-session1-2/login-manager1.private.json`. File local này chỉ chứa object có `email` và `password`; copy toàn bộ nội dung. File bị Git bỏ qua, không thuộc gói FE công khai; không chép credential vào tài liệu/log/ảnh bàn giao.
+2. Mở <http://127.0.0.1:18082/swagger-ui/index.html>. Trong nhóm `auth-controller`, mở **POST `/api/auth/login`**, chọn **Try it out**. Thay toàn bộ nội dung ô **Request body** bằng JSON vừa copy, giữ media type `application/json`, rồi chọn **Execute**. Không nhập chữ `login.manager1` hoặc bọc thêm key `manager1`/`login` quanh object.
+3. Đối chiếu **Request URL** là `http://127.0.0.1:18082/api/auth/login`. Trong **Server response**, Code200 cùng Response body `userId:7`, `role:"CenterManager"`, có authority `MANAGE_CLASSES` là đúng trong phạm vi đăng nhập local. Không lấy phần Responses liệt kê mã mẫu làm kết quả thực thi. Không cần copy cookie/token vào Authorize để thay bước đăng nhập này.
+4. Trên cùng Swagger và cùng host `127.0.0.1`, mở **GET `/api/auth/me` → Try it out → Execute**. Code200, userId7/CenterManager/có MANAGE_CLASSES là đúng: phiên vừa đăng nhập được BE nhận ở request tiếp theo. Nếu401, kiểm lại Request URL/host và thực hiện login trên cùng Swagger trước; chưa coi các ca scope phía sau là đã có phiên.
+5. Tiếp tục GET `/api/training-results`:200 với resultId `[3,2,1]` là đúng cho Manager center1; thêm `sessionId=3` nhận200 `[]` là đúng cho filter ngoài center. Đây là kết quả mong đợi để Owner đối chiếu, không tự là browser PASS. Đổi vai trong kịch bản bằng cách lấy object tương ứng trong mục `login`, POST lại rồi xác minh auth-me đúng actor mới.
+
+Nhãn thao tác đã đối chiếu bundle Swagger do BE local phục vụ và mã nguồn chính thức của [Try it out](https://github.com/swagger-api/swagger-ui/blob/main/src/core/components/try-it-out-button.jsx), [Execute](https://github.com/swagger-api/swagger-ui/blob/main/src/core/components/execute.jsx). Chưa quan sát màn hình browser của Owner. Kết quả API kiểm lại ngày12/11 ở Active/QA; không suy thành FE online đã dùng bản sửa local hoặc thành nghiệm thu browser. Demo đọc1.2 không phụ thuộc cửa giờ attendance; không reset dữ liệu vì qua ngày.
+
+<a id="local-r2-content-demo-20261112"></a>
+### Demo R2: Coach sửa content sau buổi, Member đọc lại — local12/11
+
+Runtime synthetic riêng: <http://127.0.0.1:18085/swagger-ui/index.html>, DB local riêng, Clock ứng dụng thực/giờ VN và scheduler tắt trong harness demo. Không dùng credential này trên FE online. Fixture này không phải bundle Supabase hoặc quan sát một buổi đã tổ chức thật. Readiness API/nguồn runtime theo Active/QA; browser và thao tác Owner vẫn riêng.
+
+Session1 ngày12/11/2026,06:00–07:30; result1 thuộc Member2/Coach1. Cửa PATCH thành công là **từ07:30 ngày12/11 đến trước00:00 ngày13/11, giờ VN**. Trước07:30,400 RESULT_CONTENT_NOT_OPEN là đúng và chỉ xác nhận chưa mở cửa, chưa là demo sửa content thành công. Sau cutoff,403 là đúng; không đổi Clock/ngày/state để làm demo. Nếu chưa tới cửa, Owner có thể chờ hoặc chọn skip demo2.2 rõ ràng.
+
+1. Mở [D:\Projects\SWP391\artifacts\runs\training-content-after\2026-11-12-r2\login-coach.private.json](../artifacts/runs/training-content-after/2026-11-12-r2/login-coach.private.json), copy toàn bộ object email/password. Trong Swagger local18085, nhóm `auth-controller` → POST `/api/auth/login` → **Try it out**, thay Request body bằng object đó → **Execute**; không bọc thêm key login/coach hoặc dùng Authorize thay đăng nhập. Request URL phải cùng `127.0.0.1:18085`. Code200/userId1/role Coach/có RECORD_RESULT là đúng cho login local. Tiếp GET `/api/auth/me` → Try it out → Execute,200/userId1/Coach/isFirstLogin:false là đúng: phiên hiện hành được BE nhận; nếu401, kiểm host và login cùng Swagger trước bước sau.
+2. Trong nhóm `training-result-controller`, GET `/api/training-results`, nhập `sessionId=1`, để trống filter khác → Execute.200 có resultId1/memberId2 và resultId2/memberId3 là đúng cho own-author Coach; chọn result1, ghi nhận content ban đầu `DEMO R2 - Nhận xét ban đầu`, attendanceStatus Absent, note `DEMO R2 - Giữ ghi chú` và recordedAt hiện có. Đây là fixture synthetic; Absent không có check-in time, không lấy content làm bằng chứng có mặt.
+3. **Trong cửa giờ ở trên**, mở PATCH `/api/training-results/{resultId}/content` → Try it out, resultId `1`, body `{"content":"DEMO R2 - Bổ sung hướng dẫn kỹ thuật"}` → Execute.200/content đúng chuỗi vừa gửi, resultId1/coachId1/attendanceStatus Absent/note cũ/recordedAt cũ là đúng: nhận xét đã lưu mà các field gốc giữ nguyên. GET lại với sessionId1 xác nhận result1 có content mới. Nếu400/403/404, giữ response và kiểm giờ/phiên/phân công/ID theo contract; không chạy POST/correct để vượt lỗi. Gửi lại cùng body thành công là no-op theo bằng chứng test; không cần mở quyền audit cho Coach.
+4. Mở [D:\Projects\SWP391\artifacts\runs\training-content-after\2026-11-12-r2\login-member.private.json](../artifacts/runs/training-content-after/2026-11-12-r2/login-member.private.json), POST login lại với object đó trong cùng Swagger rồi GET auth-me:200/userId2/role Member là đúng cho phiên mới. GET training-results với sessionId1, bỏ memberId:200 chỉ có resultId1 và content đã sửa, attendanceStatus/note/recordedAt giữ nguyên là đúng cho Member own readback. Không trả resultId2. Báo lại status PATCH và content/ID đọc được; không gửi cookie hoặc credential.
+
+Nhãn Try it out/Execute được kiểm từ bundle Swagger UI chính runtime này phục vụ; tên nhóm lấy từ OpenAPI runtime. Chưa thao tác browser thay Owner. [Bàn giao flow trước–sau](reference/SCMS-CAP-NHAT/SCMS-BAN-GIAO-FE-TRAINING-RESULT-AFTER-SESSION-2026-11-12.md) giữ tác động tích hợp; không dùng hướng dẫn này để suy FE Pages/Render đã có R2.
+
+<a id="local-shared-plan-history-demo-20261112"></a>
+### Demo shared-plan history — local12/11
+
+Dùng Swagger <http://127.0.0.1:18086/swagger-ui/index.html>, fixture synthetic riêng/Clock ứng dụng thực, không có cửa giờ chờ. Member A userId2 có enrollment Completed/Paid hợp lệ tại class1/plan1, đồng thời Cancelled/Paid tại class3/plan3 và private plan4. Member B userId3 chỉ có quyền tại class2/plan2. Đây là demo quyền đọc, không chứng minh khóa thật đã tổ chức hoặc phát sinh tiền thật; Active/QA giữ nguồn/bằng chứng. Không dùng credential này trên FE online.
+
+1. Mở [D:\Projects\SWP391\artifacts\runs\shared-plan-history\2026-11-12-session2-3\login-member-a.private.json](../artifacts/runs/shared-plan-history/2026-11-12-session2-3/login-member-a.private.json), copy toàn bộ object email/password. Trong Swagger local18086, nhóm `auth-controller` → POST `/api/auth/login` → **Try it out**, thay Request body bằng object vừa copy → **Execute**. Request URL phải là `http://127.0.0.1:18086/api/auth/login`.200/userId2/role Member là đúng cho login local. GET `/api/auth/me` → Try it out → Execute,200/userId2/Member/isFirstLogin:false là đúng: phiên hiện hành đã được BE nhận. Nếu401, kiểm host/port và login lại trên cùng Swagger trước bước sau; không đưa cookie/password vào báo cáo.
+2. Nhóm `training-plan-controller`, GET `/api/training-plans` với `classId=1`, bỏ các filter khác → Execute.200 có duy nhất planId1/classId1/memberId:null là đúng cho shared plan qua quyền Completed/Paid của A. Lấy planId đó gọi GET `/api/training-plans/{id}`, id1:200 và cùng title/content/classId là đúng cho list/detail thống nhất. endDate của fixture đã qua nhưng không tự khóa lịch sử. Nội dung là bản đang lưu, không có bản version tại ngày học mới.
+3. Vẫn phiên A, GET list `classId=3`:200 `[]`; GET detail id3:403 là đúng cho Cancelled dù vẫn có Paid. GET detail id4:200/memberId2/classId:null là đúng cho own private history. Các kết quả này không mở flow hủy/hoàn Normal mới và không cấp quyền ghi cho Member.
+4. Mở [D:\Projects\SWP391\artifacts\runs\shared-plan-history\2026-11-12-session2-3\login-member-b.private.json](../artifacts/runs/shared-plan-history/2026-11-12-session2-3/login-member-b.private.json), POST login lại với object này rồi GET auth-me:200/userId3/Member là đúng cho actor B. GET list `classId=1` trả200 `[]`, detail id1 trả403 là đúng vì B không có quyền lớp của A; GET detail id2 trả200 là đúng cho lớp riêng của B, xác nhận không phải lỗi đăng nhập. Báo status và planId/classId đọc được, không gửi credential/cookie.
+
+Nhãn Try it out/Execute kiểm từ bundle Swagger runtime; tag/route lấy từ OpenAPI cùng source đã kiểm. Agent API readiness không thay browser/Owner demo. [Bàn giao FE riêng](reference/SCMS-CAP-NHAT/SCMS-BAN-GIAO-FE-SHARED-PLAN-HISTORY-2026-11-12.md) giữ ảnh hưởng client filter/cache/nullable; thao tác4bước này không mutation plan/quyền học/chứng từ.
+
 | Nhóm biến | Ý nghĩa / default source |
 |---|---|
 | PORT | 8080 nếu môi trường không cấp |
 | DB_URL,DB_USERNAME,DB_PASSWORD | JDBC PostgreSQL/TLS phù hợp, credential tách riêng; Supabase pooler username chứa project reference |
-| SCMS_PAYMENT_EXPIRE_MINUTES | 5; fallback PAYMENT_EXPIRE_MINUTES |
+| SCMS_PAYMENT_EXPIRE_MINUTES | 30; fallback PAYMENT_EXPIRE_MINUTES, giới hạn hóa đơn mới1–30phút |
+| SCMS_WAITLIST_INVITATION_MINUTES | 5; hạn mời hàng chờ riêng, không kéo theo TTL hóa đơn |
+| SCMS_EARLY_ATTENDANCE_ENABLED | false mặc định; demo sau triển khai dùng true, chỉ ghi ban đầu đơn/bulk/QR |
 | SCMS_BOOKING_BLOCK_ENABLED,SCMS_ATTENDANCE_LOOKBACK_DAYS | false và3 ở source |
 | FRONTEND_URL hoặc scms.frontend-origins | Exact FE origins; source có thêm localhost/127.0.0.1 pattern |
 | SESSION_COOKIE_SAME_SITE,SESSION_COOKIE_SECURE | lax/false; cross-site HTTPS cần none/true và browser kiểm thực tế |
@@ -55,13 +127,21 @@ Mỗi request chỉ nhận tối đa20 tin mới nhất, giữ lịch sử trong
 
 Chọn Dxx/điều kiện nghiệm thu trước, chuẩn bị actor/fixture/Clock/trạng thái trước-sau. Test đích khi sửa; hoàn tất nhóm BE chạy `.\mvnw.cmd clean test` và kiểm liên quan. Count lấy từ XML, skip tách riêng; chỉ lặp kiểm rộng khi có diff/lỗi/nghi vấn mới. H2 không thay PostgreSQL/locking thật.
 
-Nhóm có phiên phải login và kiểm `/api/auth/me`, sau đó đúng người/sai người/sai role/khác center.401 do mất phiên là BLOCKED của setup, không phải pass quyền. Tiền/quyền/credit/lịch cần response và state sau commit, gồm biên5phút/12h/[start,end), retry/race. Anonymous smoke báo gộp, không liệt kê71dòng401 vào nghiệm thu nghiệp vụ.
+Nhóm có phiên phải login và kiểm `/api/auth/me`, sau đó đúng người/sai người/sai role/khác center.401 do mất phiên là BLOCKED của setup, không phải pass quyền. Tiền/quyền/credit/lịch cần response và state sau commit, gồm deadline hóa đơn cấu hình tối đa30phút, QR300giây,12h/[start,end) và cờ sớm, retry/race. Anonymous smoke báo gộp, không liệt kê71dòng401 vào nghiệm thu nghiệp vụ.
 
 ### Local workflow
 
-**Snapshot kiểm foundation10/11:** phần lõi trước nhóm hoàn thiện; checkpoint hiện hành [docs03](03-TODO.md#normal-phase1-complete-20261110), bundle đầy đủ ở mục demo-rebuild bên dưới. Chỉ làm trong bản sao source hiện hành không.env; test đích `NormalLifecycleHttpTest,NormalEnrollmentMembershipIntegrationTest,EnrollmentServiceTest,PublicationResourceHttpTest`, rồi clean test. Không dùng runner lấy committed checkout cũ để chứng minh working tree mới.
+Đợt BE/demo19/11 dùng `python scripts/test-demo-be.py --run <ten_luot_moi>` để chạy `clean test`; thêm `--test <Suite1,Suite2>` khi kiểm đích. Runner đồng bộ source hiện hành vào một thư mục build dùng lại, không copy `.env`, loại cấu hình cloud kế thừa khỏi môi trường tiến trình và khóa chống dùng chung Maven target. Mỗi lượt giữ `validation.json`, log và XML riêng trong `artifacts/runs/be-demo-20261119/<ten_luot_moi>/`; tên đã tồn tại bị từ chối. Chỉ dùng `--property scms.<suite>.pg-url=jdbc:postgresql://127.0.0.1:55440/scms_phases_<db_moi>` sau khi đã chuẩn bị DB local riêng theo hướng dẫn bên dưới. Không dùng riêng thuộc tính `spring.config.import` trên lệnh Maven để bảo đảm cách ly: một số context vẫn có thể nạp import của application.properties; bằng chứng và lượt thay thế ở QA `beDemoImplementation20261119`.
+
+Session1–3 có runner chung `python scripts/test-session123-postgres.py --suffix <ma_moi> --output-dir <thu_muc_run_moi>`; dùng Java17 và container `scms-phases-20261027` bind127.0.0.1:55440. Runner chỉ tạo DB regression mới từ bootstrap minimal, mỗi suite một DB, sao source không.env, kiểm HTTP/auth-me/response và state/audit/race bằng các test hiện hành. Không dùng bundle demo có guard ngày hoặc sửa Clock runtime. Kết quả từng case nằm trong `result.json`; source fingerprint và giới hạn theo Active/QA. Thiếu suite/skip/failure không được tính PASS.
+
+Smoke phát hành xem [quy trình Session1–3](#session123-release-smoke-20261113).
+
+Nhóm Normal: chạy trong bản sao source hiện hành không.env; test đích `NormalLifecycleHttpTest,NormalEnrollmentMembershipIntegrationTest,EnrollmentServiceTest,PublicationResourceHttpTest`, rồi clean test. Bundle đầy đủ ở mục demo-rebuild bên dưới. Không dùng runner lấy committed checkout cũ để chứng minh working tree mới; kết quả hiện hành ở Active/QA.
 
 Suite `NormalLifecycleHttpTest` mặc định H2; opt-in `-Dscms.normal.pg-url=jdbc:postgresql://127.0.0.1:55440/scms_phases_normal_<fixture_moi>` chỉ nhận DB local đúng regex, ddl-auto=none. Tạo DB mới bằng `python scripts/test-phases-postgres.py --database scms_phases_normal_<fixture_moi> --minimal-fixture`; bao gồm replay21. Actor/Member/Coach/chuyên môn/lịch làm/12buổi và phiên login+auth/me do test tạo rồi kiểm trạng thái qua connection khác sau commit. Clock VN cố định/tiến có kiểm soát; callback ký test key, không gọi VNPay/ngân hàng/SMTP thật. Có thể xuất một OpenAPI từ cùng app bằng `-Dscms.normal.openapi=<duong_dan_json_trong_ban_sao>`.
+
+R2 dùng `TrainingResultContentAfterSessionIntegrationTest` mặc định H2; opt-in `-Dscms.result-content.pg-url=jdbc:postgresql://127.0.0.1:55440/scms_phases_<fixture_moi>` chỉ nhận DB loopback mới/ddl-auto=none. Chuẩn bị minimal fixture bằng runner trên; source copy không.env, test mock job/mail, kiểm login/auth-me, HTTP và snapshot sau commit. Race giữ center row bằng connection riêng, chờ cả hai request có DB lock wait rồi mới thả. Xuất schema bằng `-Dscms.result-content.openapi=<file_json>` từ app đã kiểm; chỉ đưa path/DTO R2 vào canonical, giữ phần khác không đổi. Giữ `TrainingResultContentIntegrationTest`/`TrainingResultServiceTest` làm regression POST/guard và legacy time; hoàn tất nhóm BE chạy clean test theo AGENTS. Demo Clock thực và fixture riêng theo [hướng dẫn R2](#local-r2-content-demo-20261112), không chạy fixture test thay Owner hoặc suy PG local thành browser/cloud PASS.
 
 Kiểm migration21 độc lập: `python scripts/test-normal-lifecycle-migration.py --database scms_phases_normal_migration_<fixture_moi> --output artifacts/runs/normal-phase1/migration-validation.json`. Runner chỉ CREATE DATABASE mới trong container đã ghim; kiểm legacy NULL, giữ receipt/session, replay giữ quyết định, FK/giới hạn dời và rollback DDL khi kiểu/default/nullability sai. Schema tham chiếu kiểm riêng bằng test-demo-schema-postgres; không lấy PASS cấu trúc làm PASS fixture mới. Migration21 đã nhúng generator reset nhưng chưa nằm trong schema root; chỉ chuẩn bị/kiểm local, không tự chạy cloud hoặc SQL16.
 
@@ -79,6 +159,12 @@ Runner minimal lấy bootstrap cấu trúc, bỏ grants mặc định để test
 D01/D09: unit/MockMvc gốc chạy H2, còn `PhaseWorkflowHttpTest` kiểm HTTP login thật trên PG. Fixture ngày sinh dùng Clock cố định. Race PATCH giữ row User bằng connection riêng, chờ cả2request ở DB lock rồi thả; hai field khác nhau phải cùng còn sau commit. Directory kiểm Admin center null, scope/contact và query count không tăng theo số Coach. Snapshot account Inactive được đọc trước khi phục hồi fixture. Case Member thiếu center chỉ chạy H2 vì guard PG từ chối lưu trạng thái đó; lỗi setup không tính là pass403/400. Tích hợp này dùng schema hiện có, không thêm migration hay mở quyền cloud.
 
 RBAC theo RP-04/RP-36 và giáo án lớp: `RbacGuardIntegrationTest` mặc định chạy H2; opt-in `-Dscms.rbac.pg-url=jdbc:postgresql://127.0.0.1:55440/scms_phases_<fixture_moi>` chỉ chấp nhận DB local đúng regex này, dùng ddl-auto=none. Chuẩn bị DB mới bằng bootstrap/runner minimal và các prerequisite hiện hành theo phần trên; không dùng DB workflow đã có actor để chạy chồng fixture. Fixture dùng môn chuẩn, subtype Coach/Member/Receptionist, ngày tham gia và Paid invoice có nguồn hợp lệ; không nới FK/NOT NULL để ép test qua. Kiểm target row lock bằng blocker metadata của đúng H2 hoặc PostgreSQL. Chạy trên bản sao không.env; kết quả/source/XML chuẩn ở docs00/QA, không suy PG local thành Supabase hoặc tự chạy migration cloud.
+
+<a id="last-administrator-local-20261113"></a>
+Session3.1 dùng `LastAdministratorIntegrationTest`: real HTTP loopback/login/auth-me, fixture Admin DEMO riêng, Clock ứng dụng thực, job/mail mocked và provider tắt. Mặc định H2; PostgreSQL opt-in `-Dscms.last-admin.pg-url=jdbc:postgresql://127.0.0.1:55440/scms_phases_<fixture_moi>` trên DB mới do runner minimal phía trên chuẩn bị, `ddl-auto=none`. Không chạy bundle có anchor12/11 để tạo fixture13/11. Race giữ role rows bằng connection riêng, chờ cả hai HTTP request có DB lock wait rồi thả; kiểm response, số Admin đủ hai quyền và audit sau commit. Có thể lưu evidence không cookie/password qua `-Dscms.last-admin.evidence=<file_json>` và OpenAPI từ đúng app qua `-Dscms.last-admin.openapi=<file_json>`. Chạy bản sao source hiện hành không.env, test đích rồi clean test theo AGENTS; không dùng account hạ tầng hoặc thay authority cloud. Owner đã skip demo, không duy trì server/fixture Swagger cho mục này.
+
+<a id="error-deprecation-local-20261113"></a>
+Session3.2: `GlobalExceptionHandlerTest` chỉ kiểm mapping HTTP/body, không tính là authenticated business. Nhóm tích hợp đích là `RoomValidationIntegrationTest,NormalLifecycleHttpTest,NormalEnrollmentMembershipIntegrationTest`; đăng nhập/auth-me và đọc DB/audit sau commit. Room dùng opt-in `-Dscms.room-validation.pg-url=jdbc:postgresql://127.0.0.1:55440/scms_phases_<fixture_moi>`; Normal dùng `scms.normal.pg-url` theo regex phía trên, mỗi test class một DB minimal mới. Room H2 chỉ thêm unique exact-name cho fixture; PG dùng index partial/case-insensitive thật của migration13, không thay canonical SQL. `-Dscms.room-validation.openapi=<file_json>` xuất schema từ app được kiểm; chỉ đồng bộ các operation trong catalog, giữ DTO/luồng khác. Test version dùng synthetic Clock/fixture sẵn trong Normal regression, không đổi Clock ứng dụng hoặc chạy/vượt guard bundle12/11. Cả nhóm hoàn tất clean test theo AGENTS; skip opt-in/live không là PASS. `PhaseWorkflowHttpTest` kiểm hai alias status/extend Advanced bên cạnh quyền Paid/amount/credit hiện có, không deprecate nguyên route dùng chung hoặc gọi provider thật.
 
 Ngoài exchanges, runner giữ `acceptance-cases.json` (Dxx/fixture/expected/SQL state và index response), `actors.json` và XML trong raw run. Sau khi kiểm kết quả, ghi vào QA chuẩn bằng lệnh dưới; lấy checkout từ `verification.json`. Chỉ chạy với test đã commit hoặc bản test được copy có hash khớp; không gọi kết quả checkout cũ là kết quả working tree mới.
 
@@ -98,9 +184,34 @@ python scripts/audit-fe-contract.py
 
 Mặc định offline, đọc một OpenAPI/QA để kiểm route/source và compatibility cơ bản của exchanges đã ghi. Không probe/login Render hoặc sinh thêm nhiều tài liệu. Có --openapi/--qa để chọn bản khác. Nullability/required/format/range/error cần kiểm riêng; không coi kiểm type/property là full JSON Schema.
 
+`qa_fingerprint.py` ghi `schema_postgres.sql:null` nếu root legacy đã bị xóa có chủ đích; không thay bằng file khác hoặc sửa hash lịch sử. Các file bắt buộc khác thiếu vẫn lỗi. Canonical DB nằm trong fingerprint cây `database/`; không khôi phục root để chạy checker. Chỉ reuse bằng chứng khi phạm vi, source copy, fingerprint và OpenAPI khớp record. Wire examples cũ vẫn gắn source lịch sử; PASS offline chỉ xác nhận route/status/type/property được kiểm, không nâng thành business/FE/cloud mới. Kết quả cụ thể theo Active/QA.
+
 Báo cáo đủ: `Dxx/case →actor/fixture →expected →response+state →PASS/FAIL/BLOCKED/NOT_RUN →môi trường/SHA →một tham chiếu`. Không lấy số request/assertion làm mức hoàn tất; chỉ mở đúng scenario/index trong QA khi cần.
 
 ## 3. Deploy
+
+<a id="advanced-member-acceptance-20261114"></a>
+<a id="advanced-class-model-20261114"></a>
+### Lớp Advanced theo đăng ký
+
+DB đang giữ dữ liệu dùng [migration25](../database/migrations/25_advanced_registration_classes_postgres.sql), rồi [cleanup template không còn tham chiếu](../database/cleanup_unused_advanced_templates_postgres.sql). Phải dừng writer/job của BE trong cửa chuyển đổi; sau SQL mới chạy bản BE có lớp riêng. Nếu gặp SCMS_ADVANCED_CLASS_AMBIGUOUS, INCOMPATIBLE hoặc PENDING_PROPOSAL thì dừng và đối chiếu bản ghi, không bỏ guard/xóa lịch sử. Pending đề xuất ghi class cũ cần Member từ chối và Coach gửi lại qua flow được phép trước nâng cấp; không sửa payload/hash consent bằng SQL. Tiền/credit/PK buổi không bị đổi; chỉ class_id của buổi được nối theo subscription đã xác định chắc chắn.
+
+Bundle dựng lại đã nhúng25, không chạy lại migration riêng sau bundle. Owner đã báo SQL25 PASS/cleanup xóa9template và duyệt merge/deploy; kết quả hiện hành tại Active/QA. Agent không chạy SQL cloud. Sau phát hành được duyệt: auth-me đúng actor, Requested/Rejected không có lớp; Coach Accepted có classId duy nhất; Member thấy đúng lớp của mình; Paid mới có credit; đề xuất/Accept vào đúng lớp và hủy sớm hoàn đúng1credit.
+
+Kiểm upgrade riêng: `python scripts/test-advanced-class-migration-postgres.py --database scms_schema_adv_class_<ma_moi> --legacy-schema <snapshot_bundle_truoc25> --output <proof_json>`. Chỉ dùng DB local mới trong container được ghim; có cùng tùy chọn container/port loopback của runner bundle. Snapshot cũ chỉ làm fixture nâng cấp, không dùng để reset cloud. Active/QA giữ kết quả và source fingerprint.
+
+### Advanced14/11 — SQL trước deploy và kiểm sau phát hành
+
+Agent không tự áp query/migration trên DB đang dùng; Owner thực hiện bước SQL trước phát hành. [Migration24](../database/migrations/24_advanced_session_proposals_postgres.sql) là nâng cấp cộng thêm bảng, không reset/seed và không thay quyền học/chứng từ cũ. Kết quả thực thi và kiểm runtime xem [Active/QA](00-MASTER-CHECKLIST.md#active); kiểm cú pháp ngoại tuyến/H2 không thay nghiệm thu replay PostgreSQL.
+
+Khi Owner mở bước SQL: review đúng file, chạy toàn bộ trên DB SCMS đích; kết quả mong đợi `result=PASS`, `migration_key=20261114_advanced_session_proposals_v1`. Nếu có SCMS_ADVANCED_PROPOSAL_DEPENDENCY/INCOMPATIBLE hoặc timeout thì dừng, giữ lỗi và kiểm hiện trạng, không bỏ guard. Owner gửi kết quả đã che thông tin riêng; agent chưa tự readback khi quyền query vẫn đang dừng. Chỉ tiếp tục deploy/kiểm live khi Owner xác nhận bước này và mở phạm vi tiếp theo.
+
+Sau SQL và phát hành đúng source: GET health/build, auth-me đúng actor rồi kiểm luồng [bàn giao Advanced](reference/SCMS-BAN-GIAO-FE-ADVANCED-2026-11-14.md). Chỉ kiểm ghi trong phạm vi được mở; không tự tạo giao dịch/email hoặc sửa quyền. Merge code và test local không là deploy hoặc FE/browser PASS.
+
+Checker offline giữ wire cũ POST `book-private`→201 sẽ báo REVIEW_REQUIRED vì route đó nay bị đóng. Giữ nguyên bằng chứng cũ; đối chiếu case mới đề xuất→Member Accept và OpenAPI hiện hành, không sửa response lịch sử hoặc gọi toàn checker là PASS.
+
+**Đề xuất bundle chờ duyệt:** thêm bảng mới vào bootstrap và whitelist dựng lại theo thứ tự FK; đưa migration24 vào compiler; thêm fixture đề xuất có nhãn minh họa, cập nhật gate/count và kiểm fresh/replay/rollback rồi sinh bundle cùng anchor. Chưa sửa hoặc sinh lại bundle hiện tại; không cần reset DB đang dùng sau migration24.
+
 
 <a id="rbac-fe-verification"></a>
 ### Kiểm phản hồi FE sau bản sửa RBAC
@@ -139,44 +250,154 @@ python scripts/test-phases-postgres.py --database scms_phases_attendance_<ma_moi
 
 Chạy Maven từ bản sao source hiện hành không.env; DB mới loopback55440 đúng runner. Integration test mặc định H2, opt-in PG chỉ nhận URL local đã ghim, ddl-auto=none; fixture login/auth-me thật rồi kiểm response/DB sau commit và race. Có thể xuất schema từ cùng app bằng `-Dscms.attendance.openapi=<duong_dan_raw_openapi.json>`; chỉ cập nhật snapshot sau khi kiểm đạt. Test đích rồi clean test theo mục2. Bằng chứng/SHA/count hiện hành chỉ ghi ở docs00/QA; FE/Render/CRUD nghiệm thu đợt chung, lượt này không mutation cloud.
 
+Session1.1 content: `TrainingResultContentIntegrationTest` dùng server HTTP thật trên random port, chỉ bind127.0.0.1; mặc định H2, opt-in `-Dscms.content.pg-url=jdbc:postgresql://127.0.0.1:55440/scms_phases_<fixture_moi>` dùng PostgreSQL riêng đã chuẩn bị bằng runner minimal ở trên. Chạy test đích `-Dtest=TrainingResultServiceTest,TrainingResultContentIntegrationTest`, rồi `clean test` tuần tự trong source copy không.env. Fixture synthetic/Clock test cố định chỉ phục vụ kiểm biên; Clock ứng dụng không đổi. Test mock job/mail, tắt AI/QueryDR/probe; không gọi provider thật. Demo Owner dùng Clock thực và fixture mới đang trong cửa sổ, hướng dẫn tại [bàn giao content11/11](reference/SCMS-CAP-NHAT/SCMS-BAN-GIAO-FE-TRAINING-RESULT-CONTENT-2026-11-11.md); chuẩn bị Swagger/auth-me không là browser PASS. Bằng chứng/môi trường ở Active/QA.
+
+Session1.2 scope đọc: `TrainingResultScopeIntegrationTest` cũng dùng HTTP loopback thật, committed fixture hai center, login/auth-me và snapshot DB/audit; opt-in PG riêng bằng `-Dscms.result-scope.pg-url=jdbc:postgresql://127.0.0.1:55440/scms_phases_<fixture_moi>`. Đích H2 gồm thêm `TrainingResultServiceTest,TrainingResultAccessIntegrationTest`; PostgreSQL chạy trên DB minimal mới riêng cho suite này. [Bàn giao scope](reference/SCMS-CAP-NHAT/SCMS-BAN-GIAO-FE-TRAINING-RESULT-SCOPE-2026-11-11.md) dùng DB demo local riêng và không phụ thuộc cửa giờ attendance.
+
+Session1.3 room validation: `RoomValidationIntegrationTest` kiểm POST/PUT/GET, biên name50/location100, null/blank/raw whitespace, schema lengths và DB/audit sau commit. Opt-in `-Dscms.room-validation.pg-url=jdbc:postgresql://127.0.0.1:55440/scms_phases_<fixture_moi>` dùng DB minimal mới riêng, ddl-auto=none; thêm `-Dscms.room-validation.openapi=<duong_dan_staging_json>` để xuất schema từ app đã kiểm, giữ server metadata trung tính như snapshot FE hiện có. Đích liên quan `PublicationResourceHttpTest` giữ room activity/role/center/lock/race. Chạy đích rồi clean test tuần tự sau từng nhóm BE; không.env hoặc provider/cloud. DTO/JPA khớp cột có sẵn nên không cần migration, không chạy schema dựng lại để thêm validation.
+
+Session2.1/R1: `AttendanceDateFilterIntegrationTest` kiểm HTTP loopback thật với login/auth-me, fixture committed có Session Present/Absent/null và lobby legacy, biên nửa đêm, filter AND, owner/assignment/center/superseded và snapshot DB/audit không mutation. Dùng `-Dtest=AttendanceDateFilterIntegrationTest,AttendanceServiceTest` cho đích H2; opt-in PG riêng bằng `-Dscms.attendance-date.pg-url=jdbc:postgresql://127.0.0.1:55440/scms_phases_<fixture_moi>` trên DB minimal mới từ runner, ddl-auto=none. Thêm `-Dscms.attendance-date.openapi=<duong_dan_staging_json>` để xuất schema và đối chiếu các mô tả ngày ở cả hai alias; chỉ cập nhật mô tả param startDate/endDate, giữ shape và metadata ngoài luồng trong snapshot canonical. Fixture dùng ngày synthetic cố định để kiểm đọc, không thay bean Clock hoặc sửa dữ liệu lịch sử thực. Lobby write toggle vẫn tắt; đọc record lịch sử không bật lại luồng check-in cửa. Chạy test đích/PG rồi clean tuần tự trong source copy không.env, không provider/cloud; không cần migration hoặc dựng lại bundle demo.
+
 <a id="demo-rebuild-20261109"></a>
-### Bundle demo Normal/Refund10/11 — kiểm local, chưa chạy cloud
+<a id="member-creator-fk-20261114"></a>
+### Sửa FK người tạo Member — giữ dữ liệu14/11
 
-File đích duy nhất [database/schema_postgres.sql](../database/schema_postgres.sql): tạo lại57bảng SCMS, xóa4backup SCMS cũ; giữ hạ tầng auth/storage/realtime/extensions và bảng ngoài danh sách. FK/view ngoài phạm vi gây RESTRICT rollback. Bundle nhúng baseline/migration17–22 và Coach AI, chỉ trích guard runtime16; không chạy cleanup16 hoặc18–22 nối tiếp. Schema root là baseline bảo toàn cũ.
+DB hiện có: chạy nguyên [23_member_registered_by_postgres.sql](../database/migrations/23_member_registered_by_postgres.sql) trên đúng project Supabase SCMS đã chọn. File chỉ chuyển `members.registered_by` từ `receptionists(user_id)` sang `users(user_id)`; không xóa/sửa dòng, reset sequence hoặc gửi email. Có transaction, khóa ghi trong lúc đổi, timeout, kiểm kiểu cột/FK/orphan; lỗi làm rollback. Không chạy `database/schema_postgres.sql` để áp riêng bản sửa này vì bundle xóa/tạo lại dữ liệu demo.
 
-Bộ47account giữ33PDF/thêm14,9môn/20sân/21Class và lịch/quyền/thu/hoàn/attendance/incident/chat/thông báo tổng hợp.2PDF DEMO nằm BYTEA riêng tư, không cần provider/bucket công khai. Seed chỉ tắt hai trigger thời gian classes/sessions để nạp lịch sử tổng hợp rồi bật lại cùng transaction; FK/CHECK/unique vẫn chạy, postflight kiểm dữ liệu. Không coi seed history là nghiệp vụ thật đã quan sát.
+Kết quả trả về `result=PASS`, `constraint_name=fk_member_registered_by`, `referenced_table=users`, `validated=true` là đúng: FK đã commit và kiểm dữ liệu thành công. Replay cho cùng kết quả. Nếu có `SCMS_MEMBER_CREATOR_INCOMPATIBLE`, `SCMS_MEMBER_CREATOR_ORPHAN` hoặc timeout, dừng và kiểm cấu trúc/dữ liệu hay transaction đang giữ khóa; không bỏ guard hoặc xóa lịch sử. Bundle dựng mới đã dùng FK mới từ bootstrap, không cần chạy thêm23 sau bundle đó.
 
-Anchor là ngày VN truyền vào compiler; SQL từ chối CURRENT_DATE khác anchor. Khi chạy ngày mới phải tái sinh/kiểm lịch; không đổi Clock Render/TTL để giữ demo. Chưa cấp quyền cloud. Sau Owner duyệt phát hành: ngừng BE/job ghi, kiểm đúng DB/recovery riêng tư rồi chạy nguyên một file; restart BE để hủy phiên/ID cũ, đăng nhập mới/auth-me trước smoke. Không tái dùng pay URL trước reset.
+Không cần đổi payload hoặc deploy BE riêng cho FK này. Sau khi áp DB, kiểm tài khoản/authority bằng `/api/auth/me`, rồi kiểm tạo và đọc lại: Manager dùng `POST /api/members` với MANAGE_USERS; Receptionist dùng `POST /api/members/register` với REGISTER_MEMBER. Thành công trả201; giữ `isFirstLogin`/quy trình mật khẩu tạm. Source FE dùng form chung còn cần chọn đúng endpoint cho Receptionist. Kết quả SQL không thay nghiệm thu HTTP/FE hoặc email; agent chỉ chuẩn bị và kiểm local, chưa áp Supabase.
 
-**Kết quả mong đợi sau thực thi được duyệt:** result=PASS, migration_key=20261110_demo_rebuild_v3; summary mode=approved-synthetic-demo/accounts47/subjects9/rooms20/advanced_templates9/normal_classes12/synthetic_fixture:true. Chưa quan sát kết quả này trên Supabase. Invoice sequence giữ floor cũ và các số fixture vừa dùng, không giảm/tái dùng; rollback có thể có khoảng trống. Thu hồi quyền PUBLIC/anon/authenticated của bảng/sequence SCMS, giữ bảng/grant ngoài phạm vi; role datasource riêng cần đúng quyền sau tạo lại.
-
-Kiểm trong source copy không.env, DB mới riêng do runner tạo; không reset DB tùy ý:
+Kiểm migration local (chỉ Docker PostgreSQL loopback55440, DB mới; không đọc.env):
 
 ```powershell
-python scripts/build-demo-schema.py --anchor 2026-11-10
-python scripts/test-demo-schema-postgres.py --database scms_schema_demo_phase1_<ma_moi> --output artifacts/runs/normal-demo/sql-proof.json
-python scripts/test-phases-postgres.py --database scms_phases_normal_<ma_moi> --minimal-fixture
-.\mvnw.cmd "-DargLine=-Duser.timezone=Asia/Ho_Chi_Minh" "-Dtest=NormalLifecycleHttpTest,DemoRebuildPostgresTest" "-Dscms.normal.pg-url=jdbc:postgresql://127.0.0.1:55440/scms_phases_normal_<ma_moi>" "-Dscms.demo.pg-url=jdbc:postgresql://127.0.0.1:55440/scms_schema_demo_phase1_<ma_moi>" test
-.\mvnw.cmd clean test
-# Export từ DB fixture nguyên trạng riêng trước test HTTP làm thay đổi kịch bản:
-python scripts/build-system-data.py --anchor 2026-11-10 --from-local-pg scms_schema_demo_phase1_<db_nguyen_trang>
+$memberCreatorRun = [guid]::NewGuid().ToString('N').Substring(0,8)
+python -B scripts/test-member-creator-migration-postgres.py --database "scms_member_creator_$memberCreatorRun" --output "artifacts/runs/member-creator-$memberCreatorRun/migration.json"
 ```
 
-Ví dụ dùng ngày10/11; thay bằng ngày VN dự kiến và kiểm lại. `--check` cùng `--from-local-pg` kiểm SYSTEM-DATA tái sinh. Compiler dùng reportlab tạo2PDF invariant; không là dependency BE. QR/OTP/Pending/waitlist/provider attempt tạo lúc demo bằng HTTP; không seed secret/hold hết hạn. JVM timezone canonical cần argLine như ví dụ; không load.env hoặc SMTP/gateway thật.
+### Bundle demo Normal/Refund — cấu trúc và kiểm local
+
+**Ngày cài cần phân biệt:** Owner đã chạy một bản ngày14/11 và có readback/smoke đọc theo Active/QA; lần chạy lại sau đó báo deadlock. Bundle đang chuẩn bị có sửa khóa và anchor riêng, chưa được chạy trên Supabase; Owner chưa chốt ngày cài. Có11ngày lễ mẫu2026 đang tắt, một ngày nghỉ DEMO anchor+50, tên Advanced bỏ `(1:1)` và FK người tạo Member trỏ `users` đúng entity. Không chạy thêm seed lễ sau bundle. Hash/kết quả/ngày kiểm chuẩn ở [Active/QA](00-MASTER-CHECKLIST.md#active); đổi ngày cài cần sinh/kiểm lại toàn bộ trước khi giao chạy.
+
+File đích duy nhất [database/schema_postgres.sql](../database/schema_postgres.sql): tạo lại56bảng SCMS, xóa4backup SCMS cũ; giữ hạ tầng auth/storage/realtime/extensions và bảng ngoài danh sách. FK/view ngoài phạm vi gây RESTRICT rollback. Bundle nhúng các migration hiện hành gồm24–25 và chỉ trích guard runtime16; không chạy cleanup16 hoặc các migration nối tiếp sau bundle. Schema root là baseline bảo toàn cũ.
+
+Bộ47account giữ33PDF/thêm14,9môn/20sân/20Class (12Normal,8Advanced có đăng ký được nhận) và lịch/quyền/thu/hoàn/attendance/incident/chat/thông báo tổng hợp.2PDF DEMO nằm BYTEA riêng tư. Seed chỉ tắt hai trigger thời gian classes/sessions để nạp lịch sử tổng hợp; các ràng buộc sở hữu lớp vẫn chạy và được kiểm trước bật lại trigger thời gian. Không coi seed history là nghiệp vụ thật đã quan sát.
+
+Anchor là ngày cài bundle theo VN; compiler bắt buộc nhận `--anchor`. Preflight dùng ngày thực từ clock_timestamp/Asia/Ho_Chi_Minh, chặn khác anchor trước phần tạo/xóa; không đổi Clock Render/TTL để giữ demo. [Rule và công cụ chuẩn bị](#demo-anchor-rules) áp dụng khi đổi ngày. Chuẩn bị/kiểm local không cấp quyền chạy Supabase. Sau Owner duyệt thực thi đúng bundle: ngừng BE/job ghi, kiểm đúng DB/recovery riêng tư rồi chạy nguyên một file; restart BE để hủy phiên/ID cũ, đăng nhập mới/auth-me trước smoke. Không tái dùng pay URL trước reset.
+
+<a id="demo-reset-deadlock"></a>
+**Khi bundle báo40P01/deadlock:** Owner14/11 xác nhận chạy nguyên file, chưa biết BE hoặc SQL khác có hoạt động. Đây là vòng chờ khóa giữa các transaction, chưa phải bằng chứng FK, cutoff hay dữ liệu lịch sai. Bundle có BEGIN/COMMIT, đọc count nhiều bảng rồi DROP; BE có job tự chạy dù không bấm FE. Advisory lock của bundle không chặn transaction BE nếu BE không dùng cùng khóa. Tăng timeout hoặc bỏ guard nghiệp vụ không xử lý được nguyên nhân này; xem [PostgreSQL locking](https://www.postgresql.org/docs/current/explicit-locking.html#LOCKING-DEADLOCKS).
+
+1. Chưa coi lần lỗi là đã cài bundle thành công. Nếu đúng phiên SQL còn trạng thái aborted thì ROLLBACK tại phiên đó. DDL/DML của transaction lỗi không commit; sequence có thể nhảy số, và transaction khác vẫn có thể ghi. Không hứa toàn DB bất biến hoặc tự terminate mọi connection.
+2. Chỉ chạy lại reset trong phạm vi đã được Owner giao, khi đã dừng tất cả BE/job/local app dùng DB và không có lượt SQL/reset khác. Đóng FE chưa dừng scheduler; Maintenance Mode chặn HTTP chưa đủ chứng minh job đã ngừng. Render có thao tác [Suspend/Resume tại danh sách dịch vụ](https://render.com/changelog/suspend-and-resume-services-in-bulk-from-the-render-dashboard): chọn đúng dịch vụ BE, dùng Suspend; Resume sau khi SQL PASS. Nếu giao diện khác, cần ảnh vùng liên quan trước hướng dẫn tiếp.
+3. Để xác định hai relation và connection, Owner có thể chạy hai SELECT chỉ đọc dưới đây. PID/OID là số trong lỗi đã gửi, có thể không còn tồn tại; kết quả rỗng không xác định được nguồn lỗi cũ. Agent chưa chạy query cloud này. Kết quả mong đợi: tên relation và trạng thái ứng dụng/kết nối, không phải PASS reset; không chứa password/cookie hoặc toàn văn SQL.
+
+```sql
+SELECT c.oid, n.nspname AS schema_name, c.relname, c.relkind
+FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+WHERE c.oid IN (23334, 24028)
+ORDER BY c.oid;
+
+SELECT pid, application_name, backend_type, state,
+       wait_event_type, wait_event, xact_start,
+       pg_blocking_pids(pid) AS blocked_by
+FROM pg_stat_activity
+WHERE datname = current_database()
+  AND pid <> pg_backend_pid()
+  AND backend_type = 'client backend'
+ORDER BY pid;
+```
+
+**Đã áp dụng trong bộ sinh:** `pg_try_advisory_xact_lock` chặn reset chồng; `LOCK TABLE ONLY ... IN ACCESS EXCLUSIVE MODE NOWAIT` theo thứ tự tên cố định lấy khóa trước khi đọc dữ liệu. `SCMS_DEMO_DB_BUSY` nghĩa là bảng còn được dùng; `SCMS_DEMO_RESET_BUSY` nghĩa là có lượt reset khác. Cả hai dừng trước phần xóa/tạo, không phải reset PASS; không bỏ guard, FK/unique hoặc tăng timeout để ép chạy. Bảng có partition/inheritance ngoài mô hình hiện hành bị chặn `SCMS_DEMO_WRONG_TARGET` để giữ phạm vi. Kiểm local phải gồm reader/writer/reset chồng, rollback và chạy thành công sau khi nhả khóa; kết quả/ngày kiểm tại [Active/QA](00-MASTER-CHECKLIST.md#active).
+
+**Trước khi Owner chạy:** xác nhận ngày anchor trong file trùng ngày VN thực; dừng đúng BE/job và các client dùng DB; chạy nguyên một file. **Kết quả trả về `result=PASS` cùng summary đúng là cài bundle thành công.** Sau đó Resume/restart BE, đăng nhập lại và kiểm auth/me/ID mới. Lỗi BUSY thì dừng, xử lý kết nối còn dùng DB rồi mới chạy lại nguyên file. Chưa chốt ngày chạy thì giữ bản kiểm làm tham chiếu, không dùng bản hết ngày hoặc chỉ sửa vài DATE trong SQL.
+
+**Kết quả mong đợi sau thực thi được duyệt:** result=PASS, migration_key=20261110_demo_rebuild_v3; summary mode=approved-synthetic-demo/accounts47/subjects9/rooms20/advanced_templates0/advanced_private_classes8/normal_classes12/synthetic_fixture:true. Bản generator có rule anchor bổ sung anchor_date/business_timezone/fixture_version; migration_key là phiên bản mô hình, không phải ngày cài. Bằng chứng Supabase trước đó không chứng nhận bundle mới đã chạy; xem Active/QA. Invoice sequence giữ floor cũ và các số fixture vừa dùng, không giảm/tái dùng; rollback có thể có khoảng trống. Thu hồi quyền PUBLIC/anon/authenticated của bảng/sequence SCMS, giữ bảng/grant ngoài phạm vi; role datasource riêng cần đúng quyền sau tạo lại.
+
+Kiểm bằng runner cách ly không.env, DB mới riêng do runner tạo. Dùng đúng ngày anchor VN; ví dụ bộ19/11:
+
+```powershell
+python scripts/prepare-demo-bundle.py --anchor 2026-11-19 --demo-at 2026-11-19T20:00:00+07:00 --demo-until 2026-11-19T23:59:59+07:00 --output-dir artifacts/runs/<thu_muc_moi> --verify-local --database scms_schema_demo_phase1_<ma_moi>
+# Xuất fixture nguyên trạng trước HTTP; kiểm HTTP dùng DB clone riêng:
+python scripts/build-system-data.py --anchor 2026-11-19 --from-local-pg scms_schema_demo_phase1_<ma_moi> --output artifacts/runs/<thu_muc_moi>/SYSTEM-DATA.md
+python scripts/test-demo-be.py --run <ten_luot_moi> --test DemoRebuildPostgresTest --property scms.demo.pg-url=jdbc:postgresql://127.0.0.1:55440/scms_schema_demo_<db_clone_moi> --property scms.demo.plan=D:/Projects/SWP391/artifacts/runs/<thu_muc_moi>/demo-plan.json --property scms.demo.at=2026-11-19T20:00:00+07:00
+```
+
+Lặp kiểm đường demo trên clone khác ở23:59:59; `scms.demo.at` chỉ cố định Clock trong lớp test, không sửa Clock runtime hoặc guard SQL. Bản21 dùng15:00 và18:00, chỉ chạy SQL đúng21/11. Trước đó sinh/review ngoại tuyến và ghi SQL execution NOT_RUN; không bỏ guard. `--preview-design` chỉ xuất SYSTEM-DATA thiết kế dự kiến, chưa có ID DB được kiểm. `--check` cùng `--from-local-pg` kiểm bản xuất thực tế. Compiler dùng reportlab tạo2PDF invariant; không là dependency BE. QR/OTP/Pending/waitlist/provider attempt tạo lúc demo bằng HTTP, không seed secret/hold hết hạn. Runner tự đặt JVM timezone Asia/Ho_Chi_Minh và chặn .env/provider bên ngoài.
 
 Nhánh giữ dữ liệu chọn baseline theo README,21 rồi22 additive riêng; không reset để vá.22 thêm proposal/response/transfer, entitlement_class_id/change_pending, Refund receiver/attempt/document/verification; guard kiểu/nullability/FK/unique/replay, không backfill consent/ngân hàng hay sửa receipt. Upload HTTP giữ multipart mặc định1MiB; service/DB có trần bảo vệ5MiB, không coi trần lưu trữ là cấu hình nhận HTTP. FE gửi file≤1MiB, tăng trần HTTP cần cấu hình/test riêng; download có phiên/role/center; không dùng MediaService/public URL. PostgreSQL đã kiểm, SQLServer chưa suy tương đương.
 
 Trạng thái chuẩn/điều phối ở Active/QA. audit-supabase-demo.sql vẫn chỉ đọc; không gọi cloud audit/mutation mới chỉ vì bundle được cập nhật.
 
-<a id="normal-release-smoke-20261110"></a>
-### Smoke sau phát hành Normal/Refund — đề xuất10/11, chưa thực thi
+Khi Windows giữ cổng55440, không sửa dải cổng hệ thống. Dùng container tạm có nhãn của đợt, PostgreSQL17, bind127.0.0.1:54391. Runner SQL hỗ trợ `--container scms-bundle-<ma> --port 54391`; exporter hỗ trợ `--pg-container scms-bundle-<ma> --pg-port 54391`. Vẫn bắt buộc DB mới đúng prefix, kiểm bind loopback và guard ngày; test Java demo chỉ chấp nhận hai cổng local này. Lưu bằng chứng rồi xóa đúng container/volume tạm của đợt theo autoclean; không prune Docker chung.
 
-Owner đã cung cấp PASS cho bundle demo và yêu cầu merge tai→main; bằng chứng/trạng thái Git/CI chuẩn ở Active/QA. Không chạy lại bundle, SQL16, seed hay migration nối tiếp để làm smoke. Không tự gọi VNPay/QueryDR/mail/AI/Google/storage provider hoặc chuyển khoản ngân hàng thật. Mỗi nhóm ghi rõ build/actor/fixture/response và trạng thái sau commit, PASS/FAIL/BLOCKED/NOT_RUN; anonymous401 và health200 chưa là nghiệm thu nghiệp vụ.
+<a id="demo-anchor-rules"></a>
+### Rule đổi ngày và chuẩn bị kịch bản demo
+
+[SCMS-SCRIPT-DEMO-BE](reference/SCMS-SCRIPT-DEMO-BE.md) là kịch bản Normal/Refund theo actor và fixture. Các đề xuất màn hình/nút/bố cục/cách chuẩn bị FE trong tài liệu đó để FE duyệt; quyết định cuối thuộc FE. Contract và kiểm quyền/state tại BE vẫn áp dụng độc lập giao diện.
+
+1. **Ngày cài và giờ demo riêng nhau.** `--anchor YYYY-MM-DD` là ngày dự kiến chạy SQL theo Asia/Ho_Chi_Minh; bắt buộc, không còn default10/11. Đây chính là anchor, không có field ngày gốc thứ ba. `--demo-at` tùy chọn: ISO timestamp có offset, không trước ngày cài; có thể ở ngày sau. Nó chỉ đánh giá cửa case, không thay captured_at/thời điểm nghiệp vụ thực hoặc đặt Clock. DB đang chạy không tự lỗi stale chỉ vì sang ngày khác; từng case phải recheck state và giờ thực.
+2. **Một nguồn anchor xuyên suốt.** Sinh lại design→fixture→schema và plan bằng cùng anchor. Không sửa riêng literal ngày/guard hoặc dịch mọi ngày bằng số ngày chênh lệch: compiler chọn lại các thứ trong tuần, nên giờ đầu/cutoff thay đổi theo từng lớp. Không đổi giá/minimum/quyền/Clock/TTL để tạo kết quả đẹp.
+3. **Từ chối sớm.** Bundle chặn sai ngày VN trước CREATE/DROP; kiểm lại trong fixture và rollback cùng transaction. Không thêm cờ bỏ qua guard. Metadata lưu anchor_date, business_timezone, fixture_version; giữ migration_key phiên bản. Không dùng phiên bản có ngày trong tên làm bằng chứng ngày cài.
+4. **Plan không phải nghiệm thu.** `demo-plan.json` dùng mã case DEMO-01–DEMO-10, tách khỏi quyết định D01–D19, ghi firstSession/cutoff48h/cửa reason24h. Không nhập giờ demo: plannedDemoAt=null, availability=NOT_EVALUATED; vẫn có đủ mốc lịch. Có giờ thì AVAILABLE chỉ đúng cửa thời gian, mọi executionStatus vẫn NOT_RUN. Ngoài cửa ghi NOT_RUN; thiếu phiên/state/chỗ ghi BLOCKED. Ví dụ anchor11/11 làm N02 khai giảng13/11 06:00, case xác nhận trễ chỉ mở từ12/11 06:00.
+5. **Kiểm lại cả dữ liệu.** Các ngày trong tuần, biên tháng/năm/ngày nhuận, trước/đúng cutoff, timezone qua nửa đêm; 12buổi hợp lệ, Coach/phòng/Member không trùng, holiday, min/sĩ số, quyền/credit/hạn, proposal snapshot, thứ tự tài chính và SLA hết ngày TT mở thứ7. FK/CHECK/unique và counter hóa đơn giữ nguyên. OTP/QR/Pending/provider attempt tạo lúc chạy, không seed hoặc kéo hạn.
+6. **Bằng chứng tách lớp.** Compile/reproducibility, SQL fresh/replay/rollback/guard và HTTP response+commit là các kết quả riêng. SQL local PASS không là HTTP/Render/browser PASS. Giữ fingerprint nguồn thực kiểm trong QA; không dùng checkout cũ để chứng minh working tree mới.
+7. **Xuất từ bộ nguyên trạng.** Export/check SYSTEM-DATA trước HTTP mutation, cùng anchor/version và DB local được giới hạn. Exporter chặn sai anchor hoặc fixture đã thêm Invoice/ghi danh/chuyển quyền/Refund/xác nhận. Bảng tra cứu N01–N12/tài khoản/proposal/Refund được sinh từ cùng các dòng đã xuất; gắn alias bằng tên/email và quan hệ FK, không suy ID bằng số thứ tự. File vẫn DATA DESIGN và không là dump Supabase. DB để HTTP riêng hoặc chỉ dùng sau export.
+8. **Phạm vi thực thi riêng.** Công cụ chuẩn bị không đọc.env, không chạy cloud/deploy/provider. Chỉ Owner cho phép thực thi đúng bundle mới mới chạy Supabase trong phạm vi SCMS đã nêu. Sau reset lấy ID/cookie/phiên mới; không tái dùng nhóm smoke đã tiêu thụ. Hạ tầng ngoài SCMS giữ nguyên.
+9. **Advanced theo đăng ký, không theo số môn.** Theo D03/D04: Requested/Rejected không có lớp; mỗi đăng ký đã được Coach nhận có đúng một lớp riêng của Member/môn/Primary Coach. Quyền học và buổi phải nối về cùng đăng ký; có lớp chưa có nghĩa đã Paid hoặc đã lên lịch. Validator kiểm hai chiều trước sinh SQL, postflight kiểm trước commit và runner đọc lại sau commit; dữ liệu sai phải dừng/rollback. Fixture lịch sử được ghi rõ là dữ liệu mẫu, không seed đồng ý lịch giả. Không đổi8lớp của fixture thành11chỉ vì live đang có thêm đăng ký.
+
+Ví dụ PowerShell dưới đây dùng ngày10/11; nhập đúng ngày dự kiến cài, giờ dự kiến demo và DB mới. Cần Python/reportlab và timezone IANA Asia/Ho_Chi_Minh khả dụng; phần SQL cần Docker/PostgreSQL loopback đã cấu hình. `artifacts/runs/` là staging local được Git bỏ qua, không phải tài liệu bàn giao thứ hai:
+
+```powershell
+$demoAnchor = '2026-11-10'
+$demoRunId = [guid]::NewGuid().ToString('N').Substring(0,8)
+$demoStage = "artifacts/runs/demo-$demoAnchor-$demoRunId"
+$demoDb = "scms_schema_demo_phase1_$($demoAnchor.Replace('-',''))_$demoRunId"
+
+python scripts/test-demo-anchor.py
+python scripts/prepare-demo-bundle.py --anchor $demoAnchor --output-dir $demoStage --verify-local --database $demoDb
+python scripts/release_catalog.py --check-bundle "$demoStage/schema_postgres.sql" --profile demo-reference-2026 --output "$demoStage/catalog-proof.json"
+```
+
+Đọc `verification.json` và `demo-plan.json` trong staging. Khi đã biết giờ, có thể thêm `--demo-at '2026-11-10T12:00:00+07:00'` phù hợp ngày cài; bỏ tham số vẫn sinh bundle/lịch, không đoán giờ demo. Lệnh tạo schema/fixture mới, không ghi đè database/schema_postgres.sql hoặc bootstrap canonical. Thư mục đã có kết quả không được ghi đè. SQL verification chỉ chạy Docker loopback127.0.0.1:55440/container đã cấu hình và DB mới `scms_schema_demo_phase1_*`; lỗi DB trùng tên dừng, không tự drop. Nếu anchor chưa phải hôm nay VN, phần SQL là NOT_RUN và exit2, không tạo DB; bundle tương lai vẫn được sinh để review. Không coi exit2 là PASS.
+
+Khi SQL đã PASS, xuất từ fixture nguyên trạng trước test HTTP:
+
+```powershell
+python scripts/build-system-data.py --anchor $demoAnchor --from-local-pg $demoDb --output "$demoStage/SYSTEM-DATA.md"
+python scripts/build-system-data.py --anchor $demoAnchor --from-local-pg $demoDb --output "$demoStage/SYSTEM-DATA.md" --check
+python scripts/test-demo-handoff.py --anchor $demoAnchor --database $demoDb
+```
+
+Trong bản sao source hiện hành **không.env**, dùng local HTTP tests ở mục bundle trên: DemoRebuildPostgresTest trỏ `$demoDb`, NormalLifecycleHttpTest trỏ DB minimal riêng theo guard của runner. Lưu response/state sau commit và XML; `verification.json` của công cụ chuẩn bị vẫn ghi HTTP NOT_RUN vì công cụ không chạy HTTP test thay Bạn. Kết quả HTTP thực tế ghi canonical QA. Nếu có thay đổi BE thì chạy clean test theo AGENTS; chỉ sửa docs/script không tự suy nghiệm thu BE từ test cũ.
+
+Sau review/check, BE mới đưa schema/fixture và bản DATA DESIGN đã kiểm vào các file canonical tương ứng, cập nhật Active/QA; không giữ nhiều bản before/after trong gói FE. Không chạy thêm SQL16/migration nối tiếp sau bundle. Việc thực thi cloud và browser FE vẫn là các bước riêng.
+
+<a id="normal-release-smoke-20261110"></a>
+### Smoke sau phát hành Normal/Refund — quy trình10/11
+
+<a id="session123-release-smoke-20261113"></a>
+**Luồng phát hành Session1–3:** Cloud chỉ login/logout, đọc và negative đã chứng minh không commit trên PG local; Member PUT RBAC403, name51/400 và duplicate room409 phải GET readback quyền/phòng không đổi. Positive mutation, race và đổi thật quyền/status account thực hiện local. Bảng Normal10/11 bên dưới giữ quy trình của phạm vi đã duyệt khi đó; quyền của lượt hiện hành theo Active/QA. Không cloud SQL/SQL16/provider/ZIP hoặc lưu credential/cookie trong report. CORS HTTP chưa là browser PASS.
+
+<a id="session123-release-smoke"></a>
+Smoke phát hành: chạy `python scripts/test-release-smoke.py` offline trước; rồi `python scripts/release-smoke.py --expected-commit <runtime_sha> --expected-db-fingerprint <target_hash> --actors-file <file_private_da_duyet> --output <run_json>`. Baseline dùng `--phase baseline`; bản mới dùng `--phase post-deploy --negative-mutations` sau khi các negative request đã chứng minh rollback trên PG local. File actor/cookie không đưa vào Git hoặc log. Kiểm auth-me đúng role/isFirstLogin:false; Active được bảo vệ bởi filter hiện hành, response auth-me không có field status.
+
+Chỉ GET `/api/health`, `/actuator/health`, `/v3/api-docs` retry transport hoặc502/503/504: tối đa3attempt,35giây/attempt, deadline110giây/read, delay2giây. Retry bao gồm đọc body; từng attempt và lỗi đầu được giữ riêng. HTTP/business khác, login/logout và mọi mutation chỉ gửi một lần. Phân biệt `STARTUP_TRANSPORT_EXHAUSTED`, `TRANSPORT_FAILURE`, `API_ASSERTION`, `SETUP_OR_PAYLOAD`; deadline không nâng thành PASS. Smoke cố logout các phiên đã tạo kể cả sau failure. Kiểm SHA và DB fingerprint lại cuối lượt; chỉ là bounded API smoke, không full role/business/JSON Schema/browser/provider acceptance.
+
+**Kiểm nội dung danh mục:** thêm `--catalog-profile demo-reference-2026` để so các khóa danh mục đã duyệt: slug môn, mã phòng và ngày trong script bổ sung lễ2026. Smoke đọc `/api/subjects`, `/api/rooms`, `/api/holidays`, `/api/holidays/active`, `/api/classes`; ghi thiếu khóa cụ thể, so all/active và chỉ tổng hợp lớp theo type/status. Dòng lễ tắt vẫn phải nằm trong all-list; active-list rỗng không tự là lỗi. Không profile thì `catalogCompleteness.status=NOT_RUN`, không chứng nhận đủ dữ liệu. Thêm phòng/ngày hoặc đổi flag/giá hợp quyền không bị coi lỗi chỉ vì khác snapshot cũ; trạng thái/hạn/fixture nghiệp vụ vẫn cần kiểm riêng. Test offline: `python -B scripts/test-release-catalog.py` và `python -B scripts/test-release-smoke.py`. File yêu cầu nguồn phải có mặt; không dùng fingerprint DB đích hoặc HTTP200 thay kiểm nội dung. Kết quả của runner mới tách QA14/11 khỏi smoke phát hành13/11, không sửa bằng chứng cũ.
+
+Trước khi bàn giao một bundle với yêu cầu có đủ danh mục lễ2026, chạy `python -B scripts/release_catalog.py --check-bundle database/schema_postgres.sql --profile demo-reference-2026 --output <run_json>` **offline**. FAIL ghi thiếu ngày; SQL khác dạng INSERT literal của compiler trả REVIEW_REQUIRED, cần kiểm local có thực thi. Không nhận bộ reset là đủ danh mục khi gate chưa đạt. Kiểm này không chạy SQL, không thay kiểm schema/anchor/replay/phạm vi PG; bundle cũ khác ngày phải giữ guard và không được chạy để sửa lỗi danh mục.
+
+Trước merge lưu main/runtime/DB baseline và cây baseline. Với bản phát hành bị revert, chuẩn bị nhánh mới từ main hiện tại rồi áp lại đúng diff, kiểm cây source cuối với candidate đã giữ; merge lại nhánh cũ không chứng minh feature đã trở lại. Sau merge chờ đúng SHA/DB trong deadline triển khai đã ghi của lượt đó, rồi mới smoke. Gate bắt buộc fail hoặc hết deadline: push forward revert có cây đúng baseline của lượt này, kiểm CI/runtime/baseline smoke, giữ bằng chứng lỗi đầu; không force-push/reset DB hoặc tự thử phát hành thêm vòng.
+
+Kết quả thực thi hiện hành, phạm vi PASS/BLOCKED/NOT_RUN và fixture đã tiêu thụ xem [Active/QA](00-MASTER-CHECKLIST.md#active). Quy trình dưới đây không thay bằng chứng hoặc cho phép chạy lại fixture đã dùng như dữ liệu nguyên trạng; mỗi lượt vẫn xác định actor/ID/state/chỗ và quyền Owner trước nhóm ghi.
+
+Không chạy lại bundle, SQL16, seed hay migration nối tiếp để làm smoke. Không tự gọi VNPay/QueryDR/mail/AI/Google/storage provider hoặc chuyển khoản ngân hàng thật. Mỗi nhóm ghi rõ build/actor/fixture/response và trạng thái sau commit, PASS/FAIL/BLOCKED/NOT_RUN; anonymous401 và health200 chưa là nghiệm thu nghiệp vụ. Trạng thái Git/CI và phạm vi được Owner mở theo Active/QA.
 
 | Thứ tự / lớp kiểm | Cách kiểm và kết quả cần có |
 |---|---|
 | 1. Đúng build và DB — chỉ đọc | Lấy SHA phát hành thực tế từ Git main/CI rồi GET /api/health trên BE FE thật sự gọi: buildCommit phải khớp, status UP; đối chiếu databaseTargetFingerprint với target đã xác nhận. GET /actuator/health phải UP cho DB. Nếu build cũ/DB chưa xác định thì dừng nhóm nghiệp vụ, không đổi credential/env để ép pass |
-| 2. Phiên mới và dữ liệu — chỉ đọc | Login lại năm role bằng account demo mới, xác minh GET /api/auth/me cùng cookie đúng user/role/authorities; không dùng session/ID trước reset. Admin/Manager đọc danh mục phù hợp:47account/21Class gồm9template Advanced và12Normal,9môn/20room nếu state chưa bị thao tác. Không coi account Inactive/Locked/Pending đăng nhập thất bại là lỗi role hoặc sửa status để thử |
+| 2. Phiên mới và dữ liệu — chỉ đọc | Login lại năm role bằng account demo mới, xác minh GET /api/auth/me cùng cookie đúng user/role/authorities; không dùng session/ID trước reset. Admin/Manager đọc danh mục phù hợp bundle mới:47account/20Class gồm8Advanced có đăng ký được nhận và12Normal,9môn/20room nếu chưa thao tác. Không coi account Inactive/Locked/Pending đăng nhập thất bại là lỗi role hoặc sửa status để thử |
 | 3. Scope và DTO — chỉ đọc | Member chỉ thấy enrollment/lịch/plan/attendance/result và Refund của mình; thử ID Member khác phải bị chặn. Coach đọc roster lớp được giao, lớp không được giao bị chặn. GET roles/permissions chỉ Admin; đọc Refund/proof/history theo role tài chính, Member/Coach không được tải proof. Manager kiểm các state Refund hiện có, receiver che đúng phạm vi/contact không lộ ra thông báo; response giữ field/shape của contract |
 | 4. Cash/admission/lifecycle — nhóm ghi demo được xác định | Chọn rõ fixture SMOKE trước khi chạy; thu Cash qua Receptionist có đủ quyền phải Paid+Registered cùng transaction, Invoice.amount theo BE; Member Cash online bị chặn và retry không nhân đơn/suất. Kiểm cutoff/minimum/confirm và chặn hủy Ongoing bằng response+readback. Không đổi Clock, ngày cũ hoặc state DB để vượt cửa thời gian; phần không đúng thời điểm ghi NOT_RUN |
 | 5. Chuyển lớp/Refund — nhóm ghi demo được xác định | Nếu dùng N05→N11 phải ghi rõ Member/chỗ sẽ tiêu thụ; preview không giữ chỗ, Accept phải chuyển quyền giữ Invoice.classId/amount, retry không nhân liên kết. Refund dùng workflow Member receiver→Manager verify/approve→Receptionist claim/proof→Manager bank verification; upload chưa Completed. Có thể dừng ở đọc/claim/proof thay vì tạo xác nhận ngân hàng giả trên hồ sơ chưa thống nhất. Retry cùng UUID không tạo attempt khác; mọi evidence mô phỏng phải ghi DEMO; không chuyển tiền thật |
@@ -275,12 +496,34 @@ python scripts/check-render-production.py --output artifacts/runs/render/check.j
 
 CORS/cookie cần browser FE hiện hành kiểm preflight/Set-Cookie/cookie gửi lại. Gateway live cần Merchant/callback/fixture được phép; FE không gọi IPN. Commit chỉ docs/evidence có thể dùng `[skip render]` tránh deploy không cần thiết, theo [Render deploy docs](https://render.com/docs/deploys#skipping-an-auto-deploy).
 
+<a id="vnpay-demo-mechanism"></a>
+### Cơ chế QR và lựa chọn demo VNPay — 14/11/2026
+
+Phạm vi: đối chiếu source và tài liệu nhà cung cấp, chưa tạo/thanh toán đơn mới hoặc đổi cấu hình. D10 giữ nguyên; trạng thái kiểm ở [Active/QA](00-MASTER-CHECKLIST.md#active).
+
+1. Member tạo đơn theo giá BE, rồi POST `/api/invoices/{id}/pay-online` bằng phiên chủ hóa đơn. BE kiểm VNPay/Pending/còn hạn, trả `paymentUrl` có HMAC-SHA512; `VnPayGateway.createPaymentLink` gửi `vnp_Amount=Invoice.amount×100`, `vnp_TxnRef=invoiceCode`, `vnp_OrderInfo="Thanh toan lop/goi <invoiceCode>"`, merchant và thời hạn. Ví dụ 900.000VND gửi `90000000`; không phải thu 90triệu VND. Mỗi lần phát link lưu metadata gốc trong `vnpay_payment_attempts` FK→`invoices.invoice_id`.
+2. SCMS không tự tạo payload QR chuyển khoản tới số tài khoản cá nhân. Code chưa gửi `vnp_BankCode`, nên người trả chọn phương thức trên gateway; VNPay cung cấp QR khi chọn VNPAY-QR. SCMS chỉ gửi mô tả/mã đơn như trên, chưa gửi toàn bộ chi tiết lớp/môn/lịch. Nội dung app ngân hàng hiển thị còn phụ thuộc phương thức/app; chưa kiểm màn hình điện thoại trong lượt này. [Đặc tả VNPay](https://sandbox.vnpayment.vn/apis/docs/thanh-toan-pay/pay.html).
+3. VNPay gửi IPN có chữ ký tới BE; `InvoiceService.processVnpayResult` kiểm merchant/reference/amount và hai mã thành công trước khi ghi Paid dưới lock. Callback lặp không cấp lại quyền. Return chỉ kiểm/điều hướng. QueryDR là kênh BE hỏi lại provider bằng metadata gốc, không phải tín hiệu app ngân hàng gửi trực tiếp cho web. [VNPay phân biệt Return/IPN](https://sandbox.vnpayment.vn/apis/docs/faqs/).
+4. FE phải GET hóa đơn/quyền để hiển thị. Paid đúng hạn và đủ điều kiện mới Registered/Active; tới/quá expiresAt hoặc mất quyền giữ thì Paid+`reconciliationRequired=true`, không hồi sinh quyền. Poll của FE không gia hạn hóa đơn. Nghiệm thu phải đọc lại cả chứng từ và quyền học; chữ “thành công” trên trang Return chưa đủ.
+
+| Cách demo | Tiền và tài khoản nhận | Khả năng hiện tại |
+|---|---|---|
+| VNPay sandbox + thẻ test NCB | Giao dịch thử nghiệm, không cần tài khoản nhận tiền của Owner | Phương án đề xuất; chọn thẻ nội địa/NCB và dùng đúng [thông tin test VNPay công bố](https://sandbox.vnpayment.vn/apis/vnpay-demo/). Có thể thao tác trên trình duyệt điện thoại; đây là thanh toán sandbox, không phải app ngân hàng thật |
+| App ngân hàng thật quét QR và xác nhận, nhưng không trừ tiền | Không có chế độ này trong tích hợp SCMS đã kiểm | Chưa có bằng chứng về app/test banking dành riêng cho merchant này. Không cam kết QR sandbox dùng được trong app ngân hàng thật; nếu bắt buộc giữ trải nghiệm đó, cần VNPay xác nhận bộ mô phỏng được hỗ trợ |
+| VNPay production + app ngân hàng thật | Giao dịch tiền thật, merchant/tài khoản thanh toán theo hồ sơ với VNPay | Ngoài phạm vi demo sandbox. Không biến sandbox thành production bằng cách thay số tài khoản cá nhân trong QR; cần bộ merchant/cấu hình production và kiểm riêng |
+
+Tài liệu VNPay ghi môi trường test chỉ dùng các thông tin thẻ được công bố. Việc dùng trình duyệt điện thoại không tự đồng bộ trang PC: PC cần theo dõi **cùng invoice**, IPN phải tới BE, và FE phải đọc được Paid. Source FE có cơ chế này; chưa nghiệm thu hai thiết bị trên website đang phát hành. Phát hiện về cách trang kết quả diễn giải Return nằm tại [phân tích PAY-01](phan-tich-project.md#vnpay-demo-review), không phải lỗi schema đã xác nhận. Không cần query/reset Supabase để giải thích cơ chế này.
+
+**Nếu thêm ô Quét QR:** VNPay hỗ trợ chọn thẳng QR bằng `vnp_BankCode=VNPAYQR` trong request được BE ký; `VNBANK` dành cho thẻ ATM/tài khoản nội địa. Có thể tận dụng cùng chứng từ và callback, chưa cần thêm payment method DB chỉ để tách ô giao diện. Đây là đề xuất, chưa triển khai/kiểm nhánh QR của merchant. Nếu Owner muốn VietQR chuyển thẳng vào tài khoản cá nhân, đó là tích hợp xác nhận chuyển khoản riêng, không dùng IPN VNPay; so sánh và phần cần chốt tại [phân tích lựa chọn QR](phan-tich-project.md#vnpay-demo-review).
+
+**Đề xuất QR hiện hành sau khi Owner giao chọn phương án:** thêm VietQR + **SePay Webhooks**, giữ Cash/VNPay. Provider có tài liệu QR kèm webhook và Test Mode mô phỏng giao dịch; SCMS chưa tích hợp, chưa có cấu hình SePay được nghiệm thu. Thiết kế, rule và cách nghiệm thu ở bản phân tích trên. Đây là sản phẩm Webhooks/Test Mode, không đồng nhất với bộ credential/API của SePay Bank Hub hoặc Cổng thanh toán; chưa tự mở quyền đăng ký, cấu hình, gửi webhook/test, query DB hoặc deploy.
+
 <a id="vnpay-diagnostics"></a>
 ### Chẩn đoán VNPay báo sai chữ ký — D10
 
 Không đổi thuật toán ký chỉ dựa vào ảnh lỗi. Đối chiếu source đúng `buildCommit` từ `/api/health`, cấu hình hiệu lực và URL thực tế trước. Không nhập HashSecret vào website kiểm hash, tham số dòng lệnh, chat hoặc báo cáo.
 
-**Nếu không có bộ thông tin VNPay cấp:** ảnh Environment chỉ chứng minh đã nhập giá trị, không chứng minh merchant/key thuộc cùng bộ hoặc còn hiệu lực. Tìm email của người đã đăng ký merchant trong nhóm với từ khóa `VNPAY`, `TmnCode`, `HashSecret`, `thông tin kết nối`, cả Spam. Nếu chưa từng đăng ký hoặc không khôi phục được, Owner tự đăng ký [merchant sandbox](https://sandbox.vnpayment.vn/devreg/) bằng email đang dùng và URL FE; tự đặt mật khẩu/nhập CAPTCHA. Theo [VNPay](https://sandbox.vnpayment.vn/apis/docs/thanh-toan-pay/pay.html), hệ thống gửi thông tin kết nối về email đăng ký. Thay cả mã và key trên Render bằng đúng bộ nhận được; không suy key từ TmnCode hoặc dùng ngẫu nhiên key trong tutorial. Cookie/login lỗi thì xử lý trước theo [hướng dẫn CORS/phiên](../SCMS-HUONG-DAN-CORS-DEMO-CLOUDFLARE.md).
+**Nếu không có bộ thông tin VNPay cấp:** ảnh Environment chỉ chứng minh đã nhập giá trị, không chứng minh merchant/key thuộc cùng bộ hoặc còn hiệu lực. Tìm email của người đã đăng ký merchant trong nhóm với từ khóa `VNPAY`, `TmnCode`, `HashSecret`, `thông tin kết nối`, cả Spam. Nếu chưa từng đăng ký hoặc không khôi phục được, Owner tự đăng ký [merchant sandbox](https://sandbox.vnpayment.vn/devreg/) bằng email đang dùng và URL FE; tự đặt mật khẩu/nhập CAPTCHA. Theo [VNPay](https://sandbox.vnpayment.vn/apis/docs/thanh-toan-pay/pay.html), hệ thống gửi thông tin kết nối về email đăng ký. Thay cả mã và key trên Render bằng đúng bộ nhận được; không suy key từ TmnCode hoặc dùng ngẫu nhiên key trong tutorial. Cookie/login lỗi thì xử lý trước theo [hướng dẫn CORS/phiên](archive/2026-11/SCMS-HUONG-DAN-CORS-DEMO-CLOUDFLARE.md).
 
 `note.md` có đoạn gọi cặp cấu hình cũ là “Sandbox chung”; đây không phải bằng chứng VNPay cấp cho nhóm. `.env` local cũng không chứng minh cặp nào đang hiệu lực ở gateway. Không thay cấu hình Render bằng cặp tìm được trong ghi chú chỉ vì nó khác cặp đang lỗi; cần nguồn cấp/email hoặc xác nhận từ VNPay. Không chép key từ các file này sang tài liệu/Git.
 
@@ -317,7 +560,7 @@ Nếu đọc được `Expired`, `paymentDate=null`, `gatewayTransactionRef=null
 **Sau khi bấm Hoàn thành ở Terminal:** mở lại đúng Terminal để kiểm IPN URL còn giữ nguyên, giao thức GET và HMACSHA512. Không cần deploy BE, chạy SQL hoặc đổi env cho thao tác lưu phía VNPay. Lượt sandbox sau cấu hình đã được Owner gửi response Paid và thấy FE cập nhật ngay; bằng chứng/giới hạn tại [Active](00-MASTER-CHECKLIST.md#active). Checklist dưới dành cho lần nghiệm thu được phép khác, không yêu cầu tạo thêm đơn để lặp ca đã thành công.
 
 1. Dùng tài khoản/fixture sandbox được phép, xác minh `/api/auth/me`200 và mở F12 → Network → Preserve log. Tạo đúng một đơn thử riêng, không thu lại hóa đơn cũ đang chờ đối soát. Ghi invoiceId/code và expiresAt.
-2. Thanh toán trên `sandbox.vnpayment.vn` bằng [thẻ thử NCB do VNPay công bố](https://sandbox.vnpayment.vn/apis/vnpay-demo/); không dùng app ngân hàng/thẻ thật. Hoàn tất trong thời gian giữ5phút.
+2. Thanh toán trên `sandbox.vnpayment.vn` bằng [thẻ thử NCB do VNPay công bố](https://sandbox.vnpayment.vn/apis/vnpay-demo/); không dùng app ngân hàng/thẻ thật. Hoàn tất trước expiresAt BE trả; hóa đơn mới tối đa30phút.
 3. Sau Return, đọc GET ownInvoice mới sau commit (hoặc tải lại danh sách), không dùng receipt trước Paid hay `status=00` làm kết quả. Cần paymentStatus=Paid, paymentDate/gatewayTransactionRef có giá trị; nếu xử lý muộn hoặc quyền không còn thì Paid+reconciliationRequired=true và không cấp lại quyền. Nếu còn Pending, chờ15–30giây và GET lại một lần, giữ nguyên đơn khi chẩn đoán.
 4. IPN là server→server, không có request IPN trong DevTools FE. Pending/Expired chưa chứng minh IPN không tới; cần kiểm provider delivery/HTTP/RspCode nếu chưa Paid. QueryDR vẫn có thể timeout độc lập; không sửa chữ ký/env hoặc thêm relay chỉ vì status cũ chưa đổi. Cấu hình mới không bảo đảm gateway gửi lại giao dịch cũ. GET hiện trạng các đơn cũ không tạo thanh toán mới.
 
@@ -351,7 +594,7 @@ Mọi relay chỉ chuyển tiếp request đã ký tới đích VNPay cố đị
    | `VNPAY_QUERY_IP_ADDR` | Để trống hoặc không thêm; BE tự lấy IP host |
 
 3. Tạo đúng một đơn VNPay mới sau deploy, thanh toán bằng thẻ thử NCB. Khi quay về, FE cần POST `verify-vnpay` cho đúng `invoiceId`, rồi GET lại hóa đơn. Chỉ tải lại GET sẽ không tự chạy QueryDR. Nếu FE chưa tích hợp, dùng Console theo đoạn dưới.
-4. Xem `verificationStatus`, `invoice.paymentStatus` và `reconciliationRequired`. `VERIFIED_PAID`/`ALREADY_PAID` mới xác nhận BE đã ghi nhận tiền. Lỗi/chưa xác minh được thì kiểm tra cùng đơn, không thanh toán thêm. Nếu xử lý đã tới/quá hạn5phút, Paid đi kèm đối soát và không cấp lại quyền học.
+4. Xem `verificationStatus`, `invoice.paymentStatus` và `reconciliationRequired`. `VERIFIED_PAID`/`ALREADY_PAID` mới xác nhận BE đã ghi nhận tiền. Lỗi/chưa xác minh được thì kiểm tra cùng đơn, không thanh toán thêm. Nếu xử lý đã tới/quá expiresAt, Paid đi kèm đối soát và không cấp lại quyền học.
 
 `SETTLEMENT_ENABLED=false` là **tùy chọn chỉ kiểm tra**, trả `VERIFIED_ONLY` khi VNPay xác nhận nhưng không ghi Paid. Không bắt buộc phải đi qua chế độ này trước khi bật true cho demo sandbox. Dù true, BE vẫn kiểm chữ ký/merchant/reference/amount/type/status và chống lặp. Default hai cờ trong source vẫn false. Giữ nguyên cặp merchant/key đang tạo được link pay; `VNPAY_RETURN_URL` là BE Return, `FRONTEND_PAYMENT_RESULT_URL` là trang hóa đơn Pages.
 
@@ -368,7 +611,7 @@ const result = await fetch(api + "/api/members/me/invoices/" + id + "/verify-vnp
 console.log("HTTP", result.status, JSON.stringify(await result.json(), null, 2));
 ```
 
-Chờ `retryAfterSeconds` trước khi chạy lại. Không lấy `status=00` trên URL làm chứng từ. `ATTEMPT_MISSING` là đơn cũ thiếu metadata gốc; cần đối soát riêng. Nếu `QUERY_UNAVAILABLE`, xem log Render dòng `VNPay QueryDR invoice=... attempt=... reason=...`; chỉ chia sẻ lý do cố định, không gửi key/cookie. Contract/status đầy đủ tại [docs01](01-API-CONTRACT-FE-BE.md#payments), bàn giao VNPay ngày04/11 tại [đây](../SCMS-BAN-GIAO-FE-VNPAY-2026-11-04.md).
+Chờ `retryAfterSeconds` trước khi chạy lại. Không lấy `status=00` trên URL làm chứng từ. `ATTEMPT_MISSING` là đơn cũ thiếu metadata gốc; cần đối soát riêng. Nếu `QUERY_UNAVAILABLE`, xem log Render dòng `VNPay QueryDR invoice=... attempt=... reason=...`; chỉ chia sẻ lý do cố định, không gửi key/cookie. Contract/status đầy đủ tại [docs01](01-API-CONTRACT-FE-BE.md#payments), bàn giao VNPay ngày04/11 tại [đây](reference/SCMS-BAN-GIAO-FE-VNPAY-2026-11-04.md).
 
 **Nếu lỗi TLS/chứng chỉ Java:** có thể thử thêm Environment `JAVA_TOOL_OPTIONS=-Dcom.sun.security.enableAIAcaIssuers=true`, giữ các tùy chọn đã có nếu biến tồn tại, rồi Save/redeploy và kiểm lại **cùng đơn**. Java sẽ tìm chứng chỉ CA trung gian để dựng chuỗi tin cậy, vẫn xác minh TLS/hostname ([Oracle PKIX](https://docs.oracle.com/en/java/javase/17/security/java-pki-programmers-guide.html)). Lựa chọn này đã giúp probe HTTPS Java cục bộ kết nối được VNPay; chưa tự chứng minh nguyên nhân trên Render. Không đổi secret hoặc tạo thêm thanh toán để thử.
 
@@ -396,7 +639,7 @@ Bản vá log transport mới phân biệt `CONNECT_TIMEOUT`, `REQUEST_TIMEOUT`,
 
 **Response:** kiểm HMAC-SHA512 theo thứ tự `ResponseId,Command,ResponseCode,Message,TmnCode,TxnRef,Amount,BankCode,PayDate,TransactionNo,TransactionType,TransactionStatus,OrderInfo,PromotionCode,PromotionAmount`; so sánh constant-time, giữ nguyên giá trị, tùy chọn thiếu là rỗng đúng vị trí. ResponseId không là RequestId. Chỉ ghi thành công nếu chữ ký hợp lệ, merchant khớp attempt/cấu hình, TxnRef đúng invoiceCode, Amount đúng số nguyên Invoice.amount×100 và snapshot, loại01, responseCode00/status00, TransactionNo hợp lệ/chưa gắn invoice khác. Lỗi/timeout/thiếu hash/chưa có kết quả không ghi Paid và không chứng minh khách chưa trả.
 
-**Khóa/giới hạn:** mặc định connect3giây/request5giây, có cấu hình giới hạn tại mục kiểm mạng; tối đa3attempt/lượt, luân phiên để không bỏ link cũ; cooldown30giây/hóa đơn bằng DB lock. HTTP chạy ngoài transaction giữ khóa. Khi ghi, kiểm lại owner/role/center/amount/state dưới khóa center→invoice. IPN tới trước thì trả state hiện hành, không cấp thêm credit/thông báo. Biên5phút theo Clock lúc xử lý, không dùng PayDate bỏ cutoff: tới/quá hạn hoặc quyền không còn thì Paid+reconciliationRequired, không hồi sinh quyền. Đơn cũ thiếu metadata trả `ATTEMPT_MISSING`; deploy không tự sửa invoice20/22 đã báo trước đây.
+**Khóa/giới hạn:** mặc định connect3giây/request5giây, có cấu hình giới hạn tại mục kiểm mạng; tối đa3attempt/lượt, luân phiên để không bỏ link cũ; cooldown30giây/hóa đơn bằng DB lock. HTTP chạy ngoài transaction giữ khóa. Khi ghi, kiểm lại owner/role/center/amount/state dưới khóa center→invoice. IPN tới trước thì trả state hiện hành, không cấp thêm credit/thông báo. Biên expiresAt của từng hóa đơn theo Clock lúc xử lý, không dùng PayDate bỏ cutoff: tới/quá hạn hoặc quyền không còn thì Paid+reconciliationRequired, không hồi sinh quyền. Đơn cũ thiếu metadata trả `ATTEMPT_MISSING`; deploy không tự sửa invoice20/22 đã báo trước đây.
 
 **Kiểm local:** chạy `python scripts/test-querydr-migration.py`, rồi `python scripts/test-querydr-local.py`. Migration runner chỉ dùng PostgreSQL Docker loopback55440 và DB tạm `scms_querydr_*`. BE runner tạo bản sao source không có.env, chạy `./mvnw.cmd clean test` rồi HTTP PostgreSQL `ddl-auto=none` trên DB behavior đã migration. Kết quả ở `artifacts/runs/querydr/validation.json`, tổng hợp vào QA duy nhất. Provider là HTTP giả lập cục bộ, không là VNPay live. Có kiểm chữ ký độc lập, sai merchant/ref/amount, timeout, owner/role/center, retry/IPN race, cutoff,12credit/thông báo không trùng và state sau commit. Các lần kiểm local không thay thế kiểm QueryDR có phiên trên Render; trạng thái hiện hành xem docs00.
 
@@ -439,6 +682,36 @@ cho giao dịch này sau khi khắc phục nếu được hỗ trợ.
 Giữ HMAC-SHA512 và encoding nhất quán cho URL/chuỗi ký theo [VNPay 2.1](https://sandbox.vnpayment.vn/apis/docs/thanh-toan-pay/pay.html); không thay IPv6 hợp lệ thành localhost chỉ vì có dấu `:`. Kiểm local không thay giao dịch sandbox được gateway chấp nhận, IPN và trạng thái sau commit. Bằng chứng hiện hành xem docs00/QA, không ghi key hoặc URL giao dịch thật vào Git.
 
 ## 4. Bundle và backup
+
+<a id="demo-snapshot-recovery"></a>
+### Mốc demo, snapshot và khôi phục — 14/11/2026
+
+**Không cần sinh/reset DB mỗi ngày để dùng FE.** Anchor là ngày cài bộ fixture tương đối, không phải ngày hết hạn của database. Sau cài, dữ liệu tiếp tục vận hành theo Clock thật; từng đơn/lịch/quyền có thể hết hạn đúng nghiệp vụ. Guard ngày ngăn cài nhầm bundle cũ, không yêu cầu cài lại hằng ngày.
+
+| Mục đích | Cách dùng | Giới hạn |
+|---|---|---|
+| Xem UI, đọc lịch sử/filter/quyền | Giữ DB hiện tại, đọc state thực tế rồi chọn ca | Không reset để dữ liệu trông giống SYSTEM-DATA |
+| Code phát hành lỗi | Forward revert code và smoke đúng SHA/DB | Rollback code không tự phục hồi dữ liệu; không mặc định rollback DB cùng code |
+| Quay về trạng thái đã lưu | Restore **snapshot thật** đã kiểm vào DB local mới trước | Ngày/state vẫn là mốc cũ; restore ngày khác không làm buổi cũ thành buổi hôm nay |
+| Demo mới cần Pending/còn suất/đúng giờ attendance hoặc PATCH | Chuẩn bị fixture đích theo luồng/thời gian thực; chỉ sinh bộ mới nếu cần dựng lại toàn bộ | Không dời hàng loạt Paid/receipt/attendance/audit, đổi Clock runtime hoặc bỏ guard |
+
+**Mốc nên có:** một `SCMS_DEMO_BASE` sau khi đối chiếu danh mục, quyền và state demo. Mốc gồm archive DB mã hóa riêng và manifest không secret: thời điểm VN, fingerprint DB, code/schema tương thích, phạm vi bảng, hash archive, danh mục bắt buộc, digest/count từng bảng và sequence. Snapshot là dữ liệu thực tế; bundle sinh từ thiết kế là nguồn khác. Prompt chỉ hướng dẫn dùng mốc, không thay archive chứa dữ liệu đã phát sinh.
+
+1. **Chốt mốc/phạm vi:** đọc runtime/DB; kiểm holidays all/active và khóa môn/phòng, không chỉ HTTP200/count. Chốt bảng/sequence/function/trigger SCMS cần giữ; có bảng ngoài SCMS trong `public` thì phải tách phạm vi, không restore-clean toàn `public` trên Supabase.
+2. **Xuất và bảo vệ:** logical archive tương thích PostgreSQL, giữ cấu trúc/dữ liệu/sequence; mã hóa ngoài Git. `pg_dump` tạo bản sao nhất quán khi DB vẫn được truy cập ([PostgreSQL](https://www.postgresql.org/docs/17/app-pgdump.html)); chọn mốc ít thao tác để kịch bản dễ hiểu. Không xuất credential/hash/cookie/receiver/chứng từ vào tài liệu. DPAPI cần môi trường giải mã tương ứng; chuyển máy cần cách mã hóa/giải mã riêng đã kiểm.
+3. **Restore local mới:** không đè DB đang dùng; so manifest/digest/FK/sequence, lễ, quyền/tiền/state. Sau đó login/auth-me và readback qua BE local không cấu hình provider thật. Archive chưa restore thử không được ghi sẵn sàng. Ghi tên mốc, vị trí private archive, manifest, kết quả local và ca phụ thuộc giờ ở QA/Active.
+4. **Nếu cần restore cloud:** mở riêng đúng archive/target/phạm vi Owner yêu cầu, lưu trạng thái hiện tại trước khi thay và nói rõ thao tác sau mốc sẽ mất. Kiểm code/schema; không đụng `auth`/`storage`/hạ tầng. Giữ mã hóa đơn không giảm/tái dùng, xử lý phiên/link thanh toán cũ; restore DB không hoàn tác chuyển khoản/provider ngoài SCMS. Chuẩn bị mốc không tự mở quyền thực thi cloud.
+5. **Sau restore:** kiểm fingerprint, dữ liệu/sequence, auth-me theo role và ca thực tế. Fixture thời gian đã cũ thì ghi ca không còn chạy được, chọn/chuẩn bị ca đích; không sửa lịch sử hoặc dùng tên mốc/count cũ thay bằng chứng.
+
+Backup DB Supabase chỉ giữ metadata của Storage, không giữ file object ([Supabase](https://supabase.com/docs/guides/platform/backups)). Chứng từ BYTEA trong DB khác file ngoài DB; xác định cách app lưu trước khi nhận snapshot là đủ.
+
+**Đã có/chưa có:** `scripts/prepare-production-upgrade.py --restore-backup <private-backup-path>` giải mã backup trong `artifacts/private-backups/` và restore DB local mới; nhánh này thoát trước `.env`/remote. Chế độ `--target-fingerprint` còn gắn migration cũ, **không phải lệnh snapshot demo thuần** để chạy tùy ý. Chưa có lệnh restore cloud tổng quát được kiểm cho mốc hiện tại. Lượt14/11 này mới soạn quy trình/prompt; chưa tạo archive mới hoặc restore local/cloud.
+
+Prompt tiếp tục:
+
+> Tiếp tục tại D:\Projects\SWP391. Mục tiêu: chuẩn bị SCMS_DEMO_BASE từ DB demo hiện tại và chứng minh restore PostgreSQL local mới. Đọc AGENTS, Active, database/README và mục demo-snapshot-recovery. Chỉ mở đọc/export SCMS của đúng DB đã xác nhận và ghi DB local mới; chưa cho restore/reset/migration/seed cloud. Chốt fingerprint/phạm vi/code/schema, không chạy chế độ migration cũ để lấy backup. Archive mã hóa/private, manifest không secret; kiểm holidays all/active, môn/phòng và state thực tế, không áp quota/lịch bundle cũ. Restore local, so dữ liệu/FK/sequence/quyền/tiền, login/auth-me/readback; giữ mã hóa đơn/lịch sử, không đổi Clock hoặc dời Paid/attendance/audit. Báo mốc, vị trí file private, phần đã kiểm, ca phụ thuộc giờ và phần thiếu trước restore cloud. Không đưa credential/dump/chứng từ vào Git/câu trả lời.
+
+### Backup/upgrade lịch sử — không phải mốc demo hiện hành
 
 QA giữ target production188f6765… khác DB test1a3dfdd7…. Production có dữ liệu đã nâng cấp bằng [production-upgrade.sql](../artifacts/releases/2026-10-27/production-upgrade.sql), SHA256 **01e31ca6a8606b47d321fd61a6860076c68317d3490f3b529cf42414a80db8d7**. Đây là bundle đã chạy, replay guard từ chối; không phải việc cần chạy lại. Execution/postflight/backup metadata ở `artifacts/qa/latest.json →releases.production`. Giữ cột gốc7bảng, không backfill legacy từ amount hoặc cấp lại12credit.
 

@@ -1,0 +1,561 @@
+{
+  "fixtureVersion": "demo-20261119-v4",
+  "anchorDate": "2026-11-19",
+  "timeZone": "Asia/Ho_Chi_Minh",
+  "plannedDemoAt": "2026-11-19T20:00:00+07:00",
+  "plannedDemoUntil": "2026-11-19T23:59:59+07:00",
+  "mainPaths": {
+    "normal": {
+      "operation": "Create Normal during demo; min=max=1, buy Cash, confirm, initial attendance",
+      "subject": "BAD",
+      "coach": "BAD-A",
+      "member": "M14",
+      "room": "C01-BAD-01",
+      "daysOfWeek": [
+        1,
+        3,
+        5
+      ],
+      "startDate": "2026-11-27",
+      "sessions": [
+        {
+          "date": "2026-11-27",
+          "start": "06:00",
+          "end": "07:30",
+          "coach": "BAD-A",
+          "member": "M14",
+          "room": "C01-BAD-01"
+        },
+        {
+          "date": "2026-11-30",
+          "start": "06:00",
+          "end": "07:30",
+          "coach": "BAD-A",
+          "member": "M14",
+          "room": "C01-BAD-01"
+        },
+        {
+          "date": "2026-12-02",
+          "start": "06:00",
+          "end": "07:30",
+          "coach": "BAD-A",
+          "member": "M14",
+          "room": "C01-BAD-01"
+        },
+        {
+          "date": "2026-12-04",
+          "start": "06:00",
+          "end": "07:30",
+          "coach": "BAD-A",
+          "member": "M14",
+          "room": "C01-BAD-01"
+        },
+        {
+          "date": "2026-12-07",
+          "start": "06:00",
+          "end": "07:30",
+          "coach": "BAD-A",
+          "member": "M14",
+          "room": "C01-BAD-01"
+        },
+        {
+          "date": "2026-12-09",
+          "start": "06:00",
+          "end": "07:30",
+          "coach": "BAD-A",
+          "member": "M14",
+          "room": "C01-BAD-01"
+        },
+        {
+          "date": "2026-12-11",
+          "start": "06:00",
+          "end": "07:30",
+          "coach": "BAD-A",
+          "member": "M14",
+          "room": "C01-BAD-01"
+        },
+        {
+          "date": "2026-12-14",
+          "start": "06:00",
+          "end": "07:30",
+          "coach": "BAD-A",
+          "member": "M14",
+          "room": "C01-BAD-01"
+        },
+        {
+          "date": "2026-12-16",
+          "start": "06:00",
+          "end": "07:30",
+          "coach": "BAD-A",
+          "member": "M14",
+          "room": "C01-BAD-01"
+        },
+        {
+          "date": "2026-12-18",
+          "start": "06:00",
+          "end": "07:30",
+          "coach": "BAD-A",
+          "member": "M14",
+          "room": "C01-BAD-01"
+        },
+        {
+          "date": "2026-12-21",
+          "start": "06:00",
+          "end": "07:30",
+          "coach": "BAD-A",
+          "member": "M14",
+          "room": "C01-BAD-01"
+        },
+        {
+          "date": "2026-12-23",
+          "start": "06:00",
+          "end": "07:30",
+          "coach": "BAD-A",
+          "member": "M14",
+          "room": "C01-BAD-01"
+        }
+      ]
+    },
+    "advanced": {
+      "operation": "AR01 Requested: Coach accepts during demo; Member orders, Cash Paid, proposal and Member Accept",
+      "registration": "AR01",
+      "subject": "SWIM",
+      "session": {
+        "date": "2026-11-24",
+        "start": "06:00",
+        "end": "07:30",
+        "coach": "SWIM-A",
+        "member": "M14",
+        "room": "C01-SWIM-01"
+      }
+    },
+    "refund": {
+      "session": "SUB01-S01",
+      "subscription": "SUB01",
+      "proposal": "DEMO-CANCEL-SUB01",
+      "beforeCredit": 11,
+      "afterCredit": 12,
+      "expiryUnchanged": true,
+      "schedule": {
+        "key": "SUB01-S01",
+        "sports_class": "A-AR04",
+        "date": "2026-11-24",
+        "start": "06:00",
+        "end": "07:30",
+        "coach": "TEN-A",
+        "member": "M02",
+        "room": "C01-TEN-01",
+        "status": "Scheduled",
+        "finalized": false,
+        "review_pending": false,
+        "center_invalidated": false,
+        "makeup_for": null,
+        "subscription": "SUB01",
+        "agreement_confirmed_at": "2026-11-19T00:00",
+        "created_by": "TEN-A"
+      }
+    },
+    "sunday": {
+      "operation": "Optional separate proposal/Accept on Sunday; check availability again",
+      "session": {
+        "date": "2026-11-29",
+        "start": "06:00",
+        "end": "07:30",
+        "coach": "SWIM-A",
+        "member": "M14",
+        "room": "C01-SWIM-01"
+      }
+    },
+    "limits": {
+      "normalRegistration": "2026-11-25T06:00:00+07:00",
+      "normalOpening": "2026-11-27T06:00:00+07:00",
+      "advancedAcceptInclusive": "2026-11-23T18:00:00+07:00",
+      "refundCancellationInclusive": "2026-11-23T18:00:00+07:00"
+    },
+    "windowChecks": [
+      {
+        "at": "2026-11-19T20:00:00+07:00",
+        "status": "PASS"
+      },
+      {
+        "at": "2026-11-19T23:59:59+07:00",
+        "status": "PASS"
+      }
+    ],
+    "relativeDeadlines": "New invoice<=30min; issued attendance code300seconds; Advanced order<acceptedAt+24h; rights45days from valid Paid. Issue during demo; do not extend."
+  },
+  "dataState": "EXPECTED_FRESH_FIXTURE_NOT_CLOUD_STATE",
+  "note": "Availability describes time only; recheck runtime actor/state/version/seat before writing. FE suggestions require FE review.",
+  "actors": [
+    {
+      "key": "ADM",
+      "name": "Admin Account",
+      "role": "Admin",
+      "status": "Active"
+    },
+    {
+      "key": "M01",
+      "name": "Nguyễn Minh An",
+      "role": "Member",
+      "status": "Active"
+    },
+    {
+      "key": "M02",
+      "name": "Trần Bảo Linh",
+      "role": "Member",
+      "status": "Active"
+    },
+    {
+      "key": "M03",
+      "name": "Lê Gia Huy",
+      "role": "Member",
+      "status": "Active"
+    },
+    {
+      "key": "M04",
+      "name": "Phạm Ngọc Mai",
+      "role": "Member",
+      "status": "Active"
+    },
+    {
+      "key": "PICK-A",
+      "name": "Võ Thanh Long",
+      "role": "Coach",
+      "status": "Active"
+    },
+    {
+      "key": "PICK-B",
+      "name": "Phạm Thị Lan",
+      "role": "Coach",
+      "status": "Active"
+    },
+    {
+      "key": "BAD-A",
+      "name": "Võ Minh Đức",
+      "role": "Coach",
+      "status": "Active"
+    },
+    {
+      "key": "R1",
+      "name": "Nguyễn Thị Ngọc Anh",
+      "role": "Receptionist",
+      "status": "Active"
+    },
+    {
+      "key": "CM1",
+      "name": "Nguyễn Thành Đạt",
+      "role": "CenterManager",
+      "status": "Active"
+    },
+    {
+      "key": "M14",
+      "name": "Member Demo14",
+      "role": "Member",
+      "status": "Active"
+    },
+    {
+      "key": "M15",
+      "name": "Member Demo15",
+      "role": "Member",
+      "status": "Active"
+    }
+  ],
+  "classes": [
+    {
+      "classKey": "N01",
+      "name": "Cầu lông Normal N01",
+      "state": "Open",
+      "firstSession": "2026-11-27T09:30:00+07:00",
+      "registrationClosesAt": "2026-11-25T09:30:00+07:00",
+      "confirmationReasonRequiredFrom": "2026-11-26T09:30:00+07:00",
+      "minCapacity": 3,
+      "maxCapacity": 4,
+      "paidRegisteredBeforeDemo": 1
+    },
+    {
+      "classKey": "N02",
+      "name": "Tennis Normal N02",
+      "state": "Open",
+      "firstSession": "2026-11-20T06:00:00+07:00",
+      "registrationClosesAt": "2026-11-18T06:00:00+07:00",
+      "confirmationReasonRequiredFrom": "2026-11-19T06:00:00+07:00",
+      "minCapacity": 3,
+      "maxCapacity": 4,
+      "paidRegisteredBeforeDemo": 3
+    },
+    {
+      "classKey": "N03",
+      "name": "Bơi lội Normal N03",
+      "state": "Open",
+      "firstSession": "2026-11-21T06:00:00+07:00",
+      "registrationClosesAt": "2026-11-19T06:00:00+07:00",
+      "confirmationReasonRequiredFrom": "2026-11-20T06:00:00+07:00",
+      "minCapacity": 7,
+      "maxCapacity": 10,
+      "paidRegisteredBeforeDemo": 6
+    },
+    {
+      "classKey": "N04",
+      "name": "Bắn cung Normal N04",
+      "state": "Open",
+      "firstSession": "2026-11-27T07:45:00+07:00",
+      "registrationClosesAt": "2026-11-25T07:45:00+07:00",
+      "confirmationReasonRequiredFrom": "2026-11-26T07:45:00+07:00",
+      "minCapacity": 4,
+      "maxCapacity": 5,
+      "paidRegisteredBeforeDemo": 3
+    },
+    {
+      "classKey": "N05",
+      "name": "Pickleball Normal N05",
+      "state": "Open",
+      "firstSession": "2026-11-26T09:30:00+07:00",
+      "registrationClosesAt": "2026-11-24T09:30:00+07:00",
+      "confirmationReasonRequiredFrom": "2026-11-25T09:30:00+07:00",
+      "minCapacity": 3,
+      "maxCapacity": 4,
+      "paidRegisteredBeforeDemo": 2
+    },
+    {
+      "classKey": "N06",
+      "name": "Bóng rổ Normal N06",
+      "state": "Cancelled",
+      "firstSession": "2026-11-27T13:00:00+07:00",
+      "registrationClosesAt": "2026-11-25T13:00:00+07:00",
+      "confirmationReasonRequiredFrom": "2026-11-26T13:00:00+07:00",
+      "minCapacity": 6,
+      "maxCapacity": 8,
+      "paidRegisteredBeforeDemo": 0
+    },
+    {
+      "classKey": "N07",
+      "name": "Bóng đá Normal N07",
+      "state": "Open",
+      "firstSession": "2026-11-28T07:45:00+07:00",
+      "registrationClosesAt": "2026-11-26T07:45:00+07:00",
+      "confirmationReasonRequiredFrom": "2026-11-27T07:45:00+07:00",
+      "minCapacity": 10,
+      "maxCapacity": 15,
+      "paidRegisteredBeforeDemo": 14
+    },
+    {
+      "classKey": "N08",
+      "name": "Bóng chuyền Normal N08",
+      "state": "Ongoing",
+      "firstSession": "2026-11-10T13:00:00+07:00",
+      "registrationClosesAt": "2026-11-08T13:00:00+07:00",
+      "confirmationReasonRequiredFrom": "2026-11-09T13:00:00+07:00",
+      "minCapacity": 6,
+      "maxCapacity": 8,
+      "paidRegisteredBeforeDemo": 6
+    },
+    {
+      "classKey": "N09",
+      "name": "Bóng bàn Normal N09",
+      "state": "Closed",
+      "firstSession": "2026-09-30T14:45:00+07:00",
+      "registrationClosesAt": "2026-09-28T14:45:00+07:00",
+      "confirmationReasonRequiredFrom": "2026-09-29T14:45:00+07:00",
+      "minCapacity": 2,
+      "maxCapacity": 2,
+      "paidRegisteredBeforeDemo": 0
+    },
+    {
+      "classKey": "N10",
+      "name": "Cầu lông Normal N10",
+      "state": "Ongoing",
+      "firstSession": "2026-10-31T14:45:00+07:00",
+      "registrationClosesAt": "2026-10-29T14:45:00+07:00",
+      "confirmationReasonRequiredFrom": "2026-10-30T14:45:00+07:00",
+      "minCapacity": 3,
+      "maxCapacity": 4,
+      "paidRegisteredBeforeDemo": 3
+    },
+    {
+      "classKey": "N11",
+      "name": "Pickleball Normal N11",
+      "state": "Open",
+      "firstSession": "2026-11-27T16:30:00+07:00",
+      "registrationClosesAt": "2026-11-25T16:30:00+07:00",
+      "confirmationReasonRequiredFrom": "2026-11-26T16:30:00+07:00",
+      "minCapacity": 3,
+      "maxCapacity": 4,
+      "paidRegisteredBeforeDemo": 3
+    },
+    {
+      "classKey": "N12",
+      "name": "Cầu lông Normal N12",
+      "state": "Cancelled",
+      "firstSession": "2026-10-31T16:30:00+07:00",
+      "registrationClosesAt": "2026-10-29T16:30:00+07:00",
+      "confirmationReasonRequiredFrom": "2026-10-30T16:30:00+07:00",
+      "minCapacity": 3,
+      "maxCapacity": 4,
+      "paidRegisteredBeforeDemo": 0
+    }
+  ],
+  "cases": [
+    {
+      "case": "DEMO-01_READ_SCOPE",
+      "actors": [
+        "ADM",
+        "CM1",
+        "R1",
+        "PICK-A",
+        "M02"
+      ],
+      "fixtures": [
+        "catalog",
+        "roster",
+        "refunds"
+      ],
+      "availability": "AVAILABLE",
+      "executionStatus": "NOT_RUN",
+      "availableFromInclusive": null,
+      "availableUntilExclusive": null,
+      "expected": "Fresh login/auth-me; owner/assignment/financial scope checks"
+    },
+    {
+      "case": "DEMO-02_CASH_N01",
+      "actors": [
+        "R1",
+        "M14",
+        "M15"
+      ],
+      "fixtures": [
+        "N01"
+      ],
+      "availability": "AVAILABLE",
+      "executionStatus": "NOT_RUN",
+      "availableFromInclusive": null,
+      "availableUntilExclusive": "2026-11-25T09:30:00+07:00",
+      "expected": "Two counter Cash payments900000; Paid+Registered; retry creates no invoice/right"
+    },
+    {
+      "case": "DEMO-03_CONFIRM_N01",
+      "actors": [
+        "CM1"
+      ],
+      "fixtures": [
+        "N01",
+        "DEMO-02_CASH_N01"
+      ],
+      "availability": "AVAILABLE",
+      "executionStatus": "NOT_RUN",
+      "availableFromInclusive": null,
+      "availableUntilExclusive": "2026-11-27T09:30:00+07:00",
+      "expected": "After Cash: Paid Registered3, minimum3; persist confirmation once"
+    },
+    {
+      "case": "DEMO-04_CUTOFF_N02",
+      "actors": [
+        "R1",
+        "M14"
+      ],
+      "fixtures": [
+        "N02"
+      ],
+      "availability": "AVAILABLE",
+      "executionStatus": "NOT_RUN",
+      "availableFromInclusive": "2026-11-18T06:00:00+07:00",
+      "availableUntilExclusive": "2026-11-20T06:00:00+07:00",
+      "expected": "Registration denied NORMAL_REGISTRATION_CLOSED; no Invoice/enrollment"
+    },
+    {
+      "case": "DEMO-05_LATE_CONFIRM_N02",
+      "actors": [
+        "CM1"
+      ],
+      "fixtures": [
+        "N02"
+      ],
+      "availability": "AVAILABLE",
+      "executionStatus": "NOT_RUN",
+      "availableFromInclusive": "2026-11-19T06:00:00+07:00",
+      "availableUntilExclusive": "2026-11-20T06:00:00+07:00",
+      "expected": "Missing reason denied; DEMO reason permits confirmation if all conditions hold"
+    },
+    {
+      "case": "DEMO-06_INSUFFICIENT_N03",
+      "actors": [
+        "CM1"
+      ],
+      "fixtures": [
+        "N03"
+      ],
+      "availability": "AVAILABLE",
+      "executionStatus": "NOT_RUN",
+      "availableFromInclusive": null,
+      "availableUntilExclusive": "2026-11-21T06:00:00+07:00",
+      "expected": "Paid Registered6 below minimum7; confirmation denied"
+    },
+    {
+      "case": "DEMO-07_ONGOING_CANCEL_DENIED",
+      "actors": [
+        "CM1"
+      ],
+      "fixtures": [
+        "N08"
+      ],
+      "availability": "AVAILABLE",
+      "executionStatus": "NOT_RUN",
+      "availableFromInclusive": null,
+      "availableUntilExclusive": null,
+      "expected": "Ongoing cannot cancel-before-opening; state/history unchanged"
+    },
+    {
+      "case": "DEMO-08_TRANSFER",
+      "actors": [
+        "M01",
+        "M03",
+        "PICK-A",
+        "PICK-B"
+      ],
+      "fixtures": [
+        "N05",
+        "N11",
+        "EV-N05"
+      ],
+      "availability": "AVAILABLE",
+      "executionStatus": "NOT_RUN",
+      "availableFromInclusive": null,
+      "availableUntilExclusive": "2026-11-25T16:30:00+07:00",
+      "expected": "M01 Accept consumes last N11 seat; original Invoice preserved; M03 remains Waiting when full"
+    },
+    {
+      "case": "DEMO-09_REFUND_DEMO",
+      "actors": [
+        "M04",
+        "CM1",
+        "R1"
+      ],
+      "fixtures": [
+        "N06",
+        "RF02"
+      ],
+      "availability": "AVAILABLE",
+      "executionStatus": "NOT_RUN",
+      "availableFromInclusive": null,
+      "availableUntilExclusive": null,
+      "expected": "Existing obligation: receiver→verify→approve→claim→proof→independent DEMO verification; no real transfer"
+    },
+    {
+      "case": "DEMO-10_REPORT_RELOAD",
+      "actors": [
+        "CM1",
+        "M01",
+        "M04"
+      ],
+      "fixtures": [
+        "DEMO-02_CASH_N01",
+        "DEMO-08_TRANSFER",
+        "DEMO-09_REFUND_DEMO"
+      ],
+      "availability": "AVAILABLE",
+      "executionStatus": "NOT_RUN",
+      "availableFromInclusive": null,
+      "availableUntilExclusive": null,
+      "expected": "Reload persisted state and verify separate receipt/refund periods; upload alone is not Completed"
+    }
+  ]
+}

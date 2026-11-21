@@ -28,9 +28,13 @@ public record InvoiceResponse(
         String cashNote,
         String resolutionStatus,
         boolean cashConfirmationReversed,
-        Integer entitlementClassId
+        Integer entitlementClassId,
+        java.time.OffsetDateTime serverTime
 ) {
     public static InvoiceResponse from(Invoice invoice) {
+        return from(invoice,null);
+    }
+    public static InvoiceResponse from(Invoice invoice,java.time.Clock clock) {
         if (invoice == null) return null;
 
         Integer memberId = invoice.getMember() != null ? invoice.getMember().getId() : null;
@@ -67,7 +71,8 @@ public record InvoiceResponse(
                 invoice.getSportsClass() != null ? invoice.getSportsClass().getId() : null,
                 invoice.getSportsClass() != null ? invoice.getSportsClass().getName() : null,
                 invoice.isReconciliationRequired(),invoice.getCashNote(),invoice.getResolutionStatus(),invoice.isCashConfirmationReversed(),
-                invoice.effectiveClass()==null?null:invoice.effectiveClass().getId()
+                invoice.effectiveClass()==null?null:invoice.effectiveClass().getId(),
+                clock==null?null:com.sportscenter.training.SessionAttendancePolicy.now(clock).atZone(com.sportscenter.training.SessionAttendancePolicy.ZONE).toOffsetDateTime()
         );
     }
 }

@@ -1,0 +1,19 @@
+{
+  "anchorDate": "2026-11-21",
+  "timezone": "Asia/Ho_Chi_Minh",
+  "sqlExecution": "NOT_RUN_UNTIL_ANCHOR",
+  "httpBusiness": "NOT_RUN",
+  "systemData": "EXPECTED_DESIGN_NO_DB_IDS",
+  "ownerCopies": "schema_postgres.sql (whole file; fixture/migrations already embedded)",
+  "scope": "Rebuild only the explicit SCMS public whitelist; preserve auth/storage/extensions/unlisted objects; external dependencies refuse reset",
+  "sourceStage": "artifacts/runs/be-demo-20261119/bundle21",
+  "script": "../../../docs/reference/SCMS-SCRIPT-DEMO-BE.md#demo-bundles-20261119",
+  "evidence": "../../../artifacts/qa/latest.json#beDemoImplementation20261119",
+  "cloudSqlProviderFrontend": "NOT_RUN",
+  "sha256": {
+    "schema_postgres.sql": "f9f94542f20687563f3d39eb44bda310813cb6d86754bde65ed97743d4a6b6d7",
+    "scms_demo_scenarios.sql": "5be64e70e8559116514a3e11533e692f8d226ba0669ce6d7df8c42faefcf14e5",
+    "SYSTEM-DATA.md": "646c1c51a0de4fea8d0daed1b54017631f02eb05d5dee7dcf1ef9b41cfdc1732",
+    "demo-plan.json": "e2678307c2eda5df3131cce4c62deff0e43a32a038b4a3e32332a5efd3cc1fea"
+  }
+}
